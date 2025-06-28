@@ -134,15 +134,18 @@ export default function CarBrandModelSelector({
       const finalBrand = isBrandOther ? customBrand : selectedBrand
       const finalModel = isModelOther ? customModel : selectedModel
       
-      // Navigate to next page or show results
-      console.log('Submitting car details:', {
-        category: savedData.category,
-        description: savedData.description,
+      // Save final car details before navigation
+      saveFormData({
         brand: finalBrand,
-        model: finalModel
+        model: finalModel,
+        isBrandOther,
+        isModelOther,
+        customBrand,
+        customModel
       })
-      // For now, just log. Later you can navigate to results page
-      alert(`Αναζήτηση για ${finalBrand} ${finalModel} στην κατηγορία "${savedData.category}"`)
+      
+      // Navigate to the next step (car specifications or body work photos)
+      router.push('/car-specifications')
     }
   }
 

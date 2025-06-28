@@ -63,7 +63,7 @@ export default function CategorySelector({ selectedCategory, onCategorySelect }:
         >
           <option value="">Επιλέξτε...</option>
           <option value="service">Service</option>
-          <option value="fanopeia">Φανοποιεια</option>
+                        <option value="fanopeia">Φανοποιεία</option>
           <option value="oils">Λάδια</option>
           <option value="disk">Δίσκος</option>
         </select>

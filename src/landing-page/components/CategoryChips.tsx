@@ -10,7 +10,7 @@ interface CategoryChipsProps {
 export default function CategoryChips({ selectedCategory, onCategorySelect }: CategoryChipsProps) {
   const categories = [
     { value: 'service', label: 'Service' },
-    { value: 'fanopeia', label: 'Φανοποιεια' },
+    { value: 'fanopeia', label: 'Φανοποιεία' },
     { value: 'oils', label: 'Λάδια' },
     { value: 'disk', label: 'Δίσκος' },
   ]

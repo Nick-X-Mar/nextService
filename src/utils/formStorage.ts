@@ -9,6 +9,11 @@ export interface ServiceFormData {
   isModelOther: boolean
   customBrand: string
   customModel: string
+  // Car specifications (for service/general)
+  modelYear: string
+  engineCC: string
+  engineNumber: string
+  // Note: File objects are handled separately since they can't be serialized to localStorage
 }
 
 const STORAGE_KEY = 'nextservice-form-data'
@@ -42,7 +47,10 @@ export const loadFormData = (): ServiceFormData => {
     isBrandOther: false,
     isModelOther: false,
     customBrand: '',
-    customModel: ''
+    customModel: '',
+    modelYear: '',
+    engineCC: '',
+    engineNumber: ''
   }
 }
 
