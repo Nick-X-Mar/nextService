@@ -1,8 +1,9 @@
 import CarDetailsSection from './components/CarDetailsSection'
+import { styles } from '../../../styles/styles'
 
 export default function CarDetailsPage() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={styles.pageWrapper}>
       <CarDetailsSection />
     </div>
   )

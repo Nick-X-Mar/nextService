@@ -29,9 +29,9 @@ export default function CarSpecificationsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className={styles.pageCenter}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className={styles.loadingSpinner}></div>
           <p className={styles.bodyText}>Φόρτωση...</p>
         </div>
       </div>
@@ -41,7 +41,7 @@ export default function CarSpecificationsPage() {
       // Show body work photos form for φανοποιεία category
   if (savedData.category === 'fanopeia') {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className={styles.pageWrapper}>
         <BodyWorkPhotosForm savedData={savedData} />
       </div>
     )
@@ -49,7 +49,7 @@ export default function CarSpecificationsPage() {
 
   // Show car specs form for all other categories
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={styles.pageWrapper}>
       <CarSpecsForm savedData={savedData} />
     </div>
   )

@@ -30,6 +30,9 @@ export const styles = {
   container: "max-w-6xl mx-auto px-4 sm:px-6 lg:px-8",
   section: "py-16",
   sectionBg: "bg-gray-50",
+  pageWrapper: "min-h-screen bg-gray-50",
+  pageCenter: "min-h-screen bg-gray-50 flex items-center justify-center",
+  loadingSpinner: "animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4",
 
   // Navigation
   navLink: "text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2",
