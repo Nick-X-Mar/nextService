@@ -97,7 +97,7 @@ export default function CategorySelector({ selectedCategory, onCategorySelect }:
       <div className="mt-4 text-center">
         <a
           href="/register-professional"
-          className="inline-block text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200"
+                        className={`inline-block ${styles.linkText} font-medium transition-colors duration-200`}
         >
           Γίνε Επαγγελματίας →
         </a>

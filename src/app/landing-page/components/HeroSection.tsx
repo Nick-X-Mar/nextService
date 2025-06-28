@@ -13,7 +13,7 @@ export default function HeroSection() {
         <div className="text-center">
           <h1 className={styles.pageTitle}>
             Βρείτε τον καλύτερο
-            <span className="text-blue-600"> επαγγελματία</span>
+            <span className={styles.titleHighlight}> επαγγελματία</span>
           </h1>
           <p className={`mt-3 max-w-md mx-auto ${styles.bodyText} sm:text-lg md:mt-5 md:text-xl md:max-w-3xl`}>
             Η πλατφόρμα που συνδέει πελάτες με έμπειρους επαγγελματίες. 

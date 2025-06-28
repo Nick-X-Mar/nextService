@@ -241,7 +241,7 @@ export default function CarBrandModelSelector({
       <div className="mt-4 text-center space-y-2">
         <button
           onClick={() => router.back()}
-          className="inline-block text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200"
+          className={`inline-block ${styles.linkText} font-medium transition-colors duration-200`}
         >
           ← Επιστροφή
         </button>

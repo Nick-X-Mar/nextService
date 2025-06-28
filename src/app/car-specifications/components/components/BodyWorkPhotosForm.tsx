@@ -79,7 +79,7 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
       <div className={`${styles.container} py-24`}>
         <div className="text-center">
           <h1 className={styles.pageTitle}>
-            Φωτογραφίες <span className="text-blue-600">Ζημιάς</span>
+            Φωτογραφίες <span className={styles.titleHighlight}>Ζημιάς</span>
           </h1>
           <p className={`mt-3 max-w-md mx-auto ${styles.bodyText} sm:text-lg md:mt-5 md:text-xl md:max-w-3xl`}>
             Ανεβάστε 1-3 φωτογραφίες για να αξιολογήσουμε την εργασία που χρειάζεται
@@ -188,7 +188,7 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
             <div className="mt-4 text-center">
               <button
                 onClick={handleGoBack}
-                className="inline-block text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200"
+                className={`inline-block ${styles.linkText} font-medium transition-colors duration-200`}
               >
                 ← Επιστροφή
               </button>

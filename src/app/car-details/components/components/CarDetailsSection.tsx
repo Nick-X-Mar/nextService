@@ -27,7 +27,7 @@ export default function CarDetailsSection() {
       <div className={`${styles.container} py-24`}>
         <div className="text-center">
           <h1 className={styles.pageTitle}>
-            Στοιχεία <span className="text-blue-600">Αυτοκινήτου</span>
+            Στοιχεία <span className={styles.titleHighlight}>Αυτοκινήτου</span>
           </h1>
           <p className={`mt-3 max-w-md mx-auto ${styles.bodyText} sm:text-lg md:mt-5 md:text-xl md:max-w-3xl`}>
             Εισάγετε τα στοιχεία του αυτοκινήτου σας για να βρούμε τον κατάλληλο επαγγελματία
