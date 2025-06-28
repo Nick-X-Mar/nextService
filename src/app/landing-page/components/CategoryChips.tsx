@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react'
-import { styles } from '../../styles/styles'
-import { loadFormData } from '../../utils/formStorage'
+import { styles } from '../../../styles/styles'
 
 interface CategoryChipsProps {
   selectedCategory: string

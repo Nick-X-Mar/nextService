@@ -1,4 +1,4 @@
-import CarDetailsPage from '../../car-details/CarDetailsPage'
+import CarDetailsPage from './components/CarDetailsPage'
 
 export default function Page() {
   return <CarDetailsPage />

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import CategorySelector from './CategorySelector'
 import CategoryChips from './CategoryChips'
-import { styles } from '../../styles/styles'
+import { styles } from '../../../styles/styles'
 
 export default function HeroSection() {
   const [selectedCategory, setSelectedCategory] = useState('')

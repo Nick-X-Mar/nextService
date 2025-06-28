@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { HiMagnifyingGlass } from 'react-icons/hi2'
-import { styles } from '../../styles/styles'
-import { saveFormData, loadFormData } from '../../utils/formStorage'
+import { styles } from '../../../styles/styles'
+import { saveFormData, loadFormData } from '../../../utils/formStorage'
 
 interface CategorySelectorProps {
   selectedCategory: string

@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import CarSpecsForm from './components/CarSpecsForm'
 import BodyWorkPhotosForm from './components/BodyWorkPhotosForm'
-import { loadFormData } from '../utils/formStorage'
-import { styles } from '../styles/styles'
+import { loadFormData } from '../../../utils/formStorage'
+import { styles } from '../../../styles/styles'
 
 export default function CarSpecificationsPage() {
   const [savedData, setSavedData] = useState({ 

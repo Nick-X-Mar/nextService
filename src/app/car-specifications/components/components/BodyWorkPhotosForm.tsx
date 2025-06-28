@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { HiArrowRight, HiCloudArrowUp, HiPhoto, HiXMark } from 'react-icons/hi2'
-import { styles } from '../../styles/styles'
-import { saveFormData } from '../../utils/formStorage'
+import { HiArrowRight, HiCloudArrowUp, HiXMark } from 'react-icons/hi2'
+import { styles } from '../../../../styles/styles'
 
 interface BodyWorkPhotosFormProps {
   savedData: {

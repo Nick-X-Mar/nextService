@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import CarBrandModelSelector from './CarBrandModelSelector'
-import { styles } from '../../styles/styles'
-import { loadFormData } from '../../utils/formStorage'
+import { styles } from '../../../../styles/styles'
+import { loadFormData } from '../../../../utils/formStorage'
 
 export default function CarDetailsSection() {
   const router = useRouter()

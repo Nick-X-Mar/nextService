@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { HiArrowRight } from 'react-icons/hi2'
-import { styles } from '../../styles/styles'
-import { saveFormData, loadFormData } from '../../utils/formStorage'
+import { styles } from '../../../../styles/styles'
+import { saveFormData, loadFormData, clearFormData } from '../../../../utils/formStorage'
 
 interface CarBrandModelSelectorProps {
   selectedBrand: string
@@ -51,13 +51,11 @@ export default function CarBrandModelSelector({
   const [customBrand, setCustomBrand] = useState('')
   const [customModel, setCustomModel] = useState('')
   const [mounted, setMounted] = useState(false)
-  const [savedData, setSavedData] = useState({ category: '', description: '' })
 
   // Load saved data on component mount
   useEffect(() => {
     setMounted(true)
     const data = loadFormData()
-    setSavedData({ category: data.category, description: data.description })
     
     // Restore car selection state
     if (data.brand) {
@@ -251,7 +249,6 @@ export default function CarBrandModelSelector({
           <button
             onClick={() => {
               if (confirm('Θέλετε να διαγράψετε όλα τα στοιχεία της φόρμας;')) {
-                const { clearFormData } = require('../../utils/formStorage')
                 clearFormData()
                 window.location.href = '/'
               }

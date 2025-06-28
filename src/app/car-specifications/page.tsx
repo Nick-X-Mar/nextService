@@ -1,4 +1,4 @@
-import CarSpecificationsPage from '../../car-specifications/CarSpecificationsPage'
+import CarSpecificationsPage from './components/CarSpecificationsPage'
 
 export default function Page() {
   return <CarSpecificationsPage />
