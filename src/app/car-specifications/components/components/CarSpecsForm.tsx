@@ -125,30 +125,22 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
           <div className="mt-8 max-w-md mx-auto">
             <div className={styles.card}>
               {/* Fuel Type Switch */}
-              <div className="mb-4">
+              <div className={styles.fieldGroup}>
                 <label className={styles.label}>
                   Τύπος Καυσίμου:
                 </label>
-                <div className="flex gap-2 mt-2">
+                <div className={styles.toggleContainer}>
                   <button
                     type="button"
                     onClick={() => setFuelType('petrol')}
-                    className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      fuelType === 'petrol' 
-                        ? 'bg-orange-400 text-white' 
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                    className={fuelType === 'petrol' ? styles.toggleBtnActive : styles.toggleBtnInactive}
                   >
                     Βενζίνη
                   </button>
                   <button
                     type="button"
                     onClick={() => setFuelType('diesel')}
-                    className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      fuelType === 'diesel' 
-                        ? 'bg-orange-400 text-white' 
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                    className={fuelType === 'diesel' ? styles.toggleBtnActive : styles.toggleBtnInactive}
                   >
                     Πετρέλαιο
                   </button>
@@ -156,80 +148,72 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
               </div>
 
               {/* Automatic Transmission */}
-              <div className="mb-4">
-                <div className="flex items-center justify-between">
+              <div className={styles.fieldGroup}>
+                <div className={styles.switchContainer}>
                   <label className={styles.label}>
                     Αυτόματο Κιβώτιο:
                   </label>
                   <button
                     type="button"
                     onClick={() => setIsAutomatic(!isAutomatic)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      isAutomatic ? 'bg-blue-600' : 'bg-gray-200'
-                    }`}
+                    className={isAutomatic ? styles.switchActive : styles.switchInactive}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        isAutomatic ? 'translate-x-6' : 'translate-x-1'
-                      }`}
+                      className={isAutomatic ? styles.switchThumbActive : styles.switchThumbInactive}
                     />
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className={styles.switchDescription}>
                   {isAutomatic ? 'Αυτόματο κιβώτιο ταχυτήτων' : 'Χειροκίνητο κιβώτιο ταχυτήτων'}
                 </p>
               </div>
 
               {/* 4x4 Drive */}
-              <div className="mb-4">
-                <div className="flex items-center justify-between">
+              <div className={styles.fieldGroup}>
+                <div className={styles.switchContainer}>
                   <label className={styles.label}>
                     Τετρακίνηση (4x4):
                   </label>
                   <button
                     type="button"
                     onClick={() => setIs4x4(!is4x4)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      is4x4 ? 'bg-blue-600' : 'bg-gray-200'
-                    }`}
+                    className={is4x4 ? styles.switchActive : styles.switchInactive}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        is4x4 ? 'translate-x-6' : 'translate-x-1'
-                      }`}
+                      className={is4x4 ? styles.switchThumbActive : styles.switchThumbInactive}
                     />
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className={styles.switchDescription}>
                   {is4x4 ? 'Όχημα με τετρακίνηση' : 'Όχημα με δικίνηση'}
                 </p>
               </div>
 
               {/* Engine Number or License Photo */}
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-2">
+              <div className={styles.fieldGroup}>
+                <div className={styles.fieldLabelWithIcon}>
                   <label className={styles.label}>
                     Αριθμός Κινητήρα ή Φωτογραφία Άδειας:
                   </label>
                   <div className="relative">
                     <HiInformationCircle 
-                      className="h-4 w-4 text-orange-500 cursor-help"
+                      className={styles.infoIcon}
                       onMouseEnter={() => setShowEngineInfo(true)}
                       onMouseLeave={() => setShowEngineInfo(false)}
                     />
                     {showEngineInfo && (
-                      <div className="absolute top-6 left-0 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 w-64">
+                      <div className={styles.tooltip}>
                         <div className="text-left">
-                          <p className="text-sm font-medium text-gray-900 mb-2">Πού να βρείτε τον αριθμό κινητήρα:</p>
+                          <p className={styles.tooltipTitle}>Πού να βρείτε τον αριθμό κινητήρα:</p>
                           <img 
                             src="/images/engine-number-location.jpg" 
                             alt="Θέση αριθμού κινητήρα"
-                            className="w-full h-32 object-cover rounded mb-2"
+                            className={styles.tooltipImage}
                             onError={(e) => {
                               e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEyOCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NzM4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkVuZ2luZSBOdW1iZXIgTG9jYXRpb248L3RleHQ+PC9zdmc+'
                             }}
                           />
-                          <p className="text-xs text-gray-600">
+                          <p className={styles.tooltipText}>
                             Συνήθως βρίσκεται στο μπλοκ του κινητήρα ή στην άδεια κυκλοφορίας
                           </p>
                         </div>
@@ -238,24 +222,20 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                   </div>
                 </div>
                 
-                <div className="space-y-3">
+                <div className={styles.fieldContainer}>
                   {/* Toggle between text input and photo upload */}
-                  <div className="flex gap-2">
+                  <div className={styles.toggleContainer}>
                     <button
                       type="button"
                       onClick={() => setHasLicensePhoto(false)}
-                      className={`px-3 py-1 rounded text-sm ${
-                        !hasLicensePhoto ? styles.btnPrimary : styles.btnOutline
-                      }`}
+                      className={!hasLicensePhoto ? styles.toggleBtnActive : styles.toggleBtnInactive}
                     >
                       Αριθμός Κινητήρα
                     </button>
                     <button
                       type="button"
                       onClick={() => setHasLicensePhoto(true)}
-                      className={`px-3 py-1 rounded text-sm ${
-                        hasLicensePhoto ? styles.btnPrimary : styles.btnOutline
-                      }`}
+                      className={hasLicensePhoto ? styles.toggleBtnActive : styles.toggleBtnInactive}
                     >
                       Φωτογραφία Άδειας
                     </button>
@@ -270,7 +250,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                       className={styles.input}
                     />
                   ) : (
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
+                    <div className={styles.fileUploadArea}>
                       <input
                         type="file"
                         id="license-photo"
@@ -280,16 +260,16 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                       />
                       <label htmlFor="license-photo" className="cursor-pointer">
                         {licensePhoto ? (
-                          <div className="text-green-600">
-                            <HiPhoto className="h-8 w-8 mx-auto mb-2" />
-                            <p className="text-sm font-medium">{licensePhoto.name}</p>
-                            <p className="text-xs text-gray-500">Κάντε κλικ για αλλαγή</p>
+                          <div className={styles.fileUploadSelected}>
+                            <HiPhoto className={styles.fileUploadIcon} />
+                            <p className={styles.fileUploadText}>{licensePhoto.name}</p>
+                            <p className={styles.fileUploadSubtext}>Κάντε κλικ για αλλαγή</p>
                           </div>
                         ) : (
-                          <div className="text-gray-500">
-                            <HiCloudArrowUp className="h-8 w-8 mx-auto mb-2" />
-                            <p className="text-sm font-medium">Κάντε κλικ για ανέβασμα</p>
-                            <p className="text-xs">JPG, PNG μέχρι 10MB</p>
+                          <div className={styles.fileUploadPlaceholder}>
+                            <HiCloudArrowUp className={styles.fileUploadIcon} />
+                            <p className={styles.fileUploadText}>Κάντε κλικ για ανέβασμα</p>
+                            <p className={styles.fileUploadSubtext}>JPG, PNG μέχρι 10MB</p>
                           </div>
                         )}
                       </label>
@@ -299,30 +279,30 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
               </div>
 
               {/* VIN Number - Now last field */}
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-2">
+              <div className={styles.fieldGroup}>
+                <div className={styles.fieldLabelWithIcon}>
                   <label className={styles.label}>
                     Αριθμός Πλαισίου (VIN):
                   </label>
                   <div className="relative">
                     <HiInformationCircle 
-                      className="h-4 w-4 text-orange-500 cursor-help"
+                      className={styles.infoIcon}
                       onMouseEnter={() => setShowVinInfo(true)}
                       onMouseLeave={() => setShowVinInfo(false)}
                     />
                     {showVinInfo && (
-                      <div className="absolute top-6 left-0 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 w-64">
+                      <div className={styles.tooltip}>
                         <div className="text-left">
-                          <p className="text-sm font-medium text-gray-900 mb-2">Πού να βρείτε τον αριθμό πλαισίου:</p>
+                          <p className={styles.tooltipTitle}>Πού να βρείτε τον αριθμό πλαισίου:</p>
                           <img 
                             src="/images/vin-number-location.jpg" 
                             alt="Θέση αριθμού πλαισίου VIN"
-                            className="w-full h-32 object-cover rounded mb-2"
+                            className={styles.tooltipImage}
                             onError={(e) => {
                               e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEyOCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NzM4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPldJTiBOdW1iZXIgTG9jYXRpb248L3RleHQ+PC9zdmc+'
                             }}
                           />
-                          <p className="text-xs text-gray-600">
+                          <p className={styles.tooltipText}>
                             Βρίσκεται στο ντασμπόρτ (κάτω από το παρμπρίζ), στο πλαίσιο της πόρτας οδηγού, ή στην άδεια κυκλοφορίας
                           </p>
                         </div>
@@ -339,7 +319,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                   maxLength={17}
                 />
                 {vinNumber && vinNumber.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className={styles.switchDescription}>
                     Μήκος: {vinNumber.length}/17 χαρακτήρες
                   </p>
                 )}

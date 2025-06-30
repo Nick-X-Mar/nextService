@@ -24,6 +24,41 @@ export const styles = {
   btnOutline: "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200",
   btnDisabled: "bg-gray-300 text-gray-500 cursor-not-allowed px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2",
 
+  // Toggle Buttons (for fuel type, etc.)
+  toggleBtnActive: "flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-orange-400 text-white",
+  toggleBtnInactive: "flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200",
+  toggleContainer: "flex gap-2 mt-2",
+
+  // Switch/Toggle Controls
+  switchActive: "relative inline-flex h-6 w-11 items-center rounded-full transition-colors bg-orange-400",
+  switchInactive: "relative inline-flex h-6 w-11 items-center rounded-full transition-colors bg-gray-200",
+  switchThumbActive: "inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-6",
+  switchThumbInactive: "inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-1",
+  switchContainer: "flex items-center justify-between",
+  switchLabel: "block text-sm font-medium text-gray-700 mb-2",
+  switchDescription: "text-xs text-gray-500 mt-1",
+
+  // Information Icons & Tooltips
+  infoIcon: "h-4 w-4 text-orange-500 cursor-help",
+  tooltip: "absolute top-6 left-0 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 w-64",
+  tooltipTitle: "text-sm font-medium text-gray-900 mb-2",
+  tooltipText: "text-xs text-gray-600",
+  tooltipImage: "w-full h-32 object-cover rounded mb-2",
+
+  // File Upload
+  fileUploadArea: "border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors",
+  fileUploadIcon: "h-8 w-8 mx-auto mb-2",
+  fileUploadText: "text-sm font-medium",
+  fileUploadSubtext: "text-xs",
+  fileUploadSelected: "text-green-600",
+  fileUploadPlaceholder: "text-gray-500",
+
+  // Form Groups & Layout
+  fieldGroup: "mb-4",
+  fieldLabel: "block text-sm font-medium text-gray-700 mb-2",
+  fieldLabelWithIcon: "flex items-center gap-2 mb-2",
+  fieldContainer: "space-y-3",
+
   // Cards
   card: "bg-white rounded-lg shadow-lg p-6 border border-gray-200",
   cardHover: "bg-white rounded-lg shadow-lg p-6 border border-gray-200 hover:shadow-xl transition-shadow duration-200",
