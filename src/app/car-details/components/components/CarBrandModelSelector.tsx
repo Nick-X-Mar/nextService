@@ -50,7 +50,34 @@ export default function CarBrandModelSelector({
   const [isModelOther, setIsModelOther] = useState(false)
   const [customBrand, setCustomBrand] = useState('')
   const [customModel, setCustomModel] = useState('')
+  const [modelYear, setModelYear] = useState('')
+  const [engineCC, setEngineCC] = useState('')
   const [mounted, setMounted] = useState(false)
+
+  // Validation for model year (4 digits only)
+  const handleModelYearChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    // Only allow digits and limit to 4 characters
+    if (/^\d{0,4}$/.test(value)) {
+      setModelYear(value)
+    }
+  }
+
+  // Validation for engine CC (numbers only, reasonable range 100-9999)
+  const handleEngineCCChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    // Only allow digits and limit to 4 characters
+    if (/^\d{0,4}$/.test(value)) {
+      setEngineCC(value)
+    }
+  }
+
+  // Check if CC is in reasonable range
+  const isCCValid = (cc: string) => {
+    if (!cc || cc.length === 0) return false
+    const ccNumber = parseInt(cc)
+    return ccNumber >= 100 && ccNumber <= 9999
+  }
 
   // Load saved data on component mount
   useEffect(() => {
@@ -68,6 +95,9 @@ export default function CarBrandModelSelector({
       setIsModelOther(data.isModelOther)
       setCustomModel(data.customModel)
     }
+    // Restore new fields
+    if (data.modelYear) setModelYear(data.modelYear)
+    if (data.engineCC) setEngineCC(data.engineCC)
   }, [onBrandChange, onModelChange])
 
   // Save data whenever it changes
@@ -79,15 +109,22 @@ export default function CarBrandModelSelector({
         isBrandOther,
         isModelOther,
         customBrand,
-        customModel
+        customModel,
+        modelYear,
+        engineCC
       })
     }
-  }, [selectedBrand, selectedModel, isBrandOther, isModelOther, customBrand, customModel, mounted])
+  }, [selectedBrand, selectedModel, isBrandOther, isModelOther, customBrand, customModel, modelYear, engineCC, mounted])
 
-  // Form validation - check if we have both brand and model (either from dropdown or custom input)
+  // Form validation - check if we have brand, model, year, and valid CC
   const currentBrand = isBrandOther ? customBrand : selectedBrand
   const currentModel = isModelOther ? customModel : selectedModel
-  const isFormValid = currentBrand.trim() !== '' && currentModel.trim() !== ''
+  const isFormValid = 
+    currentBrand.trim() !== '' && 
+    currentModel.trim() !== '' &&
+    modelYear.length === 4 && /^\d{4}$/.test(modelYear) &&
+    isCCValid(engineCC)
+    
   const availableModels = !isBrandOther && selectedBrand ? carBrands[selectedBrand as keyof typeof carBrands] || [] : []
 
   const handleBrandChange = (brand: string) => {
@@ -139,7 +176,9 @@ export default function CarBrandModelSelector({
         isBrandOther,
         isModelOther,
         customBrand,
-        customModel
+        customModel,
+        modelYear,
+        engineCC
       })
       
       // Navigate to the next step (car specifications or body work photos)
@@ -223,6 +262,56 @@ export default function CarBrandModelSelector({
             />
           </div>
         )}
+
+        {/* Model Year */}
+        <div className="mb-4">
+          <label className={styles.label}>
+            Έτος Κατασκευής:
+          </label>
+          <input
+            type="text"
+            value={modelYear}
+            onChange={handleModelYearChange}
+            placeholder="π.χ. 2020"
+            className={styles.input}
+            maxLength={4}
+          />
+          {modelYear && modelYear.length === 4 && (
+            <p className="text-xs text-gray-500 mt-1">
+              ✓ Έγκυρο έτος κατασκευής
+            </p>
+          )}
+          {modelYear && modelYear.length > 0 && modelYear.length < 4 && (
+            <p className="text-xs text-red-500 mt-1">
+              Παρακαλώ εισάγετε 4 ψηφία
+            </p>
+          )}
+        </div>
+
+        {/* Engine CC */}
+        <div className="mb-4">
+          <label className={styles.label}>
+            Κυβικά Εκατοστά (CC):
+          </label>
+          <input
+            type="text"
+            value={engineCC}
+            onChange={handleEngineCCChange}
+            placeholder="π.χ. 1600, 2000, 2500"
+            className={styles.input}
+            maxLength={4}
+          />
+          {engineCC && isCCValid(engineCC) && (
+            <p className="text-xs text-gray-500 mt-1">
+              ✓ Έγκυρος κυβισμός κινητήρα
+            </p>
+          )}
+          {engineCC && engineCC.length > 0 && !isCCValid(engineCC) && (
+            <p className="text-xs text-red-500 mt-1">
+              Παρακαλώ εισάγετε έγκυρο κυβισμό (100-9999cc)
+            </p>
+          )}
+        </div>
         
         <button 
           onClick={handleSubmit}

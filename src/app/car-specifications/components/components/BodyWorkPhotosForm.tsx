@@ -11,6 +11,9 @@ interface BodyWorkPhotosFormProps {
     description: string
     brand: string
     model: string
+    modelYear: string
+    vinNumber: string
+    engineCC: string
   }
 }
 

@@ -9,9 +9,14 @@ export interface ServiceFormData {
   isModelOther: boolean
   customBrand: string
   customModel: string
-  // Car specifications (for service/general)
+  // Car specifications - Page 2 (Basic info)
   modelYear: string
+  vinNumber: string
   engineCC: string
+  // Car specifications - Page 3 (Advanced specs)
+  fuelType: 'petrol' | 'diesel' | ''
+  isAutomatic: boolean
+  is4x4: boolean
   engineNumber: string
   // Note: File objects are handled separately since they can't be serialized to localStorage
 }
@@ -49,7 +54,11 @@ export const loadFormData = (): ServiceFormData => {
     customBrand: '',
     customModel: '',
     modelYear: '',
+    vinNumber: '',
     engineCC: '',
+    fuelType: '',
+    isAutomatic: false,
+    is4x4: false,
     engineNumber: ''
   }
 }
