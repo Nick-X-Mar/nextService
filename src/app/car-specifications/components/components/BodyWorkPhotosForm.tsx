@@ -61,15 +61,69 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
 
   const isFormValid = photos.length >= 1
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (isFormValid) {
-      console.log('Submitting body work photos:', {
-        ...savedData,
-        photos: photos.map(p => ({ name: p.name, size: p.size, type: p.type }))
-      })
-      
-      // For now, show success message
-      alert(`Ολοκληρώθηκε! Στάλθηκαν ${photos.length} φωτογραφίες για αξιολόγηση της ζημιάς`)
+      try {
+        // First, create the service request to get IDs
+        const serviceRequestData = {
+          ...savedData,
+          photos: photos.map(p => ({ name: p.name, size: p.size, type: p.type }))
+        }
+        
+        const serviceResponse = await fetch('/api/service-request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(serviceRequestData),
+        })
+
+        if (!serviceResponse.ok) {
+          throw new Error('Network response was not ok')
+        }
+
+        const serviceResult = await serviceResponse.json()
+        
+        if (!serviceResult.success) {
+          alert('❌ Σφάλμα: ' + (serviceResult.error || 'Άγνωστο σφάλμα'))
+          return
+        }
+
+        // Now upload photos to S3
+        const formData = new FormData()
+        photos.forEach(file => {
+          formData.append('files', file)
+        })
+        formData.append('serviceRequestId', serviceResult.serviceRequestId)
+        formData.append('vehicleId', serviceResult.vehicleId)
+
+        const uploadResponse = await fetch('/api/upload-photos', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!uploadResponse.ok) {
+          throw new Error('Photo upload failed')
+        }
+
+        const uploadResult = await uploadResponse.json()
+        
+        if (uploadResult.success) {
+          alert(`✅ Επιτυχία!\n\nΣτάλθηκαν ${photos.length} φωτογραφίες για αξιολόγηση της ζημιάς\n\n📱 Στάλθηκε ειδοποίηση σε ${serviceResult.notificationsSent} συνεργεία μέσω SMS!\n\n📁 Φωτογραφίες αποθηκεύτηκαν στο S3: ${uploadResult.s3Folder}\n\nΑνακατεύθυνση στη σελίδα αιτημάτων...`)
+          
+          // Redirect to requests page with clientId
+          if (serviceResult.clientId) {
+            router.push(`/requests/${serviceResult.clientId}`)
+          } else {
+            router.push('/requests')
+          }
+        } else {
+          alert('❌ Σφάλμα: ' + (uploadResult.error || 'Άγνωστο σφάλμα'))
+        }
+      } catch (error) {
+        console.error('Error submitting service request:', error)
+        alert('❌ Σφάλμα κατά την αποστολή. Παρακαλώ δοκιμάστε ξανά.')
+      }
     }
   }
 

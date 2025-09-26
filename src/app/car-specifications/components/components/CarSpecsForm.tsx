@@ -70,7 +70,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
     fuelType !== '' && 
     (engineNumber.trim() !== '' || licensePhoto !== null)
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (isFormValid) {
       // Save final data
       saveFormData({
@@ -81,7 +81,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
         engineNumber
       })
       
-      console.log('Submitting car specifications:', {
+      const serviceRequest = {
         ...savedData,
         vinNumber,
         fuelType,
@@ -89,13 +89,43 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
         is4x4,
         engineNumber,
         licensePhoto: licensePhoto?.name || null
-      })
+      }
       
-      // For now, show success message
-      const fuelText = fuelType === 'petrol' ? 'Βενζίνη' : 'Πετρέλαιο'
-      const transmissionText = isAutomatic ? 'Αυτόματο' : 'Χειροκίνητο'
-      const driveText = is4x4 ? '4x4' : '2WD'
-      alert(`Ολοκληρώθηκε! ${savedData.brand} ${savedData.model} (${savedData.modelYear}), ${savedData.engineCC}cc, ${fuelText}, ${transmissionText}, ${driveText}`)
+      try {
+        const response = await fetch('/api/service-request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(serviceRequest),
+        })
+
+        if (!response.ok) {
+          throw new Error('Network response was not ok')
+        }
+
+        const result = await response.json()
+        
+        if (result.success) {
+          const fuelText = fuelType === 'petrol' ? 'Βενζίνη' : 'Πετρέλαιο'
+          const transmissionText = isAutomatic ? 'Αυτόματο' : 'Χειροκίνητο'
+          const driveText = is4x4 ? '4x4' : '2WD'
+          
+          alert(`✅ Επιτυχία!\n\n${savedData.brand} ${savedData.model} (${savedData.modelYear}), ${savedData.engineCC}cc, ${fuelText}, ${transmissionText}, ${driveText}\n\n📱 Στάλθηκε ειδοποίηση σε ${result.notificationsSent} συνεργεία μέσω SMS!\n\nΑνακατεύθυνση στη σελίδα αιτημάτων...`)
+          
+          // Redirect to requests page with clientId
+          if (result.clientId) {
+            router.push(`/requests/${result.clientId}`)
+          } else {
+            router.push('/requests')
+          }
+        } else {
+          alert('❌ Σφάλμα: ' + (result.error || 'Άγνωστο σφάλμα'))
+        }
+      } catch (error) {
+        console.error('Error submitting service request:', error)
+        alert('❌ Σφάλμα κατά την αποστολή. Παρακαλώ δοκιμάστε ξανά.')
+      }
     }
   }
 
@@ -332,8 +362,8 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                   isFormValid ? styles.btnPrimary : styles.btnDisabled
                 }`}
               >
-                <HiArrowRight className="h-5 w-5" />
                 Ζήτα προσφορές
+                <HiArrowRight className="h-5 w-5" />
               </button>
             </div>
             

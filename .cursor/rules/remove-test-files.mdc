@@ -1,0 +1,96 @@
+---
+description: Rule for cleaning up test files and temporary endpoints created during development
+globs:
+alwaysApply: true
+---
+
+# Clean Up Test Files Rule
+
+## Core Principle
+**Always clean up temporary files, test endpoints, and debug scripts created during development.**
+
+## When to Clean Up
+
+### ✅ **Always Remove These Files:**
+- **Temporary API endpoints** created for testing (e.g., `/api/test`, `/api/debug`, `/api/clients` for scanning)
+- **Test scripts** created to verify functionality
+- **Debug files** with console.log statements or temporary code
+- **One-off utility files** created for specific debugging tasks
+- **Temporary configuration files** created for testing
+- **Mock data files** created for development testing
+
+### 🎯 **File Types to Remove:**
+- `src/app/api/*/route.ts` - Temporary API endpoints
+- `src/utils/test-*.ts` - Test utility files
+- `debug-*.js` - Debug scripts
+- `temp-*.json` - Temporary data files
+- `test-*.md` - Test documentation
+- Any file with "test", "debug", "temp", or "mock" in the name
+
+### 📋 **Cleanup Process**
+
+1. **Before Completing Tasks**: Always review what files were created
+2. **Identify Temporary Files**: Mark files created for testing/debugging
+3. **Remove Immediately**: Delete temporary files before marking tasks complete
+4. **Update TODO List**: Note cleanup as a completed task
+5. **Verify Functionality**: Ensure app still works after cleanup
+
+### 🔄 **Examples of Files to Remove**
+
+```bash
+# Temporary API endpoints
+src/app/api/clients/route.ts          # Created for scanning all clients
+src/app/api/debug/route.ts            # Debug endpoint
+src/app/api/test-connection/route.ts  # Connection testing
+
+# Test utilities
+src/utils/test-dynamo.ts              # DynamoDB testing
+src/utils/debug-s3.ts                 # S3 debugging
+temp-client-data.json                 # Temporary data file
+
+# Debug scripts
+debug-database.js                     # Database debugging
+test-api-endpoints.sh                 # API testing script
+```
+
+### 🚫 **Files to Keep**
+
+- **Production API endpoints** used by the app
+- **Utility functions** that are part of the core functionality
+- **Configuration files** needed for the app to run
+- **Documentation files** that explain the system
+- **Component files** that are part of the UI
+
+### 💡 **Cleanup Checklist**
+
+Before marking any development task as complete:
+- [ ] List all files created during the task
+- [ ] Identify which are temporary/test files
+- [ ] Remove temporary files using `delete_file` tool
+- [ ] Update TODO list with cleanup task
+- [ ] Verify the app still functions correctly
+- [ ] Confirm no broken imports or references
+
+### 🎯 **Benefits**
+
+- **Clean Codebase**: No clutter from temporary files
+- **Better Performance**: Fewer files to process
+- **Easier Maintenance**: Only production code remains
+- **Professional Standards**: Clean, production-ready codebase
+- **Reduced Confusion**: No misleading test files
+
+### ⚠️ **Important Notes**
+
+- **Always verify** the app works after cleanup
+- **Check for imports** that might reference deleted files
+- **Update any documentation** that might reference removed files
+- **Be cautious** with files that might be needed for production
+- **When in doubt**, ask the user before deleting
+
+### 🔧 **Implementation**
+
+When creating temporary files for testing:
+1. **Document the purpose** in comments
+2. **Add cleanup to TODO list** immediately
+3. **Remove files** as soon as testing is complete
+4. **Update TODO** to mark cleanup as completed

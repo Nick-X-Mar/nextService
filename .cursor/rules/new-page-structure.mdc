@@ -1,0 +1,51 @@
+---
+description: New page structure pattern for Next.js app router
+globs: ["src/app/**/*"]
+alwaysApply: true
+---
+
+# New Page Structure Rule
+
+When creating a new page in this Next.js application, follow this specific folder structure:
+
+## Required Structure
+
+```
+src/app/
+├── <page-name>/           # New page folder (kebab-case)
+│   ├── page.tsx          # Main page component (required by Next.js)
+│   └── components/       # All page-specific components
+│       ├── Component1.tsx
+│       ├── Component2.tsx
+│       └── ...
+```
+
+## Example
+
+The `landing-page` folder demonstrates this pattern:
+
+```
+src/app/landing-page/
+├── LandingPage.tsx       # Main page component
+└── components/           # Page-specific components
+    ├── HeroSection.tsx
+    ├── FeaturesSection.tsx
+    ├── OffersSection.tsx
+    ├── CategoryChips.tsx
+    └── CategorySelector.tsx
+```
+
+## Rules
+
+1. **Page Folder**: Create a new folder under `src/app/` with the page name in kebab-case
+2. **Main Component**: Place the main page component as `page.tsx` in the page folder (required by Next.js App Router)
+3. **Components Folder**: Create a `components/` subfolder for all page-specific components
+4. **Component Imports**: Import components using relative paths from the main page component
+5. **Shared Components**: For truly reusable components across multiple pages, use `src/components/`
+
+## Benefits
+
+- Clear separation of page-specific components
+- Easy to locate and maintain page-related code
+- Follows Next.js App Router conventions
+- Scalable structure for large applications

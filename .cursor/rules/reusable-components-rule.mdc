@@ -1,0 +1,99 @@
+---
+description: Reusable Components Best Practices
+globs:
+alwaysApply: true
+---
+
+# Reusable Components Rule
+
+## Core Principle
+**Always create reusable components for UI elements that appear multiple times or follow consistent patterns.**
+
+## When to Create Reusable Components
+
+### ✅ **Always Create Reusable Components For:**
+- **Modals/Dialogs** - Use the generic `Modal` component
+- **Buttons** - Different variants (primary, secondary, danger, etc.)
+- **Form Elements** - Inputs, checkboxes, switches, selects
+- **Typography** - Titles, headings, body text with consistent styling
+- **Cards** - Content containers with consistent padding and styling
+- **Status Indicators** - Badges, tags, status displays
+- **Navigation Elements** - Links, breadcrumbs, pagination
+- **Loading States** - Spinners, skeletons, progress indicators
+
+### 🎯 **Component Structure Requirements**
+
+1. **Location**: Place reusable components in `/src/components/`
+2. **Naming**: Use PascalCase (e.g., `Button.tsx`, `Modal.tsx`)
+3. **Props Interface**: Always define TypeScript interfaces for props
+4. **Default Props**: Provide sensible defaults for optional props
+5. **Styling**: Use Tailwind CSS classes with consistent design tokens
+6. **Accessibility**: Include proper ARIA attributes and keyboard support
+
+### 📋 **Component Template**
+
+```tsx
+'use client'
+
+interface ComponentNameProps {
+  // Define all props with types
+  variant?: 'primary' | 'secondary'
+  size?: 'sm' | 'md' | 'lg'
+  children: React.ReactNode
+  onClick?: () => void
+  className?: string
+}
+
+export default function ComponentName({
+  variant = 'primary',
+  size = 'md',
+  children,
+  onClick,
+  className = ''
+}: ComponentNameProps) {
+  // Component logic here
+  
+  return (
+    <div className={`base-classes ${variant-classes} ${size-classes} ${className}`}>
+      {children}
+    </div>
+  )
+}
+```
+
+### 🔄 **Refactoring Existing Code**
+
+When you encounter duplicate UI patterns:
+1. **Identify** the common elements
+2. **Extract** into a reusable component
+3. **Replace** all instances with the new component
+4. **Test** to ensure functionality remains the same
+
+### 📚 **Design System Components**
+
+The following components should be created and used consistently:
+- `Button` - All button variations
+- `Title` - Page and section titles
+- `Text` - Body text with consistent styling
+- `Modal` - All popup dialogs
+- `Checkbox` - Form checkboxes
+- `Switch` - Toggle switches
+- `Input` - Text inputs
+- `Card` - Content containers
+- `Badge` - Status indicators
+
+### 🚫 **Anti-Patterns to Avoid**
+
+- Creating one-off components for similar functionality
+- Duplicating styling across components
+- Hardcoding styles instead of using design tokens
+- Not providing TypeScript interfaces
+- Ignoring accessibility requirements
+
+### 💡 **Benefits**
+
+- **Consistency**: Uniform look and feel across the app
+- **Maintainability**: Changes in one place affect all instances
+- **Developer Experience**: Easy to use and understand
+- **Performance**: Shared components reduce bundle size
+- **Testing**: Easier to test reusable components thoroughly

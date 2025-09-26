@@ -1,0 +1,15 @@
+---
+description: Do not run the application server - it is always running on localhost:3000
+globs:
+alwaysApply: true
+---
+
+**CRITICAL RULE: DO NOT RUN THE APPLICATION SERVER**
+
+The Next.js development server is always running on `http://localhost:3000`. 
+
+- Never attempt to start the server with `npm run dev`, `yarn dev`, or similar commands
+- Never run `next dev` or any server startup commands
+- The server is already running and available at localhost:3000
+- If you need to test endpoints or functionality, use the running server at http://localhost:3000
+- Only make code changes and let the user handle server management

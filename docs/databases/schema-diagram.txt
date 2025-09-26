@@ -1,0 +1,157 @@
+NextService Database Schema Diagram
+=====================================
+
+Entity Relationship Diagram (Text-based)
+
+┌─────────────┐    1:N    ┌─────────────┐
+│   Clients   │───────────│  Vehicles   │
+│             │           │             │
+│ id (PK)     │           │ id (PK)     │
+│ firstName   │           │ clientId    │
+│ lastName    │           │ brand       │
+│ email       │           │ model       │
+│ phoneNumber │           │ modelYear   │
+│ address     │           │ vinNumber   │
+│ isActive    │           │ engineCC    │
+│ createdAt   │           │ fuelType    │
+│ updatedAt   │           │ isAutomatic │
+└─────────────┘           │ is4x4       │
+        │                 │ engineNumber│
+        │                 │ licensePlate│
+        │                 │ color       │
+        │                 │ nickname    │
+        │                 │ licensePhotoUrl│
+        │                 │ isActive    │
+        │                 │ createdAt   │
+        │                 │ updatedAt   │
+        │                 └─────────────┘
+        │                          │
+        │                          │
+        │ 1:N                      │ 1:N
+        │                          │
+        ▼                          ▼
+┌─────────────┐              ┌─────────────┐
+│ServiceRequests│            │  Garages    │
+│               │            │             │
+│ id (PK)       │            │ id (PK)     │
+│ clientId      │            │ name        │
+│ vehicleId     │            │ phoneNumber │
+│ category      │            │ email       │
+│ description   │            │ address     │
+│ urgency       │            │ specialties │
+│ status        │            │ isActive    │
+│ estimatedCost │            │ createdAt   │
+│ photoUrls     │            │ updatedAt   │
+│ photos        │            └─────────────┘
+│ createdAt     │                   │
+│ updatedAt     │                   │
+└─────────────┘                   │
+        │                         │
+        │ 1:N                     │ 1:N
+        │                         │
+        ▼                         ▼
+┌─────────────┐              ┌─────────────┐
+│   Offers    │              │   Offers    │
+│             │              │             │
+│ id (PK)     │              │ id (PK)     │
+│ serviceRequestId│          │ serviceRequestId│
+│ garageId    │              │ garageId    │
+│ price       │              │ price       │
+│ description │              │ description │
+│ estimatedTime│             │ estimatedTime│
+│ status      │              │ status      │
+│ createdAt   │              │ createdAt   │
+│ updatedAt   │              │ updatedAt   │
+└─────────────┘              └─────────────┘
+
+Key Relationships:
+==================
+
+1. Clients (1) ──── (N) Vehicles
+   - One client can have multiple vehicles
+   - Each vehicle belongs to one client
+
+2. Clients (1) ──── (N) ServiceRequests
+   - One client can make multiple service requests
+   - Each service request belongs to one client
+
+3. Vehicles (1) ──── (N) ServiceRequests
+   - One vehicle can have multiple service requests
+   - Each service request is for one vehicle
+
+4. ServiceRequests (1) ──── (N) Offers
+   - One service request can receive multiple offers
+   - Each offer is for one service request
+
+5. Garages (1) ──── (N) Offers
+   - One garage can make multiple offers
+   - Each offer is made by one garage
+
+Global Secondary Indexes (GSI):
+===============================
+
+Clients Table:
+- EmailIndex (HASH: email)
+- PhoneIndex (HASH: phoneNumber)
+
+Vehicles Table:
+- ClientVehiclesIndex (HASH: clientId, RANGE: createdAt)
+- VINIndex (HASH: vinNumber)
+
+ServiceRequests Table:
+- ClientRequestsIndex (HASH: clientId, RANGE: createdAt)
+- VehicleRequestsIndex (HASH: vehicleId, RANGE: createdAt)
+- StatusIndex (HASH: status, RANGE: createdAt)
+
+Garages Table:
+- PhoneNumberIndex (HASH: phoneNumber)
+
+Offers Table:
+- ServiceRequestOffersIndex (HASH: serviceRequestId, RANGE: createdAt)
+- GarageOffersIndex (HASH: garageId, RANGE: createdAt)
+- StatusIndex (HASH: status, RANGE: createdAt)
+
+Common Query Patterns:
+=====================
+
+1. Get all vehicles for a client
+2. Get all service requests for a client
+3. Get all service requests for a vehicle
+4. Get all offers for a service request
+5. Get all offers from a garage
+6. Get all active garages for SMS notifications
+7. Get service requests by status
+8. Get offers by status
+
+Data Flow:
+==========
+
+1. Client registers and adds vehicles (with license photo)
+2. Client creates service request for a vehicle
+3. Client uploads damage photos for the service request
+4. Photos are stored in S3 and URLs saved in ServiceRequests table
+5. System sends SMS notifications to active garages
+6. Garages respond with offers
+7. Client can accept/reject offers
+8. Service is completed and status updated
+
+S3 File Storage:
+================
+
+File Organization:
+- vehicles/license-photos/ - Vehicle license document photos
+- Requests/{vehicleId}/ - Damage photos for service requests
+
+File Naming Convention:
+- {timestamp}-{index}-{originalName} for multiple files
+- {timestamp}-{originalName} for single files
+- All special characters replaced with underscores
+
+NoSQL Design Benefits:
+======================
+
+- Photos stored directly in ServiceRequests table (denormalized)
+- Single query gets service request + all photos
+- No joins needed for photo data
+- Better performance and simpler queries
+- Atomic updates for all related data
