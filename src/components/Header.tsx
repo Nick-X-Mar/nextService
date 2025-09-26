@@ -1,12 +1,21 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { HiUserPlus, HiArrowRightOnRectangle, HiBars3, HiUser } from 'react-icons/hi2'
 import { styles } from '../styles/styles'
 import { useUser } from '../contexts/UserContext'
 
 export default function Header() {
   const { user, isLoading } = useUser()
+  const router = useRouter()
+
+  const handleLogout = () => {
+    localStorage.removeItem('clientId')
+    router.push('/')
+    // Refresh the page to clear user context
+    window.location.reload()
+  }
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
@@ -39,6 +48,13 @@ export default function Header() {
                   <HiUserPlus className="h-4 w-4" />
                   Εγγραφή Επαγγελματία
                 </Link>
+                <button
+                  onClick={handleLogout}
+                  className="text-gray-700 hover:text-orange-500 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+                >
+                  <HiArrowRightOnRectangle className="h-4 w-4" />
+                  Αποσύνδεση
+                </button>
               </div>
             ) : (
               // User is not logged in - show login/register options
@@ -86,6 +102,13 @@ export default function Header() {
                     {user.firstName}
                   </span>
                 </div>
+                <button
+                  onClick={handleLogout}
+                  className="mt-2 w-full text-gray-700 hover:text-orange-500 hover:bg-gray-100 block px-3 py-2 rounded-md text-base font-medium flex items-center gap-2"
+                >
+                  <HiArrowRightOnRectangle className="h-4 w-4" />
+                  Αποσύνδεση
+                </button>
               </div>
             ) : null}
             <Link
