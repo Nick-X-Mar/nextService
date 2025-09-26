@@ -122,7 +122,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="w-full max-w-md mx-auto px-4">
         <div className="text-center mb-8">
-          <Title variant="h2" className="mb-2">
+              <Title variant="page" level={2} className="mb-2">
             Σύνδεση στον Λογαριασμό σας
           </Title>
           
@@ -164,7 +164,7 @@ export default function LoginPage() {
                   <HiExclamationTriangle className="h-6 w-6 text-yellow-600" />
                 </div>
                 
-                <Title variant="h3" className="mt-4">
+                <Title variant="section" level={3} className="mt-4">
                   Δεν βρέθηκε λογαριασμός
                 </Title>
                 

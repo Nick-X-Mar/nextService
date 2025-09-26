@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sendNotificationToGarages, isSMSConfigured } from '@/utils/notificationService'
+import { isSMSConfigured } from '@/utils/notificationService'
 import { dynamoDB } from '@/utils/dynamoService'
 import { PutCommand } from '@aws-sdk/lib-dynamodb'
 
@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     
     // Validate required fields
-    const { category, description, brand, model, modelYear, engineCC } = body
+    const { category, description, brand, model } = body
     
     if (!category || !description || !brand || !model) {
       return NextResponse.json(
@@ -44,7 +44,29 @@ export async function POST(request: NextRequest) {
     const vehicleId = `vehicle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     
     // Save to DynamoDB - remove null values as DynamoDB doesn't like them
-    const serviceRequestData: any = {
+    const serviceRequestData: {
+      id: string
+      clientId: string
+      vehicleId: string
+      category: string
+      description: string
+      urgency: string
+      status: string
+      estimatedCost?: number
+      photoUrls: string[]
+      photos: Array<{
+        id: string
+        s3Url: string
+        s3Key: string
+        originalName: string
+        fileSize: number
+        contentType: string
+        description?: string
+        uploadedAt: string
+      }>
+      createdAt: string
+      updatedAt: string
+    } = {
       id: serviceRequestId,
       clientId: clientId,
       vehicleId: vehicleId,
@@ -72,7 +94,26 @@ export async function POST(request: NextRequest) {
     }))
     
     // Save vehicle data to DynamoDB - remove null values
-    const vehicleData: any = {
+    const vehicleData: {
+      id: string
+      clientId: string
+      brand: string
+      model: string
+      modelYear: string
+      vinNumber: string
+      engineCC: string
+      fuelType: string
+      isAutomatic: boolean
+      is4x4: boolean
+      isActive: boolean
+      createdAt: string
+      updatedAt: string
+      engineNumber?: string
+      licensePlate?: string
+      color?: string
+      nickname?: string
+      licensePhotoUrl?: string
+    } = {
       id: vehicleId,
       clientId: clientId,
       brand: body.brand,
@@ -103,7 +144,17 @@ export async function POST(request: NextRequest) {
     }))
     
     // Save client data to DynamoDB - remove null values
-    const clientData: any = {
+    const clientData: {
+      id: string
+      firstName: string
+      isActive: boolean
+      createdAt: string
+      updatedAt: string
+      lastName?: string
+      email?: string
+      phoneNumber?: string
+      address?: string
+    } = {
       id: clientId,
       firstName: body.firstName || 'Επισκέπτης',
       isActive: true,

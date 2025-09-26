@@ -54,9 +54,6 @@ export default function Switch({
     checked ? sizeClasses[size].translate : 'translate-x-0'
   }`
   
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(e.target.checked)
-  }
   
   return (
     <div className={`flex items-center ${className}`}>

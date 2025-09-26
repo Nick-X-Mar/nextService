@@ -40,7 +40,6 @@ export const uploadFileToS3 = async (
   try {
     // Generate unique filename if not provided
     const timestamp = Date.now()
-    const fileExtension = file.name.split('.').pop()
     const finalFileName = fileName || `${timestamp}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
     const key = `${folder}/${finalFileName}`
 
@@ -177,11 +176,7 @@ export const validateFile = (
  * This would require additional S3 configuration for CORS and presigned URLs
  * For now, we'll use server-side upload for simplicity
  */
-export const generatePresignedUrl = async (
-  key: string,
-  contentType: string,
-  expiresIn: number = 3600
-): Promise<{ success: boolean; url?: string; error?: string }> => {
+export const generatePresignedUrl = async (): Promise<{ success: boolean; url?: string; error?: string }> => {
   // This would require @aws-sdk/s3-request-presigner
   // Implementation can be added later if needed for direct client uploads
   return {

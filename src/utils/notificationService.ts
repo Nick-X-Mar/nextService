@@ -10,7 +10,34 @@ interface SMSNotificationResult {
 }
 
 export const sendNotificationToGarages = async (
-  serviceRequestData: any
+  serviceRequestData: {
+    id: string
+    clientId: string
+    vehicleId: string
+    category: string
+    description: string
+    status: string
+    urgency: string
+    estimatedCost?: number
+    photoUrls: string[]
+    photos: Array<{
+      id: string
+      s3Url: string
+      s3Key: string
+      originalName: string
+      fileSize: number
+      contentType: string
+      description?: string
+      uploadedAt: string
+    }>
+    createdAt: string
+    updatedAt: string
+    vehicle?: {
+      brand: string
+      model: string
+      modelYear: string
+    }
+  }
 ): Promise<SMSNotificationResult> => {
   try {
     // Format the SMS message

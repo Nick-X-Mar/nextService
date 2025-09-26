@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { HiCheckCircle, HiXCircle, HiInformationCircle, HiExclamationTriangle, HiXMark } from 'react-icons/hi2'
 
 export interface ToastProps {
@@ -23,6 +23,12 @@ export default function Toast({
   const [isVisible, setIsVisible] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
 
+  const handleClose = useCallback(() => {
+    setIsVisible(false)
+    // Wait for animation to complete before removing
+    setTimeout(() => onClose(id), 300)
+  }, [onClose, id])
+
   useEffect(() => {
     // Show toast with animation
     const showTimer = setTimeout(() => setIsVisible(true), 100)
@@ -38,13 +44,7 @@ export default function Toast({
       clearTimeout(showTimer)
       clearTimeout(hideTimer)
     }
-  }, [duration, isHovered])
-
-  const handleClose = () => {
-    setIsVisible(false)
-    // Wait for animation to complete before removing
-    setTimeout(() => onClose(id), 300)
-  }
+  }, [duration, isHovered, onClose, id, handleClose])
 
   const getIcon = () => {
     switch (type) {

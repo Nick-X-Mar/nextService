@@ -1,7 +1,8 @@
 'use client'
 
-import { HiCalendar, HiMapPin, HiPhone, HiClock, HiCheckCircle, HiXCircle } from 'react-icons/hi2'
+import { HiMapPin, HiPhone } from 'react-icons/hi2'
 import { styles } from '../../../styles/styles'
+import Image from 'next/image'
 
 interface ServiceRequest {
   id: string
@@ -13,7 +14,16 @@ interface ServiceRequest {
   urgency: 'low' | 'normal' | 'high'
   estimatedCost?: number
   photoUrls: string[]
-  photos: any[]
+  photos: Array<{
+    id: string
+    s3Url: string
+    s3Key: string
+    originalName: string
+    fileSize: number
+    contentType: string
+    description?: string
+    uploadedAt: string
+  }>
   createdAt: string
   updatedAt: string
   vehicle?: {
@@ -131,11 +141,12 @@ export default function RequestDetailsContent({
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {request.photoUrls.map((url, index) => (
-              <div key={index} className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                <img
+              <div key={index} className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                <Image
                   src={url}
                   alt={`Φωτογραφία ${index + 1}`}
-                  className="w-full h-full object-cover"
+                  fill
+                  className="object-cover"
                   onError={(e) => {
                     e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NzM4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkZvdG9ncmFwaGlhPC90ZXh0Pjwvc3ZnPg=='
                   }}

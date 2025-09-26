@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { uploadFileToS3, uploadMultipleFilesToS3, validateFile, isS3Configured } from '@/utils/s3Service'
+import { uploadMultipleFilesToS3, validateFile, isS3Configured } from '@/utils/s3Service'
 import { getEnvironmentInfo } from '@/utils/dynamoService'
 
 export async function POST(request: NextRequest) {
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
 }
 
 // Handle OPTIONS request for CORS
-export async function OPTIONS(request: NextRequest) {
+export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
     headers: {

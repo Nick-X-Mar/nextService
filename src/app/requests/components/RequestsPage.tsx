@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { HiArrowLeft, HiCalendar, HiClock, HiCheckCircle, HiXCircle, HiEye, HiUserPlus, HiBell, HiPhone } from 'react-icons/hi2'
+import { HiArrowLeft, HiCalendar, HiClock, HiCheckCircle, HiXCircle, HiUserPlus, HiBell, HiPhone } from 'react-icons/hi2'
 import { styles } from '../../../styles/styles'
 import RequestCard from './RequestCard'
 import RequestDetailsModal from './RequestDetailsModal'
@@ -20,7 +20,16 @@ interface ServiceRequest {
   urgency: 'low' | 'normal' | 'high'
   estimatedCost?: number
   photoUrls: string[]
-  photos: any[]
+  photos: Array<{
+    id: string
+    s3Url: string
+    s3Key: string
+    originalName: string
+    fileSize: number
+    contentType: string
+    description?: string
+    uploadedAt: string
+  }>
   createdAt: string
   updatedAt: string
   vehicle?: {
@@ -54,17 +63,10 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Load requests on component mount and store clientId in localStorage
-  useEffect(() => {
-    // Store clientId in localStorage for user context
-    localStorage.setItem('clientId', clientId)
-    loadRequests()
-  }, [clientId])
-
   // Check if clientId is valid (starts with 'client-')
   const isValidClientId = clientId && clientId.startsWith('client-')
 
-  const loadRequests = async () => {
+  const loadRequests = useCallback(async () => {
     try {
       if (!isValidClientId) {
         // If no valid clientId, show empty state
@@ -112,7 +114,14 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [clientId, isValidClientId])
+
+  // Load requests on component mount and store clientId in localStorage
+  useEffect(() => {
+    // Store clientId in localStorage for user context
+    localStorage.setItem('clientId', clientId)
+    loadRequests()
+  }, [clientId, loadRequests])
 
   const getStatusIcon = (status: string) => {
     switch (status) {

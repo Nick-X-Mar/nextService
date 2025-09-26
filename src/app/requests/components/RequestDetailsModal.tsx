@@ -14,7 +14,16 @@ interface ServiceRequest {
   urgency: 'low' | 'normal' | 'high'
   estimatedCost?: number
   photoUrls: string[]
-  photos: any[]
+  photos: Array<{
+    id: string
+    s3Url: string
+    s3Key: string
+    originalName: string
+    fileSize: number
+    contentType: string
+    description?: string
+    uploadedAt: string
+  }>
   createdAt: string
   updatedAt: string
   vehicle?: {

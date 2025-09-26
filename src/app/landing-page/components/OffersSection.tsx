@@ -1,6 +1,7 @@
 
 import { styles } from '../../../styles/styles'
 import offersData from '../../../data/offers.json'
+import Image from 'next/image'
 
 export default function OffersSection() {
   return (
@@ -16,7 +17,7 @@ export default function OffersSection() {
             <div className="flex overflow-x-auto space-x-4">
                 {offersData.map((offer, index) => (
                 <div key={index} className="min-w-[300px] bg-white rounded-lg shadow-md p-4">
-                    <img src={offer.image} alt={offer.title} className="w-full h-40 object-cover rounded mb-2" />
+                    <Image src={offer.image} alt={offer.title} width={300} height={160} className="w-full h-40 object-cover rounded mb-2" />
                     <h3 className={styles.cardTitle}>{offer.title}</h3>
                     <p className={styles.bodyText}>{offer.description}</p>
                     <button className={styles.btnPrimary}>Περισσότερα</button>

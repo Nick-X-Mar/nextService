@@ -1,6 +1,6 @@
 'use client'
 
-import { HiEye, HiCalendar, HiMapPin } from 'react-icons/hi2'
+import { HiEye, HiCalendar } from 'react-icons/hi2'
 import { styles } from '../../../styles/styles'
 
 interface ServiceRequest {
@@ -13,7 +13,16 @@ interface ServiceRequest {
   urgency: 'low' | 'normal' | 'high'
   estimatedCost?: number
   photoUrls: string[]
-  photos: any[]
+  photos: Array<{
+    id: string
+    s3Url: string
+    s3Key: string
+    originalName: string
+    fileSize: number
+    contentType: string
+    description?: string
+    uploadedAt: string
+  }>
   createdAt: string
   updatedAt: string
   vehicle?: {

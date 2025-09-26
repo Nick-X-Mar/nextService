@@ -146,7 +146,13 @@ export const isSMSConfigured = (): boolean => {
 }
 
 // Helper to format service request message for SMS (shorter version)
-export const formatSMSMessage = (data: any): string => {
+export const formatSMSMessage = (data: {
+  category: string
+  description: string
+  brand?: string
+  model?: string
+  modelYear?: string
+}): string => {
   const { category, description, brand, model, modelYear } = data
   const categoryText = getCategoryText(category)
   

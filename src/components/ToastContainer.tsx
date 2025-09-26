@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import Toast, { ToastProps } from './Toast'
+import Toast from './Toast'
 
 export interface ToastData {
   id: string
@@ -27,7 +27,7 @@ export default function ToastContainer() {
 
   // Expose addToast globally for easy access
   if (typeof window !== 'undefined') {
-    (window as any).showToast = addToast
+    (window as Window & { showToast?: typeof addToast }).showToast = addToast
   }
 
   return (

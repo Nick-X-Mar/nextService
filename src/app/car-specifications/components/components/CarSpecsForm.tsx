@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { HiArrowRight, HiCloudArrowUp, HiPhoto, HiInformationCircle } from 'react-icons/hi2'
 import { styles } from '../../../../styles/styles'
 import { saveFormData, loadFormData } from '../../../../utils/formStorage'
+import Image from 'next/image'
 
 interface CarSpecsFormProps {
   savedData: {
@@ -235,9 +236,11 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                       <div className={styles.tooltip}>
                         <div className="text-left">
                           <p className={styles.tooltipTitle}>Πού να βρείτε τον αριθμό κινητήρα:</p>
-                          <img 
+                          <Image 
                             src="/images/engine-number-location.jpg" 
                             alt="Θέση αριθμού κινητήρα"
+                            width={300}
+                            height={200}
                             className={styles.tooltipImage}
                             onError={(e) => {
                               e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEyOCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NzM4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkVuZ2luZSBOdW1iZXIgTG9jYXRpb248L3RleHQ+PC9zdmc+'
@@ -324,9 +327,11 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                       <div className={styles.tooltip}>
                         <div className="text-left">
                           <p className={styles.tooltipTitle}>Πού να βρείτε τον αριθμό πλαισίου:</p>
-                          <img 
+                          <Image 
                             src="/images/vin-number-location.jpg" 
                             alt="Θέση αριθμού πλαισίου VIN"
+                            width={300}
+                            height={200}
                             className={styles.tooltipImage}
                             onError={(e) => {
                               e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEyOCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NzM4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPldJTiBOdW1iZXIgTG9jYXRpb248L3RleHQ+PC9zdmc+'

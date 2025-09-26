@@ -11,12 +11,15 @@ export interface ToastOptions {
 
 export function useToast() {
   const showToast = useCallback((options: ToastOptions) => {
-    if (typeof window !== 'undefined' && (window as any).showToast) {
-      (window as any).showToast(options)
-    } else {
-      // Fallback to browser alert if toast system not available
-      alert(`${options.title}${options.message ? `\n${options.message}` : ''}`)
+    if (typeof window !== 'undefined') {
+      const windowWithToast = window as Window & { showToast?: (options: ToastOptions) => void }
+      if (windowWithToast.showToast) {
+        windowWithToast.showToast(options)
+        return
+      }
     }
+    // Fallback to browser alert if toast system not available
+    alert(`${options.title}${options.message ? `\n${options.message}` : ''}`)
   }, [])
 
   const success = useCallback((title: string, message?: string) => {

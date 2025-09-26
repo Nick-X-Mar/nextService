@@ -1,9 +1,9 @@
 import RequestsPage from '../components/RequestsPage'
 
 interface PageProps {
-  params: {
+  params: Promise<{
     clientId: string
-  }
+  }>
 }
 
 export default async function Page({ params }: PageProps) {

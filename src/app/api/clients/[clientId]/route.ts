@@ -94,7 +94,7 @@ export async function PUT(
     const setExpressions: string[] = []
     const removeExpressions: string[] = []
     const expressionAttributeNames: Record<string, string> = {}
-    const expressionAttributeValues: Record<string, any> = {}
+    const expressionAttributeValues: Record<string, string | number | boolean> = {}
 
     // Add fields to update
     if (body.firstName) {

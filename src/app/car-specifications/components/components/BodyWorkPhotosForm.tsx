@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { HiArrowRight, HiCloudArrowUp, HiXMark } from 'react-icons/hi2'
 import { styles } from '../../../../styles/styles'
+import Image from 'next/image'
 
 interface BodyWorkPhotosFormProps {
   savedData: {
@@ -197,11 +198,12 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
                   <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {photos.map((photo, index) => (
                       <div key={index} className="relative group">
-                        <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                          <img
+                        <div className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                          <Image
                             src={URL.createObjectURL(photo)}
                             alt={`Φωτογραφία ${index + 1}`}
-                            className="w-full h-full object-cover"
+                            fill
+                            className="object-cover"
                           />
                         </div>
                         <button
