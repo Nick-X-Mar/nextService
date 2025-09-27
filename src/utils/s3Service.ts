@@ -1,17 +1,42 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 
 // AWS S3 configuration
-const s3Client = new S3Client({
-  region: process.env.AWS_REGION || 'eu-central-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ''
+const getS3Config = () => {
+  const config: {
+    region: string
+    credentials?: {
+      accessKeyId: string
+      secretAccessKey: string
+    }
+  } = {
+    region: process.env.REGION || 'eu-central-1'
   }
+
+  // Only add credentials if they are provided (for IAM role, don't add credentials)
+  if (process.env.ACCESS_KEY_ID && process.env.SECRET_ACCESS_KEY) {
+    config.credentials = {
+      accessKeyId: process.env.ACCESS_KEY_ID,
+      secretAccessKey: process.env.SECRET_ACCESS_KEY
+    }
+  }
+  // If no credentials are provided, AWS SDK will use IAM role or default credential chain
+
+  return config
+}
+
+const s3Client = new S3Client(getS3Config())
+
+// Debug logging
+console.log('🔧 S3 Environment:', {
+  REGION: process.env.REGION || 'NOT SET',
+  S3_BUCKET_NAME: process.env.S3_BUCKET_NAME || 'NOT SET',
+  hasAccessKey: !!process.env.ACCESS_KEY_ID,
+  hasSecretKey: !!process.env.SECRET_ACCESS_KEY
 })
 
 // S3 bucket configuration
 const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'nextservice-uploads-staging'
-const BUCKET_REGION = process.env.AWS_REGION || 'eu-central-1'
+const BUCKET_REGION = process.env.REGION || 'eu-central-1'
 
 export interface UploadResult {
   success: boolean

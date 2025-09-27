@@ -26,6 +26,13 @@ function checkRateLimit(identifier: string, maxAttempts: number = 5, windowMs: n
 }
 
 export async function POST(request: NextRequest) {
+  console.log('🔧 Login API - Environment Debug:', {
+    REGION: process.env.REGION || 'NOT SET',
+    NODE_ENV: process.env.NODE_ENV,
+    hasAccessKey: !!process.env.ACCESS_KEY_ID,
+    hasSecretKey: !!process.env.SECRET_ACCESS_KEY
+  })
+
   try {
     const body = await request.json()
     const { email } = body

@@ -17,13 +17,26 @@ const getDynamoDBConfig = () => {
     }
   } else {
     // AWS DynamoDB configuration
-    return {
-      region: process.env.AWS_REGION || 'eu-central-1',
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ''
+    const config: {
+      region: string
+      credentials?: {
+        accessKeyId: string
+        secretAccessKey: string
+      }
+    } = {
+      region: process.env.REGION || 'eu-central-1'
+    }
+
+    // Only add credentials if they are provided (for IAM role, don't add credentials)
+    if (process.env.ACCESS_KEY_ID && process.env.SECRET_ACCESS_KEY) {
+      config.credentials = {
+        accessKeyId: process.env.ACCESS_KEY_ID,
+        secretAccessKey: process.env.SECRET_ACCESS_KEY
       }
     }
+    // If no credentials are provided, AWS SDK will use IAM role or default credential chain
+
+    return config
   }
 }
 
@@ -41,12 +54,15 @@ export const getEnvironmentInfo = () => {
   return {
     isLocal: isLocalDynamoDB(),
     dynamoDBEndpoint: isLocalDynamoDB() ? process.env.DYNAMODB_ENDPOINT : 'AWS DynamoDB',
-    region: process.env.AWS_REGION || 'eu-central-1',
+    region: process.env.REGION || 'eu-central-1',
     s3Bucket: process.env.S3_BUCKET_NAME || 'nextservice-uploads-staging'
   }
 }
 
 // Log environment info (useful for debugging)
-if (process.env.NODE_ENV === 'development') {
-  console.log('🔧 DynamoDB Environment:', getEnvironmentInfo())
-}
+console.log('🔧 DynamoDB Environment:', getEnvironmentInfo())
+console.log('🔧 REGION:', process.env.REGION || 'NOT SET')
+console.log('🔧 ACCESS_KEY_ID:', process.env.ACCESS_KEY_ID ? 'SET' : 'NOT SET')
+console.log('🔧 SECRET_ACCESS_KEY:', process.env.SECRET_ACCESS_KEY ? 'SET' : 'NOT SET')
+console.log('🔧 NODE_ENV:', process.env.NODE_ENV)
+console.log('🔧 DYNAMODB_ENDPOINT:', process.env.DYNAMODB_ENDPOINT || 'NOT SET')
