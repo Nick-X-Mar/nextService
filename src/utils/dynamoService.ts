@@ -1,5 +1,6 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb'
+import { fromNodeProviderChain } from '@aws-sdk/credential-providers'
 
 // Environment-aware DynamoDB configuration
 const getDynamoDBConfig = () => {
@@ -19,10 +20,7 @@ const getDynamoDBConfig = () => {
     // AWS DynamoDB configuration
     const config: {
       region: string
-      credentials?: {
-        accessKeyId: string
-        secretAccessKey: string
-      }
+      credentials?: ReturnType<typeof fromNodeProviderChain> | { accessKeyId: string; secretAccessKey: string }
     } = {
       region: process.env.REGION || 'eu-central-1'
     }
@@ -33,8 +31,10 @@ const getDynamoDBConfig = () => {
         accessKeyId: process.env.ACCESS_KEY_ID,
         secretAccessKey: process.env.SECRET_ACCESS_KEY
       }
+    } else {
+      // Use AWS credential provider chain for IAM role
+      config.credentials = fromNodeProviderChain()
     }
-    // If no credentials are provided, AWS SDK will use IAM role or default credential chain
 
     return config
   }
@@ -66,3 +66,12 @@ console.log('🔧 ACCESS_KEY_ID:', process.env.ACCESS_KEY_ID ? 'SET' : 'NOT SET'
 console.log('🔧 SECRET_ACCESS_KEY:', process.env.SECRET_ACCESS_KEY ? 'SET' : 'NOT SET')
 console.log('🔧 NODE_ENV:', process.env.NODE_ENV)
 console.log('🔧 DYNAMODB_ENDPOINT:', process.env.DYNAMODB_ENDPOINT || 'NOT SET')
+console.log('🔧 AMPLIFY_ROLE_ARN:', process.env.AMPLIFY_ROLE_ARN || 'NOT SET')
+
+// Test AWS credentials availability
+try {
+  fromNodeProviderChain()
+  console.log('🔧 AWS Credentials Provider: Available')
+} catch (error) {
+  console.log('🔧 AWS Credentials Provider: Error', error)
+}

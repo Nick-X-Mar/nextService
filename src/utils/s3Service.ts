@@ -1,13 +1,11 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { fromNodeProviderChain } from '@aws-sdk/credential-providers'
 
 // AWS S3 configuration
 const getS3Config = () => {
   const config: {
     region: string
-    credentials?: {
-      accessKeyId: string
-      secretAccessKey: string
-    }
+    credentials?: ReturnType<typeof fromNodeProviderChain> | { accessKeyId: string; secretAccessKey: string }
   } = {
     region: process.env.REGION || 'eu-central-1'
   }
@@ -18,8 +16,10 @@ const getS3Config = () => {
       accessKeyId: process.env.ACCESS_KEY_ID,
       secretAccessKey: process.env.SECRET_ACCESS_KEY
     }
+  } else {
+    // Use AWS credential provider chain for IAM role
+    config.credentials = fromNodeProviderChain()
   }
-  // If no credentials are provided, AWS SDK will use IAM role or default credential chain
 
   return config
 }
