@@ -1,6 +1,5 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { fromIni } from '@aws-sdk/credential-provider-ini'
-import { fromNodeProviderChain } from '@aws-sdk/credential-providers'
 import path from 'path'
 
 // Helper to load shared-credentials file in local dev
@@ -11,45 +10,31 @@ const loadLocalCredentials = () =>
     profile: 'default'
   });
 
-// AWS S3 configuration
+// AWS S3 configuration - match working project pattern
 const getS3Config = () => {
-  const isProd = ['production', 'staging'].includes(process.env.NODE_ENV)
+  const isProdOrStaging = ['production', 'staging'].includes(process.env.NODE_ENV)
   
   const config: {
     region: string
-    credentials?: ReturnType<typeof fromNodeProviderChain> | { accessKeyId: string; secretAccessKey: string } | ReturnType<typeof fromIni>
+    credentials?: { accessKeyId: string; secretAccessKey: string } | ReturnType<typeof fromIni>
   } = {
     region: process.env.REGION || 'eu-central-1'
   }
 
-  // Only add credentials if they are provided (for IAM role, don't add credentials)
+  // Only add credentials if they are explicitly provided OR in development
   if (process.env.ACCESS_KEY_ID && process.env.SECRET_ACCESS_KEY) {
     config.credentials = {
       accessKeyId: process.env.ACCESS_KEY_ID,
       secretAccessKey: process.env.SECRET_ACCESS_KEY
     }
-  } else if (isProd) {
-    // In production, try different credential providers for Amplify
-    console.log('🔧 Using IAM role for S3 (production)')
-    try {
-      // Try instance metadata first (for Lambda/Amplify)
-      config.credentials = fromNodeProviderChain({
-        profile: 'default'
-      })
-      console.log('🔧 S3: Using node provider chain with default profile')
-    } catch {
-      console.log('🔧 S3: Node provider chain failed, trying without credentials')
-      // Don't set credentials - let AWS SDK use default chain
-    }
+    console.log('🔧 S3: Using explicit credentials')
+  } else if (!isProdOrStaging) {
+    // In development, use local AWS credentials
+    config.credentials = loadLocalCredentials()
+    console.log('🔧 S3: Using local AWS credentials')
   } else {
-    // In development, try to use local AWS credentials
-    try {
-      config.credentials = loadLocalCredentials()
-      console.log('🔧 Using local AWS credentials for S3')
-    } catch {
-      config.credentials = fromNodeProviderChain()
-      console.log('🔧 Using node provider chain for S3')
-    }
+    // In production/staging, rely on IAM role - no credentials specified
+    console.log('🔧 S3: Using IAM role (no explicit credentials)')
   }
 
   return config

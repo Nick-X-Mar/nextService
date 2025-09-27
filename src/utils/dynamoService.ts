@@ -1,7 +1,6 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb'
 import { fromIni } from '@aws-sdk/credential-provider-ini'
-import { fromNodeProviderChain } from '@aws-sdk/credential-providers'
 import path from 'path'
 
 // Helper to load shared-credentials file in local dev
@@ -15,7 +14,7 @@ const loadLocalCredentials = () =>
 // Environment-aware DynamoDB configuration
 const getDynamoDBConfig = () => {
   const isLocal = process.env.NODE_ENV === 'development' && process.env.DYNAMODB_ENDPOINT
-  const isProd = ['production', 'staging'].includes(process.env.NODE_ENV)
+  const isProdOrStaging = ['production', 'staging'].includes(process.env.NODE_ENV)
   
   if (isLocal) {
     // Local DynamoDB configuration
@@ -28,42 +27,28 @@ const getDynamoDBConfig = () => {
       }
     }
   } else {
-    // AWS DynamoDB configuration
+    // AWS DynamoDB configuration - match working project pattern
     const config: {
       region: string
-      credentials?: ReturnType<typeof fromNodeProviderChain> | { accessKeyId: string; secretAccessKey: string } | ReturnType<typeof fromIni>
+      credentials?: { accessKeyId: string; secretAccessKey: string } | ReturnType<typeof fromIni>
     } = {
       region: process.env.REGION || 'eu-central-1'
     }
 
-    // Only add credentials if they are provided (for IAM role, don't add credentials)
+    // Only add credentials if they are explicitly provided OR in development
     if (process.env.ACCESS_KEY_ID && process.env.SECRET_ACCESS_KEY) {
       config.credentials = {
         accessKeyId: process.env.ACCESS_KEY_ID,
         secretAccessKey: process.env.SECRET_ACCESS_KEY
       }
-    } else if (isProd) {
-      // In production, try different credential providers for Amplify
-      console.log('🔧 Using IAM role for DynamoDB (production)')
-      try {
-        // Try instance metadata first (for Lambda/Amplify)
-        config.credentials = fromNodeProviderChain({
-          profile: 'default'
-        })
-        console.log('🔧 DynamoDB: Using node provider chain with default profile')
-      } catch {
-        console.log('🔧 DynamoDB: Node provider chain failed, trying without credentials')
-        // Don't set credentials - let AWS SDK use default chain
-      }
+      console.log('🔧 DynamoDB: Using explicit credentials')
+    } else if (!isProdOrStaging) {
+      // In development, use local AWS credentials
+      config.credentials = loadLocalCredentials()
+      console.log('🔧 DynamoDB: Using local AWS credentials')
     } else {
-      // In development, try to use local AWS credentials
-      try {
-        config.credentials = loadLocalCredentials()
-        console.log('🔧 Using local AWS credentials for DynamoDB')
-      } catch {
-        config.credentials = fromNodeProviderChain()
-        console.log('🔧 Using node provider chain for DynamoDB')
-      }
+      // In production/staging, rely on IAM role - no credentials specified
+      console.log('🔧 DynamoDB: Using IAM role (no explicit credentials)')
     }
 
     return config
@@ -98,10 +83,5 @@ console.log('🔧 NODE_ENV:', process.env.NODE_ENV)
 console.log('🔧 DYNAMODB_ENDPOINT:', process.env.DYNAMODB_ENDPOINT || 'NOT SET')
 console.log('🔧 AMPLIFY_ROLE_ARN:', process.env.AMPLIFY_ROLE_ARN || 'NOT SET')
 
-// Test AWS credentials availability
-try {
-  fromNodeProviderChain()
-  console.log('🔧 AWS Credentials Provider: Available')
-} catch (error) {
-  console.log('🔧 AWS Credentials Provider: Error', error)
-}
+// AWS credentials will be handled by the AWS SDK default credential chain
+console.log('🔧 AWS Credentials: Using default credential chain')
