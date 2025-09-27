@@ -29,8 +29,18 @@ const getS3Config = () => {
       secretAccessKey: process.env.SECRET_ACCESS_KEY
     }
   } else if (isProd) {
-    // In production, rely on IAM role - no explicit credentials needed
+    // In production, try different credential providers for Amplify
     console.log('🔧 Using IAM role for S3 (production)')
+    try {
+      // Try instance metadata first (for Lambda/Amplify)
+      config.credentials = fromNodeProviderChain({
+        profile: 'default'
+      })
+      console.log('🔧 S3: Using node provider chain with default profile')
+    } catch {
+      console.log('🔧 S3: Node provider chain failed, trying without credentials')
+      // Don't set credentials - let AWS SDK use default chain
+    }
   } else {
     // In development, try to use local AWS credentials
     try {
