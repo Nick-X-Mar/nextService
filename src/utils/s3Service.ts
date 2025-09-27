@@ -1,11 +1,23 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { fromIni } from '@aws-sdk/credential-provider-ini'
 import { fromNodeProviderChain } from '@aws-sdk/credential-providers'
+import path from 'path'
+
+// Helper to load shared-credentials file in local dev
+const loadLocalCredentials = () =>
+  fromIni({
+    filepath: path.join(process.cwd(), '.aws', 'credentials'),
+    configFilepath: path.join(process.cwd(), '.aws', 'config'),
+    profile: 'default'
+  });
 
 // AWS S3 configuration
 const getS3Config = () => {
+  const isProd = ['production', 'staging'].includes(process.env.NODE_ENV)
+  
   const config: {
     region: string
-    credentials?: ReturnType<typeof fromNodeProviderChain> | { accessKeyId: string; secretAccessKey: string }
+    credentials?: ReturnType<typeof fromNodeProviderChain> | { accessKeyId: string; secretAccessKey: string } | ReturnType<typeof fromIni>
   } = {
     region: process.env.REGION || 'eu-central-1'
   }
@@ -16,9 +28,18 @@ const getS3Config = () => {
       accessKeyId: process.env.ACCESS_KEY_ID,
       secretAccessKey: process.env.SECRET_ACCESS_KEY
     }
+  } else if (isProd) {
+    // In production, rely on IAM role - no explicit credentials needed
+    console.log('🔧 Using IAM role for S3 (production)')
   } else {
-    // Use AWS credential provider chain for IAM role
-    config.credentials = fromNodeProviderChain()
+    // In development, try to use local AWS credentials
+    try {
+      config.credentials = loadLocalCredentials()
+      console.log('🔧 Using local AWS credentials for S3')
+    } catch {
+      config.credentials = fromNodeProviderChain()
+      console.log('🔧 Using node provider chain for S3')
+    }
   }
 
   return config
