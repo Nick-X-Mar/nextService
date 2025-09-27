@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { HiArrowRight, HiCloudArrowUp, HiPhoto, HiInformationCircle } from 'react-icons/hi2'
 import { styles } from '../../../../styles/styles'
 import { saveFormData, loadFormData } from '../../../../utils/formStorage'
+import { useToast } from '../../../../hooks/useToast'
 import Image from 'next/image'
 
 interface CarSpecsFormProps {
@@ -21,6 +22,7 @@ interface CarSpecsFormProps {
 
 export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   const router = useRouter()
+  const { success, error } = useToast()
   const [vinNumber, setVinNumber] = useState('')
   const [fuelType, setFuelType] = useState<'petrol' | 'diesel' | ''>('petrol')
   const [isAutomatic, setIsAutomatic] = useState(false)
@@ -101,18 +103,22 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
           body: JSON.stringify(serviceRequest),
         })
 
-        if (!response.ok) {
-          throw new Error('Network response was not ok')
-        }
-
         const result = await response.json()
+        
+        if (!response.ok) {
+          error('Σφάλμα', result.error || 'Σφάλμα κατά την αποστολή')
+          return
+        }
         
         if (result.success) {
           const fuelText = fuelType === 'petrol' ? 'Βενζίνη' : 'Πετρέλαιο'
           const transmissionText = isAutomatic ? 'Αυτόματο' : 'Χειροκίνητο'
           const driveText = is4x4 ? '4x4' : '2WD'
           
-          alert(`✅ Επιτυχία!\n\n${savedData.brand} ${savedData.model} (${savedData.modelYear}), ${savedData.engineCC}cc, ${fuelText}, ${transmissionText}, ${driveText}\n\n📱 Στάλθηκε ειδοποίηση σε ${result.notificationsSent} συνεργεία μέσω SMS!\n\nΑνακατεύθυνση στη σελίδα αιτημάτων...`)
+          success(
+            'Επιτυχία!', 
+            `${savedData.brand} ${savedData.model} (${savedData.modelYear}), ${savedData.engineCC}cc, ${fuelText}, ${transmissionText}, ${driveText}\n\n📱 Στάλθηκε ειδοποίηση σε ${result.notificationsSent} συνεργεία μέσω SMS!\n\nΑνακατεύθυνση στη σελίδα αιτημάτων...`
+          )
           
           // Redirect to requests page with clientId
           if (result.clientId) {
@@ -121,11 +127,11 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
             router.push('/requests')
           }
         } else {
-          alert('❌ Σφάλμα: ' + (result.error || 'Άγνωστο σφάλμα'))
+          error('Σφάλμα', result.error || 'Άγνωστο σφάλμα')
         }
       } catch (error) {
         console.error('Error submitting service request:', error)
-        alert('❌ Σφάλμα κατά την αποστολή. Παρακαλώ δοκιμάστε ξανά.')
+        error('Σφάλμα', 'Σφάλμα κατά την αποστολή. Παρακαλώ δοκιμάστε ξανά.')
       }
     }
   }

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { HiArrowRight, HiCloudArrowUp, HiXMark } from 'react-icons/hi2'
 import { styles } from '../../../../styles/styles'
+import { useToast } from '../../../../hooks/useToast'
 import Image from 'next/image'
 
 interface BodyWorkPhotosFormProps {
@@ -20,6 +21,7 @@ interface BodyWorkPhotosFormProps {
 
 export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProps) {
   const router = useRouter()
+  const { success, error } = useToast()
   const [photos, setPhotos] = useState<File[]>([])
   const [dragActive, setDragActive] = useState(false)
 
@@ -86,7 +88,7 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
         const serviceResult = await serviceResponse.json()
         
         if (!serviceResult.success) {
-          alert('❌ Σφάλμα: ' + (serviceResult.error || 'Άγνωστο σφάλμα'))
+          error('Σφάλμα', serviceResult.error || 'Άγνωστο σφάλμα')
           return
         }
 
@@ -110,7 +112,10 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
         const uploadResult = await uploadResponse.json()
         
         if (uploadResult.success) {
-          alert(`✅ Επιτυχία!\n\nΣτάλθηκαν ${photos.length} φωτογραφίες για αξιολόγηση της ζημιάς\n\n📱 Στάλθηκε ειδοποίηση σε ${serviceResult.notificationsSent} συνεργεία μέσω SMS!\n\n📁 Φωτογραφίες αποθηκεύτηκαν στο S3: ${uploadResult.s3Folder}\n\nΑνακατεύθυνση στη σελίδα αιτημάτων...`)
+          success(
+            'Επιτυχία!', 
+            `Στάλθηκαν ${photos.length} φωτογραφίες για αξιολόγηση της ζημιάς\n\n📱 Στάλθηκε ειδοποίηση σε ${serviceResult.notificationsSent} συνεργεία μέσω SMS!\n\n📁 Φωτογραφίες αποθηκεύτηκαν στο S3: ${uploadResult.s3Folder}\n\nΑνακατεύθυνση στη σελίδα αιτημάτων...`
+          )
           
           // Redirect to requests page with clientId
           if (serviceResult.clientId) {
@@ -119,11 +124,11 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
             router.push('/requests')
           }
         } else {
-          alert('❌ Σφάλμα: ' + (uploadResult.error || 'Άγνωστο σφάλμα'))
+          error('Σφάλμα', uploadResult.error || 'Άγνωστο σφάλμα')
         }
       } catch (error) {
         console.error('Error submitting service request:', error)
-        alert('❌ Σφάλμα κατά την αποστολή. Παρακαλώ δοκιμάστε ξανά.')
+        error('Σφάλμα', 'Σφάλμα κατά την αποστολή. Παρακαλώ δοκιμάστε ξανά.')
       }
     }
   }

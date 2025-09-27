@@ -12,19 +12,17 @@ export default function OffersSection() {
             <p className={`mt-4 max-w-2xl mx-auto text-xl ${styles.smallText}`}>
                 Βρες την προσφορά που ταιρίαζει στην ανάγκη σου
             </p>
-            <div className="relative">
-            <button className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-white p-2 rounded-full shadow-md">←</button>
-            <div className="flex overflow-x-auto space-x-4">
-                {offersData.map((offer, index) => (
-                <div key={index} className="min-w-[300px] bg-white rounded-lg shadow-md p-4">
-                    <Image src={offer.image} alt={offer.title} width={300} height={160} className="w-full h-40 object-cover rounded mb-2" />
-                    <h3 className={styles.cardTitle}>{offer.title}</h3>
-                    <p className={styles.bodyText}>{offer.description}</p>
-                    <button className={styles.btnPrimary}>Περισσότερα</button>
+            <div className="flex justify-center">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl">
+                    {offersData.map((offer, index) => (
+                    <div key={index} className="bg-white rounded-lg shadow-md p-4">
+                        <Image src={offer.image} alt={offer.title} width={300} height={160} className="w-full h-40 object-cover rounded mb-2" />
+                        <h3 className={styles.cardTitle}>{offer.title}</h3>
+                        <p className={styles.bodyText}>{offer.description}</p>
+                        <button className={styles.btnPrimary}>Περισσότερα</button>
+                    </div>
+                    ))}
                 </div>
-                ))}
-            </div>
-            <button className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white p-2 rounded-full shadow-md">→</button>
             </div>
             <button className="mt-4 {styles.btnPrimary}">Όλες οι προσφορές</button>
         </div>

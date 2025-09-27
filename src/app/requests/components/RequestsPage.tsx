@@ -6,7 +6,6 @@ import { HiArrowLeft, HiCalendar, HiClock, HiCheckCircle, HiXCircle, HiUserPlus,
 import { styles } from '../../../styles/styles'
 import RequestCard from './RequestCard'
 import RequestDetailsModal from './RequestDetailsModal'
-import Text from '../../../components/Text'
 import { useToast } from '../../../hooks/useToast'
 import { useUser } from '../../../contexts/UserContext'
 
@@ -315,17 +314,17 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                   </div>
                 </div>
                 <div className="flex-1">
-                  <Text variant="lead" weight="semibold" className="mb-2">
+                  <p className={`text-lg font-semibold text-gray-900 mb-2`}>
                     Εγγραφείτε για Ειδοποιήσεις
-                  </Text>
+                  </p>
                   
-                  <Text color="muted" className="mb-4">
+                  <p className={`text-gray-600 mb-4`}>
                     Ως επισκέπτης, μπορείτε να δείτε τα αιτήματά σας, αλλά για να λαμβάνετε{' '}
-                    <Text as="span" color="primary" weight="semibold">
+                    <span className="text-orange-500 font-semibold">
                       ειδοποιήσεις και ενημερώσεις άμεσα από τα συνεργεία
-                    </Text>
+                    </span>
                     , παρακαλώ συμπληρώστε τα στοιχεία σας.
-                  </Text>
+                  </p>
 
                   {!showRegistrationForm ? (
                     <div className="flex flex-col sm:flex-row gap-3">
@@ -347,9 +346,9 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                     <form onSubmit={handleFormSubmit} className="space-y-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <Text as="label" variant="small" weight="medium" className="block mb-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
                             Όνομα
-                          </Text>
+                          </label>
                           <input
                             type="text"
                             value={formData.firstName}
@@ -359,9 +358,9 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                         </div>
                         
                         <div>
-                          <Text as="label" variant="small" weight="medium" className="block mb-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
                             Επώνυμο
-                          </Text>
+                          </label>
                           <input
                             type="text"
                             value={formData.lastName}
@@ -372,9 +371,9 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                       </div>
                       
                       <div>
-                        <Text as="label" variant="small" weight="medium" className="block mb-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
                           Email *
-                        </Text>
+                        </label>
                         <input
                           type="email"
                           value={formData.email}
@@ -383,16 +382,16 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                           placeholder="π.χ. example@email.com"
                           required
                         />
-                        <Text variant="caption" color="muted" className="mt-1">
+                        <p className="text-xs text-gray-500 mt-1">
                           Απαραίτητο για ειδοποιήσεις και ενημερώσεις
-                        </Text>
+                        </p>
                       </div>
                       
                       <div>
-                        <Text as="label" variant="small" weight="medium" className="block mb-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
                           <HiPhone className="inline h-4 w-4 mr-1" />
                           Τηλέφωνο
-                        </Text>
+                        </label>
                         <input
                           type="tel"
                           value={formData.phoneNumber}
@@ -400,9 +399,9 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900"
                           placeholder="π.χ. 6912345678"
                         />
-                        <Text variant="caption" color="muted" className="mt-1">
+                        <p className="text-xs text-gray-500 mt-1">
                           Προαιρετικό για SMS ειδοποιήσεις
-                        </Text>
+                        </p>
                       </div>
                       
                       <div className="flex flex-col sm:flex-row gap-3 pt-2">

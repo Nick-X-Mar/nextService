@@ -18,11 +18,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if SMS service is configured
-    if (!isSMSConfigured()) {
-      return NextResponse.json(
-        { error: 'SMS service not configured. Please set AWS credentials.' },
-        { status: 500 }
-      )
+    const smsConfigured = isSMSConfigured()
+    if (!smsConfigured) {
+      console.log('SMS service not configured - continuing without SMS notifications')
     }
     
     // TODO: Uncomment when SNS is properly configured on AWS
@@ -194,7 +192,7 @@ export async function POST(request: NextRequest) {
       serviceRequestId,
       clientId,
       vehicleId,
-      note: 'SMS notifications are currently disabled'
+      note: smsConfigured ? 'SMS notifications sent' : 'SMS notifications are currently disabled'
     })
 
   } catch (error) {
