@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
@@ -7,6 +8,13 @@ const nextConfig: NextConfig = {
       test: /\.yaml$/,
       use: 'yaml-loader',
     });
+    
+    // Ensure proper path resolution for @/ aliases
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': path.resolve(__dirname, 'src'),
+    };
+    
     return config;
   },
   /* config options here */
