@@ -1,6 +1,7 @@
 'use client'
 
 import { ReactNode } from 'react'
+import { styles } from '@/styles/styles'
 
 interface InputProps {
   type?: 'text' | 'email' | 'password' | 'number' | 'tel' | 'url' | 'search'
@@ -37,20 +38,21 @@ export default function Input({
   pattern,
   autoComplete
 }: InputProps) {
-  // Size classes
+  // Size classes using design system
   const sizeClasses = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2 text-base',
-    lg: 'px-4 py-3 text-lg'
+    sm: 'px-3 py-1.5',
+    md: 'px-4 py-2', 
+    lg: 'px-4 py-3'
   }
   
   const labelSizeClasses = {
-    sm: 'text-sm',
-    md: 'text-base',
-    lg: 'text-lg'
+    sm: '',
+    md: '',
+    lg: ''
   }
   
-  const baseClasses = 'block w-full rounded-lg border border-gray-300 bg-white transition-colors duration-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-500 focus:ring-opacity-20 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed'
+  // Use consistent input styling from design system
+  const baseClasses = styles.input
   
   const inputClasses = `${baseClasses} ${sizeClasses[size]} ${
     error ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
@@ -65,7 +67,7 @@ export default function Input({
       {label && (
         <label 
           htmlFor={id}
-          className={`block ${labelSizeClasses[size]} font-medium text-gray-700 mb-1`}
+          className={`${styles.label} ${labelSizeClasses[size]}`}
         >
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}

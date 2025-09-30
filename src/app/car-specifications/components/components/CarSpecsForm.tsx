@@ -17,6 +17,10 @@ interface CarSpecsFormProps {
     modelYear: string
     vinNumber: string
     engineCC: string
+    fuelType: string
+    isAutomatic: boolean
+    is4x4: boolean
+    estimatedPrice: number | null
   }
 }
 
@@ -24,40 +28,76 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   const router = useRouter()
   const { success, error } = useToast()
   const [vinNumber, setVinNumber] = useState('')
-  const [fuelType, setFuelType] = useState<'petrol' | 'diesel' | ''>('petrol')
-  const [isAutomatic, setIsAutomatic] = useState(false)
-  const [is4x4, setIs4x4] = useState(false)
   const [engineNumber, setEngineNumber] = useState('')
   const [hasLicensePhoto, setHasLicensePhoto] = useState(false)
   const [licensePhoto, setLicensePhoto] = useState<File | null>(null)
   const [mounted, setMounted] = useState(false)
   const [showVinInfo, setShowVinInfo] = useState(false)
   const [showEngineInfo, setShowEngineInfo] = useState(false)
+  const [estimatedPrice, setEstimatedPrice] = useState<number | null>(null)
+  const [isEstimatingPrice, setIsEstimatingPrice] = useState(false)
 
   // Load saved data on component mount
   useEffect(() => {
     setMounted(true)
     const data = loadFormData()
     if (data.vinNumber) setVinNumber(data.vinNumber)
-    if (data.fuelType) setFuelType(data.fuelType)
-    else setFuelType('petrol')
-    if (data.isAutomatic !== undefined) setIsAutomatic(data.isAutomatic)
-    if (data.is4x4 !== undefined) setIs4x4(data.is4x4)
     if (data.engineNumber) setEngineNumber(data.engineNumber)
+    
+    // Estimate price when component mounts if not already estimated
+    if (!data.estimatedPrice && data.brand && data.model && data.modelYear && data.engineCC && data.fuelType) {
+      estimatePrice(data)
+    } else if (data.estimatedPrice) {
+      setEstimatedPrice(data.estimatedPrice)
+    }
   }, [])
+
+  // Function to estimate price
+  const estimatePrice = async (data: any) => {
+    setIsEstimatingPrice(true)
+    try {
+      const response = await fetch('/api/price-estimation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          category: data.category,
+          brand: data.brand,
+          model: data.model,
+          modelYear: data.modelYear,
+          engineCC: data.engineCC,
+          fuelType: data.fuelType,
+          isAutomatic: data.isAutomatic,
+          is4x4: data.is4x4
+        })
+      })
+
+      const result = await response.json()
+      
+      if (result.success && result.estimation) {
+        setEstimatedPrice(result.estimation.estimatedCost)
+        // Save estimated price to form data
+        saveFormData({
+          estimatedPrice: result.estimation.estimatedCost
+        })
+      }
+    } catch (error) {
+      console.error('Price estimation error:', error)
+    } finally {
+      setIsEstimatingPrice(false)
+    }
+  }
 
   // Save data whenever it changes
   useEffect(() => {
     if (mounted) {
       saveFormData({
         vinNumber,
-        fuelType,
-        isAutomatic,
-        is4x4,
         engineNumber
       })
     }
-  }, [vinNumber, fuelType, isAutomatic, is4x4, engineNumber, mounted])
+  }, [vinNumber, engineNumber, mounted])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -70,7 +110,6 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
 
   const isFormValid = 
     vinNumber.trim() !== '' &&
-    fuelType !== '' && 
     (engineNumber.trim() !== '' || licensePhoto !== null)
 
   const handleSubmit = async () => {
@@ -78,20 +117,19 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
       // Save final data
       saveFormData({
         vinNumber,
-        fuelType,
-        isAutomatic,
-        is4x4,
         engineNumber
       })
+      
+      // Get client ID from localStorage if user is logged in
+      const loggedInClientId = localStorage.getItem('clientId')
       
       const serviceRequest = {
         ...savedData,
         vinNumber,
-        fuelType,
-        isAutomatic,
-        is4x4,
         engineNumber,
-        licensePhoto: licensePhoto?.name || null
+        licensePhoto: licensePhoto?.name || null,
+        // Include client ID if user is logged in
+        ...(loggedInClientId && { clientId: loggedInClientId })
       }
       
       try {
@@ -111,9 +149,32 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
         }
         
         if (result.success) {
-          const fuelText = fuelType === 'petrol' ? 'Βενζίνη' : 'Πετρέλαιο'
-          const transmissionText = isAutomatic ? 'Αυτόματο' : 'Χειροκίνητο'
-          const driveText = is4x4 ? '4x4' : '2WD'
+          const fuelText = savedData.fuelType === 'petrol' ? 'Βενζίνη' : 'Πετρέλαιο'
+          const transmissionText = savedData.isAutomatic ? 'Αυτόματο' : 'Χειροκίνητο'
+          const driveText = savedData.is4x4 ? '4x4' : '2WD'
+          
+          // Store service request and vehicle data in localStorage for potential deduplication (only for guest users)
+          if (!loggedInClientId) {
+            const pendingRegistrationData = {
+              serviceRequestId: result.serviceRequestId,
+              vehicleData: {
+                id: result.vehicleId,
+                brand: savedData.brand,
+                model: savedData.model,
+                modelYear: savedData.modelYear,
+                vinNumber: vinNumber,
+                engineCC: savedData.engineCC,
+                fuelType: savedData.fuelType,
+                isAutomatic: savedData.isAutomatic,
+                is4x4: savedData.is4x4,
+                engineNumber: engineNumber
+              },
+              clientId: result.clientId,
+              timestamp: Date.now()
+            }
+            
+            localStorage.setItem('pendingRegistrationData', JSON.stringify(pendingRegistrationData))
+          }
           
           success(
             'Επιτυχία!', 
@@ -123,6 +184,9 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
           // Redirect to requests page with clientId
           if (result.clientId) {
             router.push(`/requests/${result.clientId}`)
+          } else if (loggedInClientId) {
+            // Fallback to logged in client ID
+            router.push(`/requests/${loggedInClientId}`)
           } else {
             router.push('/requests')
           }
@@ -158,79 +222,32 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
             <p className={styles.smallText}>Κυβισμός: {savedData.engineCC}cc</p>
             <p className={styles.smallText}>Κατηγορία: {savedData.category}</p>
           </div>
+
+          {/* Show estimated cost */}
+          {(estimatedPrice || isEstimatingPrice) && (
+            <div className={`${styles.cardSimple} mt-4 max-w-md mx-auto bg-orange-50 border-orange-200`}>
+              <h3 className={`${styles.cardTitle} mb-2 text-orange-800`}>Εκτιμώμενο Κόστος:</h3>
+              {isEstimatingPrice ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-600"></div>
+                  <p className="text-lg text-orange-600">Υπολογισμός...</p>
+                </div>
+              ) : (
+                <p className="text-2xl font-bold text-orange-600">{estimatedPrice}€</p>
+              )}
+              <p className="text-xs text-orange-600 mt-1">
+                Για να λάβετε πραγματικές προσφορές από συνεργεία, συμπληρώστε τα τεχνικά στοιχεία παρακάτω
+              </p>
+            </div>
+          )}
           
           <div className="mt-8 max-w-md mx-auto">
             <div className={styles.card}>
-              {/* Fuel Type Switch */}
-              <div className={styles.fieldGroup}>
-                <label className={styles.label}>
-                  Τύπος Καυσίμου:
-                </label>
-                <div className={styles.toggleContainer}>
-                  <button
-                    type="button"
-                    onClick={() => setFuelType('petrol')}
-                    className={fuelType === 'petrol' ? styles.toggleBtnActive : styles.toggleBtnInactive}
-                  >
-                    Βενζίνη
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFuelType('diesel')}
-                    className={fuelType === 'diesel' ? styles.toggleBtnActive : styles.toggleBtnInactive}
-                  >
-                    Πετρέλαιο
-                  </button>
-                </div>
-              </div>
-
-              {/* Automatic Transmission */}
-              <div className={styles.fieldGroup}>
-                <div className={styles.switchContainer}>
-                  <label className={styles.label}>
-                    Αυτόματο Κιβώτιο:
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setIsAutomatic(!isAutomatic)}
-                    className={isAutomatic ? styles.switchActive : styles.switchInactive}
-                  >
-                    <span
-                      className={isAutomatic ? styles.switchThumbActive : styles.switchThumbInactive}
-                    />
-                  </button>
-                </div>
-                <p className={styles.switchDescription}>
-                  {isAutomatic ? 'Αυτόματο κιβώτιο ταχυτήτων' : 'Χειροκίνητο κιβώτιο ταχυτήτων'}
-                </p>
-              </div>
-
-              {/* 4x4 Drive */}
-              <div className={styles.fieldGroup}>
-                <div className={styles.switchContainer}>
-                  <label className={styles.label}>
-                    Τετρακίνηση (4x4):
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setIs4x4(!is4x4)}
-                    className={is4x4 ? styles.switchActive : styles.switchInactive}
-                  >
-                    <span
-                      className={is4x4 ? styles.switchThumbActive : styles.switchThumbInactive}
-                    />
-                  </button>
-                </div>
-                <p className={styles.switchDescription}>
-                  {is4x4 ? 'Όχημα με τετρακίνηση' : 'Όχημα με δικίνηση'}
-                </p>
-              </div>
-
               {/* Engine Number or License Photo */}
               <div className={styles.fieldGroup}>
                 <div className={styles.fieldLabelWithIcon}>
                   <label className={styles.label}>
-                    Αριθμός Κινητήρα ή Φωτογραφία Άδειας:
+                    Κινητήρας ή Άδεια:
                   </label>
                   <div className="relative">
                     <HiInformationCircle 
@@ -269,14 +286,14 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                       onClick={() => setHasLicensePhoto(false)}
                       className={!hasLicensePhoto ? styles.toggleBtnActive : styles.toggleBtnInactive}
                     >
-                      Αριθμός Κινητήρα
+                      Αριθμός
                     </button>
                     <button
                       type="button"
                       onClick={() => setHasLicensePhoto(true)}
                       className={hasLicensePhoto ? styles.toggleBtnActive : styles.toggleBtnInactive}
                     >
-                      Φωτογραφία Άδειας
+                      Φωτό
                     </button>
                   </div>
 
@@ -321,7 +338,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
               <div className={styles.fieldGroup}>
                 <div className={styles.fieldLabelWithIcon}>
                   <label className={styles.label}>
-                    Αριθμός Πλαισίου (VIN):
+                    VIN:
                   </label>
                   <div className="relative">
                     <HiInformationCircle 
@@ -360,8 +377,8 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                   maxLength={17}
                 />
                 {vinNumber && vinNumber.length > 0 && (
-                  <p className={styles.switchDescription}>
-                    Μήκος: {vinNumber.length}/17 χαρακτήρες
+                  <p className="text-xs text-gray-500 mt-1">
+                    {vinNumber.length}/17 χαρακτήρες
                   </p>
                 )}
               </div>

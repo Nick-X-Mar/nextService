@@ -26,28 +26,35 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = async (clientId: string) => {
     try {
+      console.log('UserContext: Refreshing user with clientId:', clientId)
       const response = await fetch(`/api/clients/${clientId}`)
       if (response.ok) {
         const data = await response.json()
         const client = data.client
         
+        console.log('UserContext: Received client data:', client)
+        
         if (client) {
-          setUser({
+          const userData = {
             id: client.id,
             firstName: client.firstName,
             lastName: client.lastName,
             email: client.email,
             phoneNumber: client.phoneNumber,
             isRegistered: !!client.email
-          })
+          }
+          console.log('UserContext: Setting user data:', userData)
+          setUser(userData)
         } else {
+          console.log('UserContext: No client data, setting user to null')
           setUser(null)
         }
       } else {
+        console.log('UserContext: Response not ok, setting user to null')
         setUser(null)
       }
     } catch (error) {
-      console.error('Error fetching user:', error)
+      console.error('UserContext: Error fetching user:', error)
       setUser(null)
     } finally {
       setIsLoading(false)

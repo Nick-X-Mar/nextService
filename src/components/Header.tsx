@@ -9,6 +9,10 @@ import { useUser } from '../contexts/UserContext'
 export default function Header() {
   const { user, isLoading } = useUser()
   const router = useRouter()
+  
+  // Debug logging
+  console.log('Header: Current user state:', { user, isLoading })
+  console.log('Header: User isRegistered:', user?.isRegistered)
 
   const handleLogout = () => {
     localStorage.removeItem('clientId')

@@ -14,7 +14,11 @@ export default function CarSpecificationsPage() {
     model: '',
     modelYear: '',
     vinNumber: '',
-    engineCC: ''
+    engineCC: '',
+    fuelType: '',
+    isAutomatic: false,
+    is4x4: false,
+    estimatedPrice: null
   })
   const [isLoading, setIsLoading] = useState(true)
 
@@ -28,7 +32,11 @@ export default function CarSpecificationsPage() {
       model: data.model,
       modelYear: data.modelYear,
       vinNumber: data.vinNumber || '', // VIN might be empty initially since it's collected on page 3
-      engineCC: data.engineCC
+      engineCC: data.engineCC,
+      fuelType: data.fuelType || '',
+      isAutomatic: data.isAutomatic || false,
+      is4x4: data.is4x4 || false,
+      estimatedPrice: data.estimatedPrice || null
     })
     setIsLoading(false)
   }, [])

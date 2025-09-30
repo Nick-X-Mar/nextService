@@ -242,25 +242,111 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     setIsSubmitting(true)
 
     try {
-      const response = await fetch(`/api/clients/${clientId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      })
+      // Check if there's pending registration data from a service request
+      const pendingDataStr = localStorage.getItem('pendingRegistrationData')
+      let pendingData = null
+      
+      if (pendingDataStr) {
+        pendingData = JSON.parse(pendingDataStr)
+        // Check if the data is not too old (within 1 hour)
+        const oneHourAgo = Date.now() - (60 * 60 * 1000)
+        if (pendingData.timestamp < oneHourAgo) {
+          // Data is too old, ignore it
+          pendingData = null
+          localStorage.removeItem('pendingRegistrationData')
+        }
+      }
+
+      let response
+      
+      if (formData.email) {
+        // Use the new endpoint that handles email deduplication and vehicle merging
+        response = await fetch('/api/auth/register-from-requests', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            guestClientId: clientId,
+            email: formData.email,
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            phoneNumber: formData.phoneNumber
+          }),
+        })
+      } else {
+        // Use the regular client update endpoint (no email provided)
+        response = await fetch(`/api/clients/${clientId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        })
+      }
 
       if (response.ok) {
+        const data = await response.json()
+        
+        // Clear pending registration data since we've processed it
+        if (pendingData) {
+          localStorage.removeItem('pendingRegistrationData')
+        }
+        
         // Update the user as registered
         setIsRegisteredUser(true)
         setShowRegistrationForm(false)
-        // Refresh user context to update header
-        await refreshUser(clientId)
+        
+        // If we used the new endpoint and got a different client ID, update localStorage
+        if (formData.email && data.client && data.client.id !== clientId) {
+          console.log('RequestsPage: Updating clientId from', clientId, 'to', data.client.id)
+          localStorage.setItem('clientId', data.client.id)
+          console.log('RequestsPage: Calling refreshUser with new clientId:', data.client.id)
+          await refreshUser(data.client.id)
+          
+          // Show success message before redirect
+          let message = 'Συνδεθήκατε επιτυχώς στον υπάρχοντα λογαριασμό σας!'
+          if (data.vehicleDeduplicated) {
+            message += ' Βρέθηκαν και συνδέθηκαν τα υπάρχοντα οχήματά σας.'
+          }
+          message += ' Τώρα θα λαμβάνετε ειδοποιήσεις.'
+          
+          success('Επιτυχής Σύνδεση', message)
+          
+          // Use a timeout to allow the success message to show before redirect
+          setTimeout(() => {
+            try {
+              window.location.href = `/requests/${data.client.id}`
+            } catch (redirectError) {
+              console.error('Redirect failed:', redirectError)
+              // Fallback: reload the page with the new client ID
+              window.location.reload()
+            }
+          }, 1500)
+          return // Exit early to prevent further execution
+        } else {
+          // Refresh user context to update header
+          console.log('RequestsPage: Calling refreshUser for existing client:', data.client?.id || clientId)
+          await refreshUser(data.client?.id || clientId)
+        }
+        
         // Reload requests to show updated data
         loadRequests()
-        success('Επιτυχής Αποθήκευση', 'Τα στοιχεία σας αποθηκεύτηκαν επιτυχώς! Τώρα θα λαμβάνετε ειδοποιήσεις.')
+        
+        let message = 'Τα στοιχεία σας αποθηκεύτηκαν επιτυχώς! Τώρα θα λαμβάνετε ειδοποιήσεις.'
+        
+        if (formData.email && data.isExistingUser) {
+          message = 'Συνδεθήκατε επιτυχώς στον υπάρχοντα λογαριασμό σας!'
+          if (data.vehicleDeduplicated) {
+            message += ' Βρέθηκαν και συνδέθηκαν τα υπάρχοντα οχήματά σας.'
+          }
+          message += ' Τώρα θα λαμβάνετε ειδοποιήσεις.'
+        }
+        
+        success('Επιτυχής Αποθήκευση', message)
       } else {
         const errorData = await response.json()
+        console.error('Registration error details:', errorData)
         error('Σφάλμα Αποθήκευσης', errorData.error || 'Δεν ήταν δυνατή η αποθήκευση των στοιχείων')
       }
     } catch (err) {

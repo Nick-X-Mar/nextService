@@ -6,16 +6,14 @@ import { HiArrowRightOnRectangle, HiExclamationTriangle } from 'react-icons/hi2'
 import { useToast } from '@/hooks/useToast'
 import { useUser } from '@/contexts/UserContext'
 import { styles } from '@/styles/styles'
-import Title from '@/components/Title'
-import Text from '@/components/Text'
-import Input from '@/components/Input'
-import Card from '@/components/Card'
+import { Input, Card, SegmentedControl } from '@/components'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [showRegisterOption, setShowRegisterOption] = useState(false)
   const [notFoundEmail, setNotFoundEmail] = useState('')
+  const [userType, setUserType] = useState('client')
   
   const router = useRouter()
   const { success, error } = useToast()
@@ -34,27 +32,98 @@ export default function LoginPage() {
     setNotFoundEmail('')
 
     try {
-      // Search for client with this email
+      // Search for user with this email (client or garage)
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ 
+          email: email.trim(),
+          userType: userType
+        }),
       })
 
       const data = await response.json()
 
       if (response.ok && data.success) {
-        if (data.client) {
-          // User found - log them in
-          localStorage.setItem('clientId', data.client.id)
-          await refreshUser(data.client.id)
+        if (data.user) {
+          const user = data.user
           
-          success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${data.client.firstName}!`)
-          
-          // Redirect to their requests page
-          router.push(`/requests/${data.client.id}`)
+          if (userType === 'garage') {
+            // Garage login flow
+            localStorage.setItem('garageId', user.id)
+            await refreshUser(user.id)
+            
+            success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.companyName}!`)
+            
+            // Redirect to garage dashboard (you can create this later)
+            router.push('/garage-dashboard')
+          } else {
+            // Client login flow - check if there's pending vehicle data to deduplicate
+            const pendingDataStr = localStorage.getItem('pendingRegistrationData')
+            let pendingData = null
+            
+            if (pendingDataStr) {
+              pendingData = JSON.parse(pendingDataStr)
+              // Check if the data is not too old (within 1 hour)
+              const oneHourAgo = Date.now() - (60 * 60 * 1000)
+              if (pendingData.timestamp < oneHourAgo) {
+                // Data is too old, ignore it
+                pendingData = null
+                localStorage.removeItem('pendingRegistrationData')
+              }
+            }
+
+            // If there's pending vehicle data, handle deduplication
+            if (pendingData) {
+              try {
+                const dedupeResponse = await fetch('/api/auth/register-with-vehicle', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ 
+                    email: email.trim(),
+                    firstName: user.firstName,
+                    vehicleData: pendingData.vehicleData,
+                    serviceRequestId: pendingData.serviceRequestId
+                  }),
+                })
+
+                const dedupeData = await dedupeResponse.json()
+                
+                if (dedupeResponse.ok && dedupeData.success) {
+                  // Clear pending registration data
+                  localStorage.removeItem('pendingRegistrationData')
+                  
+                  let message = `Καλώς ήρθατε, ${user.firstName}!`
+                  if (dedupeData.vehicleDeduplicated) {
+                    const matchReason = dedupeData.vehicleMatchReason === 'VIN' ? 'VIN' : 'Αριθμό Κινητήρα'
+                    message += ` Βρέθηκε και συνδέθηκε το υπάρχον όχημά σας (${matchReason}).`
+                  }
+                  
+                  success('Επιτυχής Σύνδεση', message)
+                  
+                  // Redirect to their requests page
+                  router.push(`/requests/${user.id}`)
+                  return
+                }
+              } catch (dedupeError) {
+                console.error('Vehicle deduplication error:', dedupeError)
+                // Continue with normal login if deduplication fails
+              }
+            }
+            
+            // Normal client login flow
+            localStorage.setItem('clientId', user.id)
+            await refreshUser(user.id)
+            
+            success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.firstName}!`)
+            
+            // Redirect to their requests page
+            router.push(`/requests/${user.id}`)
+          }
         } else {
           // User not found - show registration option
           setNotFoundEmail(email.trim())
@@ -78,26 +147,81 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      // Create new client with this email
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          email: notFoundEmail,
-          firstName: 'Επισκέπτης' // Default name
-        }),
-      })
+      if (userType === 'garage') {
+        // Garage registration - redirect to professional registration page
+        router.push('/register-professional')
+        return
+      }
+
+      // Client registration flow
+      // Check if there's pending registration data from a service request
+      const pendingDataStr = localStorage.getItem('pendingRegistrationData')
+      let pendingData = null
+      
+      if (pendingDataStr) {
+        pendingData = JSON.parse(pendingDataStr)
+        // Check if the data is not too old (within 1 hour)
+        const oneHourAgo = Date.now() - (60 * 60 * 1000)
+        if (pendingData.timestamp < oneHourAgo) {
+          // Data is too old, ignore it
+          pendingData = null
+          localStorage.removeItem('pendingRegistrationData')
+        }
+      }
+
+      let response
+      
+      if (pendingData) {
+        // Use the new endpoint with vehicle data for deduplication
+        response = await fetch('/api/auth/register-with-vehicle', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            email: notFoundEmail,
+            firstName: 'Επισκέπτης', // Default name
+            vehicleData: pendingData.vehicleData,
+            serviceRequestId: pendingData.serviceRequestId
+          }),
+        })
+      } else {
+        // Use the regular registration endpoint
+        response = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            email: notFoundEmail,
+            firstName: 'Επισκέπτης' // Default name
+          }),
+        })
+      }
 
       const data = await response.json()
 
       if (response.ok && data.success) {
+        // Clear pending registration data since we've processed it
+        if (pendingData) {
+          localStorage.removeItem('pendingRegistrationData')
+        }
+        
         // Registration successful - log them in
         localStorage.setItem('clientId', data.client.id)
         await refreshUser(data.client.id)
         
-        success('Επιτυχής Εγγραφή', 'Ο λογαριασμός σας δημιουργήθηκε επιτυχώς!')
+        let message = 'Ο λογαριασμός σας δημιουργήθηκε επιτυχώς!'
+        
+        if (data.isExistingUser) {
+          message = 'Συνδεθήκατε επιτυχώς στον υπάρχοντα λογαριασμό σας!'
+          if (data.vehicleDeduplicated) {
+            const matchReason = data.vehicleMatchReason === 'VIN' ? 'VIN' : 'Αριθμό Κινητήρα'
+            message += ` Βρέθηκε και συνδέθηκε το υπάρχον όχημά σας (${matchReason}).`
+          }
+        }
+        
+        success('Επιτυχής Εγγραφή', message)
         
         // Redirect to their requests page
         router.push(`/requests/${data.client.id}`)
@@ -122,21 +246,33 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="w-full max-w-md mx-auto px-4">
         <div className="text-center mb-8">
-              <Title variant="page" level={2} className="mb-2">
+              <h2 className={`${styles.pageTitle} mb-2`}>
             Σύνδεση στον Λογαριασμό σας
-          </Title>
+          </h2>
           
-          <Text variant="body" color="muted">
+          <p className={styles.bodyText}>
             Εισάγετε το email σας για να συνδεθείτε
-          </Text>
+          </p>
         </div>
         <Card className={`py-8 px-4 ${styles.shadowLg} sm:rounded-lg sm:px-10`}>
           {!showRegisterOption ? (
             <form onSubmit={handleLogin} className="space-y-6">
+              {/* User Type Switch */}
+              <SegmentedControl
+                options={[
+                  { value: 'client', label: 'Πελάτης' },
+                  { value: 'garage', label: 'Συνεργείο' }
+                ]}
+                value={userType}
+                onChange={setUserType}
+                variant="orange"
+                className="max-w-xs mx-auto"
+              />
+
               <div>
-                <Text as="label" variant="small" weight="medium" className="block mb-2">
+                <label className={`${styles.label} block mb-2`}>
                   Email
-                </Text>
+                </label>
                 <Input
                   type="email"
                   value={email}
@@ -164,14 +300,14 @@ export default function LoginPage() {
                   <HiExclamationTriangle className="h-6 w-6 text-yellow-600" />
                 </div>
                 
-                <Title variant="section" level={3} className="mt-4">
+                <h3 className={`${styles.sectionTitle} mt-4`}>
                   Δεν βρέθηκε λογαριασμός
-                </Title>
+                </h3>
                 
-                <Text variant="body" color="muted" className="mt-2">
-                  Δεν υπάρχει λογαριασμός με το email{' '}
+                <p className={`${styles.bodyText} mt-2`}>
+                  Δεν υπάρχει {userType === 'garage' ? 'συνεργείο' : 'λογαριασμός'} με το email{' '}
                   <span className="font-medium text-gray-900">{notFoundEmail}</span>
-                </Text>
+                </p>
               </div>
 
               <div className="space-y-3">
@@ -180,7 +316,7 @@ export default function LoginPage() {
                   className={`${styles.btnPrimary} w-full text-base py-3`}
                   disabled={isLoading}
                 >
-                  {isLoading ? 'Δημιουργία...' : 'Δημιουργία Νέου Λογαριασμού'}
+                  {isLoading ? 'Δημιουργία...' : (userType === 'garage' ? 'Εγγραφή ως Συνεργείο' : 'Δημιουργία Νέου Λογαριασμού')}
                 </button>
                 
                 <button
@@ -196,7 +332,7 @@ export default function LoginPage() {
         </Card>
 
         <div className="mt-6 text-center">
-          <Text variant="small" color="muted">
+          <p className={styles.smallText}>
             Δεν έχετε λογαριασμό;{' '}
             <button
               onClick={() => router.push('/')}
@@ -204,7 +340,7 @@ export default function LoginPage() {
             >
               Επιστροφή στην Αρχική
             </button>
-          </Text>
+          </p>
         </div>
       </div>
     </div>

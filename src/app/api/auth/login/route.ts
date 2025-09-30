@@ -35,11 +35,17 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { email } = body
+    const { email, userType = 'client' } = body
 
     if (!email || typeof email !== 'string') {
       return NextResponse.json({ 
         error: 'Email is required' 
+      }, { status: 400 })
+    }
+
+    if (!['client', 'garage'].includes(userType)) {
+      return NextResponse.json({ 
+        error: 'Invalid user type. Must be "client" or "garage"' 
       }, { status: 400 })
     }
 
@@ -62,9 +68,10 @@ export async function POST(request: NextRequest) {
       }, { status: 429 })
     }
 
-    // Search for client with this email
+    // Search for user with this email (client or garage)
+    const tableName = userType === 'garage' ? 'Garages' : 'Clients'
     const scanCommand = new ScanCommand({
-      TableName: 'Clients',
+      TableName: tableName,
       FilterExpression: 'email = :email',
       ExpressionAttributeValues: {
         ':email': email.trim().toLowerCase()
@@ -75,24 +82,39 @@ export async function POST(request: NextRequest) {
 
     if (result.Items && result.Items.length > 0) {
       // User found
-      const client = result.Items[0]
+      const user = result.Items[0]
       
-      return NextResponse.json({
-        success: true,
-        client: {
-          id: client.id,
-          firstName: client.firstName,
-          lastName: client.lastName,
-          email: client.email,
-          phoneNumber: client.phoneNumber
-        }
-      })
+      if (userType === 'garage') {
+        return NextResponse.json({
+          success: true,
+          user: {
+            id: user.id,
+            companyName: user.companyName,
+            email: user.email,
+            mobile: user.mobile,
+            address: user.address,
+            tin: user.tin,
+            isActive: user.isActive
+          }
+        })
+      } else {
+        return NextResponse.json({
+          success: true,
+          user: {
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            phoneNumber: user.phoneNumber
+          }
+        })
+      }
     } else {
       // User not found
       return NextResponse.json({
         success: true,
-        client: null,
-        message: 'No account found with this email'
+        user: null,
+        message: `No ${userType} account found with this email`
       })
     }
 

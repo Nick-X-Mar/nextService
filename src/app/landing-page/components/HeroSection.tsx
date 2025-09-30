@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import CategorySelector from './CategorySelector'
-import CategoryChips from './CategoryChips'
 import { styles } from '../../../styles/styles'
 
 export default function HeroSection() {
@@ -19,10 +18,6 @@ export default function HeroSection() {
             Η πλατφόρμα που συνδέει πελάτες με έμπειρους επαγγελματίες. 
             Βρείτε την υπηρεσία που χρειάζεστε γρήγορα και εύκολα.
           </p>
-          <CategoryChips 
-            selectedCategory={selectedCategory}
-            onCategorySelect={setSelectedCategory}
-          />
           <CategorySelector 
             selectedCategory={selectedCategory}
             onCategorySelect={setSelectedCategory}

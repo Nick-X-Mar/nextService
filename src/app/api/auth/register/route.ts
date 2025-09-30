@@ -60,9 +60,21 @@ export async function POST(request: NextRequest) {
     const existingResult = await dynamoDB.send(scanCommand)
 
     if (existingResult.Items && existingResult.Items.length > 0) {
-      return NextResponse.json({ 
-        error: 'Υπάρχει ήδη λογαριασμός με αυτό το email' 
-      }, { status: 409 })
+      // User already exists - return the existing client data instead of error
+      const existingClient = existingResult.Items[0]
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Existing user found - logged in successfully',
+        client: {
+          id: existingClient.id,
+          firstName: existingClient.firstName,
+          email: existingClient.email,
+          lastName: existingClient.lastName,
+          phoneNumber: existingClient.phoneNumber
+        },
+        isExistingUser: true
+      })
     }
 
     // Generate unique client ID

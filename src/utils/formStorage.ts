@@ -18,6 +18,7 @@ export interface ServiceFormData {
   isAutomatic: boolean
   is4x4: boolean
   engineNumber: string
+  estimatedPrice: number | null
   // Note: File objects are handled separately since they can't be serialized to localStorage
 }
 
@@ -59,7 +60,8 @@ export const loadFormData = (): ServiceFormData => {
     fuelType: '',
     isAutomatic: false,
     is4x4: false,
-    engineNumber: ''
+    engineNumber: '',
+    estimatedPrice: null
   }
 }
 

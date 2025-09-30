@@ -206,32 +206,35 @@ The NextService database consists of **5 main tables** that work together to pro
 | Field | Type | Description | Required |
 |-------|------|-------------|----------|
 | `id` | String (PK) | Unique garage identifier | ✅ |
-| `name` | String | Garage business name | ✅ |
-| `phoneNumber` | String | Garage contact phone number | ✅ |
-| `email` | String | Garage contact email | ✅ |
-| `address` | String | Garage physical address | ✅ |
-| `services` | String Set | Services offered (service/fanopeia/oils/disk) | ✅ |
+| `companyName` | String | Company business name (Επωνυμία Εταιρείας) | ✅ |
+| `tin` | String | Tax Identification Number - ΑΦΜ (9 digits) | ✅ |
+| `email` | String | Company contact email | ✅ |
+| `taxAuthority` | String | Tax Authority - ΔΟΥ | ✅ |
+| `address` | String | Company physical address | ✅ |
+| `mobile` | String | Company mobile phone number | ✅ |
 | `isActive` | Boolean | Whether garage is accepting new requests | ✅ |
 | `rating` | Number | Average customer rating (0-5) | ❌ |
-| `description` | String | Garage description and specialties | ❌ |
-| `createdAt` | String (ISO 8601) | Garage registration timestamp | ✅ |
+| `description` | String | Company description and specialties | ❌ |
+| `createdAt` | String (ISO 8601) | Company registration timestamp | ✅ |
 | `updatedAt` | String (ISO 8601) | Last update timestamp | ✅ |
 
 **Global Secondary Indexes:**
-- `PhoneNumberIndex` (HASH: phoneNumber) - For SMS notifications
+- `TINIndex` (HASH: tin) - For TIN-based lookups
+- `MobileIndex` (HASH: mobile) - For SMS notifications
 
 **Sample Item:**
 ```json
 {
   "id": "garage-1",
-  "name": "AutoService Athens",
-  "phoneNumber": "+306984959044",
+  "companyName": "ΑΕ Συνεργείο Αυτοκινήτων Παπαδόπουλος",
+  "tin": "123456789",
   "email": "info@autoservice-athens.gr",
-  "address": "Athens, Greece",
-  "services": ["service", "fanopeia", "oils", "disk"],
+  "taxAuthority": "ΔΟΥ Αθηνών",
+  "address": "Λεωφόρος Πατησιών 123, Αθήνα",
+  "mobile": "+306984959044",
   "isActive": true,
   "rating": 4.5,
-  "description": "Professional auto service with 20+ years experience",
+  "description": "Εταιρεία εγγεγραμμένη στο NextService",
   "createdAt": "2024-09-24T19:00:00.000Z",
   "updatedAt": "2024-09-24T19:00:00.000Z"
 }

@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     
     // Validate required fields
-    const { category, description, brand, model } = body
+    const { category, description, brand, model, clientId: existingClientId } = body
     
     if (!category || !description || !brand || !model) {
       return NextResponse.json(
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     
     // Generate unique IDs
     const serviceRequestId = `sr-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    const clientId = `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    const clientId = existingClientId || `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     const vehicleId = `vehicle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     
     // Save to DynamoDB - remove null values as DynamoDB doesn't like them
@@ -141,35 +141,38 @@ export async function POST(request: NextRequest) {
       Item: vehicleData
     }))
     
-    // Save client data to DynamoDB - remove null values
-    const clientData: {
-      id: string
-      firstName: string
-      isActive: boolean
-      createdAt: string
-      updatedAt: string
-      lastName?: string
-      email?: string
-      phoneNumber?: string
-      address?: string
-    } = {
-      id: clientId,
-      firstName: body.firstName || 'Επισκέπτης',
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+    // Only create client if it doesn't already exist (new guest user)
+    if (!existingClientId) {
+      // Save client data to DynamoDB - remove null values
+      const clientData: {
+        id: string
+        firstName: string
+        isActive: boolean
+        createdAt: string
+        updatedAt: string
+        lastName?: string
+        email?: string
+        phoneNumber?: string
+        address?: string
+      } = {
+        id: clientId,
+        firstName: body.firstName || 'Επισκέπτης',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+      
+      // Only add optional fields if they have values
+      if (body.lastName) clientData.lastName = body.lastName
+      if (body.email) clientData.email = body.email
+      if (body.phoneNumber) clientData.phoneNumber = body.phoneNumber
+      if (body.address) clientData.address = body.address
+      
+      await dynamoDB.send(new PutCommand({
+        TableName: 'Clients',
+        Item: clientData
+      }))
     }
-    
-    // Only add optional fields if they have values
-    if (body.lastName) clientData.lastName = body.lastName
-    if (body.email) clientData.email = body.email
-    if (body.phoneNumber) clientData.phoneNumber = body.phoneNumber
-    if (body.address) clientData.address = body.address
-    
-    await dynamoDB.send(new PutCommand({
-      TableName: 'Clients',
-      Item: clientData
-    }))
     
     console.log('Service request saved to database:', {
       serviceRequestId,

@@ -68,11 +68,13 @@ aws dynamodb create-table \
     --table-name Garages \
     --attribute-definitions \
         AttributeName=id,AttributeType=S \
-        AttributeName=phoneNumber,AttributeType=S \
+        AttributeName=tin,AttributeType=S \
+        AttributeName=mobile,AttributeType=S \
     --key-schema \
         AttributeName=id,KeyType=HASH \
     --global-secondary-indexes \
-        IndexName=PhoneNumberIndex,KeySchema='[{AttributeName=phoneNumber,KeyType=HASH}]',Projection='{ProjectionType=ALL}',ProvisionedThroughput='{ReadCapacityUnits=5,WriteCapacityUnits=5}' \
+        IndexName=TINIndex,KeySchema='[{AttributeName=tin,KeyType=HASH}]',Projection='{ProjectionType=ALL}',ProvisionedThroughput='{ReadCapacityUnits=5,WriteCapacityUnits=5}' \
+        IndexName=MobileIndex,KeySchema='[{AttributeName=mobile,KeyType=HASH}]',Projection='{ProjectionType=ALL}',ProvisionedThroughput='{ReadCapacityUnits=5,WriteCapacityUnits=5}' \
     --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
     --region $AWS_REGION
 

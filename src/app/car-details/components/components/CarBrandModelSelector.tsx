@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation'
 import { HiArrowRight } from 'react-icons/hi2'
 import { styles } from '../../../../styles/styles'
 import { saveFormData, loadFormData, clearFormData } from '../../../../utils/formStorage'
+import SegmentedControl from '../../../../components/SegmentedControl'
 
 interface CarBrandModelSelectorProps {
   selectedBrand: string
@@ -46,12 +47,11 @@ export default function CarBrandModelSelector({
   onModelChange
 }: CarBrandModelSelectorProps) {
   const router = useRouter()
-  const [isBrandOther, setIsBrandOther] = useState(false)
-  const [isModelOther, setIsModelOther] = useState(false)
-  const [customBrand, setCustomBrand] = useState('')
-  const [customModel, setCustomModel] = useState('')
-  const [modelYear, setModelYear] = useState('')
   const [engineCC, setEngineCC] = useState('')
+  const [modelYear, setModelYear] = useState('')
+  const [fuelType, setFuelType] = useState<'petrol' | 'diesel' | ''>('petrol')
+  const [isAutomatic, setIsAutomatic] = useState(false)
+  const [is4x4, setIs4x4] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   // Validation for model year (4 digits only)
@@ -79,106 +79,49 @@ export default function CarBrandModelSelector({
     return ccNumber >= 100 && ccNumber <= 9999
   }
 
+
   // Load saved data on component mount
   useEffect(() => {
     setMounted(true)
     const data = loadFormData()
     
-    // Restore car selection state
-    if (data.brand) {
-      onBrandChange(data.brand)
-      setIsBrandOther(data.isBrandOther)
-      setCustomBrand(data.customBrand)
-    }
-    if (data.model) {
-      onModelChange(data.model)
-      setIsModelOther(data.isModelOther)
-      setCustomModel(data.customModel)
-    }
-    // Restore new fields
-    if (data.modelYear) setModelYear(data.modelYear)
+    // Restore technical specifications
     if (data.engineCC) setEngineCC(data.engineCC)
-  }, [onBrandChange, onModelChange])
+    if (data.modelYear) setModelYear(data.modelYear)
+    if (data.fuelType) setFuelType(data.fuelType)
+    else setFuelType('petrol')
+    if (data.isAutomatic !== undefined) setIsAutomatic(data.isAutomatic)
+    if (data.is4x4 !== undefined) setIs4x4(data.is4x4)
+  }, [])
 
   // Save data whenever it changes
   useEffect(() => {
     if (mounted) {
       saveFormData({
-        brand: selectedBrand,
-        model: selectedModel,
-        isBrandOther,
-        isModelOther,
-        customBrand,
-        customModel,
+        engineCC,
         modelYear,
-        engineCC
+        fuelType,
+        isAutomatic,
+        is4x4
       })
     }
-  }, [selectedBrand, selectedModel, isBrandOther, isModelOther, customBrand, customModel, modelYear, engineCC, mounted])
+  }, [engineCC, modelYear, fuelType, isAutomatic, is4x4, mounted])
 
-  // Form validation - check if we have brand, model, year, and valid CC
-  const currentBrand = isBrandOther ? customBrand : selectedBrand
-  const currentModel = isModelOther ? customModel : selectedModel
+  // Form validation - check if we have valid CC, year, and fuel type
   const isFormValid = 
-    currentBrand.trim() !== '' && 
-    currentModel.trim() !== '' &&
+    isCCValid(engineCC) &&
     modelYear.length === 4 && /^\d{4}$/.test(modelYear) &&
-    isCCValid(engineCC)
-    
-  const availableModels = !isBrandOther && selectedBrand ? carBrands[selectedBrand as keyof typeof carBrands] || [] : []
-
-  const handleBrandChange = (brand: string) => {
-    if (brand === 'other') {
-      setIsBrandOther(true)
-      onBrandChange('') // Clear parent brand while user types
-    } else {
-      setIsBrandOther(false)
-      setCustomBrand('') // Clear custom brand
-      onBrandChange(brand)
-    }
-    // Always reset model when brand changes
-    setIsModelOther(false)
-    setCustomModel('')
-    onModelChange('')
-  }
-
-  const handleCustomBrandChange = (value: string) => {
-    setCustomBrand(value)
-    onBrandChange(value) // Update parent state with custom brand
-  }
-
-  const handleModelChange = (model: string) => {
-    if (model === 'other') {
-      setIsModelOther(true)
-      onModelChange('') // Clear parent model while user types
-    } else {
-      setIsModelOther(false)
-      setCustomModel('') // Clear custom model
-      onModelChange(model)
-    }
-  }
-
-  const handleCustomModelChange = (value: string) => {
-    setCustomModel(value)
-    onModelChange(value) // Update parent state with custom model
-  }
+    fuelType !== ''
 
   const handleSubmit = () => {
     if (isFormValid) {
-      // Use the correct brand and model (either from dropdown or custom input)
-      const finalBrand = isBrandOther ? customBrand : selectedBrand
-      const finalModel = isModelOther ? customModel : selectedModel
-      
-      // Save final car details before navigation
+      // Save technical specifications before navigation
       saveFormData({
-        brand: finalBrand,
-        model: finalModel,
-        isBrandOther,
-        isModelOther,
-        customBrand,
-        customModel,
+        engineCC,
         modelYear,
-        engineCC
+        fuelType,
+        isAutomatic,
+        is4x4
       })
       
       // Navigate to the next step (car specifications or body work photos)
@@ -187,130 +130,116 @@ export default function CarBrandModelSelector({
   }
 
   return (
-    <div className="mt-5 max-w-md mx-auto md:mt-8">
-      <div className={styles.card}>
-        {/* Brand Selection */}
-        <div className="mb-4">
-          <label className={`${styles.label} text-lg text-center`}>
-            Επιλέξτε μάρκα:
-          </label>
-          <select 
-            value={isBrandOther ? 'other' : selectedBrand}
-            onChange={(e) => handleBrandChange(e.target.value)}
-            className={styles.select}
-          >
-            <option value="">Επιλέξτε μάρκα...</option>
-            {Object.keys(carBrands).map((brand) => (
-              <option key={brand} value={brand}>
-                {brand.charAt(0).toUpperCase() + brand.slice(1)}
-              </option>
-            ))}
-            <option value="other">Άλλο</option>
-          </select>
-        </div>
+    <div className="mt-5 max-w-lg mx-auto md:mt-8">
+      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6">
+        {/* Form Fields */}
+        <div className="space-y-4">
+          {/* Model Year, Engine CC, and Fuel Type - Three in a row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Model Year */}
+            <div className="space-y-2">
+              <label className={styles.label}>
+                Έτος:
+              </label>
+              <input
+                type="text"
+                value={modelYear}
+                onChange={handleModelYearChange}
+                placeholder="2020"
+                className={styles.input}
+                maxLength={4}
+              />
+              {modelYear && modelYear.length === 4 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  ✓ Έγκυρο
+                </p>
+              )}
+              {modelYear && modelYear.length > 0 && modelYear.length < 4 && (
+                <p className="text-xs text-red-500 mt-1">
+                  4 ψηφία
+                </p>
+              )}
+            </div>
 
-        {/* Custom Brand Input - Show if "Άλλο" is selected */}
-        {isBrandOther && (
-          <div className="mb-4">
-            <label className={styles.label}>
-              Εισάγετε μάρκα:
-            </label>
-            <input
-              type="text"
-              value={customBrand}
-              onChange={(e) => handleCustomBrandChange(e.target.value)}
-              placeholder="π.χ. Lada, Smart, Proton..."
-              className={styles.input}
-            />
+            {/* Engine CC */}
+            <div className="space-y-2">
+              <label className={styles.label}>
+                CC:
+              </label>
+              <input
+                type="text"
+                value={engineCC}
+                onChange={handleEngineCCChange}
+                placeholder="1600"
+                className={styles.input}
+                maxLength={4}
+              />
+              {engineCC && isCCValid(engineCC) && (
+                <p className="text-xs text-gray-500 mt-1">
+                  ✓ Έγκυρο
+                </p>
+              )}
+              {engineCC && engineCC.length > 0 && !isCCValid(engineCC) && (
+                <p className="text-xs text-red-500 mt-1">
+                  100-9999
+                </p>
+              )}
+            </div>
+
+            {/* Fuel Type */}
+            <div className="space-y-2">
+              <label className={styles.label}>
+                Καύσιμο:
+              </label>
+              <SegmentedControl
+                options={[
+                  { value: 'petrol', label: 'Βενζίνη' },
+                  { value: 'diesel', label: 'Πετρέλαιο' }
+                ]}
+                value={fuelType}
+                onChange={setFuelType}
+                variant="orange"
+                size="md"
+              />
+            </div>
           </div>
-        )}
 
-        {/* Model Selection - Only show if brand is selected and not custom */}
-        {selectedBrand && !isBrandOther && (
-          <div className="mb-4">
-            <label className={styles.label}>
-              Επιλέξτε μοντέλο:
-            </label>
-            <select 
-              value={isModelOther ? 'other' : selectedModel}
-              onChange={(e) => handleModelChange(e.target.value)}
-              className={styles.select}
-            >
-              <option value="">Επιλέξτε μοντέλο...</option>
-              {availableModels.map((model) => (
-                <option key={model} value={model}>
-                  {model}
-                </option>
-              ))}
-              <option value="other">Άλλο</option>
-            </select>
+          {/* Transmission and Drive Type - Side by side */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Automatic Transmission */}
+            <div className="space-y-2">
+              <label className={styles.label}>
+                Αυτόματο:
+              </label>
+              <SegmentedControl
+                options={[
+                  { value: 'manual', label: 'Χειροκίνητο' },
+                  { value: 'automatic', label: 'Αυτόματο' }
+                ]}
+                value={isAutomatic ? 'automatic' : 'manual'}
+                onChange={(value) => setIsAutomatic(value === 'automatic')}
+                variant="orange"
+                size="md"
+              />
+            </div>
+
+            {/* 4x4 Drive */}
+            <div className="space-y-2">
+              <label className={styles.label}>
+                4x4:
+              </label>
+              <SegmentedControl
+                options={[
+                  { value: '2wd', label: '2WD' },
+                  { value: '4x4', label: '4x4' }
+                ]}
+                value={is4x4 ? '4x4' : '2wd'}
+                onChange={(value) => setIs4x4(value === '4x4')}
+                variant="orange"
+                size="md"
+              />
+            </div>
           </div>
-        )}
-
-        {/* Custom Model Input - Show if model "Άλλο" is selected OR brand is custom */}
-        {(isModelOther || (isBrandOther && customBrand.trim() !== '')) && (
-          <div className="mb-4">
-            <label className={styles.label}>
-              Εισάγετε μοντέλο:
-            </label>
-            <input
-              type="text"
-              value={customModel}
-              onChange={(e) => handleCustomModelChange(e.target.value)}
-              placeholder="π.χ. Samara, ForTwo, Wira..."
-              className={styles.input}
-            />
-          </div>
-        )}
-
-        {/* Model Year */}
-        <div className="mb-4">
-          <label className={styles.label}>
-            Έτος Κατασκευής:
-          </label>
-          <input
-            type="text"
-            value={modelYear}
-            onChange={handleModelYearChange}
-            placeholder="π.χ. 2020"
-            className={styles.input}
-            maxLength={4}
-          />
-          {modelYear && modelYear.length === 4 && (
-            <p className="text-xs text-gray-500 mt-1">
-              ✓ Έγκυρο έτος κατασκευής
-            </p>
-          )}
-          {modelYear && modelYear.length > 0 && modelYear.length < 4 && (
-            <p className="text-xs text-red-500 mt-1">
-              Παρακαλώ εισάγετε 4 ψηφία
-            </p>
-          )}
-        </div>
-
-        {/* Engine CC */}
-        <div className="mb-4">
-          <label className={styles.label}>
-            Κυβικά Εκατοστά (CC):
-          </label>
-          <input
-            type="text"
-            value={engineCC}
-            onChange={handleEngineCCChange}
-            placeholder="π.χ. 1600, 2000, 2500"
-            className={styles.input}
-            maxLength={4}
-          />
-          {engineCC && isCCValid(engineCC) && (
-            <p className="text-xs text-gray-500 mt-1">
-              ✓ Έγκυρος κυβισμός κινητήρα
-            </p>
-          )}
-          {engineCC && engineCC.length > 0 && !isCCValid(engineCC) && (
-            <p className="text-xs text-red-500 mt-1">
-              Παρακαλώ εισάγετε έγκυρο κυβισμό (100-9999cc)
-            </p>
-          )}
         </div>
         
         <button 

@@ -19,6 +19,7 @@ This directory contains reusable UI components that follow consistent design pat
 - **`Button`** - All button variations (primary, secondary, danger, etc.)
 - **`Checkbox`** - Form checkboxes with labels
 - **`Switch`** - Toggle switches for on/off states
+- **`SegmentedControl`** - Segmented control for multiple choice selections
 - **`Input`** - Text inputs with validation and error states
 
 ### 📝 **Typography**
@@ -95,6 +96,18 @@ import { Button, Title, Text, Card, Modal } from '@/components'
   checked={isAgreed}
   onChange={setIsAgreed}
   label="I agree to the terms"
+/>
+
+// Segmented Control
+<SegmentedControl
+  options={[
+    { value: 'client', label: 'Πελάτης' },
+    { value: 'garage', label: 'Συνεργείο' }
+  ]}
+  value={userType}
+  onChange={setUserType}
+  variant="orange"
+  size="md"
 />
 
 // Switch

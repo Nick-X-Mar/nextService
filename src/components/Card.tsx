@@ -1,6 +1,7 @@
 'use client'
 
 import { ReactNode } from 'react'
+import { styles } from '@/styles/styles'
 
 interface CardProps {
   children: ReactNode
@@ -22,12 +23,12 @@ export default function Card({
   // Base classes
   const baseClasses = 'rounded-lg transition-all duration-200'
   
-  // Variant classes
+  // Variant classes using design system
   const variantClasses = {
-    default: 'bg-white border border-gray-200',
-    outlined: 'bg-white border-2 border-gray-300',
-    elevated: 'bg-white shadow-lg border border-gray-100',
-    simple: 'bg-gray-50 border border-gray-200'
+    default: styles.card,
+    outlined: 'bg-white border-2 border-gray-300 rounded-lg p-4',
+    elevated: styles.card,
+    simple: styles.cardSimple
   }
   
   // Padding classes
@@ -44,7 +45,7 @@ export default function Card({
   // Click classes
   const clickClasses = onClick ? 'cursor-pointer' : ''
   
-  const cardClasses = `${baseClasses} ${variantClasses[variant]} ${paddingClasses[padding]} ${hoverClasses} ${clickClasses} ${className}`
+  const cardClasses = `${variantClasses[variant]} ${paddingClasses[padding]} ${hoverClasses} ${clickClasses} ${className}`
   
   return (
     <div 

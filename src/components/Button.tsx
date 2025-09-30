@@ -1,6 +1,7 @@
 'use client'
 
 import { ReactNode } from 'react'
+import { styles } from '@/styles/styles'
 
 interface ButtonProps {
   children: ReactNode
@@ -25,30 +26,27 @@ export default function Button({
   className = '',
   fullWidth = false
 }: ButtonProps) {
-  // Base classes
-  const baseClasses = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed'
-  
-  // Variant classes
+  // Use design system styles
   const variantClasses = {
-    primary: 'bg-orange-600 text-white hover:bg-orange-700 focus:ring-orange-500',
-    secondary: 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500',
-    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
-    success: 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500',
-    outline: 'border-2 border-orange-600 text-orange-600 hover:bg-orange-600 hover:text-white focus:ring-orange-500',
-    ghost: 'text-orange-600 hover:bg-orange-50 focus:ring-orange-500'
+    primary: styles.btnPrimary,
+    secondary: styles.btnSecondary,
+    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2',
+    success: 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500 px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2',
+    outline: styles.btnOutline,
+    ghost: 'text-orange-500 hover:text-orange-600 px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2'
   }
   
-  // Size classes
+  // Size classes (just padding adjustments)
   const sizeClasses = {
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2 text-base',
-    lg: 'px-6 py-3 text-lg'
+    sm: 'px-3 py-1.5',
+    md: '', // Default from design system
+    lg: 'px-6 py-3'
   }
   
   // Width classes
   const widthClasses = fullWidth ? 'w-full' : ''
   
-  const buttonClasses = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${widthClasses} ${className}`
+  const buttonClasses = `${variantClasses[variant]} ${sizeClasses[size]} ${widthClasses} ${className}`
   
   return (
     <button
