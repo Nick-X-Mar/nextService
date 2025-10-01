@@ -4,6 +4,7 @@ import "./globals.css";
 import Header from "@/components/Header";
 import ToastContainer from "@/components/ToastContainer";
 import { UserProvider } from "@/contexts/UserContext";
+import "@/lib/amplify-config"; // Initialize Amplify
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand, PutCommand } from '@aws-sdk/lib-dynamodb'
+import appSyncService from '@/lib/appsync-service'
 
 export async function GET(
   request: NextRequest,
@@ -83,6 +84,9 @@ export async function POST(
     }
 
     const { message, senderId, senderType, garageId } = body
+    
+    // If garageId is not provided but senderType is garage, use senderId as garageId
+    const effectiveGarageId = garageId || (senderType === 'garage' ? senderId : null)
 
     if (!message || !senderId || !senderType) {
       return NextResponse.json({ 
@@ -140,7 +144,7 @@ export async function POST(
       message: message.trim(),
       timestamp: new Date().toISOString(),
       createdAt: new Date().toISOString(),
-      ...(garageId && { garageId: garageId })
+      ...(effectiveGarageId && { garageId: effectiveGarageId })
     }
 
     const putCommand = new PutCommand({
@@ -149,6 +153,19 @@ export async function POST(
     })
 
     await dynamoDB.send(putCommand)
+
+            // Publish message to AppSync Events for real-time updates
+            if (effectiveGarageId) {
+              const channelName = `chat-${requestId}-${effectiveGarageId}`
+              try {
+                // Publish the message to AppSync Events
+                await appSyncService.publishEvent(channelName, messageData)
+                console.log(`[API] Message published to AppSync Events channel: ${channelName}`)
+              } catch (error) {
+                console.error('[API] Error publishing to AppSync Events:', error)
+                // Don't fail the request if AppSync publishing fails
+              }
+            }
 
     return NextResponse.json({
       success: true,

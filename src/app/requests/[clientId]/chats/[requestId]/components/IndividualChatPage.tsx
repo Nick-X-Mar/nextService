@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { HiArrowLeft, HiChatBubbleLeftRight, HiUser, HiPaperAirplane, HiPhoto } from 'react-icons/hi2'
 import { styles } from '../../../../../../styles/styles'
 import { useToast } from '../../../../../../hooks/useToast'
 import ClientNavigation from '../../../../../../components/ClientNavigation'
+import '@/lib/amplify-config'
+import appSyncService from '@/lib/appsync-service'
 
 interface ChatMessage {
   id: string
@@ -41,6 +43,8 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  
+  const subscriptionRef = useRef<string | null>(null)
 
   // Fetch garages that have messages for this request
   const fetchGarages = async () => {
@@ -70,6 +74,64 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
     } catch (error) {
       console.error('Error fetching messages:', error)
       showToast('Σφάλμα κατά τη φόρτωση των μηνυμάτων', 'error')
+    }
+  }
+
+  // Subscribe to real-time messages using AWS AppSync
+  const subscribeToMessages = async (garageId: string) => {
+    // Clear existing subscription
+    if (subscriptionRef.current) {
+      appSyncService.unsubscribe(subscriptionRef.current)
+    }
+    
+    const channelName = `chat-${requestId}-${garageId}`
+    console.log(`[Client] Subscribing to AppSync channel: ${channelName}`)
+    
+    try {
+      // Connect to AppSync if not already connected
+      if (!appSyncService.getConnectionStatus()) {
+        await appSyncService.connect()
+      }
+      
+      // Subscribe to the channel
+      appSyncService.subscribe(channelName, (newMessage: ChatMessage) => {
+        console.log('[Client] Real-time message received:', newMessage)
+        
+        setMessages(prev => {
+          console.log('[Client] setMessages - prev messages:', prev)
+          console.log('[Client] setMessages - newMessage:', newMessage)
+          
+          // Prevent duplicate messages
+          const exists = prev.some(msg => msg.id === newMessage.id)
+          console.log('[Client] setMessages - message exists:', exists)
+          
+          if (exists) {
+            console.log('[Client] setMessages - message already exists, not adding')
+            return prev
+          }
+          
+          // Add new message and sort by timestamp
+          const newMessages = [...prev, newMessage].sort((a, b) => 
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          )
+          console.log('[Client] setMessages - new messages array:', newMessages)
+          return newMessages
+        })
+      })
+      
+      subscriptionRef.current = channelName
+    } catch (error) {
+      console.error('[Client] Error subscribing to AppSync:', error)
+      showToast('Σφάλμα στη σύνδεση για πραγματικό χρόνο', 'error')
+    }
+  }
+  
+  // Stop subscription
+  const stopSubscription = () => {
+    if (subscriptionRef.current) {
+      appSyncService.unsubscribe(subscriptionRef.current)
+      subscriptionRef.current = null
+      console.log('[Client] Stopped AppSync subscription')
     }
   }
 
@@ -112,6 +174,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   const handleGarageSelect = (garage: Garage) => {
     setSelectedGarage(garage)
     fetchMessages(garage.id)
+    subscribeToMessages(garage.id)
   }
 
   // Get garage initials
@@ -165,8 +228,16 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   useEffect(() => {
     if (selectedGarage) {
       fetchMessages(selectedGarage.id)
+      subscribeToMessages(selectedGarage.id)
     }
   }, [selectedGarage])
+
+  // Cleanup subscription on unmount
+  useEffect(() => {
+    return () => {
+      stopSubscription()
+    }
+  }, [])
 
   if (loading) {
     return (

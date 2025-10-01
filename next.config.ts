@@ -2,7 +2,10 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
-  devIndicators: false,
+  devIndicators: {
+    buildActivity: false,
+    buildActivityPosition: 'bottom-right',
+  },
   webpack: (config) => {
     config.module.rules.push({
       test: /\.yaml$/,
@@ -23,6 +26,10 @@ const nextConfig: NextConfig = {
     DYNAMODB_ENDPOINT: process.env.DYNAMODB_ENDPOINT,
     S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
     AMPLIFY_ROLE_ARN: process.env.AMPLIFY_ROLE_ARN,
+    NEXT_PUBLIC_APPSYNC_WEBSOCKET_ENDPOINT: process.env.NEXT_PUBLIC_APPSYNC_WEBSOCKET_ENDPOINT,
+    NEXT_PUBLIC_APPSYNC_API_KEY: process.env.NEXT_PUBLIC_APPSYNC_API_KEY,
+    NEXT_PUBLIC_APPSYNC_REGION: process.env.NEXT_PUBLIC_APPSYNC_REGION,
+    NEXT_PUBLIC_APPSYNC_ENDPOINT: process.env.NEXT_PUBLIC_APPSYNC_ENDPOINT,
   },
   /* config options here */
 };

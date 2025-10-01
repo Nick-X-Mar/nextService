@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, Button, Input } from '@/components'
 import { styles } from '@/styles/styles'
+import '@/lib/amplify-config'
+import appSyncService from '@/lib/appsync-service'
 
 interface Message {
   id: string
@@ -49,10 +51,20 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
   const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  
+  // Subscription refs
+  const subscriptionRef = useRef<string | null>(null)
 
   useEffect(() => {
     loadChatData()
   }, [garageId, requestId])
+
+  // Cleanup subscription on unmount
+  useEffect(() => {
+    return () => {
+      stopSubscription()
+    }
+  }, [])
 
   useEffect(() => {
     scrollToBottom()
@@ -60,6 +72,53 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  // Subscribe to real-time messages using AWS AppSync
+  const subscribeToMessages = async () => {
+    // Clear existing subscription
+    if (subscriptionRef.current) {
+      appSyncService.unsubscribe(subscriptionRef.current)
+    }
+    
+    const channelName = `chat-${requestId}-${garageId}`
+    console.log(`[Garage] Subscribing to AppSync channel: ${channelName}`)
+    
+    try {
+      // Connect to AppSync if not already connected
+      if (!appSyncService.getConnectionStatus()) {
+        await appSyncService.connect()
+      }
+      
+      // Subscribe to the channel
+      appSyncService.subscribe(channelName, (newMessage: Message) => {
+        console.log('[Garage] Real-time message received:', newMessage)
+        
+        setMessages(prev => {
+          // Prevent duplicate messages
+          const exists = prev.some(msg => msg.id === newMessage.id)
+          if (exists) return prev
+          
+          // Add new message and sort by timestamp
+          return [...prev, newMessage].sort((a, b) => 
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          )
+        })
+      })
+      
+      subscriptionRef.current = channelName
+    } catch (error) {
+      console.error('[Garage] Error subscribing to AppSync:', error)
+    }
+  }
+  
+  // Stop subscription
+  const stopSubscription = () => {
+    if (subscriptionRef.current) {
+      appSyncService.unsubscribe(subscriptionRef.current)
+      subscriptionRef.current = null
+      console.log('[Garage] Stopped AppSync subscription')
+    }
   }
 
   const loadChatData = async () => {
@@ -92,6 +151,10 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
           setMessages(messagesResult.messages)
         }
       }
+      
+      // Start AppSync subscription after loading initial data
+      console.log('[Garage] Starting AppSync subscription...')
+      await subscribeToMessages()
     } catch (error) {
       console.error('Error loading chat data:', error)
     } finally {
@@ -120,7 +183,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
       if (response.ok) {
         const result = await response.json()
         if (result.success) {
-          setMessages(prev => [...prev, result.message])
+          // Don't manually add the message - real-time subscription will handle it
           setNewMessage('')
         }
       }
