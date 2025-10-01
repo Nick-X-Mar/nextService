@@ -1,5 +1,5 @@
 // SMS notification service using AWS SNS
-import { sendSMSNotificationToGarages, formatSMSMessage } from './smsService'
+// import { sendSMSNotificationToGarages, formatSMSMessage } from './smsService'
 
 interface SMSNotificationResult {
   successful: number
@@ -40,6 +40,19 @@ export const sendNotificationToGarages = async (
   }
 ): Promise<SMSNotificationResult> => {
   try {
+    // SMS functionality commented out - AWS SNS not configured
+    console.log('SMS notifications disabled - AWS SNS not configured')
+    
+    // Return success without actually sending SMS
+    return {
+      successful: 0,
+      failed: 0,
+      errors: [],
+      messageIds: [],
+      summary: 'SMS ειδοποιήσεις απενεργοποιημένες - AWS SNS δεν είναι διαμορφωμένο'
+    }
+    
+    /* SMS functionality - uncomment when AWS SNS is configured
     // Format the SMS message
     const smsMessage = formatSMSMessage(serviceRequestData)
     
@@ -55,14 +68,15 @@ export const sendNotificationToGarages = async (
       ...smsResult,
       summary
     }
+    */
   } catch (error) {
-    console.error('Error sending SMS notifications:', error)
+    console.error('Error in notification service:', error)
     return {
       successful: 0,
       failed: 1,
-      errors: [`Failed to send SMS notifications: ${error}`],
+      errors: [`Notification service error: ${error}`],
       messageIds: [],
-      summary: `Αποτυχία αποστολής SMS ειδοποιήσεων: ${error}`
+      summary: `Σφάλμα υπηρεσίας ειδοποιήσεων: ${error}`
     }
   }
 }
