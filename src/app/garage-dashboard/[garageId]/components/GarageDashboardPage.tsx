@@ -14,7 +14,7 @@ interface GarageDashboardPageProps {
 
 export default function GarageDashboardPage({ garageId }: GarageDashboardPageProps) {
   const [activeTab, setActiveTab] = useState('my-offers')
-  const [garageData, setGarageData] = useState(null)
+  const [garageData, setGarageData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
@@ -107,6 +107,8 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
   }
 
   const renderActiveTab = () => {
+    if (!garageData) return null
+    
     switch (activeTab) {
       case 'my-offers':
         return <MyOffers garageId={garageData.id} />

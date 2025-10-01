@@ -1,6 +1,7 @@
-import { SNSClient, PublishCommand } from '@aws-sdk/client-sns'
+// import { SNSClient, PublishCommand } from '@aws-sdk/client-sns'
 
-// AWS SNS configuration
+// AWS SNS configuration - commented out since SNS is not configured
+/*
 const snsClient = new SNSClient({ 
   region: process.env.AWS_REGION || 'eu-central-1', // Use EU region for lower latency to Greece
   credentials: {
@@ -8,6 +9,7 @@ const snsClient = new SNSClient({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ''
   }
 })
+*/
 
 // Greek garage phone numbers - in production, these would come from database
 const GARAGE_PHONE_NUMBERS: string[] = [
@@ -26,6 +28,14 @@ interface SMSResult {
 }
 
 export const sendSMSMessage = async (phoneNumber: string, message: string): Promise<{ success: boolean; messageId?: string; error?: string }> => {
+  // SMS functionality disabled - AWS SNS not configured
+  console.log('SMS functionality disabled - AWS SNS not configured')
+  return { 
+    success: false, 
+    error: 'SMS functionality disabled - AWS SNS not configured' 
+  }
+  
+  /* SMS functionality - uncomment when AWS SNS is configured
   try {
     // Ensure phone number is in international format
     const formattedNumber = formatPhoneNumber(phoneNumber)
@@ -60,6 +70,7 @@ export const sendSMSMessage = async (phoneNumber: string, message: string): Prom
       error: error instanceof Error ? error.message : 'Unknown error' 
     }
   }
+  */
 }
 
 export const sendSMSNotificationToGarages = async (message: string): Promise<SMSResult> => {

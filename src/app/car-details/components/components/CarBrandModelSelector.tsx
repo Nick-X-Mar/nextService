@@ -197,7 +197,7 @@ export default function CarBrandModelSelector({
                   { value: 'diesel', label: 'Πετρέλαιο' }
                 ]}
                 value={fuelType}
-                onChange={setFuelType}
+                onChange={(value) => setFuelType(value as 'petrol' | 'diesel' | '')}
                 variant="orange"
                 size="md"
               />

@@ -193,8 +193,8 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
         } else {
           error('Σφάλμα', result.error || 'Άγνωστο σφάλμα')
         }
-      } catch (error) {
-        console.error('Error submitting service request:', error)
+      } catch (err) {
+        console.error('Error submitting service request:', err)
         error('Σφάλμα', 'Σφάλμα κατά την αποστολή. Παρακαλώ δοκιμάστε ξανά.')
       }
     }

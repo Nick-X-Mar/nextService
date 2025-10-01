@@ -18,7 +18,7 @@ export default function ProfessionalSection() {
             </p>
           </div>
 
-          <div className={styles.grid2}>
+          <div className={styles.grid3}>
             {/* Benefits for Professionals */}
             <div className="space-y-6">
               <div className="flex items-start space-x-4">

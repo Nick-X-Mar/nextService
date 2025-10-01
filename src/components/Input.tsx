@@ -7,6 +7,7 @@ interface InputProps {
   type?: 'text' | 'email' | 'password' | 'number' | 'tel' | 'url' | 'search'
   value: string
   onChange: (value: string) => void
+  onKeyPress?: (e: React.KeyboardEvent<HTMLInputElement>) => void
   placeholder?: string
   label?: ReactNode
   error?: string
@@ -25,6 +26,7 @@ export default function Input({
   type = 'text',
   value,
   onChange,
+  onKeyPress,
   placeholder,
   label,
   error,
@@ -78,6 +80,7 @@ export default function Input({
         type={type}
         value={value}
         onChange={handleChange}
+        onKeyPress={onKeyPress}
         placeholder={placeholder}
         disabled={disabled}
         required={required}

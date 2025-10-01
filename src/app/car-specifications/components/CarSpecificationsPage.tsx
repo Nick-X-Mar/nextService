@@ -18,7 +18,7 @@ export default function CarSpecificationsPage() {
     fuelType: '',
     isAutomatic: false,
     is4x4: false,
-    estimatedPrice: null
+    estimatedPrice: null as number | null
   })
   const [isLoading, setIsLoading] = useState(true)
 

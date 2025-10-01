@@ -33,6 +33,7 @@
     "ws": "^8.14.2"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
     "dynamodb-admin": "^4.0.0",
     "eslint": "^8",
     "eslint-config-next": "15.1.0"

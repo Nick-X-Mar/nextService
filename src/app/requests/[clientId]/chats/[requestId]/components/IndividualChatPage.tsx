@@ -59,7 +59,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       }
     } catch (error) {
       console.error('Error fetching garages:', error)
-      showToast('Σφάλμα κατά τη φόρτωση των συνεργείων', 'error')
+      showToast({ type: 'error', title: 'Σφάλμα κατά τη φόρτωση των συνεργείων' })
     }
   }
 
@@ -73,7 +73,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       }
     } catch (error) {
       console.error('Error fetching messages:', error)
-      showToast('Σφάλμα κατά τη φόρτωση των μηνυμάτων', 'error')
+      showToast({ type: 'error', title: 'Σφάλμα κατά τη φόρτωση των μηνυμάτων' })
     }
   }
 
@@ -122,7 +122,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       subscriptionRef.current = channelName
     } catch (error) {
       console.error('[Client] Error subscribing to AppSync:', error)
-      showToast('Σφάλμα στη σύνδεση για πραγματικό χρόνο', 'error')
+      showToast({ type: 'error', title: 'Σφάλμα στη σύνδεση για πραγματικό χρόνο' })
     }
   }
   
@@ -160,11 +160,11 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
         await fetchMessages(selectedGarage.id)
       } else {
         const error = await response.json()
-        showToast(error.error || 'Σφάλμα κατά την αποστολή του μηνύματος', 'error')
+        showToast({ type: 'error', title: error.error || 'Σφάλμα κατά την αποστολή του μηνύματος' })
       }
     } catch (error) {
       console.error('Error sending message:', error)
-      showToast('Σφάλμα κατά την αποστολή του μηνύματος', 'error')
+      showToast({ type: 'error', title: 'Σφάλμα κατά την αποστολή του μηνύματος' })
     } finally {
       setSending(false)
     }
