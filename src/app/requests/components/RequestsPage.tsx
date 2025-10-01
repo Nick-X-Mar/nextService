@@ -8,6 +8,7 @@ import RequestCard from './RequestCard'
 import RequestDetailsModal from './RequestDetailsModal'
 import { useToast } from '../../../hooks/useToast'
 import { useUser } from '../../../contexts/UserContext'
+import ClientNavigation from '../../../components/ClientNavigation'
 
 interface ServiceRequest {
   id: string
@@ -237,6 +238,11 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     setSelectedRequest(null)
   }
 
+  const handleChatClick = (requestId: string) => {
+    // Navigate to the garage chat page (for now, using the same garage ID)
+    router.push(`/garage-dashboard/garage-1759169248452-40o4x992z/chat/${requestId}`)
+  }
+
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -379,6 +385,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
 
   return (
     <section className="bg-white min-h-screen">
+      <ClientNavigation clientId={clientId} />
       <div className={`${styles.container} py-24`}>
         <div className="text-center mb-8">
           <h1 className={styles.pageTitle}>
@@ -530,6 +537,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                     key={request.id}
                     request={request}
                     onViewDetails={() => handleViewDetails(request)}
+                    onChatClick={() => handleChatClick(request.id)}
                     getStatusIcon={getStatusIcon}
                     getStatusText={getStatusText}
                     getStatusColor={getStatusColor}
@@ -554,6 +562,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                     key={request.id}
                     request={request}
                     onViewDetails={() => handleViewDetails(request)}
+                    onChatClick={() => handleChatClick(request.id)}
                     getStatusIcon={getStatusIcon}
                     getStatusText={getStatusText}
                     getStatusColor={getStatusColor}
@@ -578,6 +587,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                     key={request.id}
                     request={request}
                     onViewDetails={() => handleViewDetails(request)}
+                    onChatClick={() => handleChatClick(request.id)}
                     getStatusIcon={getStatusIcon}
                     getStatusText={getStatusText}
                     getStatusColor={getStatusColor}

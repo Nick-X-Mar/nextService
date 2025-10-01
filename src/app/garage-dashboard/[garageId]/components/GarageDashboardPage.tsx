@@ -8,15 +8,18 @@ import MyOffers from './MyOffers'
 import AvailableRequests from './AvailableRequests'
 import GarageSettings from './GarageSettings'
 
-export default function GarageDashboardPage() {
+interface GarageDashboardPageProps {
+  garageId: string
+}
+
+export default function GarageDashboardPage({ garageId }: GarageDashboardPageProps) {
   const [activeTab, setActiveTab] = useState('my-offers')
   const [garageData, setGarageData] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
-    // Check if garage is logged in
-    const garageId = localStorage.getItem('garageId')
+    // Validate garage ID
     if (!garageId) {
       router.push('/login')
       return
@@ -42,7 +45,7 @@ export default function GarageDashboardPage() {
     return () => {
       window.removeEventListener('hashchange', handleHashChange)
     }
-  }, [router])
+  }, [router, garageId])
 
   const loadGarageData = async (garageId: string) => {
     try {
@@ -72,7 +75,6 @@ export default function GarageDashboardPage() {
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('garageId')
     router.push('/login')
   }
 
@@ -119,24 +121,16 @@ export default function GarageDashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Page Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div>
-              <h1 className={`${styles.pageTitle} text-2xl`}>
-                {garageData.companyName}
-              </h1>
-              <p className={styles.bodyText}>
-                Πίνακας Ελέγχου Συνεργείου
-              </p>
-            </div>
-            <button
-              onClick={handleLogout}
-              className={`${styles.btnSecondary} text-sm`}
-            >
-              Αποσύνδεση
-            </button>
+          <div className="py-4">
+            <h1 className={`${styles.pageTitle} text-2xl`}>
+              {garageData.companyName}
+            </h1>
+            <p className={styles.bodyText}>
+              Πίνακας Ελέγχου Συνεργείου
+            </p>
           </div>
         </div>
       </div>

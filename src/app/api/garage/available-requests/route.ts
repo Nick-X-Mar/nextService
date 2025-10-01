@@ -30,6 +30,32 @@ export async function GET(request: NextRequest) {
 
     if (!result.Items || result.Items.length === 0) {
       return NextResponse.json({
+        success: true, 
+        requests: []
+      })
+    }
+
+    // Get all offers made by this garage to filter out requests they've already offered on
+    const offersScanCommand = new ScanCommand({
+      TableName: 'Offers',
+      FilterExpression: 'garageId = :garageId',
+      ExpressionAttributeValues: {
+        ':garageId': garageId
+      }
+    })
+
+    const offersResult = await dynamoDB.send(offersScanCommand)
+    const garageOfferRequestIds = new Set(
+      offersResult.Items?.map(offer => offer.serviceRequestId) || []
+    )
+
+    // Filter out requests that this garage has already made offers for
+    const availableRequests = result.Items.filter(
+      request => !garageOfferRequestIds.has(request.id)
+    )
+
+    if (availableRequests.length === 0) {
+      return NextResponse.json({
         success: true,
         requests: []
       })
@@ -37,7 +63,7 @@ export async function GET(request: NextRequest) {
 
     // For each service request, get client and vehicle details
     const requestsWithDetails = await Promise.all(
-      result.Items.map(async (request) => {
+      availableRequests.map(async (request) => {
         // Get client details
         const clientScanCommand = new ScanCommand({
           TableName: 'Clients',

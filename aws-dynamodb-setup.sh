@@ -97,6 +97,23 @@ aws dynamodb create-table \
     --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
     --region $AWS_REGION
 
+# 6. Create ChatMessages Table
+echo "💬 Creating ChatMessages table..."
+aws dynamodb create-table \
+    --table-name ChatMessages \
+    --attribute-definitions \
+        AttributeName=id,AttributeType=S \
+        AttributeName=requestId,AttributeType=S \
+        AttributeName=timestamp,AttributeType=S \
+        AttributeName=senderId,AttributeType=S \
+    --key-schema \
+        AttributeName=id,KeyType=HASH \
+    --global-secondary-indexes \
+        IndexName=RequestMessagesIndex,KeySchema='[{AttributeName=requestId,KeyType=HASH},{AttributeName=timestamp,KeyType=RANGE}]',Projection='{ProjectionType=ALL}',ProvisionedThroughput='{ReadCapacityUnits=5,WriteCapacityUnits=5}' \
+        IndexName=SenderMessagesIndex,KeySchema='[{AttributeName=senderId,KeyType=HASH},{AttributeName=timestamp,KeyType=RANGE}]',Projection='{ProjectionType=ALL}',ProvisionedThroughput='{ReadCapacityUnits=5,WriteCapacityUnits=5}' \
+    --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
+    --region $AWS_REGION
+
 echo "✅ All tables created successfully!"
 echo "📊 Tables created:"
 echo "   - Clients"
@@ -104,6 +121,7 @@ echo "   - Vehicles"
 echo "   - ServiceRequests"
 echo "   - Garages"
 echo "   - Offers"
+echo "   - ChatMessages"
 echo ""
 echo "🔍 You can verify the tables in the AWS Console:"
 echo "   https://console.aws.amazon.com/dynamodb/home?region=$AWS_REGION#tables:"

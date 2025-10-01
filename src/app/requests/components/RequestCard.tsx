@@ -1,6 +1,6 @@
 'use client'
 
-import { HiEye, HiCalendar } from 'react-icons/hi2'
+import { HiEye, HiCalendar, HiChatBubbleLeftRight } from 'react-icons/hi2'
 import { styles } from '../../../styles/styles'
 
 interface ServiceRequest {
@@ -35,6 +35,7 @@ interface ServiceRequest {
 interface RequestCardProps {
   request: ServiceRequest
   onViewDetails: () => void
+  onChatClick?: () => void
   getStatusIcon: (status: string) => React.ReactNode
   getStatusText: (status: string) => string
   getStatusColor: (status: string) => string
@@ -45,6 +46,7 @@ interface RequestCardProps {
 export default function RequestCard({ 
   request, 
   onViewDetails, 
+  onChatClick,
   getStatusIcon, 
   getStatusText, 
   getStatusColor, 
@@ -137,8 +139,8 @@ export default function RequestCard({
           </div>
         </div>
 
-        {/* View Details Button */}
-        <div className="ml-4">
+        {/* Action Buttons */}
+        <div className="ml-4 flex flex-col gap-2">
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -149,6 +151,20 @@ export default function RequestCard({
             <HiEye className="h-4 w-4" />
             Λεπτομέρειες
           </button>
+          
+          {/* Show chat button for requests that might have chat activity */}
+          {(request.status === 'pending' || request.status === 'in-progress' || request.status === 'appointment') && onChatClick && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onChatClick()
+              }}
+              className={`${styles.btnPrimary} flex items-center gap-2 px-3 py-2 text-sm`}
+            >
+              <HiChatBubbleLeftRight className="h-4 w-4" />
+              Συνομιλία
+            </button>
+          )}
         </div>
       </div>
     </div>

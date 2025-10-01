@@ -6,13 +6,14 @@ This document describes the DynamoDB database schema for the NextService applica
 
 ## Database Architecture
 
-The NextService database consists of **5 main tables** that work together to provide a complete service request management system:
+The NextService database consists of **6 main tables** that work together to provide a complete service request management system:
 
 - **Clients** - User/client information
 - **Vehicles** - Vehicle information linked to clients
 - **ServiceRequests** - Service requests made by clients
 - **Garages** - Garage/service provider information
 - **Offers** - Offers made by garages for service requests
+- **ChatMessages** - Messages between clients and garages for specific requests
 
 ## Table Schemas
 
@@ -397,6 +398,43 @@ AWS_REGION=eu-west-1
 - **Boolean (BOOL)**: Flags, status indicators
 - **String Set (SS)**: Arrays of strings (services)
 
+---
+
+### 6. ChatMessages Table
+
+**Purpose**: Store messages between clients and garages for specific service requests.
+
+| Field | Type | Description | Required |
+|-------|------|-------------|----------|
+| `id` | String (PK) | Unique message identifier | ✅ |
+| `requestId` | String | Reference to the service request | ✅ |
+| `senderId` | String | ID of the sender (client or garage) | ✅ |
+| `senderType` | String | Type of sender (client/garage) | ✅ |
+| `senderName` | String | Display name of the sender | ✅ |
+| `message` | String | The message content | ✅ |
+| `timestamp` | String (ISO 8601) | Message timestamp | ✅ |
+| `createdAt` | String (ISO 8601) | Message creation timestamp | ✅ |
+
+**Global Secondary Indexes:**
+- `RequestMessagesIndex` (HASH: requestId, RANGE: timestamp) - Get all messages for a request
+- `SenderMessagesIndex` (HASH: senderId, RANGE: timestamp) - Get all messages from a sender
+
+**Sample Item:**
+```json
+{
+  "id": "msg-1759063220039-abc123def",
+  "requestId": "sr-1759063220039-rsjblvy1v",
+  "senderId": "garage-1759169248452-40o4x992z",
+  "senderType": "garage",
+  "senderName": "ΑΕ Συνεργείο Παπαδόπουλος",
+  "message": "Γεια σας! Θα θέλαμε να ρωτήσουμε για το πρόβλημα με το αυτοκίνητό σας. Πότε άρχισε να εμφανίζεται;",
+  "timestamp": "2024-09-24T19:00:00.000Z",
+  "createdAt": "2024-09-24T19:00:00.000Z"
+}
+```
+
+---
+
 ### Timestamp Format
 
 All timestamps use ISO 8601 format: `YYYY-MM-DDTHH:mm:ss.sssZ`
@@ -418,7 +456,8 @@ Example: `2024-09-24T19:00:00.000Z`
 2. **Reviews Table**: Store client reviews for garages
 3. **Appointments Table**: Schedule service appointments
 4. **Payments Table**: Track payment information
-5. **Messages Table**: Communication between clients and garages
+5. **Real-time Chat**: WebSocket integration for instant messaging
+6. **File Attachments**: Support for images and documents in chat
 
 ---
 

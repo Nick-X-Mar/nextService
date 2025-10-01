@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, Badge, Button } from '@/components'
 import { styles } from '@/styles/styles'
 
@@ -35,6 +36,7 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
   const [filter, setFilter] = useState<string>('all')
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null)
   const [showOfferModal, setShowOfferModal] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
     loadAvailableRequests()
@@ -90,6 +92,10 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
   const handleMakeOffer = (request: ServiceRequest) => {
     setSelectedRequest(request)
     setShowOfferModal(true)
+  }
+
+  const handleOpenChat = (request: ServiceRequest) => {
+    router.push(`/garage-dashboard/${garageId}/chat/${request.id}`)
   }
 
   const filteredRequests = requests.filter(request => {
@@ -204,13 +210,22 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
                   <p className={`${styles.smallText} text-gray-500 mb-4`}>
                     {new Date(request.createdAt).toLocaleDateString('el-GR')}
                   </p>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => handleMakeOffer(request)}
-                  >
-                    Κάνε Προσφορά
-                  </Button>
+                  <div className="flex flex-col space-y-2">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleMakeOffer(request)}
+                    >
+                      Κάνε Προσφορά
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleOpenChat(request)}
+                    >
+                      Συνομιλία
+                    </Button>
+                  </div>
                 </div>
               </div>
             </Card>

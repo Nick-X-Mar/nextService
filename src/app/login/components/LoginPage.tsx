@@ -53,11 +53,11 @@ export default function LoginPage() {
           if (userType === 'garage') {
             // Garage login flow
             localStorage.setItem('garageId', user.id)
-            await refreshUser(user.id)
+            // Don't call refreshUser for garages - it's designed for clients only
             
             success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.companyName}!`)
             
-            // Redirect to garage dashboard (you can create this later)
+            // Redirect to garage dashboard
             router.push('/garage-dashboard')
           } else {
             // Client login flow - check if there's pending vehicle data to deduplicate
