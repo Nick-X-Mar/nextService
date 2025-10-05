@@ -25,6 +25,11 @@ class AppSyncService {
         const apiKey = process.env.NEXT_PUBLIC_APPSYNC_API_KEY
         const graphqlEndpoint = process.env.NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT
         
+        console.log('🔌 AppSync Environment Variables:')
+        console.log('  WEBSOCKET_ENDPOINT:', endpoint)
+        console.log('  API_KEY:', apiKey ? 'SET' : 'NOT SET')
+        console.log('  GRAPHQL_ENDPOINT:', graphqlEndpoint)
+        
         if (!endpoint || !apiKey || !graphqlEndpoint) {
           throw new Error('AppSync configuration missing')
         }
@@ -47,14 +52,21 @@ class AppSyncService {
         }
         
         // Use AppSync Events WebSocket endpoint with proper protocol
-        const wsUrl = `${endpoint}/event/realtime`
+        const isLocal = endpoint.includes('localhost:3002')
+        const wsUrl = isLocal ? endpoint : `${endpoint}/event/realtime`
         console.log('🔌 AppSync Events WebSocket URL:', wsUrl)
         
-        // Use the correct AppSync Events WebSocket protocol
-        this.ws = new WebSocket(wsUrl, [
-          'aws-appsync-event-ws',
-          getAuthProtocol(),
-        ])
+        // Use the correct WebSocket protocol based on server type
+        if (isLocal) {
+          // Local server - simple WebSocket connection
+          this.ws = new WebSocket(wsUrl)
+        } else {
+          // AWS AppSync - use proper protocol
+          this.ws = new WebSocket(wsUrl, [
+            'aws-appsync-event-ws',
+            getAuthProtocol(),
+          ])
+        }
         
         this.ws.onopen = () => {
           console.log('✅ AppSync Events WebSocket connected')
@@ -107,21 +119,37 @@ class AppSyncService {
       return
     }
     
-    if ((data.type === 'event' || data.type === 'data') && data.event) {
-      // Handle incoming events (AppSync Events uses 'data' type)
+    if (data.type === 'data' && data.payload) {
+      // Handle incoming events from local AppSync server
+      try {
+        const eventData = data.payload.data?.subscribe || data.payload.data
+        console.log('📨 Received local event:', eventData)
+        
+        if (eventData) {
+          // Route the event to all subscribers (simple approach)
+          this.subscriptions.forEach((callback, channelName) => {
+            console.log(`📨 Calling callback for channel: ${channelName}`)
+            callback(eventData)
+          })
+        }
+      } catch (error) {
+        console.error('Error parsing local event data:', error)
+      }
+    }
+    
+    if (data.type === 'data' && data.event) {
+      // Handle incoming events (AWS AppSync Events uses 'data' type with event field)
       try {
         const eventData = JSON.parse(data.event)
-        console.log('📨 Received event:', eventData)
-        console.log('📨 Event data type:', typeof eventData)
-        console.log('📨 Event data keys:', Object.keys(eventData))
+        console.log('📨 Received AWS event:', eventData)
         
-        // Route the event to all subscribers since we're using a single channel
+        // Route the event to all subscribers (simple approach)
         this.subscriptions.forEach((callback, channelName) => {
-          console.log(`📨 Calling callback for channel: ${channelName}`)
+          console.log(`📨 Calling callback for AWS channel: ${channelName}`)
           callback(eventData)
         })
       } catch (error) {
-        console.error('Error parsing event data:', error)
+        console.error('Error parsing AWS event data:', error)
       }
     }
     
@@ -163,21 +191,29 @@ class AppSyncService {
     // Store the callback with the original channel name for lookup
     this.subscriptions.set(channelName, callback)
     
-    // Use the same simple channel name format as publishing
-    const simpleChannelName = 'chat-channel'
-    const defaultChannelName = `/default/${simpleChannelName}`
+    // Use simple channel name for proper isolation
+    const defaultChannelName = `/default/${channelName}`
     console.log(`📡 Subscription registered for channel: ${defaultChannelName}`)
     
-    // For AppSync Events, we need to send a subscription message
+    // For local development, use 'start' type. For AWS AppSync, use 'subscribe' type
+    const isLocal = process.env.NODE_ENV === 'development'
+    const messageType = isLocal ? 'start' : 'subscribe'
+    
     if (this.isConnected && this.ws) {
       const subscribeMessage = {
         id: `sub-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        type: 'subscribe',
-        channel: defaultChannelName,
-        authorization: { 
-          'x-api-key': process.env.NEXT_PUBLIC_APPSYNC_API_KEY,
-          'host': process.env.NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT
-        }
+        type: messageType,
+        ...(isLocal ? {
+          payload: {
+            data: channelName
+          }
+        } : {
+          channel: defaultChannelName,
+          authorization: { 
+            'x-api-key': process.env.NEXT_PUBLIC_APPSYNC_API_KEY,
+            'host': process.env.NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT
+          }
+        })
       }
       
       console.log('📡 Sending subscription message:', subscribeMessage)
@@ -187,6 +223,21 @@ class AppSyncService {
 
   unsubscribe(channelName: string) {
     console.log(`📡 Unsubscribing from channel: ${channelName}`)
+    
+    // For local development, send 'stop' message to server
+    const isLocal = process.env.NODE_ENV === 'development'
+    if (isLocal && this.isConnected && this.ws) {
+      const unsubscribeMessage = {
+        id: `unsub-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: 'stop',
+        payload: {
+          data: channelName
+        }
+      }
+      
+      console.log('📡 Sending unsubscribe message:', unsubscribeMessage)
+      this.send(unsubscribeMessage)
+    }
     
     // Remove the callback
     this.subscriptions.delete(channelName)
@@ -205,18 +256,22 @@ class AppSyncService {
       }
     }
 
-    // Use a simple channel name format as shown in AWS documentation
-    const simpleChannelName = 'chat-channel' // Simplified channel name
-    
+    // Use the actual channel name for proper message routing
+    const isLocal = process.env.NODE_ENV === 'development'
     const publishMessage = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       type: 'publish',
-      channel: `/default/${simpleChannelName}`, // Use simple channel name as per AWS docs
-      events: [JSON.stringify(message)],
-      authorization: { 
-        'x-api-key': process.env.NEXT_PUBLIC_APPSYNC_API_KEY,
-        'host': process.env.NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT
-      }
+      ...(isLocal ? {
+        roomId: channelName,
+        message: message
+      } : {
+        channel: `/default/${channelName}`,
+        events: [JSON.stringify(message)],
+        authorization: { 
+          'x-api-key': process.env.NEXT_PUBLIC_APPSYNC_API_KEY,
+          'host': process.env.NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT
+        }
+      })
     }
 
     console.log('📤 Publishing event to AppSync Events:', publishMessage)

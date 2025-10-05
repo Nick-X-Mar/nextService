@@ -36,6 +36,7 @@ interface RequestCardProps {
   request: ServiceRequest
   onViewDetails: () => void
   onChatClick?: () => void
+  hasGarageMessages?: boolean
   getStatusIcon: (status: string) => React.ReactNode
   getStatusText: (status: string) => string
   getStatusColor: (status: string) => string
@@ -47,6 +48,7 @@ export default function RequestCard({
   request, 
   onViewDetails, 
   onChatClick,
+  hasGarageMessages = false,
   getStatusIcon, 
   getStatusText, 
   getStatusColor, 
@@ -157,9 +159,17 @@ export default function RequestCard({
             <button
               onClick={(e) => {
                 e.stopPropagation()
-                onChatClick()
+                if (hasGarageMessages) {
+                  onChatClick()
+                }
               }}
-              className={`${styles.btnPrimary} flex items-center gap-2 px-3 py-2 text-sm`}
+              disabled={!hasGarageMessages}
+              className={`flex items-center gap-2 px-3 py-2 text-sm ${
+                hasGarageMessages 
+                  ? `${styles.btnPrimary} cursor-pointer` 
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              }`}
+              title={!hasGarageMessages ? 'Δεν υπάρχουν μηνύματα από συνεργεία' : ''}
             >
               <HiChatBubbleLeftRight className="h-4 w-4" />
               Συνομιλία

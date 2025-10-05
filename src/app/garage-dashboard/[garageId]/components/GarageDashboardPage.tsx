@@ -25,6 +25,15 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
       return
     }
 
+    // Check if user is authenticated as a garage
+    const storedGarageId = localStorage.getItem('garageId')
+    if (!storedGarageId || storedGarageId !== garageId) {
+      // User is not authenticated as this garage or is a client
+      console.warn('Unauthorized access attempt to garage dashboard')
+      router.push('/login')
+      return
+    }
+
     // Load garage data
     loadGarageData(garageId)
 

@@ -25,7 +25,7 @@ interface Garage {
   logoUrl?: string
   lastMessage?: string
   lastMessageTime?: string
-  unreadCount?: number
+  hasUnreadMessages?: boolean
 }
 
 interface IndividualChatPageProps {
@@ -45,6 +45,12 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   const [sending, setSending] = useState(false)
   
   const subscriptionRef = useRef<string | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Scroll to bottom of messages
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
 
   // Fetch garages that have messages for this request
   const fetchGarages = async () => {
@@ -70,6 +76,10 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       if (response.ok) {
         const data = await response.json()
         setMessages(data.messages || [])
+        // Scroll to bottom after messages are loaded
+        setTimeout(() => {
+          scrollToBottom()
+        }, 100)
       }
     } catch (error) {
       console.error('Error fetching messages:', error)
@@ -84,7 +94,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       appSyncService.unsubscribe(subscriptionRef.current)
     }
     
-    const channelName = `chat-${requestId}-${garageId}`
+    const channelName = `request-${requestId}-garage-${garageId}`
     console.log(`[Client] Subscribing to AppSync channel: ${channelName}`)
     
     try {
@@ -158,6 +168,10 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
         setNewMessage('')
         // Refresh messages
         await fetchMessages(selectedGarage.id)
+        // Scroll to bottom after sending message
+        setTimeout(() => {
+          scrollToBottom()
+        }, 100)
       } else {
         const error = await response.json()
         showToast({ type: 'error', title: error.error || 'Σφάλμα κατά την αποστολή του μηνύματος' })
@@ -170,11 +184,28 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
     }
   }
 
+  // Mark messages as read
+  const markMessagesAsRead = async (garageId: string) => {
+    try {
+      await fetch(`/api/chat/${requestId}/mark-read`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ garageId })
+      })
+    } catch (error) {
+      console.error('Error marking messages as read:', error)
+    }
+  }
+
   // Handle garage selection
   const handleGarageSelect = (garage: Garage) => {
     setSelectedGarage(garage)
     fetchMessages(garage.id)
     subscribeToMessages(garage.id)
+    // Mark messages as read when garage is selected
+    markMessagesAsRead(garage.id)
   }
 
   // Get garage initials
@@ -229,6 +260,8 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
     if (selectedGarage) {
       fetchMessages(selectedGarage.id)
       subscribeToMessages(selectedGarage.id)
+      // Mark messages as read when garage is initially selected
+      markMessagesAsRead(selectedGarage.id)
     }
   }, [selectedGarage])
 
@@ -238,6 +271,21 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       stopSubscription()
     }
   }, [])
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
+
+  // Scroll to bottom when garage selection changes
+  useEffect(() => {
+    if (selectedGarage) {
+      // Small delay to ensure messages are loaded
+      setTimeout(() => {
+        scrollToBottom()
+      }, 100)
+    }
+  }, [selectedGarage])
 
   if (loading) {
     return (
@@ -320,9 +368,9 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                               <h3 className="text-sm font-medium text-gray-900 truncate">
                                 {garage.companyName}
                               </h3>
-                              {garage.unreadCount && garage.unreadCount > 0 && (
-                                <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
-                                  {garage.unreadCount}
+                              {garage.hasUnreadMessages && (
+                                <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center font-bold">
+                                  !
                                 </span>
                               )}
                             </div>
@@ -382,12 +430,18 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                       </div>
                     ) : (
                       messages.map((message, index) => {
+                        // Debug: Log message data to identify key issues
+                        console.log(`[IndividualChatPage] Message ${index}:`, { id: message.id, timestamp: message.timestamp, senderType: message.senderType })
+                        
                         const isClient = message.senderType === 'client'
                         const showDate = index === 0 || 
                           formatDate(message.timestamp) !== formatDate(messages[index - 1].timestamp)
                         
+                        // Ensure we have a valid key - use index as fallback if message.id is missing
+                        const messageKey = message.id || `message-${index}-${message.timestamp}`
+                        
                         return (
-                          <div key={message.id}>
+                          <div key={messageKey}>
                             {showDate && (
                               <div className="text-center text-xs text-gray-500 py-2">
                                 {formatDate(message.timestamp)}
@@ -411,6 +465,8 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                         )
                       })
                     )}
+                    {/* Scroll target element */}
+                    <div ref={messagesEndRef} />
                   </div>
 
                   {/* Message input */}

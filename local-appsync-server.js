@@ -60,14 +60,16 @@ function handleMessage(connectionId, data) {
   switch (data.type) {
     case 'start':
       // AppSync subscription start
+      console.log(`📨 START message from ${connectionId}:`, data.payload?.data);
       if (data.payload && data.payload.data) {
         const roomId = extractRoomId(data.payload.data);
+        console.log(`📨 Extracted room ID: ${roomId}`);
         if (roomId) {
           subscribeToRoom(connectionId, roomId);
           // Send subscription confirmation
           const ws = connections.get(connectionId);
           if (ws) {
-            ws.send(JSON.stringify({
+            const confirmation = {
               type: 'data',
               id: data.id,
               payload: {
@@ -78,9 +80,26 @@ function handleMessage(connectionId, data) {
                   }
                 }
               }
-            }));
+            };
+            console.log(`📨 Sending confirmation:`, confirmation);
+            ws.send(JSON.stringify(confirmation));
+          }
+        } else {
+          console.log(`❌ Could not extract room ID from: ${data.payload.data}`);
+          // Send error response
+          const ws = connections.get(connectionId);
+          if (ws) {
+            const errorResponse = {
+              type: 'error',
+              id: data.id,
+              error: 'Could not extract room ID'
+            };
+            console.log(`❌ Sending error response:`, errorResponse);
+            ws.send(JSON.stringify(errorResponse));
           }
         }
+      } else {
+        console.log(`❌ Invalid START message format from ${connectionId}`);
       }
       break;
       
@@ -108,9 +127,10 @@ function handleMessage(connectionId, data) {
 
 function extractRoomId(data) {
   // Extract room ID from AppSync subscription data
-  // This matches your room naming: chat-${requestId}-${garageId}
+  // This matches your room naming: request-${requestId}-garage-${garageId}
+  // Format: request-sr-1759063220039-rsjblvy1v-garage-1759169248452-40o4x992z
   if (typeof data === 'string') {
-    const match = data.match(/chat-([^-]+)-([^-]+)/);
+    const match = data.match(/^request-.+/);
     return match ? match[0] : null;
   }
   return null;

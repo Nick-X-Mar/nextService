@@ -68,9 +68,15 @@ export async function GET(
           .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         
         const lastMessage = garageMessages[0]
-        const unreadCount = garageMessages.filter((msg: any) => 
-          msg.senderType === 'garage' && !msg.readByClient
-        ).length
+        
+        // Get the last time client read messages from this garage
+        const lastReadByClient = garage.lastReadByClient || garage.createdAt
+        
+        // Check if there are any unread messages from garage
+        const hasUnreadMessages = garageMessages.some((msg: any) => 
+          msg.senderType === 'garage' && 
+          new Date(msg.timestamp).getTime() > new Date(lastReadByClient).getTime()
+        )
 
         garages.push({
           id: garage.id,
@@ -78,7 +84,7 @@ export async function GET(
           logoUrl: garage.logoUrl,
           lastMessage: lastMessage?.message,
           lastMessageTime: lastMessage?.timestamp,
-          unreadCount: unreadCount > 0 ? unreadCount : undefined
+          hasUnreadMessages: hasUnreadMessages
         })
       }
     }

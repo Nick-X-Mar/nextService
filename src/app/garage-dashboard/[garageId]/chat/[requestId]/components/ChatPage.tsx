@@ -56,8 +56,17 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
   const subscriptionRef = useRef<string | null>(null)
 
   useEffect(() => {
+    // Check if user is authenticated as a garage
+    const storedGarageId = localStorage.getItem('garageId')
+    if (!storedGarageId || storedGarageId !== garageId) {
+      // User is not authenticated as this garage or is a client
+      console.warn('Unauthorized access attempt to garage chat')
+      router.push('/login')
+      return
+    }
+
     loadChatData()
-  }, [garageId, requestId])
+  }, [garageId, requestId, router])
 
   // Cleanup subscription on unmount
   useEffect(() => {
@@ -81,7 +90,8 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
       appSyncService.unsubscribe(subscriptionRef.current)
     }
     
-    const channelName = `chat-${requestId}-${garageId}`
+    // Use request ID + garage ID for unique conversation channel
+    const channelName = `request-${requestId}-garage-${garageId}`
     console.log(`[Garage] Subscribing to AppSync channel: ${channelName}`)
     
     try {
@@ -143,8 +153,8 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
         }
       }
 
-      // Load chat messages
-      const messagesResponse = await fetch(`/api/chat/${requestId}/messages`)
+      // Load chat messages (filtered by garageId for security)
+      const messagesResponse = await fetch(`/api/chat/${requestId}/messages?garageId=${garageId}`)
       if (messagesResponse.ok) {
         const messagesResult = await messagesResponse.json()
         if (messagesResult.success) {
@@ -176,7 +186,8 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
         body: JSON.stringify({
           message: newMessage.trim(),
           senderId: garageId,
-          senderType: 'garage'
+          senderType: 'garage',
+          garageId: garageId
         })
       })
 
@@ -317,11 +328,17 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
                 </p>
               </div>
             ) : (
-              messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.senderType === 'garage' ? 'justify-end' : 'justify-start'}`}
-                >
+              messages.map((message, index) => {
+                // Debug: Log message data to identify key issues
+                console.log(`[ChatPage] Message ${index}:`, { id: message.id, timestamp: message.timestamp, senderType: message.senderType })
+                
+                // Ensure we have a valid key - use index as fallback if message.id is missing
+                const messageKey = message.id || `message-${index}-${message.timestamp}`
+                return (
+                  <div
+                    key={messageKey}
+                    className={`flex ${message.senderType === 'garage' ? 'justify-end' : 'justify-start'}`}
+                  >
                   <div
                     className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                       message.senderType === 'garage'
@@ -337,7 +354,8 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
                     </p>
                   </div>
                 </div>
-              ))
+                )
+              })
             )}
             <div ref={messagesEndRef} />
           </div>

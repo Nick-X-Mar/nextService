@@ -26,7 +26,7 @@ export async function GET(
 
     // If garageId is provided, filter messages between client and this specific garage
     if (garageId) {
-      filterExpression += ' AND (senderId = :garageId OR senderType = :clientType)'
+      filterExpression += ' AND (senderId = :garageId OR (senderType = :clientType AND (garageId = :garageId OR attribute_not_exists(garageId))))'
       expressionAttributeValues[':garageId'] = garageId
       expressionAttributeValues[':clientType'] = 'client'
     }
@@ -156,7 +156,7 @@ export async function POST(
 
             // Publish message to AppSync Events for real-time updates
             if (effectiveGarageId) {
-              const channelName = `chat-${requestId}-${effectiveGarageId}`
+              const channelName = `request-${requestId}-garage-${effectiveGarageId}`
               try {
                 // Publish the message to AppSync Events
                 await appSyncService.publishEvent(channelName, messageData)

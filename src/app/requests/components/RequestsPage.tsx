@@ -62,6 +62,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     phoneNumber: ''
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [garageMessagesMap, setGarageMessagesMap] = useState<Record<string, boolean>>({})
 
   // Check if clientId is valid (starts with 'client-')
   const isValidClientId = clientId && clientId.startsWith('client-')
@@ -104,6 +105,11 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
       
       if (result.success) {
         setRequests(result.requests)
+        // Check for garage messages for all requests
+        const requestIds = result.requests.map((req: ServiceRequest) => req.id)
+        if (requestIds.length > 0) {
+          checkGarageMessages(requestIds)
+        }
       } else {
         console.error('API error:', result.error)
         setRequests([])
@@ -238,9 +244,31 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     setSelectedRequest(null)
   }
 
+  const checkGarageMessages = async (requestIds: string[]) => {
+    const messagesMap: Record<string, boolean> = {}
+    
+    // Check each request for garage messages
+    for (const requestId of requestIds) {
+      try {
+        const response = await fetch(`/api/chat/${requestId}/garages`)
+        if (response.ok) {
+          const data = await response.json()
+          messagesMap[requestId] = data.garages && data.garages.length > 0
+        } else {
+          messagesMap[requestId] = false
+        }
+      } catch (error) {
+        console.error(`Error checking garage messages for request ${requestId}:`, error)
+        messagesMap[requestId] = false
+      }
+    }
+    
+    setGarageMessagesMap(messagesMap)
+  }
+
   const handleChatClick = (requestId: string) => {
-    // Navigate to the garage chat page (for now, using the same garage ID)
-    router.push(`/garage-dashboard/garage-1759169248452-40o4x992z/chat/${requestId}`)
+    // Navigate to the client's individual chat page
+    router.push(`/requests/${clientId}/chats/${requestId}`)
   }
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -538,6 +566,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                     request={request}
                     onViewDetails={() => handleViewDetails(request)}
                     onChatClick={() => handleChatClick(request.id)}
+                    hasGarageMessages={garageMessagesMap[request.id] || false}
                     getStatusIcon={getStatusIcon}
                     getStatusText={getStatusText}
                     getStatusColor={getStatusColor}
@@ -563,6 +592,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                     request={request}
                     onViewDetails={() => handleViewDetails(request)}
                     onChatClick={() => handleChatClick(request.id)}
+                    hasGarageMessages={garageMessagesMap[request.id] || false}
                     getStatusIcon={getStatusIcon}
                     getStatusText={getStatusText}
                     getStatusColor={getStatusColor}
@@ -588,6 +618,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                     request={request}
                     onViewDetails={() => handleViewDetails(request)}
                     onChatClick={() => handleChatClick(request.id)}
+                    hasGarageMessages={garageMessagesMap[request.id] || false}
                     getStatusIcon={getStatusIcon}
                     getStatusText={getStatusText}
                     getStatusColor={getStatusColor}
