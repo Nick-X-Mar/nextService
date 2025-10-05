@@ -9,6 +9,7 @@ export { default as Card } from './Card'
 export { default as Badge } from './Badge'
 export { default as Toast } from './Toast'
 export { default as ToastContainer } from './ToastContainer'
+export { default as RequestDetailsPanel } from './RequestDetailsPanel'
 
 // Existing components
 export { default as Header } from './Header'

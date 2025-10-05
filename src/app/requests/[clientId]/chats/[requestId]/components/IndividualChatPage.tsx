@@ -6,6 +6,7 @@ import { HiArrowLeft, HiChatBubbleLeftRight, HiUser, HiPaperAirplane, HiPhoto } 
 import { styles } from '../../../../../../styles/styles'
 import { useToast } from '../../../../../../hooks/useToast'
 import ClientNavigation from '../../../../../../components/ClientNavigation'
+import { RequestDetailsPanel } from '../../../../../../components'
 import '@/lib/amplify-config'
 import appSyncService from '@/lib/appsync-service'
 
@@ -28,6 +29,27 @@ interface Garage {
   hasUnreadMessages?: boolean
 }
 
+interface ServiceRequest {
+  id: string
+  description: string
+  category: string
+  urgency: string
+  status: string
+  createdAt: string
+  photoUrls: string[]
+  client?: {
+    firstName: string
+    lastName: string
+    phoneNumber: string
+  }
+  vehicle?: {
+    brand: string
+    model: string
+    year: string
+    licensePlate: string
+  }
+}
+
 interface IndividualChatPageProps {
   clientId: string
   requestId: string
@@ -43,6 +65,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [requestDetails, setRequestDetails] = useState<ServiceRequest | null>(null)
   
   const subscriptionRef = useRef<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -50,6 +73,20 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   // Scroll to bottom of messages
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  // Fetch request details
+  const fetchRequestDetails = async () => {
+    try {
+      const response = await fetch(`/api/requests/${requestId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setRequestDetails(data.request)
+      }
+    } catch (error) {
+      console.error('Error fetching request details:', error)
+      showToast({ type: 'error', title: 'Σφάλμα κατά τη φόρτωση των λεπτομερειών του αιτήματος' })
+    }
   }
 
   // Fetch garages that have messages for this request
@@ -250,7 +287,10 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   useEffect(() => {
     const loadData = async () => {
       setLoading(true)
-      await fetchGarages()
+      await Promise.all([
+        fetchRequestDetails(),
+        fetchGarages()
+      ])
       setLoading(false)
     }
     loadData()
@@ -317,6 +357,20 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
           </button>
           <h1 className="text-2xl font-bold text-gray-900">Συνομιλία</h1>
         </div>
+
+        {/* Request and Car Details */}
+        {requestDetails && (
+          <div className="mb-6">
+            <RequestDetailsPanel 
+              request={requestDetails}
+              allowEdit={true}
+              onUpdate={(updatedRequest) => {
+                setRequestDetails({ ...requestDetails, ...updatedRequest })
+                showToast({ type: 'success', title: 'Τα στοιχεία ενημερώθηκαν επιτυχώς' })
+              }}
+            />
+          </div>
+        )}
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="flex h-[600px]">

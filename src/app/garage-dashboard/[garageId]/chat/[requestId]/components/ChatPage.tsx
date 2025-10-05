@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card, Button, Input } from '@/components'
+import { Card, Button, Input, RequestDetailsPanel } from '@/components'
 import { styles } from '@/styles/styles'
 import '@/lib/amplify-config'
 import appSyncService from '@/lib/appsync-service'
@@ -289,32 +289,10 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
 
       {/* Request Context */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <Card className="p-4 mb-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <h3 className={`${styles.sectionTitle} mb-2`}>
-                {requestData.vehicle.brand} {requestData.vehicle.model} ({requestData.vehicle.year})
-              </h3>
-              <p className={`${styles.bodyText} mb-2`}>
-                <strong>Πελάτης:</strong> {requestData.client.firstName} {requestData.client.lastName}
-              </p>
-              <p className={`${styles.bodyText} mb-2`}>
-                <strong>Τηλέφωνο:</strong> {requestData.client.phoneNumber}
-              </p>
-              <p className={`${styles.bodyText} mb-2`}>
-                <strong>Πινακίδα:</strong> {requestData.vehicle.licensePlate}
-              </p>
-              <p className={`${styles.bodyText} mb-2`}>
-                <strong>Αίτημα:</strong> {requestData.description}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className={`${styles.smallText} text-gray-500`}>
-                {new Date(requestData.createdAt).toLocaleDateString('el-GR')}
-              </p>
-            </div>
-          </div>
-        </Card>
+        <RequestDetailsPanel 
+          request={requestData}
+          allowEdit={false}
+        />
       </div>
 
       {/* Chat Messages */}
