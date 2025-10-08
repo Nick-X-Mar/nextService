@@ -12,7 +12,7 @@ interface ServiceRequest {
   urgency: string
   status: string
   createdAt: string
-  photoUrls: string[]
+  photoUrls?: string[]
   client?: {
     firstName: string
     lastName: string
@@ -465,7 +465,7 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
         )}
 
         {/* Photos count */}
-        {request.photoUrls.length > 0 && (
+        {request.photoUrls && request.photoUrls.length > 0 && (
           <div className="border-t border-gray-200 pt-4">
             <label className="text-sm font-medium text-gray-600">Φωτογραφίες</label>
             <p className="text-sm text-gray-900 mt-1">{request.photoUrls.length} φωτογραφία/ες</p>

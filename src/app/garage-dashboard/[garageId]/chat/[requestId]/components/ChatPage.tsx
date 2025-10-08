@@ -31,8 +31,14 @@ interface ServiceRequest {
   vehicle: {
     brand: string
     model: string
-    year: number
+    modelYear: string
     licensePlate: string
+    engineCC: string
+    engineNumber: string
+    fuelType: 'petrol' | 'diesel'
+    vinNumber: string
+    is4x4: boolean
+    isAutomatic: boolean
   }
   photoUrls?: string[]
 }

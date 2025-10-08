@@ -36,7 +36,7 @@ interface ServiceRequest {
   urgency: string
   status: string
   createdAt: string
-  photoUrls: string[]
+  photoUrls?: string[]
   client?: {
     firstName: string
     lastName: string
@@ -45,8 +45,14 @@ interface ServiceRequest {
   vehicle?: {
     brand: string
     model: string
-    year: string
+    modelYear: string
     licensePlate: string
+    engineCC: string
+    engineNumber: string
+    fuelType: 'petrol' | 'diesel'
+    vinNumber: string
+    is4x4: boolean
+    isAutomatic: boolean
   }
 }
 
