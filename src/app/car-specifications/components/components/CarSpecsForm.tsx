@@ -6,6 +6,7 @@ import { HiArrowRight, HiCloudArrowUp, HiPhoto, HiInformationCircle } from 'reac
 import { styles } from '../../../../styles/styles'
 import { saveFormData, loadFormData } from '../../../../utils/formStorage'
 import { useToast } from '../../../../hooks/useToast'
+import { Button } from '@/components'
 import Image from 'next/image'
 
 interface CarSpecsFormProps {
@@ -36,6 +37,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   const [showEngineInfo, setShowEngineInfo] = useState(false)
   const [estimatedPrice, setEstimatedPrice] = useState<number | null>(null)
   const [isEstimatingPrice, setIsEstimatingPrice] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Load saved data on component mount
   useEffect(() => {
@@ -114,6 +116,8 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
 
   const handleSubmit = async () => {
     if (isFormValid) {
+      setIsSubmitting(true)
+      
       // Save final data
       saveFormData({
         vinNumber,
@@ -196,6 +200,8 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
       } catch (err) {
         console.error('Error submitting service request:', err)
         error('Σφάλμα', 'Σφάλμα κατά την αποστολή. Παρακαλώ δοκιμάστε ξανά.')
+      } finally {
+        setIsSubmitting(false)
       }
     }
   }
@@ -383,16 +389,18 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                 )}
               </div>
               
-              <button 
+              <Button 
                 onClick={handleSubmit}
                 disabled={!isFormValid}
-                className={`w-full mt-4 justify-center px-6 py-3 text-base ${
-                  isFormValid ? styles.btnPrimary : styles.btnDisabled
-                }`}
+                loading={isSubmitting}
+                variant="primary"
+                size="lg"
+                fullWidth
+                className="mt-4"
               >
                 Ζήτα προσφορές
                 <HiArrowRight className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
             
             <div className="mt-4 text-center">

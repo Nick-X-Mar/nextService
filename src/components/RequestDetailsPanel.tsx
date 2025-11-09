@@ -9,7 +9,6 @@ interface ServiceRequest {
   id: string
   description: string
   category: string
-  urgency: string
   status: string
   createdAt: string
   photoUrls?: string[]
@@ -44,7 +43,6 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
   const [editData, setEditData] = useState({
     description: request.description,
     category: request.category,
-    urgency: request.urgency,
     brand: request.vehicle?.brand || '',
     model: request.vehicle?.model || '',
     modelYear: request.vehicle?.modelYear || '',
@@ -69,32 +67,6 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
         return 'Δισκόφρενα'
       default:
         return category
-    }
-  }
-
-  const getUrgencyText = (urgency: string) => {
-    switch (urgency) {
-      case 'low':
-        return 'Χαμηλή'
-      case 'normal':
-        return 'Κανονική'
-      case 'high':
-        return 'Υψηλή'
-      default:
-        return urgency
-    }
-  }
-
-  const getUrgencyColor = (urgency: string) => {
-    switch (urgency) {
-      case 'low':
-        return 'bg-green-100 text-green-800'
-      case 'normal':
-        return 'bg-yellow-100 text-yellow-800'
-      case 'high':
-        return 'bg-red-100 text-red-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
     }
   }
 
@@ -137,7 +109,6 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
       const updatedRequest = {
         description: editData.description,
         category: editData.category,
-        urgency: editData.urgency,
         vehicle: {
           brand: editData.brand,
           model: editData.model,
@@ -160,7 +131,6 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
     setEditData({
       description: request.description,
       category: request.category,
-      urgency: request.urgency,
       brand: request.vehicle?.brand || '',
       model: request.vehicle?.model || '',
       modelYear: request.vehicle?.modelYear || '',
@@ -185,12 +155,9 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
         <div className="flex items-center gap-3">
           <h3 className="text-lg font-semibold text-gray-900">Λεπτομέρειες Αιτήματος & Οχήματος</h3>
           <div className="flex items-center gap-2">
-            {/* Status badges - always visible */}
+            {/* Status badge - always visible */}
             <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(request.status)}`}>
               {getStatusText(request.status)}
-            </span>
-            <span className={`px-2 py-1 text-xs font-medium rounded-full ${getUrgencyColor(request.urgency)}`}>
-              {getUrgencyText(request.urgency)}
             </span>
           </div>
           {/* Quick summary when collapsed */}
@@ -244,23 +211,7 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
             )}
           </div>
 
-          {/* Urgency */}
-          <div>
-            <label className="text-sm font-medium text-gray-600">Προτεραιότητα</label>
-            {isEditing && allowEdit ? (
-              <select
-                value={editData.urgency}
-                onChange={(e) => setEditData({ ...editData, urgency: e.target.value })}
-                className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-              >
-                <option value="low">Χαμηλή</option>
-                <option value="normal">Κανονική</option>
-                <option value="high">Υψηλή</option>
-              </select>
-            ) : (
-              <p className="text-sm text-gray-900 mt-1">{getUrgencyText(request.urgency)}</p>
-            )}
-          </div>
+          
         </div>
 
         {/* Description */}

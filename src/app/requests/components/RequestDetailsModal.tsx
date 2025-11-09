@@ -11,7 +11,6 @@ interface ServiceRequest {
   category: string
   description: string
   status: 'appointment' | 'pending' | 'in-progress' | 'completed' | 'cancelled'
-  urgency: 'low' | 'normal' | 'high'
   estimatedCost?: number
   photoUrls: string[]
   photos: Array<{
@@ -29,8 +28,14 @@ interface ServiceRequest {
   vehicle?: {
     brand: string
     model: string
-    modelYear: string
+    modelYear?: string
+    engineCC?: string
+    fuelType?: string
+    isAutomatic?: boolean
+    is4x4?: boolean
+    isTurbo?: boolean
   }
+  clientAvailabilityDates?: string[]
 }
 
 interface RequestDetailsModalProps {
@@ -39,8 +44,6 @@ interface RequestDetailsModalProps {
   getStatusIcon: (status: string) => React.ReactNode
   getStatusText: (status: string) => string
   getStatusColor: (status: string) => string
-  getUrgencyColor: (urgency: string) => string
-  getUrgencyText: (urgency: string) => string
 }
 
 export default function RequestDetailsModal({ 
@@ -48,9 +51,7 @@ export default function RequestDetailsModal({
   onClose, 
   getStatusIcon, 
   getStatusText, 
-  getStatusColor, 
-  getUrgencyColor, 
-  getUrgencyText 
+  getStatusColor 
 }: RequestDetailsModalProps) {
   const footer = (
     <button
@@ -74,8 +75,6 @@ export default function RequestDetailsModal({
         getStatusIcon={getStatusIcon}
         getStatusText={getStatusText}
         getStatusColor={getStatusColor}
-        getUrgencyColor={getUrgencyColor}
-        getUrgencyText={getUrgencyText}
       />
     </Modal>
   )

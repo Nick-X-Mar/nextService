@@ -52,6 +52,7 @@ export default function CarBrandModelSelector({
   const [fuelType, setFuelType] = useState<'petrol' | 'diesel' | ''>('petrol')
   const [isAutomatic, setIsAutomatic] = useState(false)
   const [is4x4, setIs4x4] = useState(false)
+  const [isTurbo, setIsTurbo] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   // Validation for model year (4 digits only)
@@ -92,6 +93,7 @@ export default function CarBrandModelSelector({
     else setFuelType('petrol')
     if (data.isAutomatic !== undefined) setIsAutomatic(data.isAutomatic)
     if (data.is4x4 !== undefined) setIs4x4(data.is4x4)
+    if (data.isTurbo !== undefined) setIsTurbo(data.isTurbo)
   }, [])
 
   // Save data whenever it changes
@@ -102,10 +104,11 @@ export default function CarBrandModelSelector({
         modelYear,
         fuelType,
         isAutomatic,
-        is4x4
+        is4x4,
+        isTurbo
       })
     }
-  }, [engineCC, modelYear, fuelType, isAutomatic, is4x4, mounted])
+  }, [engineCC, modelYear, fuelType, isAutomatic, is4x4, isTurbo, mounted])
 
   // Form validation - check if we have valid CC, year, and fuel type
   const isFormValid = 
@@ -121,7 +124,8 @@ export default function CarBrandModelSelector({
         modelYear,
         fuelType,
         isAutomatic,
-        is4x4
+        is4x4,
+        isTurbo
       })
       
       // Navigate to the next step (car specifications or body work photos)
@@ -235,6 +239,23 @@ export default function CarBrandModelSelector({
                 ]}
                 value={is4x4 ? '4x4' : '2wd'}
                 onChange={(value) => setIs4x4(value === '4x4')}
+                variant="orange"
+                size="md"
+              />
+            </div>
+
+            {/* Turbo */}
+            <div className="space-y-2">
+              <label className={styles.label}>
+                Turbo:
+              </label>
+              <SegmentedControl
+                options={[
+                  { value: 'no', label: 'Όχι' },
+                  { value: 'yes', label: 'Ναι' }
+                ]}
+                value={isTurbo ? 'yes' : 'no'}
+                onChange={(value) => setIsTurbo(value === 'yes')}
                 variant="orange"
                 size="md"
               />

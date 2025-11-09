@@ -48,7 +48,6 @@ export async function POST(request: NextRequest) {
       vehicleId: string
       category: string
       description: string
-      urgency: string
       status: string
       estimatedCost?: number
       photoUrls: string[]
@@ -70,7 +69,6 @@ export async function POST(request: NextRequest) {
       vehicleId: vehicleId,
       category: body.category,
       description: body.description,
-      urgency: body.urgency || 'normal',
       status: 'pending',
       photoUrls: body.photoUrls || [], // S3 URLs will be added here
       photos: body.photos || [], // Photo metadata array

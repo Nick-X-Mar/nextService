@@ -311,10 +311,9 @@ export default function RegisterProfessionalPage() {
                 variant="primary"
                 size="lg"
                 className="w-full"
-                disabled={isLoading}
                 loading={isLoading}
               >
-                {isLoading ? 'Εγγραφή...' : 'Εγγραφή Εταιρείας'}
+                Εγγραφή Εταιρείας
               </Button>
             </div>
           </form>

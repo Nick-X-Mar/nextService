@@ -14,7 +14,6 @@ interface ChatRequest {
   category: string
   description: string
   status: 'appointment' | 'pending' | 'in-progress' | 'completed' | 'cancelled'
-  urgency: 'low' | 'normal' | 'high'
   estimatedCost?: number
   photoUrls: string[]
   photos: Array<{

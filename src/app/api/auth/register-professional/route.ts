@@ -28,7 +28,7 @@ function checkRateLimit(identifier: string, maxAttempts: number = 3, windowMs: n
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { companyName, tin, email, taxAuthority, address, mobile } = body
+    const { companyName, tin, email, taxAuthority, address, mobile, benefits } = body
 
     // Validate required fields
     if (!companyName || typeof companyName !== 'string' || !companyName.trim()) {
@@ -137,6 +137,7 @@ export async function POST(request: NextRequest) {
       mobile: cleanMobile,
       isActive: false, // Will be activated after manual review
       description: 'Εταιρεία εγγεγραμμένη στο NextService', // Default description
+      benefits: benefits && Array.isArray(benefits) ? benefits : [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }

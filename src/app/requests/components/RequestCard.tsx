@@ -10,7 +10,6 @@ interface ServiceRequest {
   category: string
   description: string
   status: 'appointment' | 'pending' | 'in-progress' | 'completed' | 'cancelled'
-  urgency: 'low' | 'normal' | 'high'
   estimatedCost?: number
   photoUrls: string[]
   photos: Array<{
@@ -28,8 +27,14 @@ interface ServiceRequest {
   vehicle?: {
     brand: string
     model: string
-    modelYear: string
+    modelYear?: string
+    engineCC?: string
+    fuelType?: string
+    isAutomatic?: boolean
+    is4x4?: boolean
+    isTurbo?: boolean
   }
+  clientAvailabilityDates?: string[]
 }
 
 interface RequestCardProps {
@@ -40,8 +45,6 @@ interface RequestCardProps {
   getStatusIcon: (status: string) => React.ReactNode
   getStatusText: (status: string) => string
   getStatusColor: (status: string) => string
-  getUrgencyColor: (urgency: string) => string
-  getUrgencyText: (urgency: string) => string
 }
 
 export default function RequestCard({ 
@@ -51,9 +54,7 @@ export default function RequestCard({
   hasGarageMessages = false,
   getStatusIcon, 
   getStatusText, 
-  getStatusColor, 
-  getUrgencyColor, 
-  getUrgencyText 
+  getStatusColor 
 }: RequestCardProps) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -88,14 +89,11 @@ export default function RequestCard({
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          {/* Header with status and urgency */}
+          {/* Header with status */}
           <div className="flex items-center gap-3 mb-3">
             {getStatusIcon(request.status)}
             <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(request.status)}`}>
               {getStatusText(request.status)}
-            </span>
-            <span className={`px-2 py-1 text-xs font-medium rounded-full ${getUrgencyColor(request.urgency)}`}>
-              {getUrgencyText(request.urgency)} Προτεραιότητα
             </span>
           </div>
 

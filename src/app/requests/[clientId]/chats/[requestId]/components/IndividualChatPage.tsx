@@ -33,10 +33,10 @@ interface ServiceRequest {
   id: string
   description: string
   category: string
-  urgency: string
   status: string
   createdAt: string
   photoUrls?: string[]
+  clientAvailabilityDates?: string[]
   client?: {
     firstName: string
     lastName: string
@@ -45,14 +45,15 @@ interface ServiceRequest {
   vehicle?: {
     brand: string
     model: string
-    modelYear: string
-    licensePlate: string
-    engineCC: string
-    engineNumber: string
-    fuelType: 'petrol' | 'diesel'
-    vinNumber: string
-    is4x4: boolean
-    isAutomatic: boolean
+    modelYear?: string
+    licensePlate?: string
+    engineCC?: string
+    engineNumber?: string
+    fuelType?: string
+    vinNumber?: string
+    is4x4?: boolean
+    isAutomatic?: boolean
+    isTurbo?: boolean
   }
 }
 

@@ -87,7 +87,6 @@ export async function GET(request: NextRequest) {
             id: serviceRequest.id,
             description: serviceRequest.description,
             category: serviceRequest.category,
-            urgency: serviceRequest.urgency,
             client: client ? {
               firstName: client.firstName,
               lastName: client.lastName

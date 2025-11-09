@@ -9,7 +9,6 @@ interface ServiceRequest {
   id: string
   description: string
   category: string
-  urgency: string
   status: string
   createdAt: string
   client: {
@@ -21,7 +20,15 @@ interface ServiceRequest {
     brand: string
     model: string
     year: number
-    licensePlate: string
+    licensePlate?: string
+    engineCC?: string
+    engineNumber?: string
+    modelYear?: string
+    fuelType?: string
+    vinNumber?: string
+    is4x4?: boolean
+    isAutomatic?: boolean
+    isTurbo?: boolean
   }
   photoUrls?: string[]
 }
@@ -83,6 +90,24 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
     }
   }
 
+  const getFuelTypeText = (fuelType: string | undefined) => {
+    if (!fuelType) return '-'
+    switch (fuelType.toLowerCase()) {
+      case 'petrol':
+        return 'Βενζίνη'
+      case 'diesel':
+        return 'Πετρέλαιο'
+      case 'electric':
+        return 'Ηλεκτρικό'
+      case 'hybrid':
+        return 'Υβριδικό'
+      case 'lpg':
+        return 'Υγραέριο'
+      default:
+        return fuelType
+    }
+  }
+
   // Get unique categories from requests
   const getUniqueCategories = () => {
     const categories = requests.map(request => request.category)
@@ -90,12 +115,15 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
   }
 
   const handleMakeOffer = (request: ServiceRequest) => {
-    setSelectedRequest(request)
-    setShowOfferModal(true)
+    router.push(`/garage-dashboard/${garageId}/offers/${request.id}`)
   }
 
   const handleOpenChat = (request: ServiceRequest) => {
     router.push(`/garage-dashboard/${garageId}/chat/${request.id}`)
+  }
+
+  const handleCardClick = (request: ServiceRequest) => {
+    router.push(`/garage-dashboard/${garageId}/offers/${request.id}`)
   }
 
   const filteredRequests = requests.filter(request => {
@@ -177,36 +205,99 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
       ) : (
         <div className="space-y-4">
           {filteredRequests.map((request) => (
-            <Card key={request.id} className="p-6">
-              <div className="flex justify-between items-start mb-4">
+            <Card key={request.id} className="p-6 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleCardClick(request)}>
+              <div className="flex justify-between items-start gap-6">
                 <div className="flex-1">
-                  <div className="flex items-center space-x-3 mb-2">
+                  {/* Header with Vehicle Info and Category */}
+                  <div className="flex items-center space-x-3 mb-4">
                     <h3 className={`${styles.sectionTitle} text-lg`}>
-                      {request.vehicle.brand} {request.vehicle.model} ({request.vehicle.year})
+                      {request.vehicle.brand} {request.vehicle.model}
                     </h3>
                     <Badge variant="secondary">
                       {getCategoryText(request.category)}
                     </Badge>
+                    {/* Photo Indicator - only show when photos exist */}
+                    {request.photoUrls && request.photoUrls.length > 0 && (
+                      <div className="flex items-center gap-1 text-green-600">
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-sm font-medium">Φωτογραφίες</span>
+                      </div>
+                    )}
                   </div>
-                  <p className={`${styles.bodyText} mb-2`}>
-                    <strong>Πελάτης:</strong> {request.client.firstName} {request.client.lastName}
-                  </p>
-                  <p className={`${styles.bodyText} mb-2`}>
-                    <strong>Τηλέφωνο:</strong> {request.client.phoneNumber}
-                  </p>
-                  <p className={`${styles.bodyText} mb-2`}>
-                    <strong>Πινακίδα:</strong> {request.vehicle.licensePlate}
-                  </p>
-                  <p className={`${styles.bodyText} mb-2`}>
-                    <strong>Αίτημα:</strong> {request.description}
-                  </p>
-                  {request.photoUrls && request.photoUrls.length > 0 && (
-                    <p className={`${styles.bodyText} mb-2`}>
-                      <strong>Φωτογραφίες:</strong> {request.photoUrls.length} φωτογραφία(ες)
+
+                  {/* Vehicle Details Grid */}
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-2 mb-4">
+                    <div>
+                      <p className={`${styles.bodyText} text-sm`}>
+                        <span className="text-gray-600">Έτος Μοντέλου:</span> <strong>{request.vehicle.modelYear || request.vehicle.year}</strong>
+                      </p>
+                    </div>
+                    <div>
+                      <p className={`${styles.bodyText} text-sm`}>
+                        <span className="text-gray-600">Καύσιμο:</span> <strong>{getFuelTypeText(request.vehicle.fuelType)}</strong>
+                      </p>
+                    </div>
+                    <div>
+                      <p className={`${styles.bodyText} text-sm`}>
+                        <span className="text-gray-600">Κυβικά:</span> <strong>{request.vehicle.engineCC ? `${request.vehicle.engineCC} cc` : '-'}</strong>
+                      </p>
+                    </div>
+                    <div>
+                      <p className={`${styles.bodyText} text-sm`}>
+                        <span className="text-gray-600">Κιβώτιο:</span> <strong>{request.vehicle.isAutomatic ? 'Αυτόματο' : 'Χειροκίνητο'}</strong>
+                      </p>
+                    </div>
+                    <div>
+                      <p className={`${styles.bodyText} text-sm`}>
+                        <span className="text-gray-600">4x4:</span> <strong>{request.vehicle.is4x4 ? 'Ναι' : 'Όχι'}</strong>
+                      </p>
+                    </div>
+                    <div>
+                      <p className={`${styles.bodyText} text-sm`}>
+                        <span className="text-gray-600">Turbo:</span> <strong>{request.vehicle.isTurbo ? 'Ναι' : 'Όχι'}</strong>
+                      </p>
+                    </div>
+                    {request.vehicle.vinNumber && (
+                      <div className="col-span-2">
+                        <p className={`${styles.bodyText} text-sm`}>
+                          <span className="text-gray-600">VIN:</span> <strong>{request.vehicle.vinNumber}</strong>
+                        </p>
+                      </div>
+                    )}
+                    {request.vehicle.engineNumber && (
+                      <div className="col-span-2">
+                        <p className={`${styles.bodyText} text-sm`}>
+                          <span className="text-gray-600">Αρ. Κινητήρα:</span> <strong>{request.vehicle.engineNumber}</strong>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Client Info */}
+                  <div className="border-t pt-3 mb-3">
+                    <p className={`${styles.bodyText} text-sm mb-1`}>
+                      <span className="text-gray-600">Πελάτης:</span> <strong>{request.client.firstName} {request.client.lastName}</strong>
                     </p>
-                  )}
+                    <p className={`${styles.bodyText} text-sm`}>
+                      <span className="text-gray-600">Τηλέφωνο:</span> <strong>{request.client.phoneNumber}</strong>
+                    </p>
+                  </div>
+
+                  {/* Description */}
+                  <div className="border-t pt-3">
+                    <p className={`${styles.bodyText} text-sm`}>
+                      <span className="text-gray-600">Περιγραφή:</span>
+                    </p>
+                    <p className={`${styles.bodyText} mt-1`}>
+                      {request.description}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right">
+
+                {/* Actions */}
+                <div className="text-right flex-shrink-0">
                   <p className={`${styles.smallText} text-gray-500 mb-4`}>
                     {new Date(request.createdAt).toLocaleDateString('el-GR')}
                   </p>
@@ -214,14 +305,20 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={() => handleMakeOffer(request)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleMakeOffer(request)
+                      }}
                     >
                       Κάνε Προσφορά
                     </Button>
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => handleOpenChat(request)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleOpenChat(request)
+                      }}
                     >
                       Συνομιλία
                     </Button>

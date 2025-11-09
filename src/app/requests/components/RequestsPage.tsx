@@ -17,7 +17,6 @@ interface ServiceRequest {
   category: string
   description: string
   status: 'appointment' | 'pending' | 'in-progress' | 'completed' | 'cancelled'
-  urgency: 'low' | 'normal' | 'high'
   estimatedCost?: number
   photoUrls: string[]
   photos: Array<{
@@ -35,8 +34,14 @@ interface ServiceRequest {
   vehicle?: {
     brand: string
     model: string
-    modelYear: string
+    modelYear?: string
+    engineCC?: string
+    fuelType?: string
+    isAutomatic?: boolean
+    is4x4?: boolean
+    isTurbo?: boolean
   }
+  clientAvailabilityDates?: string[]
 }
 
 interface RequestsPageProps {
@@ -177,32 +182,6 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
         return 'bg-red-100 text-red-800 border-red-200'
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200'
-    }
-  }
-
-  const getUrgencyColor = (urgency: string) => {
-    switch (urgency) {
-      case 'high':
-        return 'bg-red-100 text-red-800'
-      case 'normal':
-        return 'bg-blue-100 text-blue-800'
-      case 'low':
-        return 'bg-gray-100 text-gray-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getUrgencyText = (urgency: string) => {
-    switch (urgency) {
-      case 'high':
-        return 'Υψηλή'
-      case 'normal':
-        return 'Κανονική'
-      case 'low':
-        return 'Χαμηλή'
-      default:
-        return 'Κανονική'
     }
   }
 
@@ -570,8 +549,6 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                     getStatusIcon={getStatusIcon}
                     getStatusText={getStatusText}
                     getStatusColor={getStatusColor}
-                    getUrgencyColor={getUrgencyColor}
-                    getUrgencyText={getUrgencyText}
                   />
                 ))}
               </div>
@@ -596,8 +573,6 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                     getStatusIcon={getStatusIcon}
                     getStatusText={getStatusText}
                     getStatusColor={getStatusColor}
-                    getUrgencyColor={getUrgencyColor}
-                    getUrgencyText={getUrgencyText}
                   />
                 ))}
               </div>
@@ -622,8 +597,6 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                     getStatusIcon={getStatusIcon}
                     getStatusText={getStatusText}
                     getStatusColor={getStatusColor}
-                    getUrgencyColor={getUrgencyColor}
-                    getUrgencyText={getUrgencyText}
                   />
                 ))}
               </div>
@@ -809,8 +782,6 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
             getStatusIcon={getStatusIcon}
             getStatusText={getStatusText}
             getStatusColor={getStatusColor}
-            getUrgencyColor={getUrgencyColor}
-            getUrgencyText={getUrgencyText}
           />
         )}
       </div>

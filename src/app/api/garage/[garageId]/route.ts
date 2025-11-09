@@ -46,6 +46,7 @@ export async function GET(
         taxAuthority: garage.taxAuthority,
         description: garage.description,
         isActive: garage.isActive,
+        benefits: garage.benefits || [],
         createdAt: garage.createdAt,
         updatedAt: garage.updatedAt
       }
@@ -106,7 +107,7 @@ export async function PUT(
     const updateCommand = new UpdateCommand({
       TableName: 'Garages',
       Key: { id: garageId },
-      UpdateExpression: 'SET companyName = :companyName, email = :email, mobile = :mobile, address = :address, tin = :tin, taxAuthority = :taxAuthority, description = :description, isActive = :isActive, updatedAt = :updatedAt',
+      UpdateExpression: 'SET companyName = :companyName, email = :email, mobile = :mobile, address = :address, tin = :tin, taxAuthority = :taxAuthority, description = :description, benefits = :benefits, isActive = :isActive, updatedAt = :updatedAt',
       ExpressionAttributeValues: {
         ':companyName': body.companyName,
         ':email': body.email,
@@ -115,6 +116,7 @@ export async function PUT(
         ':tin': body.tin,
         ':taxAuthority': body.taxAuthority,
         ':description': body.description || '',
+        ':benefits': body.benefits || [],
         ':isActive': true,
         ':updatedAt': new Date().toISOString()
       },
@@ -135,6 +137,7 @@ export async function PUT(
         taxAuthority: result.Attributes?.taxAuthority,
         description: result.Attributes?.description,
         isActive: result.Attributes?.isActive,
+        benefits: result.Attributes?.benefits || [],
         createdAt: result.Attributes?.createdAt,
         updatedAt: result.Attributes?.updatedAt
       }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, Badge } from '@/components'
 import { styles } from '@/styles/styles'
 
@@ -16,7 +17,6 @@ interface Offer {
     id: string
     description: string
     category: string
-    urgency: string
     client: {
       firstName: string
       lastName: string
@@ -34,6 +34,7 @@ interface MyOffersProps {
 }
 
 export default function MyOffers({ garageId }: MyOffersProps) {
+  const router = useRouter()
   const [offers, setOffers] = useState<Offer[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'pending' | 'accepted' | 'rejected'>('all')
@@ -93,30 +94,8 @@ export default function MyOffers({ garageId }: MyOffersProps) {
     }
   }
 
-  const getUrgencyColor = (urgency: string) => {
-    switch (urgency) {
-      case 'high':
-        return 'text-red-600'
-      case 'normal':
-        return 'text-yellow-600'
-      case 'low':
-        return 'text-green-600'
-      default:
-        return 'text-gray-600'
-    }
-  }
-
-  const getUrgencyText = (urgency: string) => {
-    switch (urgency) {
-      case 'high':
-        return 'Υψηλή'
-      case 'normal':
-        return 'Κανονική'
-      case 'low':
-        return 'Χαμηλή'
-      default:
-        return urgency
-    }
+  const handleOfferClick = (offer: Offer) => {
+    router.push(`/garage-dashboard/${garageId}/offers/${offer.serviceRequestId}`)
   }
 
   const filteredOffers = offers.filter(offer => {
@@ -205,7 +184,11 @@ export default function MyOffers({ garageId }: MyOffersProps) {
       ) : (
         <div className="space-y-4">
           {filteredOffers.map((offer) => (
-            <Card key={offer.id} className="p-6">
+            <Card 
+              key={offer.id} 
+              className="p-6 cursor-pointer hover:shadow-lg transition-shadow" 
+              onClick={() => handleOfferClick(offer)}
+            >
               <div className="flex justify-between items-start mb-4">
                 <div className="flex-1">
                   <div className="flex items-center space-x-3 mb-2">
@@ -225,12 +208,7 @@ export default function MyOffers({ garageId }: MyOffersProps) {
                   <p className={`${styles.bodyText} mb-2`}>
                     <strong>Κατηγορία:</strong> {offer.serviceRequest.category}
                   </p>
-                  <p className={`${styles.bodyText} mb-2`}>
-                    <strong>Επείγον:</strong> 
-                    <span className={`ml-1 ${getUrgencyColor(offer.serviceRequest.urgency)}`}>
-                      {getUrgencyText(offer.serviceRequest.urgency)}
-                    </span>
-                  </p>
+                  
                 </div>
                 <div className="text-right">
                   <div className={`${styles.sectionTitle} text-2xl text-orange-600`}>

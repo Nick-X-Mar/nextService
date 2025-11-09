@@ -58,18 +58,34 @@ export async function GET(request: NextRequest) {
           const vehicleResult = await dynamoDB.send(vehicleQuery)
           const vehicle = vehicleResult.Items?.[0]
 
+          const vehicleData = vehicle
+            ? {
+                brand: vehicle.brand,
+                model: vehicle.model,
+                modelYear: vehicle.modelYear,
+                engineCC: vehicle.engineCC,
+                fuelType: vehicle.fuelType,
+                isAutomatic: vehicle.isAutomatic,
+                is4x4: vehicle.is4x4,
+                isTurbo: vehicle.isTurbo,
+                licensePlate: vehicle.licensePlate,
+                engineNumber: vehicle.engineNumber,
+                vinNumber: vehicle.vinNumber,
+                color: vehicle.color,
+                nickname: vehicle.nickname
+              }
+            : null
+
           return {
             ...request,
-            vehicle: vehicle ? {
-              brand: vehicle.brand,
-              model: vehicle.model,
-              modelYear: vehicle.modelYear
-            } : null
+            clientAvailabilityDates: request.clientAvailabilityDates || [],
+            vehicle: vehicleData
           }
         } catch (error) {
           console.error('Error fetching vehicle for request:', request.id, error)
           return {
             ...request,
+            clientAvailabilityDates: request.clientAvailabilityDates || [],
             vehicle: null
           }
         }

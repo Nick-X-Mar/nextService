@@ -20,7 +20,6 @@ interface ServiceRequest {
   id: string
   description: string
   category: string
-  urgency: string
   status: string
   createdAt: string
   client: {

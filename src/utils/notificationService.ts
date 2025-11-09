@@ -17,7 +17,6 @@ export const sendNotificationToGarages = async (
     category: string
     description: string
     status: string
-    urgency: string
     estimatedCost?: number
     photoUrls: string[]
     photos: Array<{

@@ -92,9 +92,9 @@ export async function GET(request: NextRequest) {
           id: request.id,
           description: request.description,
           category: request.category,
-          urgency: request.urgency,
           status: request.status,
           createdAt: request.createdAt,
+          clientAvailabilityDates: request.clientAvailabilityDates || [],
           photoUrls: request.photoUrls || [],
           client: client ? {
             firstName: client.firstName,
@@ -105,7 +105,13 @@ export async function GET(request: NextRequest) {
             brand: vehicle.brand,
             model: vehicle.model,
             year: vehicle.year,
-            licensePlate: vehicle.licensePlate
+            licensePlate: vehicle.licensePlate,
+            modelYear: vehicle.modelYear,
+            engineCC: vehicle.engineCC,
+            fuelType: vehicle.fuelType,
+            isAutomatic: vehicle.isAutomatic,
+            is4x4: vehicle.is4x4,
+            isTurbo: vehicle.isTurbo
           } : null
         }
       })

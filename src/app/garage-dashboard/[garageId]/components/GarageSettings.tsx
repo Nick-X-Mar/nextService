@@ -14,6 +14,7 @@ interface GarageData {
   tin: string
   taxAuthority: string
   description?: string
+  benefits?: string[]
 }
 
 interface GarageSettingsProps {
@@ -25,12 +26,34 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
   const [formData, setFormData] = useState<GarageData>(garageData)
   const [isLoading, setIsLoading] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
+  const [newBenefit, setNewBenefit] = useState('')
   const { success, error } = useToast()
 
   const handleInputChange = (field: keyof GarageData, value: string | boolean) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
+    }))
+    setHasChanges(true)
+  }
+
+  const handleAddBenefit = () => {
+    if (newBenefit.trim()) {
+      const updatedBenefits = [...(formData.benefits || []), newBenefit.trim()]
+      setFormData(prev => ({
+        ...prev,
+        benefits: updatedBenefits
+      }))
+      setNewBenefit('')
+      setHasChanges(true)
+    }
+  }
+
+  const handleRemoveBenefit = (index: number) => {
+    const updatedBenefits = (formData.benefits || []).filter((_, i) => i !== index)
+    setFormData(prev => ({
+      ...prev,
+      benefits: updatedBenefits
     }))
     setHasChanges(true)
   }
@@ -179,6 +202,65 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
         </div>
       </Card>
 
+      {/* Benefits Management */}
+      <Card className="p-6">
+        <h3 className={`${styles.sectionTitle} mb-4`}>
+          Παροχές Εργασίας
+        </h3>
+        
+        <div className="mb-4">
+          <label className={`${styles.label} block mb-2`}>
+            Δωρεάν Παροχές
+          </label>
+          <p className={`${styles.smallText} text-gray-600 mb-3`}>
+            Προσθέστε τις δωρεάν παροχές που προσφέρετε στους πελάτες σας
+          </p>
+          
+          <div className="flex gap-2 mb-4">
+            <Input
+              value={newBenefit}
+              onChange={(value) => setNewBenefit(value)}
+              placeholder="π.χ. Δωρεάν διαγνωστική"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  handleAddBenefit()
+                }
+              }}
+            />
+            <Button
+              variant="primary"
+              onClick={handleAddBenefit}
+              disabled={!newBenefit.trim()}
+            >
+              Προσθήκη
+            </Button>
+          </div>
+        </div>
+
+        {/* Benefits List */}
+        <div className="space-y-2">
+          {formData.benefits && formData.benefits.length > 0 ? (
+            formData.benefits.map((benefit, index) => (
+              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className={styles.bodyText}>{benefit}</span>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleRemoveBenefit(index)}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  Αφαίρεση
+                </Button>
+              </div>
+            ))
+          ) : (
+            <p className={`${styles.smallText} text-gray-500 italic`}>
+              Δεν έχουν προστεθεί παροχές ακόμα
+            </p>
+          )}
+        </div>
+      </Card>
 
       {/* Action Buttons */}
       {hasChanges && (

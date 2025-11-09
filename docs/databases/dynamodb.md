@@ -94,6 +94,7 @@ The NextService database consists of **6 main tables** that work together to pro
 | `fuelType` | String | Fuel type (petrol/diesel) | ✅ |
 | `isAutomatic` | Boolean | Whether transmission is automatic | ✅ |
 | `is4x4` | Boolean | Whether vehicle has 4-wheel drive | ✅ |
+| `isTurbo` | Boolean | Whether engine has turbocharger | ❌ |
 | `engineNumber` | String | Engine serial number | ❌ |
 | `licensePlate` | String | Vehicle license plate | ❌ |
 | `color` | String | Vehicle color | ❌ |
@@ -250,14 +251,14 @@ The NextService database consists of **6 main tables** that work together to pro
 | Field | Type | Description | Required |
 |-------|------|-------------|----------|
 | `id` | String (PK) | Unique offer identifier | ✅ |
+| `offerNumber` | String | Human-readable offer number (e.g., Offer_081025_1) | ✅ |
 | `serviceRequestId` | String | Reference to the service request | ✅ |
 | `garageId` | String | Reference to the garage making the offer | ✅ |
-| `price` | Number | Offer price in the specified currency | ✅ |
-| `currency` | String | Currency code (EUR/USD) | ✅ |
-| `description` | String | Detailed description of the offer | ✅ |
-| `estimatedDuration` | String | Estimated time to complete the service | ❌ |
-| `warranty` | String | Warranty information | ❌ |
-| `status` | String | Offer status (pending/accepted/rejected/expired) | ✅ |
+| `estimatedCost` | Number | System-estimated cost for the service | ❌ |
+| `offerAmount` | Number | Garage's offered price | ✅ |
+| `benefits` | Array of Strings | List of free benefits included in the offer | ❌ |
+| `availabilityDates` | Array of Strings | Available dates for service (YYYY-MM-DD format) | ❌ |
+| `status` | String | Offer status (draft/pending/accepted/rejected) | ✅ |
 | `createdAt` | String (ISO 8601) | Offer creation timestamp | ✅ |
 | `updatedAt` | String (ISO 8601) | Last update timestamp | ✅ |
 
@@ -270,13 +271,21 @@ The NextService database consists of **6 main tables** that work together to pro
 ```json
 {
   "id": "offer-1",
+  "offerNumber": "Offer_081025_1",
   "serviceRequestId": "request-1",
   "garageId": "garage-1",
-  "price": 150,
-  "currency": "EUR",
-  "description": "Full service including oil change, filters, and brake disc inspection",
-  "estimatedDuration": "2-3 hours",
-  "warranty": "6 months",
+  "estimatedCost": 200,
+  "offerAmount": 150,
+  "benefits": [
+    "Δωρεάν διαγνωστική",
+    "Εγγύηση 12 μηνών",
+    "Δωρεάν μεταφορά οχήματος"
+  ],
+  "availabilityDates": [
+    "2025-10-09",
+    "2025-10-10",
+    "2025-10-15"
+  ],
   "status": "pending",
   "createdAt": "2024-09-24T19:00:00.000Z",
   "updatedAt": "2024-09-24T19:00:00.000Z"
