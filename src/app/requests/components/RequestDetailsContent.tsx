@@ -7,6 +7,7 @@ import { DayPicker } from 'react-day-picker'
 import 'react-day-picker/dist/style.css'
 import { addDays, addWeeks, format, isWeekend } from 'date-fns'
 import { el } from 'date-fns/locale'
+import { ServiceVehicleCard, Modal, Input, Button, Checkbox } from '@/components'
 import { styles } from '../../../styles/styles'
 
 interface ServiceRequest {
@@ -34,11 +35,14 @@ interface ServiceRequest {
     brand: string
     model: string
     modelYear?: string
+    year?: string
     engineCC?: string
     fuelType?: string
     isAutomatic?: boolean
     is4x4?: boolean
     isTurbo?: boolean
+    vinNumber?: string
+    engineNumber?: string
   }
   clientAvailabilityDates?: string[]
 }
@@ -60,14 +64,92 @@ interface GarageSummary {
   id: string
   companyName?: string
   address?: string
+  benefits?: string[] | null
 }
 
 interface OfferWithGarage extends Offer {
   garage?: GarageSummary | null
 }
 
+type VehicleInfo = ServiceRequest['vehicle'] | null
+
+interface VehicleFormState {
+  brand: string
+  model: string
+  engineCC: string
+  modelYear: string
+  fuelType: string
+  isAutomatic: 'true' | 'false'
+  is4x4: 'true' | 'false'
+  isTurbo: 'true' | 'false'
+  vinNumber: string
+  engineNumber: string
+}
+
+const fuelTypeOptions = [
+  { value: '', label: 'Επιλέξτε καύσιμο' },
+  { value: 'petrol', label: 'Βενζίνη' },
+  { value: 'diesel', label: 'Πετρέλαιο' },
+  { value: 'hybrid', label: 'Υβριδικό' },
+  { value: 'electric', label: 'Ηλεκτρικό' },
+  { value: 'lpg', label: 'Υγραέριο (LPG)' },
+  { value: 'cng', label: 'Φυσικό Αέριο (CNG)' }
+]
+
+const booleanToSelectValue = (value?: boolean | string | null): 'true' | 'false' => {
+  if (typeof value === 'boolean') {
+    return value ? 'true' : 'false'
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (['true', 'yes', '1', 'nai'].includes(normalized)) return 'true'
+    if (['false', 'no', '0', 'oxi', 'όχι'].includes(normalized)) return 'false'
+  }
+  return 'false'
+}
+
+const sanitizeEngineValue = (value?: string | number | null) => {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'number') return value.toString()
+  return value.replace(/cc/i, '').trim()
+}
+
+const createVehicleFormState = (vehicle: VehicleInfo): VehicleFormState => ({
+  brand: vehicle?.brand ?? '',
+  model: vehicle?.model ?? '',
+  engineCC: sanitizeEngineValue(vehicle?.engineCC),
+  modelYear: vehicle?.modelYear?.toString() ?? vehicle?.year?.toString() ?? '',
+  fuelType: vehicle?.fuelType ?? '',
+  isAutomatic: booleanToSelectValue(vehicle?.isAutomatic),
+  is4x4: booleanToSelectValue(vehicle?.is4x4),
+  isTurbo: booleanToSelectValue(vehicle?.isTurbo),
+  vinNumber: vehicle?.vinNumber ?? '',
+  engineNumber: vehicle?.engineNumber ?? ''
+})
+
+const mapVehicleDetailsFromApi = (vehicle: any): VehicleInfo => {
+  if (!vehicle || typeof vehicle !== 'object') {
+    return null
+  }
+
+  return {
+    brand: vehicle.brand ?? '',
+    model: vehicle.model ?? '',
+    engineCC: vehicle.engineCC ?? '',
+    modelYear: vehicle.modelYear ?? vehicle.year ?? '',
+    year: vehicle.year ?? vehicle.modelYear ?? '',
+    fuelType: vehicle.fuelType ?? '',
+    isAutomatic: vehicle.isAutomatic ?? null,
+    is4x4: vehicle.is4x4 ?? null,
+    isTurbo: vehicle.isTurbo ?? null,
+    vinNumber: vehicle.vinNumber ?? '',
+    engineNumber: vehicle.engineNumber ?? ''
+  }
+}
+
 interface RequestDetailsContentProps {
   request: ServiceRequest
+  onRequestUpdate?: (request: ServiceRequest) => void
   getStatusIcon: (status: string) => React.ReactNode
   getStatusText: (status: string) => string
   getStatusColor: (status: string) => string
@@ -75,10 +157,17 @@ interface RequestDetailsContentProps {
 
 export default function RequestDetailsContent({ 
   request, 
+  onRequestUpdate,
   getStatusIcon, 
   getStatusText, 
   getStatusColor 
 }: RequestDetailsContentProps) {
+  const [vehicleDetails, setVehicleDetails] = useState<VehicleInfo>(() =>
+    mapVehicleDetailsFromApi(request.vehicle)
+  )
+  const [vehicleForm, setVehicleForm] = useState<VehicleFormState>(() =>
+    createVehicleFormState(mapVehicleDetailsFromApi(request.vehicle))
+  )
   const [offers, setOffers] = useState<OfferWithGarage[]>([])
   const [offersLoading, setOffersLoading] = useState(true)
   const [offersError, setOffersError] = useState<string | null>(null)
@@ -89,6 +178,11 @@ export default function RequestDetailsContent({
   const [customDateErrors, setCustomDateErrors] = useState<Record<string, string | null>>({})
   const [customDateSuccesses, setCustomDateSuccesses] = useState<Record<string, string | null>>({})
   const [savingCustomDates, setSavingCustomDates] = useState<Record<string, boolean>>({})
+  const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false)
+  const [vehicleFormError, setVehicleFormError] = useState<string | null>(null)
+  const [vehicleFormSaving, setVehicleFormSaving] = useState(false)
+  const [vehicleUpdateMessage, setVehicleUpdateMessage] = useState<string | null>(null)
+  const [vehicleUpdateError, setVehicleUpdateError] = useState<string | null>(null)
 
   const hasOffers =
     typeof offers !== 'undefined' && Array.isArray(offers) && offers.length > 0
@@ -104,90 +198,6 @@ export default function RequestDetailsContent({
     })
 
     return formatted.charAt(0).toUpperCase() + formatted.slice(1)
-  }
-
-  const getCategoryText = (category: string) => {
-    switch (category) {
-      case 'service':
-        return 'Συντήρηση'
-      case 'fanopeia':
-        return 'Φανοποιεία'
-      case 'oils':
-        return 'Λάδια & Υγρά'
-      case 'disk':
-        return 'Δισκόφρενα'
-      default:
-        return category
-    }
-  }
-
-  const normalizeBoolean = (value?: boolean | string | null) => {
-    if (typeof value === 'boolean') {
-      return value
-    }
-    if (typeof value === 'string') {
-      const normalized = value.trim().toLowerCase()
-      if (normalized === 'true') return true
-      if (normalized === 'false') return false
-    }
-    return null
-  }
-
-  const getFuelTypeText = (fuelType?: string | null) => {
-    if (!fuelType) {
-      return 'Δεν έχει δηλωθεί'
-    }
-
-    const normalized = fuelType.trim().toLowerCase()
-
-    switch (normalized) {
-      case 'petrol':
-      case 'gasoline':
-        return 'Βενζίνη'
-      case 'diesel':
-        return 'Πετρέλαιο'
-      case 'hybrid':
-        return 'Υβριδικό'
-      case 'electric':
-        return 'Ηλεκτρικό'
-      case 'lpg':
-        return 'Υγραέριο (LPG)'
-      case 'cng':
-        return 'Φυσικό Αέριο (CNG)'
-      default:
-        return fuelType
-    }
-  }
-
-  const getTransmissionText = (isAutomatic?: boolean | string | null) => {
-    const value = normalizeBoolean(isAutomatic)
-    if (value === true) {
-      return 'Αυτόματο'
-    }
-    if (value === false) {
-      return 'Χειροκίνητο'
-    }
-    return 'Δεν έχει δηλωθεί'
-  }
-
-  const getBooleanText = (value?: boolean | string | null) => {
-    const normalized = normalizeBoolean(value)
-    if (normalized === true) {
-      return 'Ναι'
-    }
-    if (normalized === false) {
-      return 'Όχι'
-    }
-    return 'Δεν έχει δηλωθεί'
-  }
-
-  const formatEngineCC = (engineCC?: string | number | null) => {
-    if (engineCC === null || engineCC === undefined || engineCC === '') {
-      return 'Δεν έχει δηλωθεί'
-    }
-
-    const value = typeof engineCC === 'number' ? engineCC.toString() : engineCC
-    return `${value} cc`
   }
 
   const formatCurrency = (value?: number | string | null) => {
@@ -454,10 +464,17 @@ export default function RequestDetailsContent({
               }
 
               const garageData = await garageResponse.json()
+              const normalizedBenefits = Array.isArray(garageData?.garage?.benefits)
+                ? garageData?.garage?.benefits
+                    .map((benefit: unknown) => (typeof benefit === 'string' ? benefit.trim() : ''))
+                    .filter((benefit: string): benefit is string => benefit.length > 0)
+                : []
+
               const garageSummary: GarageSummary = {
                 id: garageData?.garage?.id ?? offer.garageId,
                 companyName: garageData?.garage?.companyName,
-                address: garageData?.garage?.address
+                address: garageData?.garage?.address,
+                benefits: normalizedBenefits
               }
 
               garageCache.set(offer.garageId, garageSummary)
@@ -530,8 +547,148 @@ export default function RequestDetailsContent({
     }
   }, [request.id])
 
+  useEffect(() => {
+    setVehicleForm(createVehicleFormState(vehicleDetails))
+  }, [vehicleDetails])
+
+  useEffect(() => {
+    const mapped = mapVehicleDetailsFromApi(request.vehicle)
+    setVehicleDetails(mapped)
+  }, [request.id, request.updatedAt])
+
+  const handleOpenVehicleModal = () => {
+    setVehicleFormError(null)
+    setVehicleUpdateError(null)
+    setVehicleForm(createVehicleFormState(vehicleDetails))
+    setIsVehicleModalOpen(true)
+  }
+
+  const handleCloseVehicleModal = () => {
+    if (!vehicleFormSaving) {
+      setIsVehicleModalOpen(false)
+    }
+  }
+
+  const handleVehicleFieldChange = (field: keyof VehicleFormState, value: string) => {
+    setVehicleForm((prev) => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handleSaveVehicleDetails = async () => {
+    if (!request.vehicleId) {
+      setVehicleFormError('Δεν είναι διαθέσιμο το όχημα για ενημέρωση.')
+      return
+    }
+
+    if (!vehicleForm.brand.trim()) {
+      setVehicleFormError('Συμπληρώστε τη μάρκα του οχήματος.')
+      return
+    }
+
+    if (!vehicleForm.model.trim()) {
+      setVehicleFormError('Συμπληρώστε το μοντέλο του οχήματος.')
+      return
+    }
+
+    setVehicleFormError(null)
+    setVehicleUpdateError(null)
+    setVehicleFormSaving(true)
+
+    const payload: Record<string, unknown> = {
+      brand: vehicleForm.brand.trim(),
+      model: vehicleForm.model.trim(),
+      isAutomatic: vehicleForm.isAutomatic === 'true',
+      is4x4: vehicleForm.is4x4 === 'true',
+      isTurbo: vehicleForm.isTurbo === 'true'
+    }
+
+    const engineValue = vehicleForm.engineCC.trim()
+      ? sanitizeEngineValue(vehicleForm.engineCC)
+      : null
+
+    if (engineValue !== null) {
+      payload.engineCC = engineValue
+    } else {
+      payload.engineCC = null
+    }
+
+    const yearValue = vehicleForm.modelYear.trim()
+    if (yearValue) {
+      payload.modelYear = yearValue
+      payload.year = yearValue
+    } else {
+      payload.modelYear = null
+      payload.year = null
+    }
+
+    if (vehicleForm.fuelType.trim()) {
+      payload.fuelType = vehicleForm.fuelType.trim()
+    } else {
+      payload.fuelType = null
+    }
+
+    if (vehicleForm.vinNumber.trim()) {
+      payload.vinNumber = vehicleForm.vinNumber.trim()
+    } else {
+      payload.vinNumber = null
+    }
+
+    if (vehicleForm.engineNumber.trim()) {
+      payload.engineNumber = vehicleForm.engineNumber.trim()
+    } else {
+      payload.engineNumber = null
+    }
+
+    try {
+      const response = await fetch(`/api/vehicles/${request.vehicleId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        const errorMessage =
+          data?.error || 'Δεν ήταν δυνατή η ενημέρωση των στοιχείων οχήματος.'
+        setVehicleFormError(errorMessage)
+        setVehicleUpdateError(errorMessage)
+        return
+      }
+
+      const updatedVehicle = mapVehicleDetailsFromApi(data.vehicle)
+      setVehicleDetails(updatedVehicle)
+      setVehicleForm(createVehicleFormState(updatedVehicle))
+      if (onRequestUpdate && updatedVehicle) {
+        const updatedRequest: ServiceRequest = {
+          ...request,
+          vehicle: {
+            ...(request.vehicle ?? {}),
+            ...updatedVehicle
+          },
+          updatedAt: data.vehicle?.updatedAt ?? new Date().toISOString()
+        }
+        onRequestUpdate(updatedRequest)
+      }
+      setIsVehicleModalOpen(false)
+      setVehicleUpdateMessage('Τα στοιχεία του οχήματος ενημερώθηκαν με επιτυχία.')
+      setTimeout(() => setVehicleUpdateMessage(null), 5000)
+    } catch (error) {
+      console.error('Error updating vehicle details:', error)
+      setVehicleFormError('Παρουσιάστηκε σφάλμα κατά την ενημέρωση. Δοκιμάστε ξανά.')
+      setVehicleUpdateError('Παρουσιάστηκε σφάλμα κατά την ενημέρωση. Δοκιμάστε ξανά.')
+    } finally {
+      setVehicleFormSaving(false)
+    }
+  }
+
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
       {/* Status and Priority */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
@@ -542,67 +699,28 @@ export default function RequestDetailsContent({
         </div>
       </div>
 
-      {/* Vehicle Information */}
-      {request.vehicle && (
-        <div className={styles.cardSimple}>
-          <h3 className={`${styles.cardTitle} mb-3`}>Πληροφορίες Οχήματος</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <p className="text-sm text-gray-600">Μάρκα</p>
-              <p className="font-medium text-black">{request.vehicle.brand}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Μοντέλο</p>
-              <p className="font-medium text-black">{request.vehicle.model}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Έτος</p>
-              <p className="font-medium text-black">{request.vehicle.modelYear || 'Δεν έχει δηλωθεί'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Κυβικά</p>
-              <p className="font-medium text-black">{formatEngineCC(request.vehicle.engineCC)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Καύσιμο</p>
-              <p className="font-medium text-black">{getFuelTypeText(request.vehicle.fuelType)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Κιβώτιο Ταχυτήτων</p>
-              <p className="font-medium text-black">{getTransmissionText(request.vehicle.isAutomatic)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">4x4</p>
-              <p className="font-medium text-black">{getBooleanText(request.vehicle.is4x4)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Turbo</p>
-              <p className="font-medium text-black">{getBooleanText(request.vehicle.isTurbo)}</p>
-            </div>
-          </div>
+      <ServiceVehicleCard
+        serviceDescription={request.description}
+        category={request.category}
+        estimatedCost={request.estimatedCost}
+        vehicle={vehicleDetails}
+        photoCount={request.photoUrls.length}
+        showEstimatedCost={request.estimatedCost !== undefined && request.estimatedCost !== null}
+        editable={Boolean(request.vehicleId)}
+        onEditClick={handleOpenVehicleModal}
+      />
+
+      {vehicleUpdateMessage && (
+        <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-800">
+          {vehicleUpdateMessage}
         </div>
       )}
 
-      {/* Service Details */}
-      <div className={styles.cardSimple}>
-        <h3 className={`${styles.cardTitle} mb-3`}>Λεπτομέρειες Υπηρεσίας</h3>
-        <div className="space-y-3">
-          <div>
-            <p className="text-sm text-gray-600">Κατηγορία</p>
-            <p className="font-medium text-black">{getCategoryText(request.category)}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-600">Περιγραφή</p>
-            <p className="font-medium text-black">{request.description}</p>
-          </div>
-          {request.estimatedCost && (
-            <div>
-              <p className="text-sm text-gray-600">Εκτιμώμενο Κόστος</p>
-              <p className="font-medium text-green-600">€{request.estimatedCost}</p>
-            </div>
-          )}
+      {vehicleUpdateError && (
+        <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {vehicleUpdateError}
         </div>
-      </div>
+      )}
 
       {/* Photos */}
       {request.photoUrls.length > 0 && (
@@ -657,6 +775,9 @@ export default function RequestDetailsContent({
               const customError = customDateErrors[offer.id]
               const customSuccess = customDateSuccesses[offer.id]
               const isSaving = savingCustomDates[offer.id] || false
+              const benefits = Array.isArray(offer.garage?.benefits)
+                ? offer.garage?.benefits ?? []
+                : []
 
               return (
                 <div
@@ -708,6 +829,28 @@ export default function RequestDetailsContent({
 
                   {isExpanded && (
                     <div className="mt-4 space-y-4 border-t border-gray-100 pt-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">
+                          Παροχές Εργασίας
+                        </p>
+                        {benefits.length > 0 ? (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {benefits.map((benefit, benefitIndex) => (
+                              <span
+                                key={`${offer.id}-benefit-${benefitIndex}`}
+                                className="px-3 py-1 rounded-full border border-orange-100 bg-orange-50 text-sm font-medium text-orange-700"
+                              >
+                                {benefit}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-600 mt-2">
+                            Το συνεργείο δεν έχει δηλώσει παροχές εργασίας για αυτή την προσφορά.
+                          </p>
+                        )}
+                      </div>
+
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-gray-800">
                           Διαθεσιμότητα συνεργείου
@@ -974,5 +1117,110 @@ export default function RequestDetailsContent({
         </div>
       )}
     </div>
+
+      <Modal
+        isOpen={isVehicleModalOpen}
+        onClose={handleCloseVehicleModal}
+        title="Επεξεργασία στοιχείων οχήματος"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={handleCloseVehicleModal}
+              disabled={vehicleFormSaving}
+            >
+              Ακύρωση
+            </Button>
+            <Button
+              onClick={handleSaveVehicleDetails}
+              loading={vehicleFormSaving}
+            >
+              Αποθήκευση
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-6">
+          {vehicleFormError && (
+            <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {vehicleFormError}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Μάρκα"
+              value={vehicleForm.brand}
+              onChange={(value) => handleVehicleFieldChange('brand', value)}
+              required
+            />
+            <Input
+              label="Μοντέλο"
+              value={vehicleForm.model}
+              onChange={(value) => handleVehicleFieldChange('model', value)}
+              required
+            />
+            <Input
+              label="Κυβικά (cc)"
+              value={vehicleForm.engineCC}
+              onChange={(value) => handleVehicleFieldChange('engineCC', value)}
+            />
+            <Input
+              label="Έτος"
+              value={vehicleForm.modelYear}
+              onChange={(value) => handleVehicleFieldChange('modelYear', value)}
+            />
+            <div>
+              <label className={styles.label}>Καύσιμο</label>
+              <select
+                className={styles.select}
+                value={vehicleForm.fuelType}
+                onChange={(event) => handleVehicleFieldChange('fuelType', event.target.value)}
+              >
+                {fuelTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Input
+              label="VIN"
+              value={vehicleForm.vinNumber}
+              onChange={(value) => handleVehicleFieldChange('vinNumber', value)}
+            />
+            <Input
+              label="Αρ. Κινητήρα"
+              value={vehicleForm.engineNumber}
+              onChange={(value) => handleVehicleFieldChange('engineNumber', value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Checkbox
+              checked={vehicleForm.isAutomatic === 'true'}
+              onChange={(checked) =>
+                handleVehicleFieldChange('isAutomatic', checked ? 'true' : 'false')
+              }
+              label="Αυτόματο κιβώτιο"
+            />
+            <Checkbox
+              checked={vehicleForm.is4x4 === 'true'}
+              onChange={(checked) =>
+                handleVehicleFieldChange('is4x4', checked ? 'true' : 'false')
+              }
+              label="4x4"
+            />
+            <Checkbox
+              checked={vehicleForm.isTurbo === 'true'}
+              onChange={(checked) =>
+                handleVehicleFieldChange('isTurbo', checked ? 'true' : 'false')
+              }
+              label="Turbo"
+            />
+          </div>
+        </div>
+      </Modal>
+    </>
   )
 }

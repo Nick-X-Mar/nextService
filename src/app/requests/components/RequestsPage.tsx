@@ -223,6 +223,15 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     setSelectedRequest(null)
   }
 
+  const handleRequestUpdate = (updatedRequest: ServiceRequest) => {
+    setRequests((prevRequests) =>
+      prevRequests.map((request) =>
+        request.id === updatedRequest.id ? { ...request, ...updatedRequest } : request
+      )
+    )
+    setSelectedRequest(updatedRequest)
+  }
+
   const checkGarageMessages = async (requestIds: string[]) => {
     const messagesMap: Record<string, boolean> = {}
     
@@ -779,6 +788,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
           <RequestDetailsModal
             request={selectedRequest}
             onClose={handleCloseModal}
+            onRequestUpdate={handleRequestUpdate}
             getStatusIcon={getStatusIcon}
             getStatusText={getStatusText}
             getStatusColor={getStatusColor}

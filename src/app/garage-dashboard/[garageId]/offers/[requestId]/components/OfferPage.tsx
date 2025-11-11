@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card, Button, Input, Checkbox } from '@/components'
+import { Card, Button, Input, Checkbox, ServiceVehicleCard } from '@/components'
 import { styles } from '@/styles/styles'
 import { DayPicker } from 'react-day-picker'
 import { addDays, addWeeks, isWeekend, startOfDay, isBefore, format } from 'date-fns'
@@ -380,30 +380,6 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
     }
   }
 
-  const getCategoryText = (category: string) => {
-    switch (category) {
-      case 'service': return 'Συντήρηση'
-      case 'brakes': return 'Φρένα'
-      case 'tires': return 'Λάστιχα'
-      case 'engine': return 'Κινητήρας'
-      case 'electrical': return 'Ηλεκτρικά'
-      case 'oils': return 'Λάδια'
-      default: return category
-    }
-  }
-
-  const getFuelTypeText = (fuelType: string | undefined) => {
-    if (!fuelType) return '-'
-    switch (fuelType.toLowerCase()) {
-      case 'petrol': return 'Βενζίνη'
-      case 'diesel': return 'Πετρέλαιο'
-      case 'electric': return 'Ηλεκτρικό'
-      case 'hybrid': return 'Υβριδικό'
-      case 'lpg': return 'Υγραέριο'
-      default: return fuelType
-    }
-  }
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -491,101 +467,26 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
         </Card>
 
         {/* Request Details Section */}
-        <Card className="p-6">
-          <h2 className={`${styles.sectionTitle} mb-4`}>Εργασία - Όχημα</h2>
-          
-          {/* Work Description */}
-          <div className="mb-6">
-            <h3 className={`${styles.sectionTitle} text-lg mb-2`}>Εργασία</h3>
-            <p className={`${styles.bodyText} p-3 bg-gray-50 rounded-lg`}>
-              {serviceRequest.description}
-            </p>
-          </div>
-
-          {/* Vehicle Details */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            <div>
-              <p className={`${styles.bodyText} text-sm`}>
-                <span className="text-gray-600">Μάρκα:</span> 
-                <strong className="ml-2">{serviceRequest.vehicle.brand}</strong>
-              </p>
-            </div>
-            <div>
-              <p className={`${styles.bodyText} text-sm`}>
-                <span className="text-gray-600">Μοντέλο:</span> 
-                <strong className="ml-2">{serviceRequest.vehicle.model}</strong>
-              </p>
-            </div>
-            <div>
-              <p className={`${styles.bodyText} text-sm`}>
-                <span className="text-gray-600">Κυβικά:</span> 
-                <strong className="ml-2">{serviceRequest.vehicle.engineCC ? `${serviceRequest.vehicle.engineCC} cc` : '-'}</strong>
-              </p>
-            </div>
-            <div>
-              <p className={`${styles.bodyText} text-sm`}>
-                <span className="text-gray-600">Έτος:</span> 
-                <strong className="ml-2">{serviceRequest.vehicle.modelYear || serviceRequest.vehicle.year}</strong>
-              </p>
-            </div>
-            <div>
-              <p className={`${styles.bodyText} text-sm`}>
-                <span className="text-gray-600">Καύσιμο:</span> 
-                <strong className="ml-2">{getFuelTypeText(serviceRequest.vehicle.fuelType)}</strong>
-              </p>
-            </div>
-            <div>
-              <p className={`${styles.bodyText} text-sm`}>
-                <span className="text-gray-600">Κιβώτιο:</span> 
-                <strong className="ml-2">{serviceRequest.vehicle.isAutomatic ? 'Αυτόματο' : 'Χειροκίνητο'}</strong>
-              </p>
-            </div>
-                    <div>
-                      <p className={`${styles.bodyText} text-sm`}>
-                        <span className="text-gray-600">4x4:</span> 
-                        <strong className="ml-2">{serviceRequest.vehicle.is4x4 ? 'Ναι' : 'Όχι'}</strong>
-                      </p>
-                    </div>
-                    <div>
-                      <p className={`${styles.bodyText} text-sm`}>
-                        <span className="text-gray-600">Turbo:</span> 
-                        <strong className="ml-2">{serviceRequest.vehicle.isTurbo ? 'Ναι' : 'Όχι'}</strong>
-                      </p>
-                    </div>
-          </div>
-
-          {/* Additional Vehicle Details */}
-          {(serviceRequest.vehicle.vinNumber || serviceRequest.vehicle.engineNumber) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {serviceRequest.vehicle.vinNumber && (
-                <div>
-                  <p className={`${styles.bodyText} text-sm`}>
-                    <span className="text-gray-600">VIN:</span> 
-                    <strong className="ml-2">{serviceRequest.vehicle.vinNumber}</strong>
-                  </p>
-                </div>
-              )}
-              {serviceRequest.vehicle.engineNumber && (
-                <div>
-                  <p className={`${styles.bodyText} text-sm`}>
-                    <span className="text-gray-600">Αρ. Κινητήρα:</span> 
-                    <strong className="ml-2">{serviceRequest.vehicle.engineNumber}</strong>
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Photos Indicator */}
-          {serviceRequest.photoUrls && serviceRequest.photoUrls.length > 0 && (
-            <div className="mt-4 flex items-center gap-2 text-green-600">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              <span className="text-sm font-medium">Φωτογραφίες ({serviceRequest.photoUrls.length})</span>
-            </div>
-          )}
-        </Card>
+        <ServiceVehicleCard
+          serviceDescription={serviceRequest.description}
+          category={serviceRequest.category}
+          estimatedCost={serviceRequest.estimatedCost}
+          vehicle={{
+            brand: serviceRequest.vehicle.brand,
+            model: serviceRequest.vehicle.model,
+            engineCC: serviceRequest.vehicle.engineCC,
+            modelYear: serviceRequest.vehicle.modelYear,
+            year: serviceRequest.vehicle.year,
+            fuelType: serviceRequest.vehicle.fuelType,
+            isAutomatic: serviceRequest.vehicle.isAutomatic,
+            is4x4: serviceRequest.vehicle.is4x4,
+            isTurbo: serviceRequest.vehicle.isTurbo,
+            vinNumber: serviceRequest.vehicle.vinNumber,
+            engineNumber: serviceRequest.vehicle.engineNumber
+          }}
+          photoCount={serviceRequest.photoUrls?.length || 0}
+          showEstimatedCost={false}
+        />
 
         {/* Offer Section */}
         <Card className="p-6">

@@ -41,6 +41,7 @@ interface ServiceRequest {
 interface RequestDetailsModalProps {
   request: ServiceRequest
   onClose: () => void
+  onRequestUpdate?: (request: ServiceRequest) => void
   getStatusIcon: (status: string) => React.ReactNode
   getStatusText: (status: string) => string
   getStatusColor: (status: string) => string
@@ -49,6 +50,7 @@ interface RequestDetailsModalProps {
 export default function RequestDetailsModal({ 
   request, 
   onClose, 
+  onRequestUpdate,
   getStatusIcon, 
   getStatusText, 
   getStatusColor 
@@ -72,6 +74,7 @@ export default function RequestDetailsModal({
     >
       <RequestDetailsContent
         request={request}
+        onRequestUpdate={onRequestUpdate}
         getStatusIcon={getStatusIcon}
         getStatusText={getStatusText}
         getStatusColor={getStatusColor}
