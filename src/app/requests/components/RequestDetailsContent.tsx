@@ -9,43 +9,8 @@ import { addDays, addWeeks, format, isWeekend } from 'date-fns'
 import { el } from 'date-fns/locale'
 import { ServiceVehicleCard, Modal, Input, Button, Checkbox } from '@/components'
 import { styles } from '../../../styles/styles'
-
-interface ServiceRequest {
-  id: string
-  clientId: string
-  vehicleId: string
-  category: string
-  description: string
-  status: 'appointment' | 'pending' | 'in-progress' | 'completed' | 'cancelled'
-  estimatedCost?: number
-  photoUrls: string[]
-  photos: Array<{
-    id: string
-    s3Url: string
-    s3Key: string
-    originalName: string
-    fileSize: number
-    contentType: string
-    description?: string
-    uploadedAt: string
-  }>
-  createdAt: string
-  updatedAt: string
-  vehicle?: {
-    brand: string
-    model: string
-    modelYear?: string
-    year?: string
-    engineCC?: string
-    fuelType?: string
-    isAutomatic?: boolean
-    is4x4?: boolean
-    isTurbo?: boolean
-    vinNumber?: string
-    engineNumber?: string
-  }
-  clientAvailabilityDates?: string[]
-}
+import { ServiceRequestStatus, OfferStatus } from '../../../types/statuses'
+import type { ServiceRequest } from '../../../types/requests'
 
 interface Offer {
   id: string
@@ -54,10 +19,12 @@ interface Offer {
   availabilityDates?: string[]
   garageId?: string
   offerNumber?: string
-  status?: string
+  status?: OfferStatus
   createdAt?: string
   updatedAt?: string
   clientAvailabilityDates?: string[]
+  appointmentDate?: string
+  appointmentPrice?: number
 }
 
 interface GarageSummary {
@@ -183,10 +150,12 @@ export default function RequestDetailsContent({
   const [vehicleFormSaving, setVehicleFormSaving] = useState(false)
   const [vehicleUpdateMessage, setVehicleUpdateMessage] = useState<string | null>(null)
   const [vehicleUpdateError, setVehicleUpdateError] = useState<string | null>(null)
+  const [acceptingOfferId, setAcceptingOfferId] = useState<string | null>(null)
+  const [acceptError, setAcceptError] = useState<string | null>(null)
 
   const hasOffers =
     typeof offers !== 'undefined' && Array.isArray(offers) && offers.length > 0
-  const showWaitingForResponsesBanner = request.status === 'pending' && !hasOffers
+  const showWaitingForResponsesBanner = request.status === ServiceRequestStatus.PENDING && !hasOffers
 
   const formatAvailabilityDate = (dateString: string) => {
     const date = new Date(`${dateString}T00:00:00`)
@@ -423,8 +392,75 @@ export default function RequestDetailsContent({
     }
   }
 
-  const handleAcceptOffer = (offer: OfferWithGarage) => {
-    console.log('Accept offer', offer.id)
+  const handleAcceptOffer = async (offer: OfferWithGarage) => {
+    const selectedDate = selectedOfferDates[offer.id]
+
+    if (!selectedDate) {
+      setAcceptError('Επιλέξτε ημερομηνία για το ραντεβού πριν αποδεχτείτε την προσφορά.')
+      return
+    }
+
+    try {
+      setAcceptError(null)
+      setAcceptingOfferId(offer.id)
+
+      const payload = {
+        offerId: offer.id,
+        appointmentDate: selectedDate,
+        appointmentPrice: offer.offerAmount
+      }
+
+      const response = await fetch(`/api/requests/${request.id}/accept-offer`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        const errorMessage =
+          data?.error || 'Δεν ήταν δυνατή η αποδοχή της προσφοράς. Δοκιμάστε ξανά.'
+        setAcceptError(errorMessage)
+        return
+      }
+
+      const updatedRequest: ServiceRequest = {
+        ...request,
+        status: ServiceRequestStatus.APPOINTMENT,
+        acceptedOfferId: payload.offerId,
+        appointmentDate: payload.appointmentDate,
+        appointmentPrice: payload.appointmentPrice,
+        updatedAt: data.request?.updatedAt ?? new Date().toISOString()
+      }
+
+      setOffers((prev) =>
+        prev.map((item) =>
+          item.id === offer.id
+            ? {
+                ...item,
+                status: OfferStatus.ACCEPTED,
+                appointmentDate: payload.appointmentDate,
+                appointmentPrice: payload.appointmentPrice
+              }
+            : {
+                ...item,
+                status: OfferStatus.REJECTED
+              }
+        )
+      )
+
+      if (onRequestUpdate) {
+        onRequestUpdate(updatedRequest)
+      }
+    } catch (error) {
+      console.error('Error accepting offer:', error)
+      setAcceptError('Παρουσιάστηκε σφάλμα κατά την αποδοχή της προσφοράς. Δοκιμάστε ξανά.')
+    } finally {
+      setAcceptingOfferId(null)
+    }
   }
 
   useEffect(() => {
@@ -768,7 +804,12 @@ export default function RequestDetailsContent({
               const availabilityDates = offer.availabilityDates || []
               const hasAvailability = availabilityDates.length > 0
               const selectedDate = selectedOfferDates[offer.id] || null
-              const canAcceptOffer = hasAvailability && Boolean(selectedDate)
+              const canAcceptOffer =
+                hasAvailability &&
+                Boolean(selectedDate) &&
+                request.status !== ServiceRequestStatus.APPOINTMENT &&
+                offer.status !== OfferStatus.ACCEPTED &&
+                offer.status !== OfferStatus.REJECTED
               const isExpanded = expandedOfferId === offer.id
               const isCustomOpen = customPickerOpen[offer.id]
               const customDates = customDatesByOffer[offer.id] || []
@@ -778,6 +819,7 @@ export default function RequestDetailsContent({
               const benefits = Array.isArray(offer.garage?.benefits)
                 ? offer.garage?.benefits ?? []
                 : []
+              const isAcceptedOffer = request.acceptedOfferId === offer.id
 
               return (
                 <div
@@ -795,7 +837,11 @@ export default function RequestDetailsContent({
                     isExpanded
                       ? 'border-orange-300 bg-white shadow-sm'
                       : 'border-gray-200 bg-gray-50 hover:border-orange-200'
-                  } p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400`}
+                  } p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${
+                    request.status === ServiceRequestStatus.APPOINTMENT && offer.status === OfferStatus.REJECTED
+                      ? 'opacity-60 pointer-events-none'
+                      : ''
+                  }`}
                 >
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
@@ -815,10 +861,17 @@ export default function RequestDetailsContent({
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-gray-600">Τιμή</p>
-                      <p className="text-lg font-semibold text-gray-900">
-                        {formatCurrency(offer.offerAmount)}
+                      <p className="text-sm text-gray-600">
+                        {isAcceptedOffer ? 'Τελικό ποσό' : 'Τιμή'}
                       </p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {formatCurrency(offer.appointmentPrice ?? offer.offerAmount)}
+                      </p>
+                      {isAcceptedOffer && request.appointmentDate && (
+                        <p className="text-xs text-green-700 mt-1">
+                          Ημ/νία ραντεβού: {formatAvailabilityDate(request.appointmentDate)}
+                        </p>
+                      )}
                       {offer.estimatedCost && offer.estimatedCost > 0 && (
                         <p className="text-xs text-gray-500 mt-1">
                           Εκτιμώμενο κόστος: {formatCurrency(offer.estimatedCost)}
@@ -1037,21 +1090,25 @@ export default function RequestDetailsContent({
                         </>
                       )}
 
-                      <div className="flex flex-wrap gap-3 pt-2">
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            handleAcceptOffer(offer)
-                          }}
-                          disabled={!canAcceptOffer}
-                          className={`${styles.btnPrimary} px-4 py-2 text-sm ${
-                            !canAcceptOffer ? 'opacity-60 cursor-not-allowed' : ''
-                          }`}
-                        >
-                          Αποδοχή προσφοράς
-                        </button>
-                      </div>
+                      {request.status !== ServiceRequestStatus.APPOINTMENT && offer.status !== OfferStatus.ACCEPTED && (
+                        <div className="flex flex-wrap gap-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              handleAcceptOffer(offer)
+                            }}
+                            disabled={!canAcceptOffer || acceptingOfferId === offer.id}
+                            className={`${styles.btnPrimary} px-4 py-2 text-sm ${
+                              !canAcceptOffer || acceptingOfferId === offer.id
+                                ? 'opacity-60 cursor-not-allowed'
+                                : ''
+                            }`}
+                          >
+                            {acceptingOfferId === offer.id ? 'Αποδοχή...' : 'Αποδοχή προσφοράς'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1062,7 +1119,7 @@ export default function RequestDetailsContent({
       </div>
 
       {/* Status-specific information */}
-      {request.status === 'appointment' && (
+      {request.status === ServiceRequestStatus.APPOINTMENT && (
         <div className="bg-blue-50 p-4 rounded-lg">
           <h4 className="font-medium text-blue-900 mb-2">📅 Ραντεβού Προγραμματισμένο</h4>
           <p className="text-sm text-blue-800 mb-3">
@@ -1090,7 +1147,7 @@ export default function RequestDetailsContent({
         </div>
       )}
 
-      {request.status === 'in-progress' && (
+      {request.status === ServiceRequestStatus.IN_PROGRESS && (
         <div className="bg-blue-50 p-4 rounded-lg">
           <h4 className="font-medium text-blue-900 mb-2">🔧 Εργασία σε Εξέλιξη</h4>
           <p className="text-sm text-blue-800">
@@ -1099,7 +1156,7 @@ export default function RequestDetailsContent({
         </div>
       )}
 
-      {request.status === 'completed' && (
+      {request.status === ServiceRequestStatus.COMPLETED && (
         <div className="bg-green-50 p-4 rounded-lg">
           <h4 className="font-medium text-green-900 mb-2">✅ Ολοκληρώθηκε</h4>
           <p className="text-sm text-green-800">
@@ -1108,7 +1165,7 @@ export default function RequestDetailsContent({
         </div>
       )}
 
-      {request.status === 'cancelled' && (
+      {request.status === ServiceRequestStatus.CANCELLED && (
         <div className="bg-red-50 p-4 rounded-lg">
           <h4 className="font-medium text-red-900 mb-2">❌ Ακυρώθηκε</h4>
           <p className="text-sm text-red-800">

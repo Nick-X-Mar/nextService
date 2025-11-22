@@ -4,32 +4,8 @@ import { useState } from 'react'
 import { HiPencil, HiCheck, HiXMark, HiChevronDown, HiChevronUp } from 'react-icons/hi2'
 import { SegmentedControl } from './index'
 import { styles } from '../styles/styles'
-
-interface ServiceRequest {
-  id: string
-  description: string
-  category: string
-  status: string
-  createdAt: string
-  photoUrls?: string[]
-  client?: {
-    firstName: string
-    lastName: string
-    phoneNumber: string
-  }
-  vehicle?: {
-    brand: string
-    model: string
-    modelYear: string
-    licensePlate: string
-    engineCC: string
-    engineNumber: string
-    fuelType: 'petrol' | 'diesel'
-    vinNumber: string
-    is4x4: boolean
-    isAutomatic: boolean
-  }
-}
+import { ServiceRequestStatus } from '../types/statuses'
+import type { ServiceRequest } from '../types/requests'
 
 interface RequestDetailsPanelProps {
   request: ServiceRequest
@@ -70,34 +46,34 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
     }
   }
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status: ServiceRequestStatus) => {
     switch (status) {
-      case 'pending':
+      case ServiceRequestStatus.PENDING:
         return 'Εκκρεμεί'
-      case 'in-progress':
+      case ServiceRequestStatus.IN_PROGRESS:
         return 'Σε Εξέλιξη'
-      case 'completed':
+      case ServiceRequestStatus.COMPLETED:
         return 'Ολοκληρώθηκε'
-      case 'cancelled':
+      case ServiceRequestStatus.CANCELLED:
         return 'Ακυρώθηκε'
-      case 'appointment':
+      case ServiceRequestStatus.APPOINTMENT:
         return 'Ραντεβού'
       default:
         return status
     }
   }
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: ServiceRequestStatus) => {
     switch (status) {
-      case 'pending':
+      case ServiceRequestStatus.PENDING:
         return 'bg-yellow-100 text-yellow-800'
-      case 'in-progress':
+      case ServiceRequestStatus.IN_PROGRESS:
         return 'bg-blue-100 text-blue-800'
-      case 'completed':
+      case ServiceRequestStatus.COMPLETED:
         return 'bg-green-100 text-green-800'
-      case 'cancelled':
+      case ServiceRequestStatus.CANCELLED:
         return 'bg-red-100 text-red-800'
-      case 'appointment':
+      case ServiceRequestStatus.APPOINTMENT:
         return 'bg-purple-100 text-purple-800'
       default:
         return 'bg-gray-100 text-gray-800'

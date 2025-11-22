@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand, PutCommand } from '@aws-sdk/lib-dynamodb'
 import appSyncService from '@/lib/appsync-service'
+import { ScanCommand as RequestsScanCommand } from '@aws-sdk/lib-dynamodb'
+import { ServiceRequestStatus } from '@/types/statuses'
 
 export async function GET(
   request: NextRequest,
@@ -98,6 +100,30 @@ export async function POST(
       return NextResponse.json({ 
         error: 'Invalid senderType. Must be "garage" or "client"' 
       }, { status: 400 })
+    }
+
+    // Prevent sending messages when the related request is in appointment status
+    try {
+      const requestScan = new RequestsScanCommand({
+        TableName: 'Requests',
+        FilterExpression: 'id = :requestId',
+        ExpressionAttributeValues: {
+          ':requestId': requestId
+        }
+      })
+
+      const requestResult = await dynamoDB.send(requestScan)
+      const requestItem = requestResult.Items && requestResult.Items[0]
+
+      if (requestItem && requestItem.status === ServiceRequestStatus.APPOINTMENT) {
+        return NextResponse.json(
+          { error: 'Η συνομιλία είναι μόνο για ανάγνωση επειδή έχει προγραμματιστεί ραντεβού για αυτό το αίτημα.' },
+          { status: 403 }
+        )
+      }
+    } catch (statusError) {
+      console.error('Error checking request status before creating chat message:', statusError)
+      // In case of error checking status, fall back to allowing the message
     }
 
     // Generate unique message ID

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, Button, Input, Checkbox, ServiceVehicleCard } from '@/components'
 import { styles } from '@/styles/styles'
+import { OfferStatus } from '@/types/statuses'
 import { DayPicker } from 'react-day-picker'
 import { addDays, addWeeks, isWeekend, startOfDay, isBefore, format } from 'date-fns'
 import { el } from 'date-fns/locale'
@@ -66,7 +67,7 @@ interface Offer {
   offerNumber?: string
   estimatedCost: number
   offerAmount: number
-  status: 'draft' | 'pending' | 'accepted' | 'rejected'
+  status: OfferStatus
   createdAt: string
   benefits: string[]
 }
@@ -82,7 +83,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
   const [offer, setOffer] = useState<Offer>({
     estimatedCost: 0,
     offerAmount: 0,
-    status: 'draft',
+    status: OfferStatus.DRAFT,
     createdAt: new Date().toISOString(),
     benefits: []
   })
@@ -244,11 +245,22 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
   }
 
   const handleSendOffer = async () => {
+    // Validate required fields
     if (offer.offerAmount <= 0) {
       showToast({
         type: 'error',
-        title: 'Σφάλμα Εισαγωγής',
-        message: 'Παρακαλώ εισάγετε έγκυρο ποσό προσφοράς (πάνω από 0)',
+        title: 'Ατελής Σύμπληρωση',
+        message: 'Παρακαλώ συμπληρώστε το πεδίο "Ποσό Προσφοράς"',
+        duration: 4000
+      })
+      return
+    }
+
+    if (selectedDates.length === 0) {
+      showToast({
+        type: 'error',
+        title: 'Ατελής Σύμπληρωση',
+        message: 'Παρακαλώ επιλέξτε τουλάχιστον μία ημερομηνία διαθεσιμότητας',
         duration: 4000
       })
       return
@@ -265,7 +277,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
           offerAmount: offer.offerAmount,
           benefits: selectedBenefits,
           availabilityDates: selectedDates.map(d => format(d, 'yyyy-MM-dd')),
-          status: 'pending'
+          status: OfferStatus.PENDING
         }
 
         const response = await fetch('/api/offers', {
@@ -322,7 +334,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
           offerAmount: offer.offerAmount,
           benefits: selectedBenefits,
           availabilityDates: selectedDates.map(d => format(d, 'yyyy-MM-dd')),
-          status: 'pending',
+          status: OfferStatus.PENDING,
           serviceRequestId: requestId,
           garageId: garageId
         }
@@ -551,7 +563,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
 
         {/* Availability Calendar Section */}
         <Card className="p-6">
-          <h2 className={`${styles.sectionTitle} mb-4`}>Διαθεσιμότητα</h2>
+          <h2 className={`${styles.sectionTitle} mb-4`}>Διαθεσιμότητα *</h2>
           <p className={`${styles.bodyText} text-sm text-gray-600 mb-4`}>
             Επιλέξτε τις ημέρες που μπορείτε να δεχτείτε το όχημα (Δευτέρα - Παρασκευή)
           </p>
@@ -638,11 +650,11 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
             <div className="flex items-center gap-4">
               <span className={`${styles.bodyText} text-sm text-gray-600`}>Status:</span>
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                offer.status === 'draft' 
+                offer.status === OfferStatus.DRAFT 
                   ? 'bg-yellow-100 text-yellow-800' 
                   : 'bg-blue-100 text-blue-800'
               }`}>
-                {offer.status === 'draft' ? 'Draft' : 'Pending'}
+                {offer.status === OfferStatus.DRAFT ? 'Draft' : 'Pending'}
               </span>
             </div>
             
@@ -656,7 +668,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
               <Button
                 variant="primary"
                 onClick={handleSendOffer}
-                disabled={offer.offerAmount <= 0 || !hasChanges()}
+                disabled={isSubmitting || (existingOffer && !hasChanges())}
                 loading={isSubmitting}
               >
                 {existingOffer ? 'Ενημέρωση Προσφοράς' : 'Αποστολή Προσφοράς'}

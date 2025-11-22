@@ -4,34 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, Badge, Button } from '@/components'
 import { styles } from '@/styles/styles'
-
-interface ServiceRequest {
-  id: string
-  description: string
-  category: string
-  status: string
-  createdAt: string
-  client: {
-    firstName: string
-    lastName: string
-    phoneNumber: string
-  }
-  vehicle: {
-    brand: string
-    model: string
-    year: number
-    licensePlate?: string
-    engineCC?: string
-    engineNumber?: string
-    modelYear?: string
-    fuelType?: string
-    vinNumber?: string
-    is4x4?: boolean
-    isAutomatic?: boolean
-    isTurbo?: boolean
-  }
-  photoUrls?: string[]
-}
+import { ServiceRequestStatus } from '@/types/statuses'
+import type { ServiceRequest } from '@/types/requests'
 
 interface AvailableRequestsProps {
   garageId: string

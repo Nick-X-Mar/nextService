@@ -14,3 +14,4 @@ export { default as ServiceVehicleCard } from './ServiceVehicleCard'
 
 // Existing components
 export { default as Header } from './Header'
+export { default as GarageNavigation } from './GarageNavigation'

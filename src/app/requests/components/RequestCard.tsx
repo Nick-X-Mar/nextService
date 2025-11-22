@@ -2,49 +2,17 @@
 
 import { HiEye, HiCalendar, HiChatBubbleLeftRight } from 'react-icons/hi2'
 import { styles } from '../../../styles/styles'
-
-interface ServiceRequest {
-  id: string
-  clientId: string
-  vehicleId: string
-  category: string
-  description: string
-  status: 'appointment' | 'pending' | 'in-progress' | 'completed' | 'cancelled'
-  estimatedCost?: number
-  photoUrls: string[]
-  photos: Array<{
-    id: string
-    s3Url: string
-    s3Key: string
-    originalName: string
-    fileSize: number
-    contentType: string
-    description?: string
-    uploadedAt: string
-  }>
-  createdAt: string
-  updatedAt: string
-  vehicle?: {
-    brand: string
-    model: string
-    modelYear?: string
-    engineCC?: string
-    fuelType?: string
-    isAutomatic?: boolean
-    is4x4?: boolean
-    isTurbo?: boolean
-  }
-  clientAvailabilityDates?: string[]
-}
+import { ServiceRequestStatus } from '../../../types/statuses'
+import type { ServiceRequest } from '../../../types/requests'
 
 interface RequestCardProps {
   request: ServiceRequest
   onViewDetails: () => void
   onChatClick?: () => void
   hasGarageMessages?: boolean
-  getStatusIcon: (status: string) => React.ReactNode
-  getStatusText: (status: string) => string
-  getStatusColor: (status: string) => string
+  getStatusIcon: (status: ServiceRequestStatus) => React.ReactNode
+  getStatusText: (status: ServiceRequestStatus) => string
+  getStatusColor: (status: ServiceRequestStatus) => string
 }
 
 export default function RequestCard({ 
@@ -82,6 +50,16 @@ export default function RequestCard({
     }
   }
 
+  const formatAppointmentDate = (dateString: string) => {
+    const date = new Date(`${dateString}T00:00:00`)
+    return date.toLocaleDateString('el-GR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      weekday: 'long'
+    })
+  }
+
   return (
     <div 
       className={`${styles.card} hover:shadow-lg hover:border-orange-300 transition-all duration-200 cursor-pointer`}
@@ -114,19 +92,40 @@ export default function RequestCard({
             {request.description}
           </p>
 
+          {/* Appointment Date - Prominent (only for appointments) */}
+          {request.status === ServiceRequestStatus.APPOINTMENT && request.appointmentDate && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+              <div className="flex items-center gap-2">
+                <HiCalendar className="h-5 w-5 text-blue-600" />
+                <div>
+                  <p className="text-sm font-medium text-blue-900">
+                    Ημερομηνία Ραντεβού
+                  </p>
+                  <p className="text-lg font-bold text-blue-700">
+                    {formatAppointmentDate(request.appointmentDate)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Details row */}
           <div className="flex items-center justify-between text-sm text-gray-500">
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1">
-                <HiCalendar className="h-4 w-4" />
-                <span>{formatDate(request.createdAt)}</span>
-              </div>
-              {request.estimatedCost && (
-                <div className="flex items-center gap-1">
-                  <span className="font-medium text-green-600">
-                    €{request.estimatedCost}
-                  </span>
-                </div>
+              {request.status !== ServiceRequestStatus.APPOINTMENT && (
+                <>
+                  <div className="flex items-center gap-1">
+                    <HiCalendar className="h-4 w-4" />
+                    <span>{formatDate(request.createdAt)}</span>
+                  </div>
+                  {request.estimatedCost && (
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium text-green-600">
+                        €{request.estimatedCost}
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
               {request.photoUrls.length > 0 && (
                 <div className="flex items-center gap-1">
@@ -139,8 +138,19 @@ export default function RequestCard({
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="ml-4 flex flex-col gap-2">
+        {/* Price and Action Buttons */}
+        <div className="ml-4 flex flex-col items-end gap-3">
+          {/* Price - Right aligned (only for appointments) */}
+          {request.status === ServiceRequestStatus.APPOINTMENT && typeof request.appointmentPrice === 'number' && (
+            <div className="text-right">
+              <div className="text-2xl font-bold text-orange-600">
+                €{request.appointmentPrice}
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex flex-col gap-2">
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -153,7 +163,7 @@ export default function RequestCard({
           </button>
           
           {/* Show chat button for requests that might have chat activity */}
-          {(request.status === 'pending' || request.status === 'in-progress' || request.status === 'appointment') && onChatClick && (
+          {(request.status === ServiceRequestStatus.PENDING || request.status === ServiceRequestStatus.IN_PROGRESS) && onChatClick && (
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -173,6 +183,7 @@ export default function RequestCard({
               Συνομιλία
             </button>
           )}
+          </div>
         </div>
       </div>
     </div>

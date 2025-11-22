@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { useAuth } from './AuthContext'
 
 interface User {
   id: string
@@ -21,55 +22,38 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined)
 
 export function UserProvider({ children }: { children: ReactNode }) {
+  const { client, isLoading: authLoading, refreshClient } = useAuth()
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Sync with AuthContext client data
+  useEffect(() => {
+    if (client) {
+      const userData: User = {
+        id: client.id,
+        firstName: client.firstName,
+        lastName: client.lastName,
+        email: client.email,
+        phoneNumber: client.phoneNumber,
+        isRegistered: client.isRegistered
+      }
+      setUser(userData)
+    } else {
+      setUser(null)
+    }
+    setIsLoading(authLoading)
+  }, [client, authLoading])
 
   const refreshUser = async (clientId: string) => {
     try {
       console.log('UserContext: Refreshing user with clientId:', clientId)
-      const response = await fetch(`/api/clients/${clientId}`)
-      if (response.ok) {
-        const data = await response.json()
-        const client = data.client
-        
-        console.log('UserContext: Received client data:', client)
-        
-        if (client) {
-          const userData = {
-            id: client.id,
-            firstName: client.firstName,
-            lastName: client.lastName,
-            email: client.email,
-            phoneNumber: client.phoneNumber,
-            isRegistered: !!client.email
-          }
-          console.log('UserContext: Setting user data:', userData)
-          setUser(userData)
-        } else {
-          console.log('UserContext: No client data, setting user to null')
-          setUser(null)
-        }
-      } else {
-        console.log('UserContext: Response not ok, setting user to null')
-        setUser(null)
-      }
+      // Use AuthContext to refresh, which will update both contexts
+      await refreshClient(clientId)
     } catch (error) {
-      console.error('UserContext: Error fetching user:', error)
+      console.error('UserContext: Error refreshing user:', error)
       setUser(null)
-    } finally {
-      setIsLoading(false)
     }
   }
-
-  // Check for clientId in localStorage on mount
-  useEffect(() => {
-    const clientId = localStorage.getItem('clientId')
-    if (clientId) {
-      refreshUser(clientId)
-    } else {
-      setIsLoading(false)
-    }
-  }, [])
 
   return (
     <UserContext.Provider value={{ user, isLoading, setUser, refreshUser }}>
@@ -85,3 +69,4 @@ export function useUser() {
   }
   return context
 }
+

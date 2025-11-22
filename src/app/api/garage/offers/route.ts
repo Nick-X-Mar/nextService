@@ -83,19 +83,25 @@ export async function GET(request: NextRequest) {
           description: offer.description,
           status: offer.status,
           createdAt: offer.createdAt,
+          appointmentDate: offer.appointmentDate,
+          appointmentPrice: offer.appointmentPrice,
           serviceRequest: {
             id: serviceRequest.id,
             description: serviceRequest.description,
             category: serviceRequest.category,
-            client: client ? {
-              firstName: client.firstName,
-              lastName: client.lastName
-            } : null,
-            vehicle: vehicle ? {
-              brand: vehicle.brand,
-              model: vehicle.model,
-              year: vehicle.year
-            } : null
+            client: client
+              ? {
+                  firstName: client.firstName,
+                  lastName: client.lastName
+                }
+              : null,
+            vehicle: vehicle
+              ? {
+                  brand: vehicle.brand,
+                  model: vehicle.model,
+                  year: vehicle.year
+                }
+              : null
           }
         }
       })

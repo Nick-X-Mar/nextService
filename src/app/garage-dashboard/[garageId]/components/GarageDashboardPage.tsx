@@ -1,11 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { SegmentedControl, Card } from '@/components'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { SegmentedControl } from '@/components'
 import { styles } from '@/styles/styles'
+import { OfferStatus } from '@/types/statuses'
+import GarageNavigation from '@/components/GarageNavigation'
+import { useAuth } from '@/contexts/AuthContext'
 import MyOffers from './MyOffers'
 import AvailableRequests from './AvailableRequests'
+import Appointments from './Appointments'
 import GarageSettings from './GarageSettings'
 
 interface GarageDashboardPageProps {
@@ -13,10 +17,20 @@ interface GarageDashboardPageProps {
 }
 
 export default function GarageDashboardPage({ garageId }: GarageDashboardPageProps) {
-  const [activeTab, setActiveTab] = useState('my-offers')
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const { userType, garage: authGarage, isLoading: authLoading } = useAuth()
+  
   const [garageData, setGarageData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const router = useRouter()
+  const [counts, setCounts] = useState({ requests: 0, offers: 0, appointments: 0 })
+
+  // Determine active tab from URL params, default to 'requests'
+  const activeTab = tabParam === 'offers' ? 'offers' 
+    : tabParam === 'appointments' ? 'appointments'
+    : tabParam === 'settings' ? 'settings'
+    : 'requests'
 
   useEffect(() => {
     // Validate garage ID
@@ -25,9 +39,13 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
       return
     }
 
+    // Wait for auth to load
+    if (authLoading) {
+      return
+    }
+
     // Check if user is authenticated as a garage
-    const storedGarageId = localStorage.getItem('garageId')
-    if (!storedGarageId || storedGarageId !== garageId) {
+    if (userType !== 'garage' || !authGarage || authGarage.id !== garageId) {
       // User is not authenticated as this garage or is a client
       console.warn('Unauthorized access attempt to garage dashboard')
       router.push('/login')
@@ -36,25 +54,14 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
 
     // Load garage data
     loadGarageData(garageId)
+  }, [router, garageId, userType, authGarage, authLoading])
 
-    // Handle hash-based tab switching
-    const handleHashChange = () => {
-      const hash = window.location.hash.replace('#', '')
-      if (hash && ['my-offers', 'available', 'settings'].includes(hash)) {
-        setActiveTab(hash)
-      }
+  useEffect(() => {
+    // Load counts when garage data is available
+    if (garageData) {
+      loadCounts()
     }
-
-    // Check initial hash
-    handleHashChange()
-
-    // Listen for hash changes
-    window.addEventListener('hashchange', handleHashChange)
-    
-    return () => {
-      window.removeEventListener('hashchange', handleHashChange)
-    }
-  }, [router, garageId])
+  }, [garageData])
 
   const loadGarageData = async (garageId: string) => {
     try {
@@ -81,6 +88,55 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const loadCounts = async () => {
+    try {
+      // Load available requests count
+      const requestsResponse = await fetch(`/api/garage/available-requests?garageId=${garageId}`)
+      if (requestsResponse.ok) {
+        const requestsData = await requestsResponse.json()
+        if (requestsData.success) {
+          setCounts(prev => ({ ...prev, requests: requestsData.requests?.length || 0 }))
+        }
+      }
+
+      // Load offers count
+      const offersResponse = await fetch(`/api/garage/offers?garageId=${garageId}`)
+      if (offersResponse.ok) {
+        const offersData = await offersResponse.json()
+        if (offersData.success) {
+          // Count only pending offers (exclude rejected and accepted ones)
+          const offersCount = offersData.offers?.filter((offer: any) => {
+            const status = offer.status?.toLowerCase()
+            return status === OfferStatus.PENDING
+          }).length || 0
+          
+          setCounts(prev => ({ ...prev, offers: offersCount }))
+          
+          // Count appointments (accepted offers with appointmentDate from today onwards)
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          
+          const appointmentsCount = offersData.offers?.filter((offer: any) => {
+            const isAccepted = offer.status === 'accepted' || offer.status === 'ACCEPTED'
+            if (!isAccepted || !offer.appointmentDate) return false
+            
+            const appointmentDate = new Date(`${offer.appointmentDate}T00:00:00`)
+            appointmentDate.setHours(0, 0, 0, 0)
+            return appointmentDate >= today
+          }).length || 0
+          
+          setCounts(prev => ({ ...prev, appointments: appointmentsCount }))
+        }
+      }
+    } catch (error) {
+      console.error('Error loading counts:', error)
+    }
+  }
+
+  const handleTabChange = (tab: string) => {
+    router.push(`/garage-dashboard/${garageId}?tab=${tab}`)
   }
 
   const handleLogout = () => {
@@ -115,62 +171,51 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
     )
   }
 
-  const renderActiveTab = () => {
+  const renderContent = () => {
     if (!garageData) return null
     
-    switch (activeTab) {
-      case 'my-offers':
-        return <MyOffers garageId={garageData.id} />
-      case 'available':
-        return <AvailableRequests garageId={garageData.id} />
-      case 'settings':
-        return <GarageSettings garageData={garageData} onUpdate={setGarageData} />
-      default:
-        return <MyOffers garageId={garageData.id} />
+    // Settings tab shows settings component directly
+    if (activeTab === 'settings') {
+      return <GarageSettings garageData={garageData} onUpdate={setGarageData} />
     }
+    
+    // Other tabs show unified content with SegmentedControl
+    return (
+      <>
+        {/* SegmentedControl for requests/offers/appointments */}
+        <div className="mb-6">
+          <SegmentedControl
+            options={[
+              { value: 'requests', label: `Νέα Αιτήματα (${counts.requests})` },
+              { value: 'offers', label: `Προσφορές από Εμένα (${counts.offers})` },
+              { value: 'appointments', label: `Ραντεβού (${counts.appointments})` }
+            ]}
+            value={activeTab}
+            onChange={handleTabChange}
+            variant="orange"
+          />
+        </div>
+
+        {/* Content based on active tab */}
+        <div className="space-y-6">
+          {activeTab === 'requests' && <AvailableRequests garageId={garageData.id} />}
+          {activeTab === 'offers' && <MyOffers garageId={garageData.id} />}
+          {activeTab === 'appointments' && <Appointments garageId={garageData.id} />}
+        </div>
+      </>
+    )
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Page Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="py-4">
-            <h1 className={`${styles.pageTitle} text-2xl`}>
-              {garageData.companyName}
-            </h1>
-            <p className={styles.bodyText}>
-              Πίνακας Ελέγχου Συνεργείου
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* Navigation with header integrated */}
+      {garageData && (
+        <GarageNavigation garageId={garageId} companyName={garageData.companyName} />
+      )}
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Tab Navigation */}
-        <div className="mb-8">
-          <SegmentedControl
-            options={[
-              { value: 'my-offers', label: 'Οι Προσφορές μου' },
-              { value: 'available', label: 'Διαθέσιμα Αιτήματα' },
-              { value: 'settings', label: 'Ρυθμίσεις' }
-            ]}
-            value={activeTab}
-            onChange={(tab) => {
-              setActiveTab(tab)
-              window.location.hash = tab
-            }}
-            variant="orange"
-            size="md"
-            className="max-w-md"
-          />
-        </div>
-
-        {/* Tab Content */}
-        <div className="space-y-6">
-          {renderActiveTab()}
-        </div>
+      <div className={`${styles.container} py-8`}>
+        {renderContent()}
       </div>
     </div>
   )

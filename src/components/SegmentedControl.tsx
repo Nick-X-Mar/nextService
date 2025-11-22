@@ -36,13 +36,13 @@ export default function SegmentedControl({
     if (variant === 'orange') {
       return isSelected
         ? 'bg-orange-500 text-white shadow-sm'
-        : 'text-orange-600 hover:text-orange-700'
+        : 'text-gray-900 hover:text-orange-600'
     }
     
     // Default variant
     return isSelected
       ? 'bg-blue-500 text-white shadow-sm'
-      : 'text-blue-600 hover:text-blue-700'
+      : 'text-gray-900 hover:text-blue-600'
   }
 
   const getButtonClasses = (index: number, isSelected: boolean) => {
@@ -68,7 +68,7 @@ export default function SegmentedControl({
   }
 
   return (
-    <div className={`flex items-center justify-center bg-gray-100 rounded-lg w-full ${containerSizeClasses[size]} ${className}`}>
+    <div className={`flex items-center justify-center border border-gray-300 rounded-md focus-within:outline-none focus-within:ring-2 focus-within:ring-orange-400 focus-within:border-orange-400 bg-white w-full ${containerSizeClasses[size]} ${className}`}>
       {options.map((option, index) => (
         <button
           key={option.value}

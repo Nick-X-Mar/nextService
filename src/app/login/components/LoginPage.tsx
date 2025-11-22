@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { HiArrowRightOnRectangle, HiExclamationTriangle } from 'react-icons/hi2'
 import { useToast } from '@/hooks/useToast'
 import { useUser } from '@/contexts/UserContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { styles } from '@/styles/styles'
 import { Input, Card, SegmentedControl } from '@/components'
 
@@ -18,6 +19,7 @@ export default function LoginPage() {
   const router = useRouter()
   const { success, error } = useToast()
   const { refreshUser } = useUser()
+  const { refreshClient, refreshGarage, logout } = useAuth()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,9 +53,10 @@ export default function LoginPage() {
           const user = data.user
           
           if (userType === 'garage') {
-            // Garage login flow
+            // Garage login flow - clear client authentication first
+            localStorage.removeItem('clientId')
             localStorage.setItem('garageId', user.id)
-            // Don't call refreshUser for garages - it's designed for clients only
+            await refreshGarage(user.id)
             
             success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.companyName}!`)
             
@@ -115,9 +118,11 @@ export default function LoginPage() {
               }
             }
             
-            // Normal client login flow
+            // Normal client login flow - clear garage authentication first
+            localStorage.removeItem('garageId')
             localStorage.setItem('clientId', user.id)
-            await refreshUser(user.id)
+            await refreshClient(user.id)
+            await refreshUser(user.id) // Keep for backward compatibility
             
             success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.firstName}!`)
             
@@ -207,9 +212,11 @@ export default function LoginPage() {
           localStorage.removeItem('pendingRegistrationData')
         }
         
-        // Registration successful - log them in
+        // Registration successful - log them in - clear garage authentication first
+        localStorage.removeItem('garageId')
         localStorage.setItem('clientId', data.client.id)
-        await refreshUser(data.client.id)
+        await refreshClient(data.client.id)
+        await refreshUser(data.client.id) // Keep for backward compatibility
         
         let message = 'Ο λογαριασμός σας δημιουργήθηκε επιτυχώς!'
         

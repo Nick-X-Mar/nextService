@@ -1,48 +1,18 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { HiArrowLeft, HiCalendar, HiClock, HiCheckCircle, HiXCircle, HiUserPlus, HiBell, HiPhone } from 'react-icons/hi2'
 import { styles } from '../../../styles/styles'
 import RequestCard from './RequestCard'
 import RequestDetailsModal from './RequestDetailsModal'
 import { useToast } from '../../../hooks/useToast'
 import { useUser } from '../../../contexts/UserContext'
+import { useAuth } from '../../../contexts/AuthContext'
 import ClientNavigation from '../../../components/ClientNavigation'
-
-interface ServiceRequest {
-  id: string
-  clientId: string
-  vehicleId: string
-  category: string
-  description: string
-  status: 'appointment' | 'pending' | 'in-progress' | 'completed' | 'cancelled'
-  estimatedCost?: number
-  photoUrls: string[]
-  photos: Array<{
-    id: string
-    s3Url: string
-    s3Key: string
-    originalName: string
-    fileSize: number
-    contentType: string
-    description?: string
-    uploadedAt: string
-  }>
-  createdAt: string
-  updatedAt: string
-  vehicle?: {
-    brand: string
-    model: string
-    modelYear?: string
-    engineCC?: string
-    fuelType?: string
-    isAutomatic?: boolean
-    is4x4?: boolean
-    isTurbo?: boolean
-  }
-  clientAvailabilityDates?: string[]
-}
+import { SegmentedControl } from '../../../components'
+import { ServiceRequestStatus } from '../../../types/statuses'
+import type { ServiceRequest } from '../../../types/requests'
 
 interface RequestsPageProps {
   clientId: string
@@ -50,6 +20,11 @@ interface RequestsPageProps {
 
 export default function RequestsPage({ clientId }: RequestsPageProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+
+  const initialTab: 'open' | 'appointment' | 'closed' =
+    tabParam === 'appointment' ? 'appointment' : tabParam === 'closed' ? 'closed' : 'open'
   const { success, error } = useToast()
   const { refreshUser } = useUser()
   const [requests, setRequests] = useState<ServiceRequest[]>([])
@@ -57,6 +32,14 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [isRegisteredUser, setIsRegisteredUser] = useState<boolean | null>(null)
+  const [activeTab, setActiveTab] = useState<'open' | 'appointment' | 'closed'>(initialTab)
+
+  // Keep activeTab in sync when the ?tab= search param changes (e.g. from top navigation)
+  useEffect(() => {
+    const nextTab: 'open' | 'appointment' | 'closed' =
+      tabParam === 'appointment' ? 'appointment' : tabParam === 'closed' ? 'closed' : 'open'
+    setActiveTab(nextTab)
+  }, [tabParam])
   
   // Registration form state
   const [showRegistrationForm, setShowRegistrationForm] = useState(false)
@@ -71,6 +54,28 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
 
   // Check if clientId is valid (starts with 'client-')
   const isValidClientId = clientId && clientId.startsWith('client-')
+
+  const checkGarageMessages = useCallback(async (requestIds: string[]) => {
+    const messagesMap: Record<string, boolean> = {}
+    
+    // Check each request for garage messages
+    for (const requestId of requestIds) {
+      try {
+        const response = await fetch(`/api/chat/${requestId}/garages`)
+        if (response.ok) {
+          const data = await response.json()
+          messagesMap[requestId] = data.garages && data.garages.length > 0
+        } else {
+          messagesMap[requestId] = false
+        }
+      } catch (error) {
+        console.error(`Error checking garage messages for request ${requestId}:`, error)
+        messagesMap[requestId] = false
+      }
+    }
+    
+    setGarageMessagesMap(messagesMap)
+  }, [])
 
   const loadRequests = useCallback(async () => {
     try {
@@ -125,60 +130,69 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     } finally {
       setIsLoading(false)
     }
-  }, [clientId, isValidClientId])
+  }, [clientId, isValidClientId, checkGarageMessages])
 
-  // Load requests on component mount and store clientId in localStorage
+  const { refreshClient } = useAuth()
+
+  // Load requests on component mount and update auth context
   useEffect(() => {
-    // Store clientId in localStorage for user context
-    localStorage.setItem('clientId', clientId)
+    // Clear garage authentication if exists
+    localStorage.removeItem('garageId')
+    // Store clientId in localStorage and refresh auth context
+    const storedClientId = localStorage.getItem('clientId')
+    if (storedClientId !== clientId) {
+      localStorage.setItem('clientId', clientId)
+      refreshClient(clientId)
+    }
     loadRequests()
-  }, [clientId, loadRequests])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: ServiceRequestStatus) => {
     switch (status) {
-      case 'appointment':
+      case ServiceRequestStatus.APPOINTMENT:
         return <HiCalendar className="h-5 w-5 text-blue-600" />
-      case 'pending':
+      case ServiceRequestStatus.PENDING:
         return <HiClock className="h-5 w-5 text-yellow-600" />
-      case 'in-progress':
+      case ServiceRequestStatus.IN_PROGRESS:
         return <HiClock className="h-5 w-5 text-blue-600" />
-      case 'completed':
+      case ServiceRequestStatus.COMPLETED:
         return <HiCheckCircle className="h-5 w-5 text-green-600" />
-      case 'cancelled':
+      case ServiceRequestStatus.CANCELLED:
         return <HiXCircle className="h-5 w-5 text-red-600" />
       default:
         return <HiClock className="h-5 w-5 text-gray-600" />
     }
   }
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status: ServiceRequestStatus) => {
     switch (status) {
-      case 'appointment':
+      case ServiceRequestStatus.APPOINTMENT:
         return 'Ραντεβού'
-      case 'pending':
+      case ServiceRequestStatus.PENDING:
         return 'Εκκρεμές'
-      case 'in-progress':
+      case ServiceRequestStatus.IN_PROGRESS:
         return 'Σε Εξέλιξη'
-      case 'completed':
+      case ServiceRequestStatus.COMPLETED:
         return 'Ολοκληρωμένο'
-      case 'cancelled':
+      case ServiceRequestStatus.CANCELLED:
         return 'Ακυρωμένο'
       default:
         return 'Άγνωστο'
     }
   }
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: ServiceRequestStatus) => {
     switch (status) {
-      case 'appointment':
+      case ServiceRequestStatus.APPOINTMENT:
         return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'pending':
+      case ServiceRequestStatus.PENDING:
         return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'in-progress':
+      case ServiceRequestStatus.IN_PROGRESS:
         return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'completed':
+      case ServiceRequestStatus.COMPLETED:
         return 'bg-green-100 text-green-800 border-green-200'
-      case 'cancelled':
+      case ServiceRequestStatus.CANCELLED:
         return 'bg-red-100 text-red-800 border-red-200'
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200'
@@ -188,16 +202,16 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
   // Sort requests by status priority and then by date (latest first)
   const sortedRequests = [...requests].sort((a, b) => {
     // Define status priority order
-    const statusPriority = {
-      'appointment': 1,
-      'pending': 2,
-      'in-progress': 2,
-      'completed': 3,
-      'cancelled': 3
+    const statusPriority: Record<ServiceRequestStatus, number> = {
+      [ServiceRequestStatus.APPOINTMENT]: 1,
+      [ServiceRequestStatus.PENDING]: 2,
+      [ServiceRequestStatus.IN_PROGRESS]: 2,
+      [ServiceRequestStatus.COMPLETED]: 3,
+      [ServiceRequestStatus.CANCELLED]: 3
     }
 
-    const aPriority = statusPriority[a.status as keyof typeof statusPriority] || 4
-    const bPriority = statusPriority[b.status as keyof typeof statusPriority] || 4
+    const aPriority = statusPriority[a.status] || 4
+    const bPriority = statusPriority[b.status] || 4
 
     // First sort by status priority
     if (aPriority !== bPriority) {
@@ -209,9 +223,9 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
   })
 
   // Group requests by status
-  const appointmentRequests = sortedRequests.filter(r => r.status === 'appointment')
-  const openRequests = sortedRequests.filter(r => r.status === 'pending' || r.status === 'in-progress')
-  const closedRequests = sortedRequests.filter(r => r.status === 'completed' || r.status === 'cancelled')
+  const appointmentRequests = sortedRequests.filter(r => r.status === ServiceRequestStatus.APPOINTMENT)
+  const openRequests = sortedRequests.filter(r => r.status === ServiceRequestStatus.PENDING || r.status === ServiceRequestStatus.IN_PROGRESS)
+  const closedRequests = sortedRequests.filter(r => r.status === ServiceRequestStatus.COMPLETED || r.status === ServiceRequestStatus.CANCELLED)
 
   const handleViewDetails = (request: ServiceRequest) => {
     setSelectedRequest(request)
@@ -230,28 +244,6 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
       )
     )
     setSelectedRequest(updatedRequest)
-  }
-
-  const checkGarageMessages = async (requestIds: string[]) => {
-    const messagesMap: Record<string, boolean> = {}
-    
-    // Check each request for garage messages
-    for (const requestId of requestIds) {
-      try {
-        const response = await fetch(`/api/chat/${requestId}/garages`)
-        if (response.ok) {
-          const data = await response.json()
-          messagesMap[requestId] = data.garages && data.garages.length > 0
-        } else {
-          messagesMap[requestId] = false
-        }
-      } catch (error) {
-        console.error(`Error checking garage messages for request ${requestId}:`, error)
-        messagesMap[requestId] = false
-      }
-    }
-    
-    setGarageMessagesMap(messagesMap)
   }
 
   const handleChatClick = (requestId: string) => {
@@ -322,6 +314,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
         // If we used the new endpoint and got a different client ID, update localStorage
         if (formData.email && data.client && data.client.id !== clientId) {
           console.log('RequestsPage: Updating clientId from', clientId, 'to', data.client.id)
+          localStorage.removeItem('garageId')
           localStorage.setItem('clientId', data.client.id)
           console.log('RequestsPage: Calling refreshUser with new clientId:', data.client.id)
           await refreshUser(data.client.id)
@@ -540,8 +533,30 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
         )}
 
         <div className="max-w-4xl mx-auto">
-          {/* Appointment Requests */}
-          {appointmentRequests.length > 0 && (
+          {/* Tabs */}
+          <div className="mb-6">
+            <SegmentedControl
+              value={activeTab}
+              onChange={(value) =>
+                setActiveTab(
+                  value === 'appointment'
+                    ? 'appointment'
+                    : value === 'closed'
+                    ? 'closed'
+                    : 'open'
+                )
+              }
+              options={[
+                { value: 'open', label: `Ανοιχτά (${openRequests.length})` },
+                { value: 'appointment', label: `Ραντεβού (${appointmentRequests.length})` },
+                { value: 'closed', label: `Περασμένα (${closedRequests.length})` }
+              ]}
+              variant="orange"
+            />
+          </div>
+
+          {/* Lists per tab */}
+          {activeTab === 'appointment' && appointmentRequests.length > 0 && (
             <div className="mb-8">
               <h2 className={`${styles.sectionTitle} mb-4 flex items-center gap-2`}>
                 <HiCalendar className="h-6 w-6 text-blue-600" />
@@ -564,8 +579,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
             </div>
           )}
 
-          {/* Open/Pending Requests */}
-          {openRequests.length > 0 && (
+          {activeTab === 'open' && openRequests.length > 0 && (
             <div className="mb-8">
               <h2 className={`${styles.sectionTitle} mb-4 flex items-center gap-2`}>
                 <HiClock className="h-6 w-6 text-yellow-600" />
@@ -588,12 +602,11 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
             </div>
           )}
 
-          {/* Closed Requests */}
-          {closedRequests.length > 0 && (
+          {activeTab === 'closed' && closedRequests.length > 0 && (
             <div className="mb-8">
               <h2 className={`${styles.sectionTitle} mb-4 flex items-center gap-2`}>
                 <HiCheckCircle className="h-6 w-6 text-green-600" />
-                Κλειστά Αιτήματα ({closedRequests.length})
+                Περασμένα Αιτήματα ({closedRequests.length})
               </h2>
               <div className="space-y-4">
                 {closedRequests.map((request) => (

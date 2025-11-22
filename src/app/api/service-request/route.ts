@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isSMSConfigured } from '@/utils/notificationService'
 import { dynamoDB } from '@/utils/dynamoService'
 import { PutCommand } from '@aws-sdk/lib-dynamodb'
+import { ServiceRequestStatus } from '@/types/statuses'
 
 export async function POST(request: NextRequest) {
   try {
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
       vehicleId: vehicleId,
       category: body.category,
       description: body.description,
-      status: 'pending',
+      status: ServiceRequestStatus.PENDING,
       photoUrls: body.photoUrls || [], // S3 URLs will be added here
       photos: body.photos || [], // Photo metadata array
       createdAt: new Date().toISOString(),

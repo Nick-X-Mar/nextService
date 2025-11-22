@@ -2,19 +2,25 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function Page() {
   const router = useRouter()
+  const { userType, garage, isLoading } = useAuth()
 
   useEffect(() => {
-    // Get garage ID from localStorage and redirect to the new URL structure
-    const garageId = localStorage.getItem('garageId')
-    if (garageId) {
-      router.replace(`/garage-dashboard/${garageId}`)
+    // Wait for auth to load
+    if (isLoading) {
+      return
+    }
+
+    // Check if user is authenticated as a garage
+    if (userType === 'garage' && garage) {
+      router.replace(`/garage-dashboard/${garage.id}`)
     } else {
       router.replace('/login')
     }
-  }, [router])
+  }, [router, userType, garage, isLoading])
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">

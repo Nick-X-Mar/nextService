@@ -4,6 +4,7 @@ import "./globals.css";
 import Header from "@/components/Header";
 import ToastContainer from "@/components/ToastContainer";
 import { UserProvider } from "@/contexts/UserContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 import "@/lib/amplify-config"; // Initialize Amplify
 
 const geistSans = Geist({
@@ -31,11 +32,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <UserProvider>
-          <Header />
-          {children}
-          <ToastContainer />
-        </UserProvider>
+        <AuthProvider>
+          <UserProvider>
+            <Header />
+            {children}
+            <ToastContainer />
+          </UserProvider>
+        </AuthProvider>
       </body>
     </html>
   );

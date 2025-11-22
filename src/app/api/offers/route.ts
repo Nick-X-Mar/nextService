@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, PutCommand, QueryCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { OfferStatus } from '@/types/statuses'
 
 // Initialize DynamoDB client
 const client = new DynamoDBClient({
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
       garageId,
       estimatedCost: estimatedCost || 0,
       offerAmount,
-      status: status || 'pending',
+      status: status || OfferStatus.PENDING,
       benefits: benefits || [],
       availabilityDates: availabilityDates || [],
       clientAvailabilityDates: [],
@@ -174,7 +175,7 @@ export async function PUT(request: NextRequest) {
         ':offerAmount': offerAmount,
         ':benefits': benefits || [],
         ':availabilityDates': availabilityDates || [],
-        ':status': status || 'pending',
+        ':status': status || OfferStatus.PENDING,
         ':updatedAt': new Date().toISOString()
       },
       ReturnValues: 'ALL_NEW'

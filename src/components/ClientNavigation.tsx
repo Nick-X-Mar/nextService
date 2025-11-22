@@ -1,8 +1,8 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { HiHome, HiChatBubbleLeftRight, HiUser } from 'react-icons/hi2'
+import { HiHome, HiChatBubbleLeftRight, HiUser, HiCalendar } from 'react-icons/hi2'
 import { styles } from '../styles/styles'
 
 interface ClientNavigationProps {
@@ -11,9 +11,18 @@ interface ClientNavigationProps {
 
 export default function ClientNavigation({ clientId }: ClientNavigationProps) {
   const pathname = usePathname()
-  
-  const isActive = (path: string) => {
-    return pathname === path
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+
+  const isRequestsTabActive = (tab: 'open' | 'appointment') => {
+    if (pathname !== `/requests/${clientId}`) return false
+
+    if (tab === 'appointment') {
+      return tabParam === 'appointment'
+    }
+
+    // Default to "Αιτήματα" when no specific appointment tab is selected
+    return tabParam !== 'appointment'
   }
 
   const navItems = [
@@ -21,13 +30,19 @@ export default function ClientNavigation({ clientId }: ClientNavigationProps) {
       href: `/requests/${clientId}`,
       label: 'Αιτήματα',
       icon: HiHome,
-      active: isActive(`/requests/${clientId}`)
+      active: isRequestsTabActive('open')
+    },
+    {
+      href: `/requests/${clientId}?tab=appointment`,
+      label: 'Ραντεβού',
+      icon: HiCalendar,
+      active: isRequestsTabActive('appointment')
     },
     {
       href: `/requests/${clientId}/chats`,
       label: 'Συνομιλίες',
       icon: HiChatBubbleLeftRight,
-      active: isActive(`/requests/${clientId}/chats`)
+      active: pathname === `/requests/${clientId}/chats`
     }
   ]
 

@@ -4,6 +4,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, Button, Input, RequestDetailsPanel } from '@/components'
 import { styles } from '@/styles/styles'
+import { ServiceRequestStatus } from '@/types/statuses'
+import type { ServiceRequest } from '@/types/requests'
+import { useAuth } from '@/contexts/AuthContext'
 import '@/lib/amplify-config'
 import appSyncService from '@/lib/appsync-service'
 
@@ -14,32 +17,6 @@ interface Message {
   message: string
   timestamp: string
   senderName: string
-}
-
-interface ServiceRequest {
-  id: string
-  description: string
-  category: string
-  status: string
-  createdAt: string
-  client: {
-    firstName: string
-    lastName: string
-    phoneNumber: string
-  }
-  vehicle: {
-    brand: string
-    model: string
-    modelYear: string
-    licensePlate: string
-    engineCC: string
-    engineNumber: string
-    fuelType: 'petrol' | 'diesel'
-    vinNumber: string
-    is4x4: boolean
-    isAutomatic: boolean
-  }
-  photoUrls?: string[]
 }
 
 interface ChatPageProps {
@@ -56,14 +33,21 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
   const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const isReadOnly = requestData?.status === ServiceRequestStatus.APPOINTMENT
   
   // Subscription refs
   const subscriptionRef = useRef<string | null>(null)
 
+  const { userType, garage: authGarage, isLoading: authLoading } = useAuth()
+
   useEffect(() => {
+    // Wait for auth to load
+    if (authLoading) {
+      return
+    }
+
     // Check if user is authenticated as a garage
-    const storedGarageId = localStorage.getItem('garageId')
-    if (!storedGarageId || storedGarageId !== garageId) {
+    if (userType !== 'garage' || !authGarage || authGarage.id !== garageId) {
       // User is not authenticated as this garage or is a client
       console.warn('Unauthorized access attempt to garage chat')
       router.push('/login')
@@ -71,7 +55,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     }
 
     loadChatData()
-  }, [garageId, requestId, router])
+  }, [garageId, requestId, router, userType, authGarage, authLoading])
 
   // Cleanup subscription on unmount
   useEffect(() => {
@@ -144,9 +128,9 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
       const requestResponse = await fetch(`/api/requests/${requestId}`)
       if (requestResponse.ok) {
         const requestResult = await requestResponse.json()
-        if (requestResult.success) {
-          setRequestData(requestResult.request)
-        }
+        // Some endpoints return { success, request }, others may return just { request }
+        const request = requestResult.request || requestResult
+        setRequestData(request)
       }
 
       // Load garage data
@@ -178,7 +162,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
   }
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || isSending) return
+    if (!newMessage.trim() || isSending || isReadOnly) return
 
     try {
       setIsSending(true)
@@ -343,27 +327,35 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Message Input */}
-          <div className="border-t p-4">
-            <div className="flex space-x-2">
-              <Input
-                value={newMessage}
-                onChange={setNewMessage}
-                onKeyPress={handleKeyPress}
-                placeholder="Γράψτε το μήνυμά σας..."
-                className="flex-1"
-                disabled={isSending}
-              />
-              <Button
-                variant="primary"
-                onClick={handleSendMessage}
-                disabled={!newMessage.trim() || isSending}
-                loading={isSending}
-              >
-                Αποστολή
-              </Button>
+          {/* Message Input / Read-only notice */}
+          {isReadOnly ? (
+            <div className="border-t p-4 bg-gray-50">
+              <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800 text-center">
+                Η συνομιλία είναι μόνο για ανάγνωση επειδή έχει προγραμματιστεί ραντεβού για αυτό το αίτημα.
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="border-t p-4">
+              <div className="flex space-x-2">
+                <Input
+                  value={newMessage}
+                  onChange={setNewMessage}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Γράψτε το μήνυμά σας..."
+                  className="flex-1"
+                  disabled={isSending}
+                />
+                <Button
+                  variant="primary"
+                  onClick={handleSendMessage}
+                  disabled={!newMessage.trim() || isSending}
+                  loading={isSending}
+                >
+                  Αποστολή
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       </div>
     </div>

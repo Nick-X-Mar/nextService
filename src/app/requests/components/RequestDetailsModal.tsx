@@ -3,48 +3,16 @@
 import Modal from '../../../components/Modal'
 import RequestDetailsContent from './RequestDetailsContent'
 import { styles } from '../../../styles/styles'
-
-interface ServiceRequest {
-  id: string
-  clientId: string
-  vehicleId: string
-  category: string
-  description: string
-  status: 'appointment' | 'pending' | 'in-progress' | 'completed' | 'cancelled'
-  estimatedCost?: number
-  photoUrls: string[]
-  photos: Array<{
-    id: string
-    s3Url: string
-    s3Key: string
-    originalName: string
-    fileSize: number
-    contentType: string
-    description?: string
-    uploadedAt: string
-  }>
-  createdAt: string
-  updatedAt: string
-  vehicle?: {
-    brand: string
-    model: string
-    modelYear?: string
-    engineCC?: string
-    fuelType?: string
-    isAutomatic?: boolean
-    is4x4?: boolean
-    isTurbo?: boolean
-  }
-  clientAvailabilityDates?: string[]
-}
+import { ServiceRequestStatus } from '../../../types/statuses'
+import type { ServiceRequest } from '../../../types/requests'
 
 interface RequestDetailsModalProps {
   request: ServiceRequest
   onClose: () => void
   onRequestUpdate?: (request: ServiceRequest) => void
-  getStatusIcon: (status: string) => React.ReactNode
-  getStatusText: (status: string) => string
-  getStatusColor: (status: string) => string
+  getStatusIcon: (status: ServiceRequestStatus) => React.ReactNode
+  getStatusText: (status: ServiceRequestStatus) => string
+  getStatusColor: (status: ServiceRequestStatus) => string
 }
 
 export default function RequestDetailsModal({ 

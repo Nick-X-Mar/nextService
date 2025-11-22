@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, Badge } from '@/components'
 import { styles } from '@/styles/styles'
+import { OfferStatus } from '@/types/statuses'
 
 interface Offer {
   id: string
@@ -11,8 +12,10 @@ interface Offer {
   price: number
   currency: string
   description: string
-  status: 'pending' | 'accepted' | 'rejected' | 'expired'
+  status: OfferStatus
   createdAt: string
+  appointmentDate?: string
+  appointmentPrice?: number
   serviceRequest: {
     id: string
     description: string
@@ -37,7 +40,7 @@ export default function MyOffers({ garageId }: MyOffersProps) {
   const router = useRouter()
   const [offers, setOffers] = useState<Offer[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'pending' | 'accepted' | 'rejected'>('all')
+  const [filter, setFilter] = useState<'all' | OfferStatus>('all')
 
   useEffect(() => {
     loadOffers()
@@ -64,31 +67,31 @@ export default function MyOffers({ garageId }: MyOffersProps) {
     }
   }
 
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusBadgeVariant = (status: OfferStatus) => {
     switch (status) {
-      case 'pending':
+      case OfferStatus.PENDING:
         return 'warning'
-      case 'accepted':
+      case OfferStatus.ACCEPTED:
         return 'success'
-      case 'rejected':
+      case OfferStatus.REJECTED:
         return 'danger'
-      case 'expired':
+      case OfferStatus.EXPIRED:
         return 'secondary'
       default:
         return 'secondary'
     }
   }
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status: OfferStatus) => {
     switch (status) {
-      case 'pending':
-        return 'Εκκρεμής'
-      case 'accepted':
-        return 'Αποδεκτή'
-      case 'rejected':
-        return 'Απορριφθείσα'
-      case 'expired':
-        return 'Λήξασα'
+      case OfferStatus.PENDING:
+        return 'Εκκρεμείς'
+      case OfferStatus.ACCEPTED:
+        return 'Αποδεκτές'
+      case OfferStatus.REJECTED:
+        return 'Απορριφθείσες'
+      case OfferStatus.EXPIRED:
+        return 'Λήξασες'
       default:
         return status
     }
@@ -99,6 +102,11 @@ export default function MyOffers({ garageId }: MyOffersProps) {
   }
 
   const filteredOffers = offers.filter(offer => {
+    // Exclude accepted offers with appointmentDate (they should be in Appointments tab)
+    if (offer.status === OfferStatus.ACCEPTED && offer.appointmentDate) {
+      return false
+    }
+    
     if (filter === 'all') return true
     return offer.status === filter
   })
@@ -125,13 +133,13 @@ export default function MyOffers({ garageId }: MyOffersProps) {
           </p>
         </div>
         <div className="text-sm text-gray-500">
-          Σύνολο: {offers.length} προσφορές
+          Σύνολο: {filteredOffers.length} προσφορές
         </div>
       </div>
 
       {/* Filter */}
       <div className="flex space-x-2">
-        {(['all', 'pending', 'accepted', 'rejected'] as const).map((status) => (
+        {(['all', OfferStatus.PENDING, OfferStatus.REJECTED] as const).map((status) => (
           <button
             key={status}
             onClick={() => setFilter(status)}
@@ -186,8 +194,16 @@ export default function MyOffers({ garageId }: MyOffersProps) {
           {filteredOffers.map((offer) => (
             <Card 
               key={offer.id} 
-              className="p-6 cursor-pointer hover:shadow-lg transition-shadow" 
-              onClick={() => handleOfferClick(offer)}
+              className={`p-6 transition-shadow ${
+                offer.status === OfferStatus.REJECTED
+                  ? 'bg-gray-50 opacity-70 cursor-default'
+                  : 'cursor-pointer hover:shadow-lg'
+              }`} 
+              onClick={() => {
+                if (offer.status !== OfferStatus.REJECTED) {
+                  handleOfferClick(offer)
+                }
+              }}
             >
               <div className="flex justify-between items-start mb-4">
                 <div className="flex-1">
@@ -212,7 +228,10 @@ export default function MyOffers({ garageId }: MyOffersProps) {
                 </div>
                 <div className="text-right">
                   <div className={`${styles.sectionTitle} text-2xl text-orange-600`}>
-                    {offer.price} {offer.currency}
+                    {typeof offer.appointmentPrice === 'number'
+                      ? offer.appointmentPrice
+                      : offer.price}{' '}
+                    {offer.currency}
                   </div>
                   <p className={`${styles.smallText} text-gray-500`}>
                     {new Date(offer.createdAt).toLocaleDateString('el-GR')}
@@ -225,6 +244,19 @@ export default function MyOffers({ garageId }: MyOffersProps) {
                 <p className={styles.bodyText}>
                   {offer.description}
                 </p>
+                {offer.status === OfferStatus.ACCEPTED && offer.appointmentDate && (
+                  <p className={`${styles.smallText} text-green-700 mt-2`}>
+                    Ραντεβού:{' '}
+                    <span className="font-medium">
+                      {new Date(`${offer.appointmentDate}T00:00:00`).toLocaleDateString('el-GR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        weekday: 'long'
+                      })}
+                    </span>
+                  </p>
+                )}
               </div>
             </Card>
           ))}

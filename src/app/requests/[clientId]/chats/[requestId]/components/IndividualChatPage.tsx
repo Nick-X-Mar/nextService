@@ -7,6 +7,8 @@ import { styles } from '../../../../../../styles/styles'
 import { useToast } from '../../../../../../hooks/useToast'
 import ClientNavigation from '../../../../../../components/ClientNavigation'
 import { RequestDetailsPanel } from '../../../../../../components'
+import { ServiceRequestStatus } from '../../../../../../types/statuses'
+import type { ServiceRequest } from '../../../../../../types/requests'
 import '@/lib/amplify-config'
 import appSyncService from '@/lib/appsync-service'
 
@@ -29,34 +31,6 @@ interface Garage {
   hasUnreadMessages?: boolean
 }
 
-interface ServiceRequest {
-  id: string
-  description: string
-  category: string
-  status: string
-  createdAt: string
-  photoUrls?: string[]
-  clientAvailabilityDates?: string[]
-  client?: {
-    firstName: string
-    lastName: string
-    phoneNumber: string
-  }
-  vehicle?: {
-    brand: string
-    model: string
-    modelYear?: string
-    licensePlate?: string
-    engineCC?: string
-    engineNumber?: string
-    fuelType?: string
-    vinNumber?: string
-    is4x4?: boolean
-    isAutomatic?: boolean
-    isTurbo?: boolean
-  }
-}
-
 interface IndividualChatPageProps {
   clientId: string
   requestId: string
@@ -73,6 +47,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [requestDetails, setRequestDetails] = useState<ServiceRequest | null>(null)
+  const isReadOnly = requestDetails?.status === ServiceRequestStatus.APPOINTMENT
   
   const subscriptionRef = useRef<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -88,7 +63,9 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       const response = await fetch(`/api/requests/${requestId}`)
       if (response.ok) {
         const data = await response.json()
-        setRequestDetails(data.request)
+        // Some endpoints return { success, request }, others may return just { request }
+        const request = data.request || data
+        setRequestDetails(request)
       }
     } catch (error) {
       console.error('Error fetching request details:', error)
@@ -191,7 +168,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
 
   // Send new message
   const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedGarage || sending) return
+    if (!newMessage.trim() || !selectedGarage || sending || isReadOnly) return
 
     setSending(true)
     try {
@@ -530,31 +507,39 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                     <div ref={messagesEndRef} />
                   </div>
 
-                  {/* Message input */}
-                  <div className="p-4 border-t border-gray-200 bg-white">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                        placeholder="Γράψτε το μήνυμά σας..."
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                        disabled={sending}
-                      />
-                      <button
-                        onClick={sendMessage}
-                        disabled={!newMessage.trim() || sending}
-                        className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                      >
-                        {sending ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        ) : (
-                          <HiPaperAirplane className="h-4 w-4" />
-                        )}
-                      </button>
+                  {/* Message input / Read-only notice */}
+                  {isReadOnly ? (
+                    <div className="p-4 border-t border-gray-200 bg-gray-50">
+                      <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800 text-center">
+                        Η συνομιλία είναι μόνο για ανάγνωση επειδή έχει προγραμματιστεί ραντεβού για αυτό το αίτημα.
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="p-4 border-t border-gray-200 bg-white">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                          placeholder="Γράψτε το μήνυμά σας..."
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                          disabled={sending}
+                        />
+                        <button
+                          onClick={sendMessage}
+                          disabled={!newMessage.trim() || sending}
+                          className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                        >
+                          {sending ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          ) : (
+                            <HiPaperAirplane className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="flex-1 flex items-center justify-center text-gray-500">

@@ -68,25 +68,32 @@ export async function GET(
         createdAt: serviceRequest.createdAt,
         clientAvailabilityDates: serviceRequest.clientAvailabilityDates || [],
         photoUrls: serviceRequest.photoUrls || [],
-        client: client ? {
-          firstName: client.firstName,
-          lastName: client.lastName,
-          phoneNumber: client.phoneNumber
-        } : null,
-        vehicle: vehicle ? {
-          brand: vehicle.brand,
-          model: vehicle.model,
-          year: vehicle.year,
-          licensePlate: vehicle.licensePlate,
-          modelYear: vehicle.modelYear,
-          engineCC: vehicle.engineCC,
-          engineNumber: vehicle.engineNumber,
-          fuelType: vehicle.fuelType,
-          vinNumber: vehicle.vinNumber,
-          is4x4: vehicle.is4x4,
-          isAutomatic: vehicle.isAutomatic,
-          isTurbo: vehicle.isTurbo
-        } : null
+        acceptedOfferId: serviceRequest.acceptedOfferId,
+        appointmentDate: serviceRequest.appointmentDate,
+        appointmentPrice: serviceRequest.appointmentPrice,
+        client: client
+          ? {
+              firstName: client.firstName,
+              lastName: client.lastName,
+              phoneNumber: client.phoneNumber
+            }
+          : null,
+        vehicle: vehicle
+          ? {
+              brand: vehicle.brand,
+              model: vehicle.model,
+              year: vehicle.year,
+              licensePlate: vehicle.licensePlate,
+              modelYear: vehicle.modelYear,
+              engineCC: vehicle.engineCC,
+              engineNumber: vehicle.engineNumber,
+              fuelType: vehicle.fuelType,
+              vinNumber: vehicle.vinNumber,
+              is4x4: vehicle.is4x4,
+              isAutomatic: vehicle.isAutomatic,
+              isTurbo: vehicle.isTurbo
+            }
+          : null
       }
     })
 

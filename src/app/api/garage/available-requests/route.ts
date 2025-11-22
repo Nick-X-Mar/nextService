@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { ServiceRequestStatus } from '@/types/statuses'
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
         '#status': 'status'
       },
       ExpressionAttributeValues: {
-        ':status': 'pending'
+        ':status': ServiceRequestStatus.PENDING
       }
     })
 
