@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { HiArrowRight, HiCloudArrowUp, HiXMark } from 'react-icons/hi2'
 import { styles } from '../../../../styles/styles'
 import { useToast } from '../../../../hooks/useToast'
+import { loadFormData } from '../../../../utils/formStorage'
 import Image from 'next/image'
 
 interface BodyWorkPhotosFormProps {
@@ -67,10 +68,21 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
   const handleSubmit = async () => {
     if (isFormValid) {
       try {
+        // Load latest form data to include originalVehicleId and originalVehicleData
+        const latestFormData = loadFormData()
+        
+        // Get client ID from localStorage if user is logged in
+        const loggedInClientId = localStorage.getItem('clientId')
+        
         // First, create the service request to get IDs
         const serviceRequestData = {
           ...savedData,
-          photos: photos.map(p => ({ name: p.name, size: p.size, type: p.type }))
+          photos: photos.map(p => ({ name: p.name, size: p.size, type: p.type })),
+          // Include original vehicle tracking data if present
+          ...(latestFormData.originalVehicleId && { originalVehicleId: latestFormData.originalVehicleId }),
+          ...(latestFormData.originalVehicleData && { originalVehicleData: latestFormData.originalVehicleData }),
+          // Include client ID if user is logged in
+          ...(loggedInClientId && { clientId: loggedInClientId })
         }
         
         const serviceResponse = await fetch('/api/service-request', {

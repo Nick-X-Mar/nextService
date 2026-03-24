@@ -24,7 +24,7 @@ export default function FeaturesSection() {
               </div>
               <h3 className={`mt-4 ${styles.cardTitle}`}>Εύκολη Αναζήτηση</h3>
               <p className={`mt-2 ${styles.bodyText}`}>
-                Βρείτε γρήγορα τον επαγγελματία που χρειάζεστε με τα εξελιγμένα φίλτρα μας
+                Βρείτε γρήγορα τον επαγγελματία που χρειάζεστε
               </p>
             </div>
 

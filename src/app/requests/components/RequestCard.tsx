@@ -13,6 +13,7 @@ interface RequestCardProps {
   getStatusIcon: (status: ServiceRequestStatus) => React.ReactNode
   getStatusText: (status: ServiceRequestStatus) => string
   getStatusColor: (status: ServiceRequestStatus) => string
+  disabled?: boolean
 }
 
 export default function RequestCard({ 
@@ -22,7 +23,8 @@ export default function RequestCard({
   hasGarageMessages = false,
   getStatusIcon, 
   getStatusText, 
-  getStatusColor 
+  getStatusColor,
+  disabled = false
 }: RequestCardProps) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -62,8 +64,12 @@ export default function RequestCard({
 
   return (
     <div 
-      className={`${styles.card} hover:shadow-lg hover:border-orange-300 transition-all duration-200 cursor-pointer`}
-      onClick={onViewDetails}
+      className={`${styles.card} transition-all duration-200 ${
+        disabled 
+          ? 'opacity-60 cursor-not-allowed bg-gray-50' 
+          : 'hover:shadow-lg hover:border-orange-300 cursor-pointer'
+      }`}
+      onClick={disabled ? undefined : onViewDetails}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
@@ -154,9 +160,14 @@ export default function RequestCard({
           <button
             onClick={(e) => {
               e.stopPropagation()
-              onViewDetails()
+              if (!disabled) {
+                onViewDetails()
+              }
             }}
-            className={`${styles.btnSecondary} flex items-center gap-2 px-3 py-2 text-sm`}
+            disabled={disabled}
+            className={`${styles.btnSecondary} flex items-center gap-2 px-3 py-2 text-sm ${
+              disabled ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
           >
             <HiEye className="h-4 w-4" />
             Λεπτομέρειες

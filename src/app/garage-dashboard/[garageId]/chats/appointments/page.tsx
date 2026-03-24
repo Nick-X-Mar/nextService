@@ -11,3 +11,10 @@ export default async function Page({ params }: PageProps) {
   return <GarageAppointmentsChatsPage garageId={garageId} />
 }
 
+
+
+
+
+
+
+

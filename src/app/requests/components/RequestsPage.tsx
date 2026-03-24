@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { HiArrowLeft, HiCalendar, HiClock, HiCheckCircle, HiXCircle, HiUserPlus, HiBell, HiPhone } from 'react-icons/hi2'
+import { HiArrowLeft, HiCalendar, HiClock, HiCheckCircle, HiXCircle, HiUserPlus, HiBell, HiPhone, HiPlusCircle } from 'react-icons/hi2'
 import { styles } from '../../../styles/styles'
 import RequestCard from './RequestCard'
 import RequestDetailsModal from './RequestDetailsModal'
@@ -199,6 +199,16 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     }
   }
 
+  // Helper function to check if appointment date has passed
+  const isPastAppointment = (appointmentDate?: string): boolean => {
+    if (!appointmentDate) return false
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const appointment = new Date(`${appointmentDate}T00:00:00`)
+    appointment.setHours(0, 0, 0, 0)
+    return appointment < today
+  }
+
   // Sort requests by status priority and then by date (latest first)
   const sortedRequests = [...requests].sort((a, b) => {
     // Define status priority order
@@ -223,9 +233,41 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
   })
 
   // Group requests by status
-  const appointmentRequests = sortedRequests.filter(r => r.status === ServiceRequestStatus.APPOINTMENT)
+  const allAppointmentRequests = sortedRequests.filter(r => r.status === ServiceRequestStatus.APPOINTMENT)
+  
+  // Split appointments into future and past
+  const futureAppointments = allAppointmentRequests
+    .filter(r => !isPastAppointment(r.appointmentDate))
+    .sort((a, b) => {
+      // Sort future appointments by appointmentDate (earliest first)
+      if (!a.appointmentDate && !b.appointmentDate) return 0
+      if (!a.appointmentDate) return 1
+      if (!b.appointmentDate) return -1
+      
+      const dateA = new Date(`${a.appointmentDate}T00:00:00`).getTime()
+      const dateB = new Date(`${b.appointmentDate}T00:00:00`).getTime()
+      return dateA - dateB
+    })
+  
+  const pastAppointments = allAppointmentRequests
+    .filter(r => isPastAppointment(r.appointmentDate))
+    .sort((a, b) => {
+      // Sort past appointments by appointmentDate (most recent first)
+      if (!a.appointmentDate && !b.appointmentDate) return 0
+      if (!a.appointmentDate) return 1
+      if (!b.appointmentDate) return -1
+      
+      const dateA = new Date(`${a.appointmentDate}T00:00:00`).getTime()
+      const dateB = new Date(`${b.appointmentDate}T00:00:00`).getTime()
+      return dateB - dateA
+    })
+  
+  const appointmentRequests = futureAppointments
   const openRequests = sortedRequests.filter(r => r.status === ServiceRequestStatus.PENDING || r.status === ServiceRequestStatus.IN_PROGRESS)
-  const closedRequests = sortedRequests.filter(r => r.status === ServiceRequestStatus.COMPLETED || r.status === ServiceRequestStatus.CANCELLED)
+  const closedRequests = [
+    ...sortedRequests.filter(r => r.status === ServiceRequestStatus.COMPLETED || r.status === ServiceRequestStatus.CANCELLED),
+    ...pastAppointments
+  ]
 
   const handleViewDetails = (request: ServiceRequest) => {
     setSelectedRequest(request)
@@ -400,9 +442,18 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
           <h1 className={styles.pageTitle}>
             Αιτήματα <span className={styles.titleHighlight}>Υπηρεσιών</span>
           </h1>
-          <p className={`mt-3 max-w-md mx-auto ${styles.bodyText} sm:text-lg md:mt-5 md:text-xl md:max-w-3xl`}>
+          {/* <p className={`mt-3 max-w-md mx-auto ${styles.bodyText} sm:text-lg md:mt-5 md:text-xl md:max-w-3xl`}>
             Δείτε όλα τα αιτήματα υπηρεσιών που έχετε κάνει
-          </p>
+          </p> */}
+          <div className="mt-6">
+            <button
+              onClick={() => router.push('/')}
+              className={`${styles.btnPrimary} flex items-center justify-center gap-2 mx-auto`}
+            >
+              <HiPlusCircle className="h-5 w-5" />
+              Νεο Αίτημα
+            </button>
+          </div>
         </div>
 
         {/* Guest User Registration Prompt - Show for all guest users */}
@@ -619,6 +670,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                     getStatusIcon={getStatusIcon}
                     getStatusText={getStatusText}
                     getStatusColor={getStatusColor}
+                    disabled={request.status === ServiceRequestStatus.APPOINTMENT && isPastAppointment(request.appointmentDate)}
                   />
                 ))}
               </div>

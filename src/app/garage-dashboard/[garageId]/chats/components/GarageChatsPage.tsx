@@ -390,3 +390,10 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
   )
 }
 
+
+
+
+
+
+
+

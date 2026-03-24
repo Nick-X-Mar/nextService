@@ -88,7 +88,7 @@ export default function ProfessionalSection() {
                 </Link>
                 
                 <p className={`${styles.smallText} mt-4 text-gray-500`}>
-                  Εγγραφή δωρεάν • Έγκριση σε 24 ώρες
+                  Εγγραφή δωρεάν
                 </p>
               </div>
             </div>

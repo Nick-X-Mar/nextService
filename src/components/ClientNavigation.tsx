@@ -2,7 +2,7 @@
 
 import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { HiHome, HiChatBubbleLeftRight, HiUser, HiCalendar } from 'react-icons/hi2'
+import { HiHome, HiChatBubbleLeftRight, HiUser, HiCalendar, HiCog6Tooth, HiPlusCircle } from 'react-icons/hi2'
 import { styles } from '../styles/styles'
 
 interface ClientNavigationProps {
@@ -27,6 +27,12 @@ export default function ClientNavigation({ clientId }: ClientNavigationProps) {
 
   const navItems = [
     {
+      href: '/',
+      label: 'Νεο Αίτημα',
+      icon: HiPlusCircle,
+      active: pathname === '/'
+    },
+    {
       href: `/requests/${clientId}`,
       label: 'Αιτήματα',
       icon: HiHome,
@@ -43,6 +49,12 @@ export default function ClientNavigation({ clientId }: ClientNavigationProps) {
       label: 'Συνομιλίες',
       icon: HiChatBubbleLeftRight,
       active: pathname === `/requests/${clientId}/chats`
+    },
+    {
+      href: `/profile/${clientId}`,
+      label: 'Προφίλ',
+      icon: HiCog6Tooth,
+      active: pathname === `/profile/${clientId}`
     }
   ]
 

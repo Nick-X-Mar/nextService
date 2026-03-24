@@ -418,3 +418,10 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
   )
 }
 
+
+
+
+
+
+
+

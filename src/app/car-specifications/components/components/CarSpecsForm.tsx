@@ -127,11 +127,17 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
       // Get client ID from localStorage if user is logged in
       const loggedInClientId = localStorage.getItem('clientId')
       
+      // Load latest form data to include originalVehicleId and originalVehicleData
+      const latestFormData = loadFormData()
+      
       const serviceRequest = {
         ...savedData,
         vinNumber,
         engineNumber,
         licensePhoto: licensePhoto?.name || null,
+        // Include original vehicle tracking data if present
+        ...(latestFormData.originalVehicleId && { originalVehicleId: latestFormData.originalVehicleId }),
+        ...(latestFormData.originalVehicleData && { originalVehicleData: latestFormData.originalVehicleData }),
         // Include client ID if user is logged in
         ...(loggedInClientId && { clientId: loggedInClientId })
       }

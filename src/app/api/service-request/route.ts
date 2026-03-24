@@ -4,6 +4,63 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { PutCommand } from '@aws-sdk/lib-dynamodb'
 import { ServiceRequestStatus } from '@/types/statuses'
 
+// Helper function to normalize string values for comparison
+const normalizeString = (value: string | undefined | null): string => {
+  if (!value) return ''
+  return value.toString().trim().toLowerCase()
+}
+
+// Helper function to compare vehicle data
+const areVehiclesSame = (
+  original: {
+    brand?: string
+    model?: string
+    modelYear?: string
+    engineCC?: string
+    fuelType?: string
+    isAutomatic?: boolean
+    is4x4?: boolean
+    vinNumber?: string
+    engineNumber?: string
+    licensePlate?: string
+    color?: string
+  },
+  current: {
+    brand?: string
+    model?: string
+    modelYear?: string
+    engineCC?: string
+    fuelType?: string
+    isAutomatic?: boolean
+    is4x4?: boolean
+    vinNumber?: string
+    engineNumber?: string
+    licensePlate?: string
+    color?: string
+  }
+): boolean => {
+  // Compare required fields
+  if (normalizeString(original.brand) !== normalizeString(current.brand)) return false
+  if (normalizeString(original.model) !== normalizeString(current.model)) return false
+  
+  // Compare optional fields (handle empty/null values)
+  if (normalizeString(original.modelYear) !== normalizeString(current.modelYear)) return false
+  if (normalizeString(original.engineCC) !== normalizeString(current.engineCC)) return false
+  if (normalizeString(original.fuelType) !== normalizeString(current.fuelType)) return false
+  
+  // Compare boolean fields
+  if (original.isAutomatic !== current.isAutomatic) return false
+  if (original.is4x4 !== current.is4x4) return false
+  
+  // Compare optional identification fields
+  if (normalizeString(original.vinNumber) !== normalizeString(current.vinNumber)) return false
+  if (normalizeString(original.engineNumber) !== normalizeString(current.engineNumber)) return false
+  if (normalizeString(original.licensePlate) !== normalizeString(current.licensePlate)) return false
+  if (normalizeString(original.color) !== normalizeString(current.color)) return false
+  
+  return true
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -40,7 +97,43 @@ export async function POST(request: NextRequest) {
     // Generate unique IDs
     const serviceRequestId = `sr-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     const clientId = existingClientId || `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    const vehicleId = `vehicle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    
+    // Check if we should use existing vehicle or create a new one
+    let vehicleId: string
+    let shouldCreateNewVehicle = true
+    
+    if (body.originalVehicleId && body.originalVehicleData) {
+      // Compare current vehicle data with original
+      const currentVehicleData = {
+        brand: body.brand,
+        model: body.model,
+        modelYear: body.modelYear,
+        engineCC: body.engineCC,
+        fuelType: body.fuelType,
+        isAutomatic: body.isAutomatic,
+        is4x4: body.is4x4,
+        vinNumber: body.vinNumber,
+        engineNumber: body.engineNumber,
+        licensePlate: body.licensePlate,
+        color: body.color
+      }
+      
+      if (areVehiclesSame(body.originalVehicleData, currentVehicleData)) {
+        // Vehicle data unchanged - use existing vehicle ID
+        vehicleId = body.originalVehicleId
+        shouldCreateNewVehicle = false
+        console.log('Vehicle data unchanged, using existing vehicle ID:', vehicleId)
+      } else {
+        // Vehicle data changed - create new vehicle
+        vehicleId = `vehicle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        shouldCreateNewVehicle = true
+        console.log('Vehicle data changed, creating new vehicle with ID:', vehicleId)
+      }
+    } else {
+      // No original vehicle data - create new vehicle (default behavior)
+      vehicleId = `vehicle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      shouldCreateNewVehicle = true
+    }
     
     // Save to DynamoDB - remove null values as DynamoDB doesn't like them
     const serviceRequestData: {
@@ -90,55 +183,60 @@ export async function POST(request: NextRequest) {
       Item: serviceRequestData
     }))
     
-    // Save vehicle data to DynamoDB - remove null values
-    const vehicleData: {
-      id: string
-      clientId: string
-      brand: string
-      model: string
-      modelYear: string
-      vinNumber: string
-      engineCC: string
-      fuelType: string
-      isAutomatic: boolean
-      is4x4: boolean
-      isActive: boolean
-      createdAt: string
-      updatedAt: string
-      engineNumber?: string
-      licensePlate?: string
-      color?: string
-      nickname?: string
-      licensePhotoUrl?: string
-    } = {
-      id: vehicleId,
-      clientId: clientId,
-      brand: body.brand,
-      model: body.model,
-      modelYear: body.modelYear,
-      vinNumber: body.vinNumber,
-      engineCC: body.engineCC,
-      fuelType: body.fuelType || 'petrol', // Default to petrol if not provided
-      isAutomatic: body.isAutomatic !== undefined ? body.isAutomatic : false, // Default to false if not provided
-      is4x4: body.is4x4 !== undefined ? body.is4x4 : false, // Default to false if not provided
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+    // Only create new vehicle if data was changed or no original vehicle exists
+    if (shouldCreateNewVehicle) {
+      // Save vehicle data to DynamoDB - remove null values
+      const vehicleData: {
+        id: string
+        clientId: string
+        brand: string
+        model: string
+        modelYear: string
+        vinNumber: string
+        engineCC: string
+        fuelType: string
+        isAutomatic: boolean
+        is4x4: boolean
+        isActive: boolean
+        createdAt: string
+        updatedAt: string
+        engineNumber?: string
+        licensePlate?: string
+        color?: string
+        nickname?: string
+        licensePhotoUrl?: string
+      } = {
+        id: vehicleId,
+        clientId: clientId,
+        brand: body.brand,
+        model: body.model,
+        modelYear: body.modelYear,
+        vinNumber: body.vinNumber,
+        engineCC: body.engineCC,
+        fuelType: body.fuelType || 'petrol', // Default to petrol if not provided
+        isAutomatic: body.isAutomatic !== undefined ? body.isAutomatic : false, // Default to false if not provided
+        is4x4: body.is4x4 !== undefined ? body.is4x4 : false, // Default to false if not provided
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+      
+      // Only add optional fields if they have values
+      if (body.engineNumber) vehicleData.engineNumber = body.engineNumber
+      if (body.licensePlate) vehicleData.licensePlate = body.licensePlate
+      if (body.color) vehicleData.color = body.color
+      if (body.nickname) vehicleData.nickname = body.nickname
+      if (body.licensePhotoUrl) vehicleData.licensePhotoUrl = body.licensePhotoUrl
+      
+      console.log('Vehicle data to save:', JSON.stringify(vehicleData, null, 2))
+      
+      await dynamoDB.send(new PutCommand({
+        TableName: 'Vehicles',
+        Item: vehicleData
+      }))
+    } else {
+      console.log('Using existing vehicle, skipping vehicle creation:', vehicleId)
     }
-    
-    // Only add optional fields if they have values
-    if (body.engineNumber) vehicleData.engineNumber = body.engineNumber
-    if (body.licensePlate) vehicleData.licensePlate = body.licensePlate
-    if (body.color) vehicleData.color = body.color
-    if (body.nickname) vehicleData.nickname = body.nickname
-    if (body.licensePhotoUrl) vehicleData.licensePhotoUrl = body.licensePhotoUrl
-    
-    console.log('Vehicle data to save:', JSON.stringify(vehicleData, null, 2))
-    
-    await dynamoDB.send(new PutCommand({
-      TableName: 'Vehicles',
-      Item: vehicleData
-    }))
     
     // Only create client if it doesn't already exist (new guest user)
     if (!existingClientId) {

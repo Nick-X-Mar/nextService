@@ -19,6 +19,21 @@ export interface ServiceFormData {
   is4x4: boolean
   engineNumber: string
   estimatedPrice: number | null
+  // Original vehicle tracking (for detecting changes)
+  originalVehicleId?: string
+  originalVehicleData?: {
+    brand: string
+    model: string
+    modelYear?: string
+    engineCC?: string
+    fuelType?: string
+    isAutomatic?: boolean
+    is4x4?: boolean
+    vinNumber?: string
+    engineNumber?: string
+    licensePlate?: string
+    color?: string
+  }
   // Note: File objects are handled separately since they can't be serialized to localStorage
 }
 
@@ -61,7 +76,9 @@ export const loadFormData = (): ServiceFormData => {
     isAutomatic: false,
     is4x4: false,
     engineNumber: '',
-    estimatedPrice: null
+    estimatedPrice: null,
+    originalVehicleId: undefined,
+    originalVehicleData: undefined
   }
 }
 
