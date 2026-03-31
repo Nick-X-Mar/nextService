@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import Icon from '@/components/ui/Icon'
@@ -28,8 +29,14 @@ export default function TopHeader() {
           >
             <Icon name={mobileMenuOpen ? 'close' : 'menu'} className={isLanding ? 'text-white' : 'text-on-surface'} />
           </button>
-          <Link href="/" className={`text-xl font-black tracking-tighter italic font-headline ${isLanding ? 'text-white' : 'text-on-surface'}`}>
-            nextservice.gr
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/logo.png"
+              alt="NextService"
+              width={120}
+              height={40}
+              className="h-8 w-auto"
+            />
           </Link>
         </div>
 

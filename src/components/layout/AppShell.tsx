@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import TopHeader from './TopHeader'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
+import Footer from './Footer'
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const { userType, isLoading } = useAuth()
@@ -21,6 +22,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       <main className={`min-h-screen ${isLanding ? '' : 'pt-14'} pb-24 md:pb-0 ${showSidebar ? 'md:ml-64' : ''}`}>
         {children}
       </main>
+      {isLanding && <Footer />}
       <BottomNav />
     </>
   )
