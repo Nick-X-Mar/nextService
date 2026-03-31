@@ -2,12 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { HiChevronLeft, HiChevronRight, HiPencil, HiCheck, HiXMark, HiTruck, HiCalendar, HiCog6Tooth, HiDocumentText, HiPlus } from 'react-icons/hi2'
-import Card from '../../../../components/Card'
-import Button from '../../../../components/Button'
-import Input from '../../../../components/Input'
+import Icon from '@/components/ui/Icon'
 import { styles } from '../../../../styles/styles'
-import { saveFormData } from '../../../../utils/formStorage'
+import { saveFormData, ServiceFormData } from '../../../../utils/formStorage'
 
 interface Vehicle {
   id: string
@@ -137,6 +134,7 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
       fuelType: (currentVehicle.fuelType as 'petrol' | 'diesel' | '') || '',
       isAutomatic: currentVehicle.isAutomatic || false,
       is4x4: currentVehicle.is4x4 || false,
+      isTurbo: currentVehicle.isTurbo || false,
       engineNumber: currentVehicle.engineNumber || '',
       // Keep existing category and description if any
       category: '',
@@ -160,7 +158,7 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
     }
 
     // Save vehicle data to localStorage
-    saveFormData(vehicleFormData)
+    saveFormData(vehicleFormData as Partial<ServiceFormData>)
 
     // Navigate to landing page
     router.push('/')
@@ -168,15 +166,15 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
 
   if (vehicles.length === 0) {
     return (
-      <Card variant="default" padding="lg">
+      <div className={styles.card}>
         <div className="text-center py-12">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <HiTruck className="h-8 w-8 text-gray-400" />
+          <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mx-auto mb-4">
+            <Icon name="directions_car" className="text-on-surface-variant" size="lg" />
           </div>
           <h3 className={`${styles.cardTitle} mb-2`}>Δεν υπάρχουν οχήματα</h3>
           <p className={styles.bodyText}>Δεν έχετε καταχωρήσει κάποιο όχημα ακόμα.</p>
         </div>
-      </Card>
+      </div>
     )
   }
 
@@ -194,43 +192,70 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
     ? 'Υβριδικό'
     : currentVehicle.fuelType || '-'
 
+  const ReadOnlyField = ({ label, value, mono }: { label: string; value: string; mono?: boolean }) => (
+    <div className="space-y-2">
+      <label className={styles.labelUpper}>{label}</label>
+      <div className="px-4 py-3.5 bg-surface-container-highest/50 rounded-xl">
+        <p className={`text-sm font-medium text-on-surface ${mono ? 'font-mono' : ''}`}>
+          {value || '-'}
+        </p>
+      </div>
+    </div>
+  )
+
+  const EditableField = ({ label, value, onChange, placeholder, required }: {
+    label: string; value: string; onChange: (v: string) => void; placeholder: string; required?: boolean
+  }) => (
+    <div className="space-y-2">
+      <label className={styles.labelUpper}>{label}</label>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        required={required}
+        className={styles.input}
+      />
+    </div>
+  )
+
   return (
-    <Card variant="default" padding="lg">
+    <div className={styles.card}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
+      <div className="flex items-center justify-between mb-6 pb-4 border-b border-outline-variant/10">
         <div className="flex items-center gap-3 flex-1">
-          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-            <HiTruck className="h-5 w-5 text-blue-600" />
+          <div className="w-10 h-10 bg-surface-container rounded-lg flex items-center justify-center">
+            <Icon name="directions_car" filled className="text-primary" />
           </div>
           <div className="flex-1">
             <h2 className={`${styles.sectionTitle} mb-0`}>Οχήματα</h2>
             {vehicles.length > 1 && (
               <div className="flex items-center gap-3 mt-1">
-                <span className="text-sm text-gray-500">
+                <span className="text-xs font-bold text-on-surface-variant">
                   {currentVehicleIndex + 1} από {vehicles.length}
                 </span>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={handlePrevious}
                     disabled={currentVehicleIndex === 0}
-                    className={`p-1.5 rounded-lg transition-colors ${
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
                       currentVehicleIndex === 0
-                        ? 'text-gray-300 cursor-not-allowed'
-                        : 'text-gray-600 hover:bg-gray-100'
+                        ? 'text-on-surface-variant/30 cursor-not-allowed'
+                        : 'text-on-surface-variant hover:bg-surface-container'
                     }`}
                   >
-                    <HiChevronLeft className="h-5 w-5" />
+                    <Icon name="chevron_left" size="md" />
                   </button>
                   <button
                     onClick={handleNext}
                     disabled={currentVehicleIndex === vehicles.length - 1}
-                    className={`p-1.5 rounded-lg transition-colors ${
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
                       currentVehicleIndex === vehicles.length - 1
-                        ? 'text-gray-300 cursor-not-allowed'
-                        : 'text-gray-600 hover:bg-gray-100'
+                        ? 'text-on-surface-variant/30 cursor-not-allowed'
+                        : 'text-on-surface-variant hover:bg-surface-container'
                     }`}
                   >
-                    <HiChevronRight className="h-5 w-5" />
+                    <Icon name="chevron_right" size="md" />
                   </button>
                 </div>
               </div>
@@ -238,39 +263,37 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
           </div>
         </div>
         {!isEditing && (
-          <Button
-            variant="outline"
-            size="sm"
+          <button
             onClick={() => setIsEditing(true)}
+            className={styles.btnOutline}
           >
-            <HiPencil className="h-4 w-4" />
+            <Icon name="edit" size="sm" />
             Επεξεργασία
-          </Button>
+          </button>
         )}
       </div>
 
-      {/* Vehicle Title */}
+      {/* Vehicle Title Banner */}
       {(currentVehicle.nickname || currentVehicle.brand || currentVehicle.model) && (
-        <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100 flex items-center justify-between gap-4">
+        <div className="mb-6 p-4 bg-gradient-to-r from-primary/5 to-primary-container/10 rounded-xl border border-primary/10 flex items-center justify-between gap-4">
           <div className="flex-1">
-            <h3 className="text-xl font-bold text-gray-900">
+            <h3 className="text-xl font-black tracking-tight text-on-surface">
               {currentVehicle.nickname || `${currentVehicle.brand} ${currentVehicle.model}`}
             </h3>
             {currentVehicle.nickname && (
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-secondary mt-1">
                 {currentVehicle.brand} {currentVehicle.model}
               </p>
             )}
           </div>
           {!isEditing && (
-            <Button
-              variant="primary"
-              size="sm"
+            <button
               onClick={handleNewRequest}
+              className={styles.btnPrimary}
             >
-              <HiPlus className="h-4 w-4" />
-              Νέο Αίτημα για αυτό το Όχημα
-            </Button>
+              <Icon name="add" size="sm" />
+              Νέο Αίτημα
+            </button>
           )}
         </div>
       )}
@@ -279,159 +302,53 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
       <div className="space-y-6">
         {/* Basic Information Section */}
         <div>
-          <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">
+          <h4 className={`${styles.labelUpper} mb-4`}>
             Βασικές Πληροφορίες
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Brand */}
-            <div className="space-y-2">
-              <label className={styles.label}>Μάρκα</label>
-              {isEditing ? (
-                <Input
-                  type="text"
-                  value={formData.brand || ''}
-                  onChange={(value) => handleInputChange('brand', value)}
-                  placeholder="Μάρκα"
-                  required
-                />
-              ) : (
-                <div className="px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className={`${styles.bodyText} text-gray-900 font-medium`}>
-                    {currentVehicle.brand || '-'}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Model */}
-            <div className="space-y-2">
-              <label className={styles.label}>Μοντέλο</label>
-              {isEditing ? (
-                <Input
-                  type="text"
-                  value={formData.model || ''}
-                  onChange={(value) => handleInputChange('model', value)}
-                  placeholder="Μοντέλο"
-                  required
-                />
-              ) : (
-                <div className="px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className={`${styles.bodyText} text-gray-900 font-medium`}>
-                    {currentVehicle.model || '-'}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Model Year */}
-            <div className="space-y-2">
-              <label className={styles.label}>Έτος Κατασκευής</label>
-              {isEditing ? (
-                <Input
-                  type="text"
-                  value={formData.modelYear || ''}
-                  onChange={(value) => handleInputChange('modelYear', value)}
-                  placeholder="π.χ. 2020"
-                />
-              ) : (
-                <div className="px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className={`${styles.bodyText} text-gray-900 font-medium`}>
-                    {currentVehicle.modelYear || '-'}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Color */}
-            <div className="space-y-2">
-              <label className={styles.label}>Χρώμα</label>
-              {isEditing ? (
-                <Input
-                  type="text"
-                  value={formData.color || ''}
-                  onChange={(value) => handleInputChange('color', value)}
-                  placeholder="Χρώμα"
-                />
-              ) : (
-                <div className="px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className={`${styles.bodyText} text-gray-900 font-medium`}>
-                    {currentVehicle.color || '-'}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* License Plate */}
-            <div className="space-y-2">
-              <label className={styles.label}>Πινακίδα</label>
-              {isEditing ? (
-                <Input
-                  type="text"
-                  value={formData.licensePlate || ''}
-                  onChange={(value) => handleInputChange('licensePlate', value)}
-                  placeholder="π.χ. ABC-1234"
-                />
-              ) : (
-                <div className="px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className={`${styles.bodyText} text-gray-900 font-medium`}>
-                    {currentVehicle.licensePlate || '-'}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Nickname - only show if editing or if it exists */}
-            {(currentVehicle.nickname || isEditing) && (
-              <div className="space-y-2">
-                <label className={styles.label}>Ψευδώνυμο</label>
-                {isEditing ? (
-                  <Input
-                    type="text"
-                    value={formData.nickname || ''}
-                    onChange={(value) => handleInputChange('nickname', value)}
-                    placeholder="π.χ. Το αμάξι μου"
-                  />
-                ) : (
-                  <div className="px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                    <p className={`${styles.bodyText} text-gray-900 font-medium`}>
-                      {currentVehicle.nickname || '-'}
-                    </p>
-                  </div>
+            {isEditing ? (
+              <>
+                <EditableField label="Μάρκα" value={formData.brand || ''} onChange={(v) => handleInputChange('brand', v)} placeholder="Μάρκα" required />
+                <EditableField label="Μοντέλο" value={formData.model || ''} onChange={(v) => handleInputChange('model', v)} placeholder="Μοντέλο" required />
+                <EditableField label="Έτος Κατασκευής" value={formData.modelYear || ''} onChange={(v) => handleInputChange('modelYear', v)} placeholder="π.χ. 2020" />
+                <EditableField label="Χρώμα" value={formData.color || ''} onChange={(v) => handleInputChange('color', v)} placeholder="Χρώμα" />
+                <EditableField label="Πινακίδα" value={formData.licensePlate || ''} onChange={(v) => handleInputChange('licensePlate', v)} placeholder="π.χ. ABC-1234" />
+                <EditableField label="Ψευδώνυμο" value={formData.nickname || ''} onChange={(v) => handleInputChange('nickname', v)} placeholder="π.χ. Το αμάξι μου" />
+              </>
+            ) : (
+              <>
+                <ReadOnlyField label="Μάρκα" value={currentVehicle.brand || '-'} />
+                <ReadOnlyField label="Μοντέλο" value={currentVehicle.model || '-'} />
+                <ReadOnlyField label="Έτος Κατασκευής" value={currentVehicle.modelYear || '-'} />
+                <ReadOnlyField label="Χρώμα" value={currentVehicle.color || '-'} />
+                <ReadOnlyField label="Πινακίδα" value={currentVehicle.licensePlate || '-'} />
+                {currentVehicle.nickname && (
+                  <ReadOnlyField label="Ψευδώνυμο" value={currentVehicle.nickname} />
                 )}
-              </div>
+              </>
             )}
           </div>
         </div>
 
         {/* Technical Specifications Section */}
-        <div className="pt-6 border-t border-gray-200">
-          <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4 flex items-center gap-2">
-            <HiCog6Tooth className="h-4 w-4" />
-            Τεχνικά Χαρακτηριστικά
-          </h4>
+        <div className="pt-6 border-t border-outline-variant/10">
+          <div className="flex items-center gap-2 mb-4">
+            <Icon name="settings" size="sm" className="text-on-surface-variant" />
+            <h4 className={`${styles.labelUpper} mb-0`}>
+              Τεχνικά Χαρακτηριστικά
+            </h4>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Engine CC */}
-            <div className="space-y-2">
-              <label className={styles.label}>Κυβισμός (cc)</label>
-              {isEditing ? (
-                <Input
-                  type="text"
-                  value={formData.engineCC || ''}
-                  onChange={(value) => handleInputChange('engineCC', value)}
-                  placeholder="π.χ. 1600"
-                />
-              ) : (
-                <div className="px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className={`${styles.bodyText} text-gray-900 font-medium`}>
-                    {currentVehicle.engineCC || '-'} {currentVehicle.engineCC ? 'cc' : ''}
-                  </p>
-                </div>
-              )}
-            </div>
+            {isEditing ? (
+              <EditableField label="Κυβισμός (cc)" value={formData.engineCC || ''} onChange={(v) => handleInputChange('engineCC', v)} placeholder="π.χ. 1600" />
+            ) : (
+              <ReadOnlyField label="Κυβισμός (cc)" value={currentVehicle.engineCC ? `${currentVehicle.engineCC} cc` : '-'} />
+            )}
 
             {/* Fuel Type */}
             <div className="space-y-2">
-              <label className={styles.label}>Καύσιμο</label>
+              <label className={styles.labelUpper}>Καύσιμο</label>
               {isEditing ? (
                 <select
                   value={formData.fuelType || ''}
@@ -445,8 +362,8 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
                   <option value="hybrid">Υβριδικό</option>
                 </select>
               ) : (
-                <div className="px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className={`${styles.bodyText} text-gray-900 font-medium`}>
+                <div className="px-4 py-3.5 bg-surface-container-highest/50 rounded-xl">
+                  <p className="text-sm font-medium text-on-surface">
                     {fuelTypeText}
                   </p>
                 </div>
@@ -455,7 +372,7 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
 
             {/* Transmission Type */}
             <div className="space-y-2">
-              <label className={styles.label}>Μετάδοση</label>
+              <label className={styles.labelUpper}>Μετάδοση</label>
               {isEditing ? (
                 <div className={styles.toggleContainer}>
                   <button
@@ -482,8 +399,8 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
                   </button>
                 </div>
               ) : (
-                <div className="px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className={`${styles.bodyText} text-gray-900 font-medium`}>
+                <div className="px-4 py-3.5 bg-surface-container-highest/50 rounded-xl">
+                  <p className="text-sm font-medium text-on-surface">
                     {currentVehicle.isAutomatic ? 'Αυτόματο' : 'Χειροκίνητο'}
                   </p>
                 </div>
@@ -493,75 +410,50 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
         </div>
 
         {/* Identification Numbers Section */}
-        <div className="pt-6 border-t border-gray-200">
-          <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4 flex items-center gap-2">
-            <HiDocumentText className="h-4 w-4" />
-            Αριθμοί Αναγνώρισης
-          </h4>
+        <div className="pt-6 border-t border-outline-variant/10">
+          <div className="flex items-center gap-2 mb-4">
+            <Icon name="description" size="sm" className="text-on-surface-variant" />
+            <h4 className={`${styles.labelUpper} mb-0`}>
+              Αριθμοί Αναγνώρισης
+            </h4>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* VIN Number */}
-            <div className="space-y-2">
-              <label className={styles.label}>VIN Number</label>
-              {isEditing ? (
-                <Input
-                  type="text"
-                  value={formData.vinNumber || ''}
-                  onChange={(value) => handleInputChange('vinNumber', value)}
-                  placeholder="VIN Number"
-                />
-              ) : (
-                <div className="px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className={`${styles.bodyText} text-gray-900 font-mono text-sm`}>
-                    {currentVehicle.vinNumber || '-'}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Engine Number */}
-            <div className="space-y-2">
-              <label className={styles.label}>Αριθμός Κινητήρα</label>
-              {isEditing ? (
-                <Input
-                  type="text"
-                  value={formData.engineNumber || ''}
-                  onChange={(value) => handleInputChange('engineNumber', value)}
-                  placeholder="Αριθμός Κινητήρα"
-                />
-              ) : (
-                <div className="px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className={`${styles.bodyText} text-gray-900 font-mono text-sm`}>
-                    {currentVehicle.engineNumber || '-'}
-                  </p>
-                </div>
-              )}
-            </div>
+            {isEditing ? (
+              <>
+                <EditableField label="VIN Number" value={formData.vinNumber || ''} onChange={(v) => handleInputChange('vinNumber', v)} placeholder="VIN Number" />
+                <EditableField label="Αριθμός Κινητήρα" value={formData.engineNumber || ''} onChange={(v) => handleInputChange('engineNumber', v)} placeholder="Αριθμός Κινητήρα" />
+              </>
+            ) : (
+              <>
+                <ReadOnlyField label="VIN Number" value={currentVehicle.vinNumber || '-'} mono />
+                <ReadOnlyField label="Αριθμός Κινητήρα" value={currentVehicle.engineNumber || '-'} mono />
+              </>
+            )}
           </div>
         </div>
       </div>
 
       {/* Edit Action Buttons */}
       {isEditing && (
-        <div className="flex gap-3 pt-6 mt-6 border-t border-gray-200">
-          <Button
-            variant="primary"
+        <div className="flex gap-3 pt-6 mt-6 border-t border-outline-variant/10">
+          <button
             onClick={handleSave}
-            loading={isSubmitting}
-            disabled={!formData.brand?.trim() || !formData.model?.trim()}
+            disabled={isSubmitting || !formData.brand?.trim() || !formData.model?.trim()}
+            className={`${styles.btnPrimary} ${(isSubmitting || !formData.brand?.trim() || !formData.model?.trim()) ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            <HiCheck className="h-4 w-4" />
-            Αποθήκευση
-          </Button>
-          <Button
-            variant="secondary"
+            <Icon name="check" size="sm" />
+            {isSubmitting ? 'Αποθήκευση...' : 'Αποθήκευση'}
+          </button>
+          <button
             onClick={handleCancel}
             disabled={isSubmitting}
+            className={styles.btnOutline}
           >
-            <HiXMark className="h-4 w-4" />
+            <Icon name="close" size="sm" />
             Ακύρωση
-          </Button>
+          </button>
         </div>
       )}
-    </Card>
+    </div>
   )
 }

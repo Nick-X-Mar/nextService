@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { HiMapPin, HiPhone } from 'react-icons/hi2'
+import Icon from '@/components/ui/Icon'
 import { DayPicker } from 'react-day-picker'
 import 'react-day-picker/dist/style.css'
 import { addDays, addWeeks, format, isWeekend } from 'date-fns'
@@ -85,7 +85,7 @@ const createVehicleFormState = (vehicle: VehicleInfo): VehicleFormState => ({
   brand: vehicle?.brand ?? '',
   model: vehicle?.model ?? '',
   engineCC: sanitizeEngineValue(vehicle?.engineCC),
-  modelYear: vehicle?.modelYear?.toString() ?? vehicle?.year?.toString() ?? '',
+  modelYear: vehicle?.modelYear?.toString() ?? '',
   fuelType: vehicle?.fuelType ?? '',
   isAutomatic: booleanToSelectValue(vehicle?.isAutomatic),
   is4x4: booleanToSelectValue(vehicle?.is4x4),
@@ -103,8 +103,7 @@ const mapVehicleDetailsFromApi = (vehicle: any): VehicleInfo => {
     brand: vehicle.brand ?? '',
     model: vehicle.model ?? '',
     engineCC: vehicle.engineCC ?? '',
-    modelYear: vehicle.modelYear ?? vehicle.year ?? '',
-    year: vehicle.year ?? vehicle.modelYear ?? '',
+    modelYear: vehicle.modelYear ?? '',
     fuelType: vehicle.fuelType ?? '',
     isAutomatic: vehicle.isAutomatic ?? null,
     is4x4: vehicle.is4x4 ?? null,
@@ -117,17 +116,17 @@ const mapVehicleDetailsFromApi = (vehicle: any): VehicleInfo => {
 interface RequestDetailsContentProps {
   request: ServiceRequest
   onRequestUpdate?: (request: ServiceRequest) => void
-  getStatusIcon: (status: string) => React.ReactNode
-  getStatusText: (status: string) => string
-  getStatusColor: (status: string) => string
+  getStatusIcon: (status: ServiceRequestStatus) => React.ReactNode
+  getStatusText: (status: ServiceRequestStatus) => string
+  getStatusColor: (status: ServiceRequestStatus) => string
 }
 
-export default function RequestDetailsContent({ 
-  request, 
+export default function RequestDetailsContent({
+  request,
   onRequestUpdate,
-  getStatusIcon, 
-  getStatusText, 
-  getStatusColor 
+  getStatusIcon,
+  getStatusText,
+  getStatusColor
 }: RequestDetailsContentProps) {
   const [vehicleDetails, setVehicleDetails] = useState<VehicleInfo>(() =>
     mapVehicleDetailsFromApi(request.vehicle)
@@ -725,455 +724,503 @@ export default function RequestDetailsContent({
   return (
     <>
       <div className="space-y-6">
-      {/* Status and Priority */}
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
+        {/* Status badge */}
+        <div className="flex items-center gap-3">
           {getStatusIcon(request.status)}
-          <span className={`px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(request.status)}`}>
+          <span className={`text-[0.65rem] font-black uppercase tracking-[0.1em] px-3 py-1 rounded-full ${getStatusColor(request.status)}`}>
             {getStatusText(request.status)}
           </span>
         </div>
-      </div>
 
-      <ServiceVehicleCard
-        serviceDescription={request.description}
-        category={request.category}
-        estimatedCost={request.estimatedCost}
-        vehicle={vehicleDetails}
-        photoCount={request.photoUrls.length}
-        showEstimatedCost={request.estimatedCost !== undefined && request.estimatedCost !== null}
-        editable={Boolean(request.vehicleId)}
-        onEditClick={handleOpenVehicleModal}
-      />
+        <ServiceVehicleCard
+          serviceDescription={request.description}
+          category={request.category}
+          estimatedCost={request.estimatedCost}
+          vehicle={vehicleDetails}
+          photoCount={request.photoUrls.length}
+          showEstimatedCost={request.estimatedCost !== undefined && request.estimatedCost !== null}
+          editable={Boolean(request.vehicleId)}
+          onEditClick={handleOpenVehicleModal}
+        />
 
-      {vehicleUpdateMessage && (
-        <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-800">
-          {vehicleUpdateMessage}
-        </div>
-      )}
+        {vehicleUpdateMessage && (
+          <div className="rounded-xl bg-green-50 border border-green-100 px-4 py-3 text-sm text-green-800 flex items-center gap-2">
+            <Icon name="check_circle" filled size="sm" className="text-green-600" />
+            {vehicleUpdateMessage}
+          </div>
+        )}
 
-      {vehicleUpdateError && (
-        <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {vehicleUpdateError}
-        </div>
-      )}
+        {vehicleUpdateError && (
+          <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700 flex items-center gap-2">
+            <Icon name="error" filled size="sm" className="text-red-600" />
+            {vehicleUpdateError}
+          </div>
+        )}
 
-      {/* Photos */}
-      {request.photoUrls.length > 0 && (
-        <div className={styles.cardSimple}>
-          <h3 className={`${styles.cardTitle} mb-3`}>
-            Φωτογραφίες ({request.photoUrls.length})
+        {/* Photos */}
+        {request.photoUrls.length > 0 && (
+          <div className="bg-surface-container-lowest rounded-xl p-5 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10">
+            <h3 className="text-lg font-bold text-on-surface mb-3 flex items-center gap-2">
+              <Icon name="photo_library" size="md" className="text-on-surface-variant" />
+              Φωτογραφίες ({request.photoUrls.length})
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {request.photoUrls.map((url, index) => (
+                <div key={index} className="relative aspect-square bg-surface-container rounded-xl overflow-hidden">
+                  <Image
+                    src={url}
+                    alt={`Φωτογραφία ${index + 1}`}
+                    fill
+                    className="object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NzM4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkZvdG9ncmFwaGlhPC90ZXh0Pjwvc3ZnPg=='
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Accept error */}
+        {acceptError && (
+          <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700 flex items-center gap-2">
+            <Icon name="error" filled size="sm" className="text-red-600" />
+            {acceptError}
+          </div>
+        )}
+
+        {/* Offers */}
+        <div className="bg-surface-container-lowest rounded-xl p-5 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10">
+          <h3 className="text-lg font-bold text-on-surface mb-4 flex items-center gap-2">
+            <Icon name="local_offer" size="md" className="text-primary" />
+            Προσφορές από Συνεργεία
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {request.photoUrls.map((url, index) => (
-              <div key={index} className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                <Image
-                  src={url}
-                  alt={`Φωτογραφία ${index + 1}`}
-                  fill
-                  className="object-cover"
-                  onError={(e) => {
-                    e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NzM4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkZvdG9ncmFwaGlhPC90ZXh0Pjwvc3ZnPg=='
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+          {offersLoading ? (
+            <div className="flex items-center gap-3 text-sm text-on-surface-variant py-4">
+              <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+              <span>Φόρτωση προσφορών...</span>
+            </div>
+          ) : offersError ? (
+            <div className="bg-red-50 border border-red-100 text-red-700 text-sm rounded-xl p-4 flex items-center gap-2">
+              <Icon name="error" size="sm" className="text-red-600" />
+              {offersError}
+            </div>
+          ) : offers.length === 0 ? (
+            <div className="bg-blue-50 border border-blue-100 text-blue-700 text-sm rounded-xl p-4 flex items-center gap-2">
+              <Icon name="info" size="sm" className="text-blue-600" />
+              Δεν υπάρχουν ακόμη προσφορές από συνεργεία. Θα σας ενημερώσουμε μόλις λάβουμε κάποια.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {offers.map((offer, index) => {
+                const availabilityDates = offer.availabilityDates || []
+                const hasAvailability = availabilityDates.length > 0
+                const selectedDate = selectedOfferDates[offer.id] || null
+                const canAcceptOffer =
+                  hasAvailability &&
+                  Boolean(selectedDate) &&
+                  request.status !== ServiceRequestStatus.APPOINTMENT &&
+                  offer.status !== OfferStatus.ACCEPTED &&
+                  offer.status !== OfferStatus.REJECTED
+                const isExpanded = expandedOfferId === offer.id
+                const isCustomOpen = customPickerOpen[offer.id]
+                const customDates = customDatesByOffer[offer.id] || []
+                const customError = customDateErrors[offer.id]
+                const customSuccess = customDateSuccesses[offer.id]
+                const isSaving = savingCustomDates[offer.id] || false
+                const benefits = Array.isArray(offer.garage?.benefits)
+                  ? offer.garage?.benefits ?? []
+                  : []
+                const isAcceptedOffer = request.acceptedOfferId === offer.id
 
-      {/* Offers */}
-      <div className={styles.cardSimple}>
-        <h3 className={`${styles.cardTitle} mb-3`}>Προσφορές από Συνεργεία</h3>
-        {offersLoading ? (
-          <div className="flex items-center gap-3 text-sm text-gray-600">
-            <div className="h-5 w-5 border-2 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
-            <span>Φόρτωση προσφορών...</span>
-          </div>
-        ) : offersError ? (
-          <div className="bg-red-50 border border-red-100 text-red-700 text-sm rounded-lg p-3">
-            {offersError}
-          </div>
-        ) : offers.length === 0 ? (
-          <div className="bg-blue-50 border border-blue-100 text-blue-700 text-sm rounded-lg p-3">
-            Δεν υπάρχουν ακόμη προσφορές από συνεργεία. Θα σας ενημερώσουμε μόλις λάβουμε κάποια.
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {offers.map((offer, index) => {
-              const availabilityDates = offer.availabilityDates || []
-              const hasAvailability = availabilityDates.length > 0
-              const selectedDate = selectedOfferDates[offer.id] || null
-              const canAcceptOffer =
-                hasAvailability &&
-                Boolean(selectedDate) &&
-                request.status !== ServiceRequestStatus.APPOINTMENT &&
-                offer.status !== OfferStatus.ACCEPTED &&
-                offer.status !== OfferStatus.REJECTED
-              const isExpanded = expandedOfferId === offer.id
-              const isCustomOpen = customPickerOpen[offer.id]
-              const customDates = customDatesByOffer[offer.id] || []
-              const customError = customDateErrors[offer.id]
-              const customSuccess = customDateSuccesses[offer.id]
-              const isSaving = savingCustomDates[offer.id] || false
-              const benefits = Array.isArray(offer.garage?.benefits)
-                ? offer.garage?.benefits ?? []
-                : []
-              const isAcceptedOffer = request.acceptedOfferId === offer.id
-
-              return (
-                <div
-                  key={offer.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleOfferCardClick(offer.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      handleOfferCardClick(offer.id)
-                    }
-                  }}
-                  className={`rounded-xl border transition-colors ${
-                    isExpanded
-                      ? 'border-orange-300 bg-white shadow-sm'
-                      : 'border-gray-200 bg-gray-50 hover:border-orange-200'
-                  } p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${
-                    request.status === ServiceRequestStatus.APPOINTMENT && offer.status === OfferStatus.REJECTED
-                      ? 'opacity-60 pointer-events-none'
-                      : ''
-                  }`}
-                >
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-700">
-                        Προσφορά {index + 1}
-                      </p>
-                      {offer.garage?.companyName && (
-                        <p className="text-base font-semibold text-gray-900 mt-1">
-                          {offer.garage.companyName}
-                        </p>
-                      )}
-                      <p className="text-sm text-gray-600 mt-1">
-                        Περιοχή:{' '}
-                        <span className="font-medium text-gray-900">
-                          {getGarageAreaText(offer.garage?.address)}
-                        </span>
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-600">
-                        {isAcceptedOffer ? 'Τελικό ποσό' : 'Τιμή'}
-                      </p>
-                      <p className="text-lg font-semibold text-gray-900">
-                        {formatCurrency(offer.appointmentPrice ?? offer.offerAmount)}
-                      </p>
-                      {isAcceptedOffer && request.appointmentDate && (
-                        <p className="text-xs text-green-700 mt-1">
-                          Ημ/νία ραντεβού: {formatAvailabilityDate(request.appointmentDate)}
-                        </p>
-                      )}
-                      {offer.estimatedCost && offer.estimatedCost > 0 && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          Εκτιμώμενο κόστος: {formatCurrency(offer.estimatedCost)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {isExpanded && (
-                    <div className="mt-4 space-y-4 border-t border-gray-100 pt-4">
+                return (
+                  <div
+                    key={offer.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleOfferCardClick(offer.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        handleOfferCardClick(offer.id)
+                      }
+                    }}
+                    className={`rounded-xl border transition-all duration-200 ${
+                      isExpanded
+                        ? 'border-primary/30 bg-surface-container-lowest shadow-md'
+                        : 'border-outline-variant/10 bg-surface-container hover:border-primary/20'
+                    } p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                      request.status === ServiceRequestStatus.APPOINTMENT && offer.status === OfferStatus.REJECTED
+                        ? 'opacity-50 pointer-events-none'
+                        : ''
+                    }`}
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-800">
-                          Παροχές Εργασίας
+                        <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
+                          Προσφορά {index + 1}
                         </p>
-                        {benefits.length > 0 ? (
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {benefits.map((benefit, benefitIndex) => (
-                              <span
-                                key={`${offer.id}-benefit-${benefitIndex}`}
-                                className="px-3 py-1 rounded-full border border-orange-100 bg-orange-50 text-sm font-medium text-orange-700"
-                              >
-                                {benefit}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-600 mt-2">
-                            Το συνεργείο δεν έχει δηλώσει παροχές εργασίας για αυτή την προσφορά.
+                        {offer.garage?.companyName && (
+                          <p className="text-base font-bold text-on-surface mt-1">
+                            {offer.garage.companyName}
+                          </p>
+                        )}
+                        <p className="text-sm text-on-surface-variant mt-1 flex items-center gap-1">
+                          <Icon name="location_on" size="sm" />
+                          {getGarageAreaText(offer.garage?.address)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
+                          {isAcceptedOffer ? 'Τελικό ποσό' : 'Τιμή'}
+                        </p>
+                        <p className="text-xl font-black text-on-surface">
+                          {formatCurrency(offer.appointmentPrice ?? offer.offerAmount)}
+                        </p>
+                        {isAcceptedOffer && request.appointmentDate && (
+                          <p className="text-xs font-bold text-green-700 mt-1 flex items-center gap-1 justify-end">
+                            <Icon name="event_available" size="sm" className="text-green-600" />
+                            {formatAvailabilityDate(request.appointmentDate)}
+                          </p>
+                        )}
+                        {offer.estimatedCost && offer.estimatedCost > 0 && (
+                          <p className="text-xs text-on-surface-variant mt-1">
+                            Εκτιμώμενο: {formatCurrency(offer.estimatedCost)}
                           </p>
                         )}
                       </div>
+                    </div>
 
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-gray-800">
-                          Διαθεσιμότητα συνεργείου
-                        </p>
-                        {offer.offerNumber && (
-                          <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                            {offer.offerNumber}
-                          </span>
-                        )}
-                      </div>
-
-                      {availabilityDates.length > 0 ? (
-                        <div className="space-y-3">
-                          <p className="text-sm text-gray-600">
-                            Επιλέξτε μία από τις διαθέσιμες ημερομηνίες του συνεργείου.
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {availabilityDates.map((date) => (
-                              <button
-                                key={date}
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation()
-                                  handleSelectOfferDate(offer.id, date)
-                                }}
-                                className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors duration-200 ${
-                                  selectedDate === date
-                                    ? 'bg-orange-500 border-orange-500 text-white shadow-sm'
-                                    : 'bg-white border-gray-200 text-gray-700 hover:border-orange-300 hover:text-orange-600'
-                                }`}
-                              >
-                                {formatAvailabilityDate(date)}
-                              </button>
-                            ))}
-                          </div>
-                          {selectedDate && (
-                            <div className="mt-2 p-3 bg-orange-50 border border-orange-100 rounded-lg text-sm text-orange-800">
-                              Έχετε επιλέξει:{' '}
-                              <span className="font-semibold text-orange-900">
-                                {formatAvailabilityDate(selectedDate)}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-600">
-                          Το συνεργείο δεν έχει δηλώσει ακόμη διαθέσιμες ημερομηνίες για την προσφορά αυτή.
-                        </p>
-                      )}
-
-                      {(offer.clientAvailabilityDates?.length || 0) > 0 && !isCustomOpen && (
+                    {isExpanded && (
+                      <div className="mt-4 space-y-4 border-t border-outline-variant/10 pt-4">
+                        {/* Benefits */}
                         <div>
-                          <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-                            Ημερομηνίες που προτείνατε ({offer.clientAvailabilityDates?.length})
-                          </h4>
-                          <div className="flex flex-wrap gap-2">
-                            {(offer.clientAvailabilityDates || [])
-                              .slice()
-                              .sort()
-                              .map((date) => (
+                          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mb-2">
+                            Παροχές Εργασίας
+                          </p>
+                          {benefits.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {benefits.map((benefit, benefitIndex) => (
                                 <span
-                                  key={date}
-                                  className="px-3 py-1 bg-gray-100 border border-gray-200 text-gray-700 rounded-full text-sm"
+                                  key={`${offer.id}-benefit-${benefitIndex}`}
+                                  className="px-3 py-1 rounded-full bg-primary/10 text-sm font-bold text-primary"
                                 >
-                                  {formatAvailabilityDate(date)}
+                                  {benefit}
                                 </span>
                               ))}
-                          </div>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-on-surface-variant">
+                              Το συνεργείο δεν έχει δηλώσει παροχές εργασίας για αυτή την προσφορά.
+                            </p>
+                          )}
                         </div>
-                      )}
 
-                      {hasAvailability && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              handleToggleCustomPicker(offer.id)
-                            }}
-                            className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors duration-200 ${
-                              isCustomOpen
-                                ? 'bg-orange-100 border-orange-400 text-orange-700 shadow-sm'
-                                : 'bg-white border-dashed border-gray-300 text-gray-600 hover:border-orange-300 hover:text-orange-600'
-                            }`}
-                          >
-                            {isCustomOpen ? 'Κλείσιμο επιλογής ημερομηνιών' : 'Προσθέστε δικές σας ημερομηνίες'}
-                          </button>
+                        {/* Availability header */}
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
+                            Διαθεσιμότητα συνεργείου
+                          </p>
+                          {offer.offerNumber && (
+                            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
+                              {offer.offerNumber}
+                            </span>
+                          )}
+                        </div>
 
-                          {isCustomOpen && (
-                            <div className="space-y-4">
-                              <p className="text-sm text-gray-600">
-                                Επιλέξτε έως 5 ημερομηνίες (Δευτέρα - Παρασκευή) που σας εξυπηρετούν. Θα ενημερώσουμε το συγκεκριμένο συνεργείο.
-                              </p>
-                              <div className="flex justify-center">
-                                <DayPicker
-                                  mode="multiple"
-                                  selected={customDates}
-                                  onSelect={(dates) => handleCustomDateSelect(offer.id, dates)}
-                                  locale={el}
-                                  disabled={[
-                                    { before: addDays(new Date(), 1) },
-                                    (date) => isWeekend(date),
-                                    { after: addWeeks(new Date(), 2) }
-                                  ]}
-                                  fromDate={addDays(new Date(), 1)}
-                                  toDate={addWeeks(new Date(), 2)}
-                                  className="border rounded-lg p-4"
-                                  modifiersClassNames={{
-                                    selected: 'bg-orange-500 text-white hover:bg-orange-600',
-                                    today: 'font-bold text-orange-600'
-                                  }}
-                                  styles={{
-                                    root: { color: '#111111' },
-                                    caption_label: { color: '#111111', fontWeight: 600 },
-                                    nav_button: { color: '#111111' },
-                                    head_cell: { color: '#111111' },
-                                    day: { color: '#111111' },
-                                    day_disabled: { color: '#d1d5db' },
-                                    day_outside: { color: '#d1d5db' }
-                                  }}
-                                />
-                              </div>
-
-                              {customError && (
-                                <div className="bg-red-50 border border-red-100 text-red-700 text-sm rounded-lg p-3">
-                                  {customError}
-                                </div>
-                              )}
-
-                              {customDates.length > 0 && (
-                                <div className="p-3 bg-orange-50 border border-orange-100 rounded-lg">
-                                  <h5 className="text-sm font-medium text-orange-900 mb-2">
-                                    Επιλεγμένες ημερομηνίες ({customDates.length}/5)
-                                  </h5>
-                                  <div className="flex flex-wrap gap-2">
-                                    {customDates
-                                      .slice()
-                                      .sort((a, b) => a.getTime() - b.getTime())
-                                      .map((date, customIndex) => (
-                                        <span
-                                          key={`${date.getTime()}-${customIndex}`}
-                                          className="px-3 py-1 bg-orange-500 text-white rounded-full text-sm"
-                                        >
-                                          {formatCustomDateLabel(date)}
-                                        </span>
-                                      ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              <div className="flex flex-wrap gap-3">
+                        {/* Availability dates */}
+                        {availabilityDates.length > 0 ? (
+                          <div className="space-y-3">
+                            <p className="text-sm text-on-surface-variant">
+                              Επιλέξτε μία από τις διαθέσιμες ημερομηνίες του συνεργείου.
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {availabilityDates.map((date) => (
                                 <button
+                                  key={date}
                                   type="button"
                                   onClick={(event) => {
                                     event.stopPropagation()
-                                    handleSaveCustomDates(offer)
+                                    handleSelectOfferDate(offer.id, date)
                                   }}
-                                  disabled={isSaving || customDates.length === 0}
-                                  className={`${styles.btnPrimary} ${
-                                    isSaving || customDates.length === 0 ? 'opacity-60 cursor-not-allowed' : ''
+                                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all duration-200 ${
+                                    selectedDate === date
+                                      ? 'bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-lg shadow-primary/20'
+                                      : 'bg-surface-container border border-outline-variant/20 text-on-surface hover:border-primary/30'
                                   }`}
                                 >
-                                  {isSaving ? 'Αποστολή...' : 'Αποστολή προτεινόμενων ημερομηνιών'}
+                                  {formatAvailabilityDate(date)}
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation()
-                                    handleClearCustomDates(offer.id)
-                                  }}
-                                  className={styles.btnSecondary}
-                                >
-                                  Καθαρισμός επιλογών
-                                </button>
-                              </div>
-
-                              {customSuccess && (
-                                <div className="bg-green-50 border border-green-100 text-green-800 text-sm rounded-lg p-3">
-                                  {customSuccess}
-                                </div>
-                              )}
+                              ))}
                             </div>
-                          )}
-                        </>
-                      )}
+                            {selectedDate && (
+                              <div className="mt-2 p-3 bg-primary/5 border border-primary/10 rounded-xl text-sm text-on-surface flex items-center gap-2">
+                                <Icon name="event_available" filled size="sm" className="text-primary" />
+                                Έχετε επιλέξει:{' '}
+                                <span className="font-bold text-primary">
+                                  {formatAvailabilityDate(selectedDate)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-on-surface-variant">
+                            Το συνεργείο δεν έχει δηλώσει ακόμη διαθέσιμες ημερομηνίες για την προσφορά αυτή.
+                          </p>
+                        )}
 
-                      {request.status !== ServiceRequestStatus.APPOINTMENT && offer.status !== OfferStatus.ACCEPTED && (
-                        <div className="flex flex-wrap gap-3 pt-2">
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              handleAcceptOffer(offer)
-                            }}
-                            disabled={!canAcceptOffer || acceptingOfferId === offer.id}
-                            className={`${styles.btnPrimary} px-4 py-2 text-sm ${
-                              !canAcceptOffer || acceptingOfferId === offer.id
-                                ? 'opacity-60 cursor-not-allowed'
-                                : ''
-                            }`}
-                          >
-                            {acceptingOfferId === offer.id ? 'Αποδοχή...' : 'Αποδοχή προσφοράς'}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                        {/* Client availability dates already submitted */}
+                        {(offer.clientAvailabilityDates?.length || 0) > 0 && !isCustomOpen && (
+                          <div>
+                            <h4 className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mb-2">
+                              Ημερομηνίες που προτείνατε ({offer.clientAvailabilityDates?.length})
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                              {(offer.clientAvailabilityDates || [])
+                                .slice()
+                                .sort()
+                                .map((date) => (
+                                  <span
+                                    key={date}
+                                    className="px-3 py-1 bg-surface-container border border-outline-variant/10 text-on-surface-variant rounded-full text-sm font-medium"
+                                  >
+                                    {formatAvailabilityDate(date)}
+                                  </span>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Custom date picker toggle */}
+                        {hasAvailability && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                handleToggleCustomPicker(offer.id)
+                              }}
+                              className={`px-4 py-2 rounded-xl border text-sm font-bold transition-all duration-200 ${
+                                isCustomOpen
+                                  ? 'bg-primary/10 border-primary/30 text-primary'
+                                  : 'bg-surface-container-lowest border-dashed border-outline-variant/30 text-on-surface-variant hover:border-primary/30 hover:text-primary'
+                              }`}
+                            >
+                              {isCustomOpen ? 'Κλείσιμο επιλογής ημερομηνιών' : 'Προσθέστε δικές σας ημερομηνίες'}
+                            </button>
+
+                            {isCustomOpen && (
+                              <div className="space-y-4">
+                                <p className="text-sm text-on-surface-variant">
+                                  Επιλέξτε έως 5 ημερομηνίες (Δευτέρα - Παρασκευή) που σας εξυπηρετούν. Θα ενημερώσουμε το συγκεκριμένο συνεργείο.
+                                </p>
+                                <div className="flex justify-center">
+                                  <DayPicker
+                                    mode="multiple"
+                                    selected={customDates}
+                                    onSelect={(dates) => handleCustomDateSelect(offer.id, dates)}
+                                    locale={el}
+                                    disabled={[
+                                      { before: addDays(new Date(), 1) },
+                                      (date) => isWeekend(date),
+                                      { after: addWeeks(new Date(), 2) }
+                                    ]}
+                                    fromDate={addDays(new Date(), 1)}
+                                    toDate={addWeeks(new Date(), 2)}
+                                    className="border border-outline-variant/10 rounded-xl p-4"
+                                    modifiersClassNames={{
+                                      selected: 'bg-primary text-on-primary hover:bg-primary-container',
+                                      today: 'font-bold text-primary'
+                                    }}
+                                    styles={{
+                                      root: { color: '#1b1c1c' },
+                                      caption_label: { color: '#1b1c1c', fontWeight: 700 },
+                                      nav_button: { color: '#1b1c1c' },
+                                      head_cell: { color: '#554434' },
+                                      day: { color: '#1b1c1c' },
+                                      day_disabled: { color: '#d1d5db' },
+                                      day_outside: { color: '#d1d5db' }
+                                    }}
+                                  />
+                                </div>
+
+                                {customError && (
+                                  <div className="bg-red-50 border border-red-100 text-red-700 text-sm rounded-xl p-3 flex items-center gap-2">
+                                    <Icon name="error" size="sm" className="text-red-600" />
+                                    {customError}
+                                  </div>
+                                )}
+
+                                {customDates.length > 0 && (
+                                  <div className="p-3 bg-primary/5 border border-primary/10 rounded-xl">
+                                    <h5 className="text-xs font-bold text-on-surface mb-2">
+                                      Επιλεγμένες ημερομηνίες ({customDates.length}/5)
+                                    </h5>
+                                    <div className="flex flex-wrap gap-2">
+                                      {customDates
+                                        .slice()
+                                        .sort((a, b) => a.getTime() - b.getTime())
+                                        .map((date, customIndex) => (
+                                          <span
+                                            key={`${date.getTime()}-${customIndex}`}
+                                            className="px-3 py-1 bg-gradient-to-br from-primary to-primary-container text-on-primary rounded-full text-sm font-bold"
+                                          >
+                                            {formatCustomDateLabel(date)}
+                                          </span>
+                                        ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                <div className="flex flex-wrap gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      handleSaveCustomDates(offer)
+                                    }}
+                                    disabled={isSaving || customDates.length === 0}
+                                    className={`${styles.btnPrimary} ${
+                                      isSaving || customDates.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+                                    }`}
+                                  >
+                                    {isSaving ? 'Αποστολή...' : 'Αποστολή προτεινόμενων ημερομηνιών'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      handleClearCustomDates(offer.id)
+                                    }}
+                                    className={styles.btnOutline}
+                                  >
+                                    Καθαρισμός επιλογών
+                                  </button>
+                                </div>
+
+                                {customSuccess && (
+                                  <div className="bg-green-50 border border-green-100 text-green-800 text-sm rounded-xl p-3 flex items-center gap-2">
+                                    <Icon name="check_circle" filled size="sm" className="text-green-600" />
+                                    {customSuccess}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {/* Accept offer button */}
+                        {request.status !== ServiceRequestStatus.APPOINTMENT && offer.status !== OfferStatus.ACCEPTED && (
+                          <div className="flex flex-wrap gap-3 pt-2">
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                handleAcceptOffer(offer)
+                              }}
+                              disabled={!canAcceptOffer || acceptingOfferId === offer.id}
+                              className={`${styles.btnPrimary} ${
+                                !canAcceptOffer || acceptingOfferId === offer.id
+                                  ? 'opacity-50 cursor-not-allowed'
+                                  : ''
+                              }`}
+                            >
+                              <Icon name="check_circle" size="sm" />
+                              {acceptingOfferId === offer.id ? 'Αποδοχή...' : 'Αποδοχή προσφοράς'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Status-specific banners */}
+        {request.status === ServiceRequestStatus.APPOINTMENT && (
+          <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+            <div className="flex items-start gap-3">
+              <Icon name="event" filled className="text-blue-600 flex-shrink-0 mt-0.5" size="md" />
+              <div>
+                <h4 className="font-bold text-blue-900 mb-1">Ραντεβού Προγραμματισμένο</h4>
+                <p className="text-sm text-blue-800 mb-3">
+                  Έχετε προγραμματίσει ραντεβού για αυτή την υπηρεσία. Θα επικοινωνήσουμε μαζί σας σύντομα.
+                </p>
+                <div className="flex gap-2">
+                  <button className={`${styles.btnPrimary} text-sm`}>
+                    <Icon name="phone" size="sm" />
+                    Επικοινωνία
+                  </button>
+                  <button className={`${styles.btnOutline} text-sm`}>
+                    <Icon name="location_on" size="sm" />
+                    Τοποθεσία
+                  </button>
                 </div>
-              )
-            })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showWaitingForResponsesBanner && (
+          <div className="bg-primary/5 rounded-xl p-4 border border-primary/10">
+            <div className="flex items-start gap-3">
+              <Icon name="hourglass_top" filled className="text-primary flex-shrink-0 mt-0.5" size="md" />
+              <div>
+                <h4 className="font-bold text-on-surface mb-1">Αναμονή Απαντήσεων</h4>
+                <p className="text-sm text-on-surface-variant">
+                  Το αίτημά σας έχει σταλεί σε συνεργεία. Περιμένετε προσφορές και θα ενημερωθείτε σύντομα.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {request.status === ServiceRequestStatus.IN_PROGRESS && (
+          <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+            <div className="flex items-start gap-3">
+              <Icon name="engineering" filled className="text-blue-600 flex-shrink-0 mt-0.5" size="md" />
+              <div>
+                <h4 className="font-bold text-blue-900 mb-1">Εργασία σε Εξέλιξη</h4>
+                <p className="text-sm text-blue-800">
+                  Η εργασία έχει ξεκινήσει. Θα ενημερωθείτε για την πρόοδο.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {request.status === ServiceRequestStatus.COMPLETED && (
+          <div className="bg-green-50 rounded-xl p-4 border border-green-100">
+            <div className="flex items-start gap-3">
+              <Icon name="check_circle" filled className="text-green-600 flex-shrink-0 mt-0.5" size="md" />
+              <div>
+                <h4 className="font-bold text-green-900 mb-1">Ολοκληρώθηκε</h4>
+                <p className="text-sm text-green-800">
+                  Η εργασία έχει ολοκληρωθεί επιτυχώς. Ευχαριστούμε που επιλέξατε τις υπηρεσίες μας!
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {request.status === ServiceRequestStatus.CANCELLED && (
+          <div className="bg-red-50 rounded-xl p-4 border border-red-100">
+            <div className="flex items-start gap-3">
+              <Icon name="cancel" filled className="text-red-600 flex-shrink-0 mt-0.5" size="md" />
+              <div>
+                <h4 className="font-bold text-red-900 mb-1">Ακυρώθηκε</h4>
+                <p className="text-sm text-red-800">
+                  Αυτό το αίτημα έχει ακυρωθεί. Εάν χρειάζεστε βοήθεια, μπορείτε να δημιουργήσετε νέο αίτημα.
+                </p>
+              </div>
+            </div>
           </div>
         )}
       </div>
-
-      {/* Status-specific information */}
-      {request.status === ServiceRequestStatus.APPOINTMENT && (
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <h4 className="font-medium text-blue-900 mb-2">📅 Ραντεβού Προγραμματισμένο</h4>
-          <p className="text-sm text-blue-800 mb-3">
-            Έχετε προγραμματίσει ραντεβού για αυτή την υπηρεσία. Θα επικοινωνήσουμε μαζί σας σύντομα.
-          </p>
-          <div className="flex gap-2">
-            <button className={`${styles.btnPrimary} text-sm px-4 py-2`}>
-              <HiPhone className="h-4 w-4 mr-2" />
-              Επικοινωνία
-            </button>
-            <button className={`${styles.btnSecondary} text-sm px-4 py-2`}>
-              <HiMapPin className="h-4 w-4 mr-2" />
-              Τοποθεσία
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showWaitingForResponsesBanner && (
-        <div className="bg-yellow-50 p-4 rounded-lg">
-          <h4 className="font-medium text-yellow-900 mb-2">⏳ Αναμονή Απαντήσεων</h4>
-          <p className="text-sm text-yellow-800">
-            Το αίτημά σας έχει σταλεί σε συνεργεία. Περιμένετε προσφορές και θα ενημερωθείτε σύντομα.
-          </p>
-        </div>
-      )}
-
-      {request.status === ServiceRequestStatus.IN_PROGRESS && (
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <h4 className="font-medium text-blue-900 mb-2">🔧 Εργασία σε Εξέλιξη</h4>
-          <p className="text-sm text-blue-800">
-            Η εργασία έχει ξεκινήσει. Θα ενημερωθείτε για την πρόοδο.
-          </p>
-        </div>
-      )}
-
-      {request.status === ServiceRequestStatus.COMPLETED && (
-        <div className="bg-green-50 p-4 rounded-lg">
-          <h4 className="font-medium text-green-900 mb-2">✅ Ολοκληρώθηκε</h4>
-          <p className="text-sm text-green-800">
-            Η εργασία έχει ολοκληρωθεί επιτυχώς. Ευχαριστούμε που επιλέξατε τις υπηρεσίες μας!
-          </p>
-        </div>
-      )}
-
-      {request.status === ServiceRequestStatus.CANCELLED && (
-        <div className="bg-red-50 p-4 rounded-lg">
-          <h4 className="font-medium text-red-900 mb-2">❌ Ακυρώθηκε</h4>
-          <p className="text-sm text-red-800">
-            Αυτό το αίτημα έχει ακυρωθεί. Εάν χρειάζεστε βοήθεια, μπορείτε να δημιουργήσετε νέο αίτημα.
-          </p>
-        </div>
-      )}
-    </div>
 
       <Modal
         isOpen={isVehicleModalOpen}
@@ -1199,7 +1246,8 @@ export default function RequestDetailsContent({
       >
         <div className="space-y-6">
           {vehicleFormError && (
-            <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center gap-2">
+              <Icon name="error" filled size="sm" className="text-red-600" />
               {vehicleFormError}
             </div>
           )}

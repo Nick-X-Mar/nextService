@@ -17,35 +17,39 @@ export default function Badge({
   className = '',
   dot = false
 }: BadgeProps) {
-  // Base classes
-  const baseClasses = 'inline-flex items-center font-medium rounded-full'
-  
-  // Variant classes
+  const baseClasses = 'inline-flex items-center font-bold rounded-full uppercase tracking-wider'
+
   const variantClasses = {
-    default: 'bg-gray-100 text-gray-800',
-    primary: 'bg-orange-100 text-orange-800',
-    secondary: 'bg-gray-100 text-gray-800',
+    default: 'bg-surface-container text-on-surface-variant',
+    primary: 'bg-primary/10 text-primary',
+    secondary: 'bg-secondary-container text-on-secondary-container',
     success: 'bg-green-100 text-green-800',
-    warning: 'bg-yellow-100 text-yellow-800',
+    warning: 'bg-amber-100 text-amber-800',
     danger: 'bg-red-100 text-red-800',
     info: 'bg-blue-100 text-blue-800'
   }
-  
-  // Size classes
+
   const sizeClasses = {
-    sm: 'px-2 py-0.5 text-xs',
-    md: 'px-2.5 py-1 text-sm',
-    lg: 'px-3 py-1.5 text-base'
+    sm: 'px-2 py-0.5 text-[10px]',
+    md: 'px-2.5 py-1 text-[11px]',
+    lg: 'px-3 py-1.5 text-xs'
   }
-  
-  // Dot classes
-  const dotClasses = dot ? 'w-2 h-2 rounded-full mr-1.5' : ''
-  
+
+  const dotColorClasses = {
+    default: 'bg-on-surface-variant',
+    primary: 'bg-primary',
+    secondary: 'bg-secondary',
+    success: 'bg-green-600',
+    warning: 'bg-amber-600',
+    danger: 'bg-red-600',
+    info: 'bg-blue-600'
+  }
+
   const badgeClasses = `${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`
-  
+
   return (
     <span className={badgeClasses}>
-      {dot && <span className={`${dotClasses} ${variantClasses[variant].split(' ')[0]}`}></span>}
+      {dot && <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${dotColorClasses[variant]}`}></span>}
       {children}
     </span>
   )

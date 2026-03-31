@@ -21,60 +21,28 @@ export default function SegmentedControl({
   variant = 'default'
 }: SegmentedControlProps) {
   const sizeClasses = {
-    sm: 'py-1 px-3 text-xs',
-    md: 'py-2 px-4 text-sm',
+    sm: 'py-1.5 px-3 text-xs',
+    md: 'py-2.5 px-4 text-sm',
     lg: 'py-3 px-6 text-base'
   }
 
-  const containerSizeClasses = {
-    sm: 'p-0.5',
-    md: 'p-1',
-    lg: 'p-1.5'
-  }
+  const getButtonClasses = (isSelected: boolean) => {
+    const base = `flex-1 font-bold transition-all duration-200 ${sizeClasses[size]} active:scale-95`
 
-  const getVariantClasses = (isSelected: boolean) => {
-    if (variant === 'orange') {
-      return isSelected
-        ? 'bg-orange-500 text-white shadow-sm'
-        : 'text-gray-900 hover:text-orange-600'
+    if (isSelected) {
+      return `${base} bg-primary text-on-primary shadow-md shadow-primary/20 rounded-xl`
     }
-    
-    // Default variant
-    return isSelected
-      ? 'bg-blue-500 text-white shadow-sm'
-      : 'text-gray-900 hover:text-blue-600'
-  }
-
-  const getButtonClasses = (index: number, isSelected: boolean) => {
-    const baseClasses = `flex-1 font-medium transition-all duration-200 ${sizeClasses[size]} ${getVariantClasses(isSelected)}`
-    
-    if (options.length === 2) {
-      // Two options - rounded corners on outer edges only
-      if (index === 0) {
-        return `${baseClasses} rounded-l-md`
-      } else {
-        return `${baseClasses} rounded-r-md`
-      }
-    } else {
-      // Multiple options - rounded corners on outer edges only
-      if (index === 0) {
-        return `${baseClasses} rounded-l-md`
-      } else if (index === options.length - 1) {
-        return `${baseClasses} rounded-r-md`
-      } else {
-        return baseClasses
-      }
-    }
+    return `${base} text-secondary hover:text-on-surface rounded-xl`
   }
 
   return (
-    <div className={`flex items-center justify-center border border-gray-300 rounded-md focus-within:outline-none focus-within:ring-2 focus-within:ring-orange-400 focus-within:border-orange-400 bg-white w-full ${containerSizeClasses[size]} ${className}`}>
-      {options.map((option, index) => (
+    <div className={`flex items-center bg-surface-container-highest rounded-xl p-1 w-full ${className}`}>
+      {options.map((option) => (
         <button
           key={option.value}
           type="button"
           onClick={() => onChange(option.value)}
-          className={getButtonClasses(index, value === option.value)}
+          className={getButtonClasses(value === option.value)}
         >
           {option.label}
         </button>

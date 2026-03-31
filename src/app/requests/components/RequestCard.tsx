@@ -1,7 +1,6 @@
 'use client'
 
-import { HiEye, HiCalendar, HiChatBubbleLeftRight } from 'react-icons/hi2'
-import { styles } from '../../../styles/styles'
+import Icon from '@/components/ui/Icon'
 import { ServiceRequestStatus } from '../../../types/statuses'
 import type { ServiceRequest } from '../../../types/requests'
 
@@ -16,13 +15,13 @@ interface RequestCardProps {
   disabled?: boolean
 }
 
-export default function RequestCard({ 
-  request, 
-  onViewDetails, 
+export default function RequestCard({
+  request,
+  onViewDetails,
   onChatClick,
   hasGarageMessages = false,
-  getStatusIcon, 
-  getStatusText, 
+  getStatusIcon,
+  getStatusText,
   getStatusColor,
   disabled = false
 }: RequestCardProps) {
@@ -30,25 +29,46 @@ export default function RequestCard({
     const date = new Date(dateString)
     return date.toLocaleDateString('el-GR', {
       day: '2-digit',
-      month: '2-digit',
+      month: 'long',
       year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
     })
   }
 
   const getCategoryText = (category: string) => {
     switch (category) {
       case 'service':
-        return 'Συντήρηση'
+        return 'Γενικό Service'
       case 'fanopeia':
         return 'Φανοποιεία'
       case 'oils':
         return 'Λάδια & Υγρά'
       case 'disk':
         return 'Δισκόφρενα'
+      case 'kteo':
+        return 'ΚΤΕΟ'
+      case 'elastika':
+        return 'Ελαστικά'
       default:
         return category
+    }
+  }
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'service':
+        return 'build'
+      case 'fanopeia':
+        return 'car_crash'
+      case 'oils':
+        return 'oil_barrel'
+      case 'disk':
+        return 'album'
+      case 'kteo':
+        return 'verified'
+      case 'elastika':
+        return 'tire_repair'
+      default:
+        return 'miscellaneous_services'
     }
   }
 
@@ -62,140 +82,105 @@ export default function RequestCard({
     })
   }
 
+  const estimatedCost = request.status === ServiceRequestStatus.APPOINTMENT
+    ? request.appointmentPrice
+    : request.estimatedCost
+
   return (
-    <div 
-      className={`${styles.card} transition-all duration-200 ${
-        disabled 
-          ? 'opacity-60 cursor-not-allowed bg-gray-50' 
-          : 'hover:shadow-lg hover:border-orange-300 cursor-pointer'
+    <div
+      className={`bg-surface-container-lowest rounded-xl p-5 shadow-[0_-4px_24px_rgba(27,28,28,0.02)] border border-outline-variant/10 transition-all duration-200 ${
+        disabled
+          ? 'opacity-50 cursor-not-allowed'
+          : 'hover:shadow-2xl hover:shadow-on-surface/5 cursor-pointer active:scale-[0.99]'
       }`}
       onClick={disabled ? undefined : onViewDetails}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          {/* Header with status */}
-          <div className="flex items-center gap-3 mb-3">
-            {getStatusIcon(request.status)}
-            <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(request.status)}`}>
-              {getStatusText(request.status)}
-            </span>
-          </div>
-
-          {/* Vehicle info */}
+      {/* Header: Status + Cost */}
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex flex-col gap-1">
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider w-fit ${getStatusColor(request.status)}`}>
+            {getStatusText(request.status)}
+          </span>
+          {/* Vehicle title */}
           {request.vehicle && (
-            <div className="mb-3">
-              <h3 className="font-semibold text-gray-900">
-                {request.vehicle.brand} {request.vehicle.model} ({request.vehicle.modelYear})
-              </h3>
-              <p className="text-sm text-gray-600">
-                Κατηγορία: {getCategoryText(request.category)}
-              </p>
-            </div>
+            <h3 className="text-lg font-bold leading-tight">
+              {request.vehicle.brand} {request.vehicle.model} {request.vehicle.modelYear || ''}
+            </h3>
           )}
-
-          {/* Description */}
-          <p className="text-gray-700 mb-3 line-clamp-2">
-            {request.description}
-          </p>
-
-          {/* Appointment Date - Prominent (only for appointments) */}
-          {request.status === ServiceRequestStatus.APPOINTMENT && request.appointmentDate && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-              <div className="flex items-center gap-2">
-                <HiCalendar className="h-5 w-5 text-blue-600" />
-                <div>
-                  <p className="text-sm font-medium text-blue-900">
-                    Ημερομηνία Ραντεβού
-                  </p>
-                  <p className="text-lg font-bold text-blue-700">
-                    {formatAppointmentDate(request.appointmentDate)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Details row */}
-          <div className="flex items-center justify-between text-sm text-gray-500">
-            <div className="flex items-center gap-4">
-              {request.status !== ServiceRequestStatus.APPOINTMENT && (
-                <>
-                  <div className="flex items-center gap-1">
-                    <HiCalendar className="h-4 w-4" />
-                    <span>{formatDate(request.createdAt)}</span>
-                  </div>
-                  {request.estimatedCost && (
-                    <div className="flex items-center gap-1">
-                      <span className="font-medium text-green-600">
-                        €{request.estimatedCost}
-                      </span>
-                    </div>
-                  )}
-                </>
-              )}
-              {request.photoUrls.length > 0 && (
-                <div className="flex items-center gap-1">
-                  <span className="text-blue-600">
-                    {request.photoUrls.length} φωτογραφί{request.photoUrls.length === 1 ? 'α' : 'ες'}
-                  </span>
-                </div>
-              )}
-            </div>
+          {/* Date */}
+          <div className="flex items-center gap-1 text-on-surface-variant/70 mt-1">
+            <Icon name="calendar_month" size="sm" />
+            <span className="text-[10px] font-medium">{formatDate(request.createdAt)}</span>
           </div>
         </div>
+        {estimatedCost && (
+          <div className="text-right">
+            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">ΕΚΤΙΜΗΣΗ</p>
+            <p className="text-xl font-bold text-tertiary">{estimatedCost}€</p>
+          </div>
+        )}
+      </div>
 
-        {/* Price and Action Buttons */}
-        <div className="ml-4 flex flex-col items-end gap-3">
-          {/* Price - Right aligned (only for appointments) */}
-          {request.status === ServiceRequestStatus.APPOINTMENT && typeof request.appointmentPrice === 'number' && (
-            <div className="text-right">
-              <div className="text-2xl font-bold text-orange-600">
-                €{request.appointmentPrice}
-              </div>
-            </div>
-          )}
+      {/* Category */}
+      <div className="flex items-center gap-2 mb-3">
+        <Icon name={getCategoryIcon(request.category)} size="sm" className="text-primary" />
+        <span className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">
+          {getCategoryText(request.category)}
+        </span>
+      </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-col gap-2">
+      {/* Appointment date */}
+      {request.status === ServiceRequestStatus.APPOINTMENT && request.appointmentDate && (
+        <div className="bg-blue-50 rounded-xl p-3 mb-3 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+            <Icon name="event" filled className="text-blue-600" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-blue-600">
+              Ημερομηνία Ραντεβού
+            </p>
+            <p className="text-base font-bold text-blue-900">
+              {formatAppointmentDate(request.appointmentDate)}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Description */}
+      {request.description && (
+        <p className="text-sm text-secondary leading-relaxed mb-6 line-clamp-2">
+          {request.description}
+        </p>
+      )}
+
+      {/* Action buttons */}
+      <div className="flex gap-3 border-t border-surface-container pt-4">
+        {onChatClick && (
           <button
             onClick={(e) => {
               e.stopPropagation()
-              if (!disabled) {
-                onViewDetails()
-              }
+              if (hasGarageMessages) onChatClick()
             }}
-            disabled={disabled}
-            className={`${styles.btnSecondary} flex items-center gap-2 px-3 py-2 text-sm ${
-              disabled ? 'opacity-50 cursor-not-allowed' : ''
+            disabled={!hasGarageMessages}
+            className={`flex-1 px-4 py-2.5 text-xs font-bold uppercase tracking-widest rounded-lg transition-colors ${
+              hasGarageMessages
+                ? 'text-on-surface-variant bg-surface-variant hover:bg-surface-container-high'
+                : 'text-on-surface-variant/40 bg-surface-container cursor-not-allowed'
             }`}
           >
-            <HiEye className="h-4 w-4" />
-            Λεπτομέρειες
+            Συνομιλία
           </button>
-          
-          {/* Show chat button for requests that might have chat activity */}
-          {(request.status === ServiceRequestStatus.PENDING || request.status === ServiceRequestStatus.IN_PROGRESS) && onChatClick && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                if (hasGarageMessages) {
-                  onChatClick()
-                }
-              }}
-              disabled={!hasGarageMessages}
-              className={`flex items-center gap-2 px-3 py-2 text-sm ${
-                hasGarageMessages 
-                  ? `${styles.btnPrimary} cursor-pointer` 
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              }`}
-              title={!hasGarageMessages ? 'Δεν υπάρχουν μηνύματα από συνεργεία' : ''}
-            >
-              <HiChatBubbleLeftRight className="h-4 w-4" />
-              Συνομιλία
-            </button>
-          )}
-          </div>
-        </div>
+        )}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            if (!disabled) onViewDetails()
+          }}
+          disabled={disabled}
+          className="flex-1 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-on-primary bg-gradient-to-br from-primary to-primary-container rounded-lg shadow-sm active:scale-95 transition-all"
+        >
+          Λεπτομέρειες
+        </button>
       </div>
     </div>
   )

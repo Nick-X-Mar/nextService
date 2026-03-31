@@ -2,11 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { HiArrowLeft, HiChatBubbleLeftRight, HiClock, HiCalendar, HiUser, HiEye } from 'react-icons/hi2'
-import { styles } from '../../../../../styles/styles'
+import Icon from '@/components/ui/Icon'
 import { useToast } from '../../../../../hooks/useToast'
-import ClientNavigation from '../../../../../components/ClientNavigation'
-import SegmentedControl from '../../../../../components/SegmentedControl'
 import { ServiceRequestStatus } from '../../../../../types/statuses'
 import type { ServiceRequest } from '../../../../../types/requests'
 
@@ -52,20 +49,21 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
   const [appointments, setAppointments] = useState<ChatRequest[]>([])
   const [unsuccessfulConversations, setUnsuccessfulConversations] = useState<UnsuccessfulConversation[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const loadPendingConversations = async () => {
     try {
       const response = await fetch(`/api/requests?clientId=${clientId}`)
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch requests')
       }
 
       const result = await response.json()
-      
+
       if (result.success) {
         // Filter requests with status PENDING that have messages
-        const pendingRequests = result.requests.filter((request: ChatRequest) => 
+        const pendingRequests = result.requests.filter((request: ChatRequest) =>
           request.status === ServiceRequestStatus.PENDING
         )
 
@@ -85,7 +83,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
                       timestamp: lastMessage.timestamp,
                       sender: lastMessage.senderType || lastMessage.sender || 'garage'
                     },
-                    unreadCount: chatData.messages.filter((msg: any) => 
+                    unreadCount: chatData.messages.filter((msg: any) =>
                       (msg.senderType === 'garage' || msg.sender === 'garage') && !msg.read
                     ).length
                   }
@@ -112,17 +110,17 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
   const loadAppointments = async () => {
     try {
       const response = await fetch(`/api/requests?clientId=${clientId}`)
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch requests')
       }
 
       const result = await response.json()
-      
+
       if (result.success) {
         // Filter requests with status APPOINTMENT that have appointmentDate
-        const appointmentRequests = result.requests.filter((request: ChatRequest) => 
-          request.status === ServiceRequestStatus.APPOINTMENT && 
+        const appointmentRequests = result.requests.filter((request: ChatRequest) =>
+          request.status === ServiceRequestStatus.APPOINTMENT &&
           request.appointmentDate
         )
 
@@ -142,7 +140,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
                       timestamp: lastMessage.timestamp,
                       sender: lastMessage.senderType || lastMessage.sender || 'garage'
                     },
-                    unreadCount: chatData.messages.filter((msg: any) => 
+                    unreadCount: chatData.messages.filter((msg: any) =>
                       (msg.senderType === 'garage' || msg.sender === 'garage') && !msg.read
                     ).length
                   }
@@ -157,7 +155,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
 
         // Sort: Future appointments first (ascending), then past appointments (descending)
         const now = new Date()
-        const future = requestsWithMessages.filter((r) => 
+        const future = requestsWithMessages.filter((r) =>
           r.appointmentDate && new Date(r.appointmentDate) >= now
         ).sort((a, b) => {
           const dateA = new Date(a.appointmentDate || '').getTime()
@@ -165,7 +163,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
           return dateA - dateB
         })
 
-        const past = requestsWithMessages.filter((r) => 
+        const past = requestsWithMessages.filter((r) =>
           r.appointmentDate && new Date(r.appointmentDate) < now
         ).sort((a, b) => {
           const dateA = new Date(a.appointmentDate || '').getTime()
@@ -187,16 +185,16 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
   const loadUnsuccessfulConversations = async () => {
     try {
       const response = await fetch(`/api/requests?clientId=${clientId}`)
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch requests')
       }
 
       const result = await response.json()
-      
+
       if (result.success) {
         // Filter requests with acceptedOfferId
-        const requestsWithAcceptedOffer = result.requests.filter((request: ChatRequest) => 
+        const requestsWithAcceptedOffer = result.requests.filter((request: ChatRequest) =>
           request.acceptedOfferId
         )
 
@@ -214,7 +212,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
               if (!offersData.success || !offersData.offers) return
 
               // Find the accepted offer's garageId
-              const acceptedOffer = offersData.offers.find((offer: any) => 
+              const acceptedOffer = offersData.offers.find((offer: any) =>
                 offer.id === request.acceptedOfferId
               )
               if (!acceptedOffer) return
@@ -229,7 +227,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
               if (!garagesData.success || !garagesData.garages) return
 
               // Filter garages that have messages but their offer was not accepted
-              const unsuccessfulGarages = garagesData.garages.filter((garage: any) => 
+              const unsuccessfulGarages = garagesData.garages.filter((garage: any) =>
                 garage.id !== acceptedGarageId
               )
 
@@ -241,12 +239,12 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
                     const messagesData = await messagesResponse.json()
                     if (messagesData.messages) {
                       // Filter messages from this garage
-                      const garageMessages = messagesData.messages.filter((msg: any) => 
+                      const garageMessages = messagesData.messages.filter((msg: any) =>
                         msg.senderType === 'garage' && msg.senderId === garage.id
                       )
 
                       if (garageMessages.length > 0) {
-                        const lastMessage = garageMessages.sort((a: any, b: any) => 
+                        const lastMessage = garageMessages.sort((a: any, b: any) =>
                           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
                         )[0]
 
@@ -264,7 +262,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
                             timestamp: lastMessage.timestamp,
                             sender: lastMessage.senderType || 'garage'
                           },
-                          unreadCount: garageMessages.filter((msg: any) => 
+                          unreadCount: garageMessages.filter((msg: any) =>
                             (msg.senderType === 'garage' || msg.sender === 'garage') && !msg.read
                           ).length
                         })
@@ -331,7 +329,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
     const date = new Date(timestamp)
     const now = new Date()
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
-    
+
     if (diffInHours < 24) {
       return date.toLocaleTimeString('el-GR', {
         hour: '2-digit',
@@ -342,57 +340,6 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
         day: '2-digit',
         month: '2-digit'
       })
-    }
-  }
-
-  const getStatusIcon = (status: ServiceRequestStatus) => {
-    switch (status) {
-      case ServiceRequestStatus.APPOINTMENT:
-        return <HiCalendar className="h-5 w-5 text-blue-600" />
-      case ServiceRequestStatus.PENDING:
-        return <HiClock className="h-5 w-5 text-yellow-600" />
-      case ServiceRequestStatus.IN_PROGRESS:
-        return <HiClock className="h-5 w-5 text-blue-600" />
-      case ServiceRequestStatus.COMPLETED:
-        return <HiClock className="h-5 w-5 text-green-600" />
-      case ServiceRequestStatus.CANCELLED:
-        return <HiClock className="h-5 w-5 text-red-600" />
-      default:
-        return <HiClock className="h-5 w-5 text-gray-600" />
-    }
-  }
-
-  const getStatusText = (status: ServiceRequestStatus) => {
-    switch (status) {
-      case ServiceRequestStatus.APPOINTMENT:
-        return 'Ραντεβού'
-      case ServiceRequestStatus.PENDING:
-        return 'Εκκρεμές'
-      case ServiceRequestStatus.IN_PROGRESS:
-        return 'Σε Εξέλιξη'
-      case ServiceRequestStatus.COMPLETED:
-        return 'Ολοκληρωμένο'
-      case ServiceRequestStatus.CANCELLED:
-        return 'Ακυρωμένο'
-      default:
-        return 'Άγνωστο'
-    }
-  }
-
-  const getStatusColor = (status: ServiceRequestStatus) => {
-    switch (status) {
-      case ServiceRequestStatus.APPOINTMENT:
-        return 'bg-blue-100 text-blue-800 border-blue-200'
-      case ServiceRequestStatus.PENDING:
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case ServiceRequestStatus.IN_PROGRESS:
-        return 'bg-blue-100 text-blue-800 border-blue-200'
-      case ServiceRequestStatus.COMPLETED:
-        return 'bg-green-100 text-green-800 border-green-200'
-      case ServiceRequestStatus.CANCELLED:
-        return 'bg-red-100 text-red-800 border-red-200'
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
     }
   }
 
@@ -425,154 +372,117 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
     return new Date(appointmentDate) < new Date()
   }
 
-  const renderConversationCard = (
+  const renderRequestCard = (
     request: ChatRequest | UnsuccessfulConversation,
-    isDisabled: boolean = false,
+    isCompleted: boolean = false,
     garageName?: string
   ) => {
     const isUnsuccessful = 'garageName' in request
     const chatRequest = isUnsuccessful ? request.request : request
     const lastMessage = isUnsuccessful ? request.lastMessage : request.lastMessage
     const unreadCount = isUnsuccessful ? request.unreadCount : request.unreadCount
+    const hasUnread = unreadCount && unreadCount > 0
+
+    // Get thumbnail from photos or photoUrls
+    const thumbnailUrl = chatRequest.photos?.[0]?.s3Url || chatRequest.photoUrls?.[0]
+
+    const vehicleName = chatRequest.vehicle
+      ? `${chatRequest.vehicle.brand} ${chatRequest.vehicle.model}`
+      : 'Αίτημα'
+    const vehicleYear = chatRequest.vehicle?.modelYear || ''
+
+    const isActive = !isCompleted
+    const statusLabel = isActive ? 'ΕΝΕΡΓΟ' : 'ΟΛΟΚΛΗΡΩΘΗΚΕ'
+    const statusClasses = isActive
+      ? 'bg-primary/10 text-primary'
+      : 'bg-secondary-container text-on-secondary-container'
 
     return (
-      <div 
+      <div
         key={isUnsuccessful ? `${request.requestId}-${request.garageId}` : request.id}
-        className={`${styles.card} transition-all duration-200 ${
-          isDisabled 
-            ? 'opacity-50 cursor-not-allowed' 
-            : 'hover:shadow-lg hover:border-orange-300 cursor-pointer'
-        }`}
-        onClick={() => !isDisabled && handleChatClick(
-          chatRequest.id, 
+        className={`${
+          isActive
+            ? 'bg-surface-container-lowest border-l-4 border-primary shadow-[0_4px_24px_rgba(27,28,28,0.02)]'
+            : 'bg-surface-container-low border-l-4 border-transparent opacity-80'
+        } p-5 rounded-xl transition-all duration-200 cursor-pointer hover:shadow-md active:scale-[0.99]`}
+        onClick={() => handleChatClick(
+          chatRequest.id,
           isUnsuccessful ? request.garageId : undefined
         )}
       >
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            {/* Header with status and unread count */}
-            <div className="flex items-center gap-3 mb-3">
-              <HiChatBubbleLeftRight className="h-5 w-5 text-orange-600" />
-              {isUnsuccessful && garageName && (
-                <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800 border border-gray-200">
-                  {garageName}
-                </span>
-              )}
-              <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(chatRequest.status)}`}>
-                {getStatusText(chatRequest.status)}
-              </span>
-              {unreadCount && unreadCount > 0 && (
-                <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
-                  {unreadCount} νέα
-                </span>
-              )}
-              {isDisabled && (
-                <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 border border-gray-200">
-                  Παρελθόν
-                </span>
-              )}
-            </div>
-
-            {/* Vehicle info */}
-            {chatRequest.vehicle && (
-              <div className="mb-3">
-                <h3 className="font-semibold text-gray-900">
-                  {chatRequest.vehicle.brand} {chatRequest.vehicle.model} ({chatRequest.vehicle.modelYear})
-                </h3>
-                <p className="text-sm text-gray-600">
-                  Κατηγορία: {getCategoryText(chatRequest.category)}
-                </p>
-              </div>
-            )}
-
-            {/* Description */}
-            <p className="text-gray-700 mb-3 line-clamp-2">
-              {chatRequest.description}
-            </p>
-
-            {/* Appointment Date - Prominent (only for appointments tab) */}
-            {chatRequest.status === ServiceRequestStatus.APPOINTMENT && chatRequest.appointmentDate && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-                <div className="flex items-center gap-2">
-                  <HiCalendar className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <p className="text-sm font-medium text-blue-900">
-                      Ημερομηνία Ραντεβού
-                    </p>
-                    <p className="text-lg font-bold text-blue-700">
-                      {formatAppointmentDate(chatRequest.appointmentDate)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Last message or request details */}
-            {lastMessage ? (
-              <div className="bg-gray-50 rounded-lg p-3 mb-3">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-medium text-gray-500">
-                    {lastMessage.sender === 'client' ? 'Εσείς' : 'Συνεργείο'}
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    {formatLastMessageTime(lastMessage.timestamp)}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-700 line-clamp-2">
-                  {lastMessage.content}
-                </p>
-              </div>
+        <div className="flex items-start gap-4">
+          {/* Vehicle Thumbnail */}
+          <div className="flex-shrink-0">
+            {thumbnailUrl ? (
+              <img
+                src={thumbnailUrl}
+                alt={vehicleName}
+                className={`w-16 h-16 rounded-lg object-cover ${isCompleted ? 'grayscale' : ''}`}
+              />
             ) : (
-              <div className="text-sm text-gray-500 mb-3">
-                Δεν υπάρχουν ακόμα μηνύματα
+              <div className={`w-16 h-16 rounded-lg bg-surface-container flex items-center justify-center ${isCompleted ? 'grayscale' : ''}`}>
+                <Icon name="directions_car" size="lg" className="text-on-surface-variant" />
               </div>
             )}
-
-            {/* Details row */}
-            <div className="flex items-center justify-between text-sm text-gray-500">
-              <div className="flex items-center gap-4">
-                {chatRequest.status !== ServiceRequestStatus.APPOINTMENT && (
-                  <div className="flex items-center gap-1">
-                    <HiCalendar className="h-4 w-4" />
-                    <span>{formatDate(chatRequest.createdAt)}</span>
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
 
-          {/* Price and Chat Button */}
-          <div className="ml-4 flex flex-col items-end gap-3">
-            {/* Price - Right aligned */}
-            {(chatRequest.appointmentPrice || chatRequest.estimatedCost) && (
-              <div className="text-right">
-                <div className="text-2xl font-bold text-orange-600">
-                  €{chatRequest.appointmentPrice || chatRequest.estimatedCost}
-                </div>
-                {chatRequest.status !== ServiceRequestStatus.APPOINTMENT && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    {formatDate(chatRequest.createdAt)}
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            {/* Title Row: Vehicle name + Status badge */}
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <h3 className="font-bold text-lg text-on-surface truncate">
+                  {isUnsuccessful && garageName ? garageName : vehicleName}
+                  {vehicleYear && !isUnsuccessful ? ` ${vehicleYear}` : ''}
+                </h3>
+              </div>
+              <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0 ml-2 ${statusClasses}`}>
+                {statusLabel}
+              </span>
+            </div>
+
+            {/* Service type */}
+            <p className="text-xs text-on-surface-variant uppercase tracking-wide mb-2">
+              {getCategoryText(chatRequest.category)}
+            </p>
+
+            {/* Bottom section: message/offer info + date */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 min-w-0">
+                {lastMessage ? (
+                  <p className={`text-sm truncate ${hasUnread ? 'text-on-surface font-medium' : 'text-on-surface-variant'}`}>
+                    {lastMessage.sender === 'client' ? 'Εσείς: ' : ''}
+                    {lastMessage.content}
+                  </p>
+                ) : (
+                  <p className="text-sm text-on-surface-variant italic">
+                    Αναμονή για προσφορές...
                   </p>
                 )}
               </div>
-            )}
+              <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                {hasUnread && (
+                  <div className="bg-primary text-on-primary text-[10px] font-bold h-5 min-w-5 px-1 rounded-full flex items-center justify-center">
+                    {unreadCount}
+                  </div>
+                )}
+                {lastMessage && (
+                  <span className="text-xs text-on-surface-variant">
+                    {formatLastMessageTime(lastMessage.timestamp)}
+                  </span>
+                )}
+              </div>
+            </div>
 
-            {/* Chat Button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                if (!isDisabled) {
-                  handleChatClick(chatRequest.id, isUnsuccessful ? request.garageId : undefined)
-                }
-              }}
-              disabled={isDisabled}
-              className={`${styles.btnPrimary} flex items-center gap-2 px-4 py-2 text-sm ${
-                isDisabled ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-            >
-              <HiEye className="h-4 w-4" />
-              Άνοιγμα Συνομιλίας
-            </button>
+            {/* Appointment date badge */}
+            {chatRequest.status === ServiceRequestStatus.APPOINTMENT && chatRequest.appointmentDate && (
+              <div className="mt-2 flex items-center gap-1.5 bg-surface-container rounded-lg px-2.5 py-1.5 w-fit">
+                <Icon name="calendar_month" size="sm" className="text-primary" />
+                <span className="text-[11px] font-bold text-on-surface">
+                  {formatAppointmentDate(chatRequest.appointmentDate)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -580,16 +490,17 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
   }
 
   const renderEmptyState = (message: string, description: string) => (
-    <div className="text-center py-12">
-      <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-        <HiChatBubbleLeftRight className="h-12 w-12 text-gray-400" />
+    <div className="text-center py-16">
+      <div className="mx-auto w-20 h-20 bg-surface-container rounded-full flex items-center justify-center mb-5">
+        <Icon name="chat_bubble_outline" size="xl" className="text-on-surface-variant" />
       </div>
-      <h3 className="text-lg font-medium text-gray-900 mb-2">{message}</h3>
-      <p className="text-gray-500 mb-6">{description}</p>
+      <h3 className="text-lg font-bold text-on-surface mb-2">{message}</h3>
+      <p className="text-sm text-on-surface-variant mb-8 max-w-sm mx-auto">{description}</p>
       <button
         onClick={() => router.push(`/requests/${clientId}`)}
-        className={styles.btnPrimary}
+        className="inline-flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded-full font-medium text-sm hover:opacity-90 transition-opacity mx-auto"
       >
+        <Icon name="list_alt" size="sm" />
         Δείτε τα Αιτήματά σας
       </button>
     </div>
@@ -597,11 +508,11 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
 
   if (isLoading) {
     return (
-      <section className="bg-white min-h-screen">
-        <div className={styles.pageCenter}>
-          <div className="text-center">
-            <div className={styles.loadingSpinner}></div>
-            <p className={styles.bodyText}>Φόρτωση συνομιλιών...</p>
+      <section className="min-h-screen bg-surface">
+        <div className="max-w-2xl mx-auto px-4 pt-8 pb-12">
+          <div className="text-center py-20">
+            <div className="animate-spin w-8 h-8 border-3 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-sm text-on-surface-variant">Φόρτωση συνομιλιών...</p>
           </div>
         </div>
       </section>
@@ -609,98 +520,118 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
   }
 
   return (
-    <section className="bg-white min-h-screen">
-      <ClientNavigation clientId={clientId} />
-      <div className={`${styles.container} py-24`}>
-        <div className="text-center mb-8">
-          <h1 className={styles.pageTitle}>
-            <span className={styles.titleHighlight}>Συνομιλιών</span>
+    <section className="min-h-screen bg-surface">
+      <div className="max-w-2xl mx-auto px-4 pt-8 pb-12">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-on-surface">
+            Μηνύματα
           </h1>
-          <p className={`mt-3 max-w-md mx-auto ${styles.bodyText} sm:text-lg md:mt-5 md:text-xl md:max-w-3xl`}>
-            Δείτε όλες τις συνομιλίες σας με τα συνεργεία
-          </p>
+          <button className="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center">
+            <Icon name="tune" size="md" className="text-on-surface-variant" />
+          </button>
         </div>
 
-        <div className="max-w-4xl mx-auto">
-          {/* Tab Control */}
-          <div className="mb-6">
-            <SegmentedControl
-              options={[
-                { value: 'pending', label: 'Εκκρεμείς Συνομιλίες' },
-                { value: 'appointments', label: 'Ραντεβού' },
-                { value: 'unsuccessful', label: 'Απορριφθείσες Προσφορές' }
-              ]}
-              value={activeTab}
-              onChange={(value) => setActiveTab(value as TabType)}
-              variant="orange"
-              className="max-w-2xl mx-auto"
+        {/* Search Bar */}
+        <div className="mb-5">
+          <div className="relative">
+            <Icon name="search" size="md" className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+            <input
+              type="text"
+              placeholder="Αναζήτηση συνομιλιών..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-12 bg-surface-container-highest border-0 rounded-full pl-12 pr-4 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary transition-all"
             />
           </div>
-
-          {/* Tab Content */}
-          {activeTab === 'pending' && (
-            <>
-              {pendingConversations.length > 0 ? (
-                <div className="space-y-4">
-                  {pendingConversations.map((request) => 
-                    renderConversationCard(request, false)
-                  )}
-                </div>
-              ) : (
-                renderEmptyState(
-                  'Δεν υπάρχουν εκκρεμείς συνομιλίες',
-                  'Δεν έχετε ακόμα συνομιλίες σε αναμονή. Όταν ένα συνεργείο απαντήσει στο αίτημά σας, θα εμφανιστεί εδώ.'
-                )
-              )}
-            </>
-          )}
-
-          {activeTab === 'appointments' && (
-            <>
-              {appointments.length > 0 ? (
-                <div className="space-y-4">
-                  {appointments.map((request) => {
-                    const isPast = isPastAppointment(request.appointmentDate)
-                    return renderConversationCard(request, isPast)
-                  })}
-                </div>
-              ) : (
-                renderEmptyState(
-                  'Δεν υπάρχουν ραντεβού',
-                  'Δεν έχετε προγραμματισμένα ραντεβού. Όταν αποδεχτείτε μια προσφορά, θα εμφανιστεί εδώ.'
-                )
-              )}
-            </>
-          )}
-
-          {activeTab === 'unsuccessful' && (
-            <>
-              {unsuccessfulConversations.length > 0 ? (
-                <div className="space-y-4">
-                  {unsuccessfulConversations.map((conversation) => 
-                    renderConversationCard(conversation, false, conversation.garageName)
-                  )}
-                </div>
-              ) : (
-                renderEmptyState(
-                  'Δεν υπάρχουν συνομιλίες που δεν κατέλληξαν σε ραντεβού',
-                  'Όλες οι συνομιλίες σας έχουν οδηγήσει σε ραντεβού ή είναι ακόμα σε αναμονή.'
-                )
-              )}
-            </>
-          )}
-
-          {/* Back Button */}
-          <div className="mt-8 text-center">
-            <button
-              onClick={() => router.push(`/requests/${clientId}`)}
-              className={`inline-flex items-center gap-2 ${styles.linkText} font-medium transition-colors duration-200`}
-            >
-              <HiArrowLeft className="h-4 w-4" />
-              Επιστροφή στα Αιτήματα
-            </button>
-          </div>
         </div>
+
+        {/* Status Filter Chips */}
+        <div className="flex items-center gap-2 mb-6">
+          <button
+            onClick={() => setActiveTab('pending')}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              activeTab === 'pending'
+                ? 'bg-primary text-on-primary'
+                : 'bg-secondary-container text-on-secondary-container'
+            }`}
+          >
+            Όλα
+          </button>
+          <button
+            onClick={() => setActiveTab('appointments')}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              activeTab === 'appointments'
+                ? 'bg-primary text-on-primary'
+                : 'bg-secondary-container text-on-secondary-container'
+            }`}
+          >
+            Ενεργά
+          </button>
+          <button
+            onClick={() => setActiveTab('unsuccessful')}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              activeTab === 'unsuccessful'
+                ? 'bg-primary text-on-primary'
+                : 'bg-secondary-container text-on-secondary-container'
+            }`}
+          >
+            Ολοκληρωμένα
+          </button>
+        </div>
+
+        {/* Request Cards List */}
+        {activeTab === 'pending' && (
+          <>
+            {pendingConversations.length > 0 ? (
+              <div className="space-y-3">
+                {pendingConversations.map((request) =>
+                  renderRequestCard(request, false)
+                )}
+              </div>
+            ) : (
+              renderEmptyState(
+                'Δεν υπάρχουν εκκρεμείς συνομιλίες',
+                'Δεν έχετε ακόμα συνομιλίες σε αναμονή. Όταν ένα συνεργείο απαντήσει στο αίτημά σας, θα εμφανιστεί εδώ.'
+              )
+            )}
+          </>
+        )}
+
+        {activeTab === 'appointments' && (
+          <>
+            {appointments.length > 0 ? (
+              <div className="space-y-3">
+                {appointments.map((request) => {
+                  const isPast = isPastAppointment(request.appointmentDate)
+                  return renderRequestCard(request, isPast)
+                })}
+              </div>
+            ) : (
+              renderEmptyState(
+                'Δεν υπάρχουν ραντεβού',
+                'Δεν έχετε προγραμματισμένα ραντεβού. Όταν αποδεχτείτε μια προσφορά, θα εμφανιστεί εδώ.'
+              )
+            )}
+          </>
+        )}
+
+        {activeTab === 'unsuccessful' && (
+          <>
+            {unsuccessfulConversations.length > 0 ? (
+              <div className="space-y-3">
+                {unsuccessfulConversations.map((conversation) =>
+                  renderRequestCard(conversation, true, conversation.garageName)
+                )}
+              </div>
+            ) : (
+              renderEmptyState(
+                'Δεν υπάρχουν ολοκληρωμένες συνομιλίες',
+                'Όλες οι συνομιλίες σας έχουν οδηγήσει σε ραντεβού ή είναι ακόμα σε αναμονή.'
+              )
+            )}
+          </>
+        )}
       </div>
     </section>
   )

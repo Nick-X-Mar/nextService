@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { SegmentedControl } from '@/components'
 import { styles } from '@/styles/styles'
 import { OfferStatus } from '@/types/statuses'
-import GarageNavigation from '@/components/GarageNavigation'
 import { useAuth } from '@/contexts/AuthContext'
+import Icon from '@/components/ui/Icon'
 import MyOffers from './MyOffers'
 import AvailableRequests from './AvailableRequests'
 import Appointments from './Appointments'
@@ -21,13 +21,13 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
   const { userType, garage: authGarage, isLoading: authLoading } = useAuth()
-  
+
   const [garageData, setGarageData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [counts, setCounts] = useState({ requests: 0, offers: 0, appointments: 0 })
 
   // Determine active tab from URL params, default to 'requests'
-  const activeTab = tabParam === 'offers' ? 'offers' 
+  const activeTab = tabParam === 'offers' ? 'offers'
     : tabParam === 'appointments' ? 'appointments'
     : tabParam === 'settings' ? 'settings'
     : 'requests'
@@ -66,16 +66,16 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
   const loadGarageData = async (garageId: string) => {
     try {
       const response = await fetch(`/api/garage/${garageId}`)
-      
+
       if (!response.ok) {
         if (response.status === 404) {
           throw new Error('Garage not found')
         }
         throw new Error('Failed to load garage data')
       }
-      
+
       const data = await response.json()
-      
+
       if (data.success) {
         setGarageData(data.garage)
       } else {
@@ -111,22 +111,22 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
             const status = offer.status?.toLowerCase()
             return status === OfferStatus.PENDING
           }).length || 0
-          
+
           setCounts(prev => ({ ...prev, offers: offersCount }))
-          
+
           // Count appointments (accepted offers with appointmentDate from today onwards)
           const today = new Date()
           today.setHours(0, 0, 0, 0)
-          
+
           const appointmentsCount = offersData.offers?.filter((offer: any) => {
             const isAccepted = offer.status === 'accepted' || offer.status === 'ACCEPTED'
             if (!isAccepted || !offer.appointmentDate) return false
-            
+
             const appointmentDate = new Date(`${offer.appointmentDate}T00:00:00`)
             appointmentDate.setHours(0, 0, 0, 0)
             return appointmentDate >= today
           }).length || 0
-          
+
           setCounts(prev => ({ ...prev, appointments: appointmentsCount }))
         }
       }
@@ -145,10 +145,10 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-          <p className={styles.bodyText}>Φόρτωση...</p>
+          <div className={styles.loadingSpinner}></div>
+          <p className="text-sm text-secondary mt-2">Φορτωση...</p>
         </div>
       </div>
     )
@@ -156,15 +156,19 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
 
   if (!garageData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <h2 className={`${styles.pageTitle} mb-4`}>Σφάλμα</h2>
-          <p className={styles.bodyText}>Δεν ήταν δυνατή η φόρτωση των δεδομένων του συνεργείου.</p>
+          <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mx-auto mb-4">
+            <Icon name="error" size="lg" className="text-tertiary" />
+          </div>
+          <h2 className="text-2xl font-bold tracking-tight text-on-surface mb-2">Σφαλμα</h2>
+          <p className="text-base text-secondary leading-relaxed mb-6">Δεν ηταν δυνατη η φορτωση των δεδομενων του συνεργειου.</p>
           <button
             onClick={handleLogout}
-            className={`${styles.btnSecondary} mt-4`}
+            className={styles.btnSecondary}
           >
-            Επιστροφή στη Σύνδεση
+            <Icon name="arrow_back" size="sm" />
+            Επιστροφη στη Συνδεση
           </button>
         </div>
       </div>
@@ -173,22 +177,22 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
 
   const renderContent = () => {
     if (!garageData) return null
-    
+
     // Settings tab shows settings component directly
     if (activeTab === 'settings') {
       return <GarageSettings garageData={garageData} onUpdate={setGarageData} />
     }
-    
+
     // Other tabs show unified content with SegmentedControl
     return (
       <>
         {/* SegmentedControl for requests/offers/appointments */}
-        <div className="mb-6">
+        <div className="mb-8">
           <SegmentedControl
             options={[
-              { value: 'requests', label: `Νέα Αιτήματα (${counts.requests})` },
-              { value: 'offers', label: `Προσφορές από Εμένα (${counts.offers})` },
-              { value: 'appointments', label: `Ραντεβού (${counts.appointments})` }
+              { value: 'requests', label: `Αιτηματα (${counts.requests})` },
+              { value: 'offers', label: `Προσφορες (${counts.offers})` },
+              { value: 'appointments', label: `Ραντεβου (${counts.appointments})` }
             ]}
             value={activeTab}
             onChange={handleTabChange}
@@ -207,14 +211,8 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navigation with header integrated */}
-      {garageData && (
-        <GarageNavigation garageId={garageId} companyName={garageData.companyName} />
-      )}
-
-      {/* Main Content */}
-      <div className={`${styles.container} py-8`}>
+    <div className="py-8">
+      <div className={styles.container}>
         {renderContent()}
       </div>
     </div>

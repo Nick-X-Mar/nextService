@@ -26,28 +26,26 @@ export default function Button({
   className = '',
   fullWidth = false
 }: ButtonProps) {
-  // Use design system styles
   const variantClasses = {
     primary: styles.btnPrimary,
     secondary: styles.btnSecondary,
-    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2',
-    success: 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500 px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2',
+    danger: styles.btnDanger,
+    success: 'bg-green-600 text-white hover:bg-green-700 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors duration-200 active:scale-95 flex items-center gap-2',
     outline: styles.btnOutline,
-    ghost: 'text-orange-500 hover:text-orange-600 px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2'
+    ghost: styles.btnGhost,
   }
-  
-  // Size classes (just padding adjustments)
+
   const sizeClasses = {
-    sm: 'px-3 py-1.5',
-    md: '', // Default from design system
-    lg: 'px-6 py-3'
+    sm: 'px-3 py-1.5 text-xs',
+    md: '',
+    lg: 'px-8 py-4 text-base'
   }
-  
-  // Width classes
-  const widthClasses = fullWidth ? 'w-full' : ''
-  
-  const buttonClasses = `${variantClasses[variant]} ${sizeClasses[size]} ${widthClasses} ${className}`
-  
+
+  const widthClasses = fullWidth ? 'w-full justify-center' : ''
+  const disabledClasses = disabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
+
+  const buttonClasses = `${variantClasses[variant]} ${sizeClasses[size]} ${widthClasses} ${disabledClasses} ${className}`
+
   return (
     <button
       type={type}

@@ -2,10 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { HiBuildingOffice2, HiMapPin, HiPhone, HiEnvelope, HiWrenchScrewdriver, HiCheckCircle } from 'react-icons/hi2'
+import Icon from '@/components/ui/Icon'
 import { useToast } from '@/hooks/useToast'
 import { styles } from '@/styles/styles'
-import { Input, Card, Button } from '@/components'
 
 interface GarageFormData {
   companyName: string
@@ -27,7 +26,7 @@ export default function RegisterProfessionalPage() {
   })
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
-  
+
   const router = useRouter()
   const { success, error } = useToast()
 
@@ -45,32 +44,32 @@ export default function RegisterProfessionalPage() {
       error('Σφάλμα', 'Η επωνυμία της εταιρείας είναι υποχρεωτική')
       return false
     }
-    
+
     if (!formData.tin.trim()) {
       error('Σφάλμα', 'Ο ΑΦΜ είναι υποχρεωτικός')
       return false
     }
-    
+
     if (!formData.email.trim()) {
       error('Σφάλμα', 'Το email είναι υποχρεωτικό')
       return false
     }
-    
+
     if (!formData.taxAuthority.trim()) {
       error('Σφάλμα', 'Η ΔΟΥ είναι υποχρεωτική')
       return false
     }
-    
+
     if (!formData.address.trim()) {
       error('Σφάλμα', 'Η διεύθυνση είναι υποχρεωτική')
       return false
     }
-    
+
     if (!formData.mobile.trim()) {
       error('Σφάλμα', 'Ο αριθμός κινητού είναι υποχρεωτικός')
       return false
     }
-    
+
 
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -98,7 +97,7 @@ export default function RegisterProfessionalPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!validateForm()) {
       return
     }
@@ -132,63 +131,72 @@ export default function RegisterProfessionalPage() {
 
   if (isSubmitted) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-full max-w-md mx-auto px-4">
-          <Card className="py-8 px-6 text-center">
-            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-6">
-              <HiCheckCircle className="h-8 w-8 text-green-600" />
+      <div className="min-h-screen bg-surface flex items-center justify-center px-4">
+        <div className="w-full max-w-md">
+          <div className="bg-surface-container-lowest rounded-2xl p-8 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10 text-center">
+            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-50 mb-6">
+              <Icon name="check_circle" filled className="text-green-600" size="xl" />
             </div>
-            
-            <h2 className={`${styles.pageTitle} mb-4`}>
+
+            <h2 className="text-2xl font-black tracking-tight text-on-surface mb-4">
               Εγγραφή Ολοκληρώθηκε!
             </h2>
-            
-            <p className={`${styles.bodyText} mb-6`}>
-              Η εταιρεία <strong>{formData.companyName}</strong> εγγράφηκε επιτυχώς στο σύστημά μας.
+
+            <p className={`${styles.bodyText} mb-8`}>
+              Η εταιρεία <strong className="text-on-surface">{formData.companyName}</strong> εγγράφηκε επιτυχώς στο σύστημά μας.
               Θα επικοινωνήσουμε μαζί σας σύντομα για να ενεργοποιήσουμε τον λογαριασμό σας.
             </p>
-            
+
             <div className="space-y-3">
-              <Button
+              <button
                 onClick={() => router.push('/')}
-                className="w-full"
-                variant="primary"
+                className={`${styles.btnPrimary} w-full justify-center py-3.5`}
               >
+                <Icon name="home" size="sm" />
                 Επιστροφή στην Αρχική
-              </Button>
-              
-              <Button
-                  onClick={() => {
-                    setIsSubmitted(false)
-                    setFormData({
-                      companyName: '',
-                      tin: '',
-                      email: '',
-                      taxAuthority: '',
-                      address: '',
-                      mobile: ''
-                    })
-                  }}
-                className="w-full"
-                variant="secondary"
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsSubmitted(false)
+                  setFormData({
+                    companyName: '',
+                    tin: '',
+                    email: '',
+                    taxAuthority: '',
+                    address: '',
+                    mobile: ''
+                  })
+                }}
+                className={`${styles.btnOutline} w-full justify-center py-3.5`}
               >
+                <Icon name="add" size="sm" />
                 Νέα Εγγραφή
-              </Button>
+              </button>
             </div>
-          </Card>
+          </div>
         </div>
       </div>
     )
   }
 
+  const formFields: { key: keyof GarageFormData; label: string; icon: string; type: string; placeholder: string; maxLength?: number }[] = [
+    { key: 'companyName', label: 'Επωνυμία Εταιρείας', icon: 'business', type: 'text', placeholder: 'π.χ. ΑΕ Συνεργείο Αυτοκινήτων Παπαδόπουλος' },
+    { key: 'tin', label: 'ΑΦΜ', icon: 'pin', type: 'text', placeholder: 'π.χ. 123456789', maxLength: 9 },
+    { key: 'email', label: 'Email', icon: 'mail', type: 'email', placeholder: 'π.χ. info@company.gr' },
+    { key: 'taxAuthority', label: 'ΔΟΥ', icon: 'account_balance', type: 'text', placeholder: 'π.χ. ΔΟΥ Αθηνών' },
+    { key: 'address', label: 'Διεύθυνση', icon: 'location_on', type: 'text', placeholder: 'π.χ. Λεωφόρος Πατησιών 123, Αθήνα' },
+    { key: 'mobile', label: 'Κινητό Τηλέφωνο', icon: 'phone_iphone', type: 'tel', placeholder: 'π.χ. 6971234567 ή +30 6971234567' },
+  ]
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       {/* Header */}
-      <div className="bg-white shadow-sm">
+      <div className="bg-surface-container-lowest border-b border-outline-variant/10">
         <div className="max-w-4xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className={`${styles.pageTitle} mb-2`}>
+              <h1 className="text-3xl font-black tracking-tight text-on-surface mb-2">
                 Εγγραφή Εταιρείας
               </h1>
               <p className={styles.bodyText}>
@@ -196,8 +204,8 @@ export default function RegisterProfessionalPage() {
               </p>
             </div>
             <div className="hidden md:block">
-              <div className="flex items-center justify-center h-16 w-16 rounded-full bg-blue-100">
-                <HiBuildingOffice2 className="h-8 w-8 text-blue-600" />
+              <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary-container rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
+                <Icon name="business" filled className="text-on-primary" size="lg" />
               </div>
             </div>
           </div>
@@ -206,118 +214,64 @@ export default function RegisterProfessionalPage() {
 
       {/* Form */}
       <div className="max-w-2xl mx-auto px-4 py-8">
-        <Card className="p-8">
+        {/* Requirements Info Card */}
+        <div className="bg-surface-container-low rounded-xl p-5 mb-6 flex items-start gap-3">
+          <Icon name="info" filled className="text-primary mt-0.5" />
+          <div>
+            <p className="text-sm font-bold text-on-surface mb-1">Απαιτούμενα στοιχεία</p>
+            <p className="text-xs text-secondary leading-relaxed">
+              Ολα τα πεδία είναι υποχρεωτικά. Ο ΑΦΜ πρέπει να είναι 9 ψηφία και ο αριθμός κινητού σε ελληνικό format.
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-surface-container-lowest rounded-2xl p-8 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10">
           <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Basic Information */}
-            <div className="space-y-6">
-              <div className="flex items-center space-x-3 mb-6">
-                <HiBuildingOffice2 className="h-6 w-6 text-blue-600" />
-                <h2 className={`${styles.sectionTitle}`}>
-                  Βασικές Πληροφορίες
-                </h2>
+            {/* Section Header */}
+            <div className="flex items-center gap-3 pb-4 border-b border-outline-variant/10">
+              <div className="w-10 h-10 bg-surface-container rounded-lg flex items-center justify-center">
+                <Icon name="business" filled className="text-primary" />
               </div>
-
-              <div>
-                <label className={`${styles.label} block mb-2`}>
-                  Επωνυμία Εταιρείας *
-                </label>
-                <Input
-                  type="text"
-                  value={formData.companyName}
-                  onChange={(value) => handleInputChange('companyName', value)}
-                  placeholder="π.χ. ΑΕ Συνεργείο Αυτοκινήτων Παπαδόπουλος"
-                  required
-                  disabled={isLoading}
-                />
-              </div>
-
-              <div>
-                <label className={`${styles.label} block mb-2`}>
-                  ΑΦΜ *
-                </label>
-                <Input
-                  type="text"
-                  value={formData.tin}
-                  onChange={(value) => handleInputChange('tin', value)}
-                  placeholder="π.χ. 123456789"
-                  required
-                  disabled={isLoading}
-                  maxLength={9}
-                />
-              </div>
-
-              <div>
-                <label className={`${styles.label} block mb-2`}>
-                  Email *
-                </label>
-                <Input
-                  type="email"
-                  value={formData.email}
-                  onChange={(value) => handleInputChange('email', value)}
-                  placeholder="π.χ. info@company.gr"
-                  required
-                  disabled={isLoading}
-                />
-              </div>
-
-              <div>
-                <label className={`${styles.label} block mb-2`}>
-                  ΔΟΥ *
-                </label>
-                <Input
-                  type="text"
-                  value={formData.taxAuthority}
-                  onChange={(value) => handleInputChange('taxAuthority', value)}
-                  placeholder="π.χ. ΔΟΥ Αθηνών"
-                  required
-                  disabled={isLoading}
-                />
-              </div>
-
-              <div>
-                <label className={`${styles.label} block mb-2`}>
-                  Διεύθυνση *
-                </label>
-                <Input
-                  type="text"
-                  value={formData.address}
-                  onChange={(value) => handleInputChange('address', value)}
-                  placeholder="π.χ. Λεωφόρος Πατησιών 123, Αθήνα"
-                  required
-                  disabled={isLoading}
-                />
-              </div>
-
-              <div>
-                <label className={`${styles.label} block mb-2`}>
-                  Κινητό Τηλέφωνο *
-                </label>
-                <Input
-                  type="tel"
-                  value={formData.mobile}
-                  onChange={(value) => handleInputChange('mobile', value)}
-                  placeholder="π.χ. 6971234567 ή +30 6971234567"
-                  required
-                  disabled={isLoading}
-                />
-              </div>
+              <h2 className={styles.sectionTitle}>
+                Βασικές Πληροφορίες
+              </h2>
             </div>
 
+            {/* Form Fields */}
+            <div className="space-y-5">
+              {formFields.map((field) => (
+                <div key={field.key} className="space-y-2">
+                  <label className={`${styles.labelUpper} flex items-center gap-2`}>
+                    <Icon name={field.icon} size="sm" className="text-on-surface-variant" />
+                    {field.label} *
+                  </label>
+                  <input
+                    type={field.type}
+                    value={formData[field.key]}
+                    onChange={(e) => handleInputChange(field.key, e.target.value)}
+                    placeholder={field.placeholder}
+                    required
+                    disabled={isLoading}
+                    maxLength={field.maxLength}
+                    className={`${styles.input} ${isLoading ? 'opacity-50' : ''}`}
+                  />
+                </div>
+              ))}
+            </div>
 
             {/* Submit Button */}
-            <div className="pt-6 border-t border-gray-200">
-              <Button
+            <div className="pt-6 border-t border-outline-variant/10">
+              <button
                 type="submit"
-                variant="primary"
-                size="lg"
-                className="w-full"
-                loading={isLoading}
+                disabled={isLoading}
+                className={`${styles.btnPrimary} w-full justify-center py-4 text-base ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                Εγγραφή Εταιρείας
-              </Button>
+                <Icon name="how_to_reg" size="sm" />
+                {isLoading ? 'Εγγραφή...' : 'Εγγραφή Εταιρείας'}
+              </button>
             </div>
           </form>
-        </Card>
+        </div>
 
         {/* Footer */}
         <div className="mt-8 text-center">
@@ -325,7 +279,7 @@ export default function RegisterProfessionalPage() {
             Έχετε ήδη λογαριασμό;{' '}
             <button
               onClick={() => router.push('/')}
-              className={`font-medium ${styles.linkText}`}
+              className={styles.linkText}
             >
               Επιστροφή στην Αρχική
             </button>

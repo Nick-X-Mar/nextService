@@ -1,8 +1,7 @@
 'use client'
 
-import Card from './Card'
 import { styles } from '@/styles/styles'
-import { HiPencil } from 'react-icons/hi2'
+import Icon from '@/components/ui/Icon'
 
 interface VehicleDetails {
   brand?: string | null
@@ -163,105 +162,101 @@ export default function ServiceVehicleCard({
       : 'Δεν έχει δηλωθεί'
 
   return (
-    <Card className={`p-6 ${className}`}>
-      <div className="mb-4 flex items-start justify-between">
-        <h2 className={`${styles.sectionTitle}`}>{title}</h2>
+    <div className={`bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10 ${className}`}>
+      <div className="mb-5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Icon name="build" size="md" className="text-primary" filled />
+          <p className={styles.labelUpper}>{title}</p>
+        </div>
         {editable && (
           <button
             type="button"
             onClick={onEditClick}
-            className="inline-flex items-center justify-center rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 shadow-sm transition-colors hover:border-orange-300 hover:text-orange-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
+            className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-highest transition-colors"
             aria-label="Επεξεργασία στοιχείων οχήματος"
           >
-            <HiPencil className="h-4 w-4" />
+            <Icon name="edit" size="sm" className="text-on-surface-variant" />
           </button>
         )}
       </div>
 
       {(serviceDescription !== undefined || showCategory) && (
-        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <p className="text-sm text-gray-600">{serviceTitle}</p>
-            <p className="font-medium text-gray-900">{serviceText}</p>
+            <p className={styles.label}>{serviceTitle}</p>
+            <p className="text-sm font-medium text-on-surface mt-1">{serviceText}</p>
           </div>
           {showCategory && (
             <div>
-              <p className="text-sm text-gray-600">Κατηγορία</p>
-              <p className="font-medium text-gray-900">{getCategoryText(category)}</p>
+              <p className={styles.label}>Κατηγορία</p>
+              <p className="text-sm font-medium text-on-surface mt-1">{getCategoryText(category)}</p>
             </div>
           )}
         </div>
       )}
 
       {formattedEstimatedCost && (
-        <div className="mb-6">
-          <p className="text-sm text-gray-600">Εκτιμώμενο Κόστος</p>
-          <p className="font-medium text-gray-900">{formattedEstimatedCost}</p>
+        <div className="mb-5">
+          <p className={styles.label}>Εκτιμώμενο Κόστος</p>
+          <p className="text-sm font-medium text-on-surface mt-1">{formattedEstimatedCost}</p>
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div>
-          <p className="text-sm text-gray-600">Μάρκα</p>
-          <p className="font-medium text-gray-900">{vehicle?.brand || 'Δεν έχει δηλωθεί'}</p>
+      <div className={styles.specGrid}>
+        <div className={styles.specCell}>
+          <p className={styles.specLabel}>Μάρκα</p>
+          <p className={styles.specValue}>{vehicle?.brand || '--'}</p>
         </div>
-        <div>
-          <p className="text-sm text-gray-600">Μοντέλο</p>
-          <p className="font-medium text-gray-900">{vehicle?.model || 'Δεν έχει δηλωθεί'}</p>
+        <div className={styles.specCell}>
+          <p className={styles.specLabel}>Μοντέλο</p>
+          <p className={styles.specValue}>{vehicle?.model || '--'}</p>
         </div>
-        <div>
-          <p className="text-sm text-gray-600">Κυβικά</p>
-          <p className="font-medium text-gray-900">{formatEngineCC(vehicle?.engineCC)}</p>
+        <div className={styles.specCell}>
+          <p className={styles.specLabel}>Κυβικά</p>
+          <p className={styles.specValue}>{formatEngineCC(vehicle?.engineCC)}</p>
         </div>
-        <div>
-          <p className="text-sm text-gray-600">Έτος</p>
-          <p className="font-medium text-gray-900">{modelYearText}</p>
+        <div className={styles.specCell}>
+          <p className={styles.specLabel}>Έτος</p>
+          <p className={styles.specValue}>{modelYearText}</p>
         </div>
-        <div>
-          <p className="text-sm text-gray-600">Καύσιμο</p>
-          <p className="font-medium text-gray-900">{getFuelTypeText(vehicle?.fuelType)}</p>
+        <div className={styles.specCell}>
+          <p className={styles.specLabel}>Καύσιμο</p>
+          <p className={styles.specValue}>{getFuelTypeText(vehicle?.fuelType)}</p>
         </div>
-        <div>
-          <p className="text-sm text-gray-600">Κιβώτιο Ταχυτήτων</p>
-          <p className="font-medium text-gray-900">{getTransmissionText(vehicle?.isAutomatic)}</p>
+        <div className={styles.specCell}>
+          <p className={styles.specLabel}>Κιβώτιο</p>
+          <p className={styles.specValue}>{getTransmissionText(vehicle?.isAutomatic)}</p>
         </div>
-        <div>
-          <p className="text-sm text-gray-600">4x4</p>
-          <p className="font-medium text-gray-900">{getBooleanText(vehicle?.is4x4, 'Όχι')}</p>
+        <div className={styles.specCell}>
+          <p className={styles.specLabel}>4x4</p>
+          <p className={styles.specValue}>{getBooleanText(vehicle?.is4x4, 'Όχι')}</p>
         </div>
-        <div>
-          <p className="text-sm text-gray-600">Turbo</p>
-          <p className="font-medium text-gray-900">{getBooleanText(vehicle?.isTurbo, 'Όχι')}</p>
+        <div className={styles.specCell}>
+          <p className={styles.specLabel}>Turbo</p>
+          <p className={styles.specValue}>{getBooleanText(vehicle?.isTurbo, 'Όχι')}</p>
         </div>
         {vehicle?.vinNumber && (
-          <div>
-            <p className="text-sm text-gray-600">VIN</p>
-            <p className="font-medium text-gray-900">{vehicle.vinNumber}</p>
+          <div className={styles.specCell}>
+            <p className={styles.specLabel}>VIN</p>
+            <p className={`${styles.specValue} text-[10px]`}>{vehicle.vinNumber}</p>
           </div>
         )}
         {vehicle?.engineNumber && (
-          <div>
-            <p className="text-sm text-gray-600">Αρ. Κινητήρα</p>
-            <p className="font-medium text-gray-900">{vehicle.engineNumber}</p>
+          <div className={styles.specCell}>
+            <p className={styles.specLabel}>Αρ. Κινητήρα</p>
+            <p className={`${styles.specValue} text-[10px]`}>{vehicle.engineNumber}</p>
           </div>
         )}
       </div>
 
       {photoCount > 0 && (
-        <div className="mt-6 flex items-center gap-2 text-green-600">
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-              clipRule="evenodd"
-            />
-          </svg>
-          <span className="text-sm font-medium text-green-700">
+        <div className="mt-5 flex items-center gap-2">
+          <Icon name="check_circle" size="sm" className="text-green-600" filled />
+          <span className="text-xs font-bold text-green-700">
             Φωτογραφίες ({photoCount})
           </span>
         </div>
       )}
-    </Card>
+    </div>
   )
 }
-

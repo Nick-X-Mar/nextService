@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card, Button, Input, RequestDetailsPanel } from '@/components'
+import { RequestDetailsPanel } from '@/components'
 import { styles } from '@/styles/styles'
 import { ServiceRequestStatus } from '@/types/statuses'
 import type { ServiceRequest } from '@/types/requests'
 import { useAuth } from '@/contexts/AuthContext'
+import Icon from '@/components/ui/Icon'
 import '@/lib/amplify-config'
 import appSyncService from '@/lib/appsync-service'
 
@@ -32,9 +33,10 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
   const [garageData, setGarageData] = useState<any>(null)
   const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const router = useRouter()
   const isReadOnly = requestData?.status === ServiceRequestStatus.APPOINTMENT
-  
+
   // Subscription refs
   const subscriptionRef = useRef<string | null>(null)
 
@@ -78,39 +80,39 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     if (subscriptionRef.current) {
       appSyncService.unsubscribe(subscriptionRef.current)
     }
-    
+
     // Use request ID + garage ID for unique conversation channel
     const channelName = `request-${requestId}-garage-${garageId}`
     console.log(`[Garage] Subscribing to AppSync channel: ${channelName}`)
-    
+
     try {
       // Connect to AppSync if not already connected
       if (!appSyncService.getConnectionStatus()) {
         await appSyncService.connect()
       }
-      
+
       // Subscribe to the channel
       appSyncService.subscribe(channelName, (newMessage: Message) => {
         console.log('[Garage] Real-time message received:', newMessage)
-        
+
         setMessages(prev => {
           // Prevent duplicate messages
           const exists = prev.some(msg => msg.id === newMessage.id)
           if (exists) return prev
-          
+
           // Add new message and sort by timestamp
-          return [...prev, newMessage].sort((a, b) => 
+          return [...prev, newMessage].sort((a, b) =>
             new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
           )
         })
       })
-      
+
       subscriptionRef.current = channelName
     } catch (error) {
       console.error('[Garage] Error subscribing to AppSync:', error)
     }
   }
-  
+
   // Stop subscription
   const stopSubscription = () => {
     if (subscriptionRef.current) {
@@ -123,7 +125,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
   const loadChatData = async () => {
     try {
       setIsLoading(true)
-      
+
       // Load request data
       const requestResponse = await fetch(`/api/requests/${requestId}`)
       if (requestResponse.ok) {
@@ -150,7 +152,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
           setMessages(messagesResult.messages)
         }
       }
-      
+
       // Start AppSync subscription after loading initial data
       console.log('[Garage] Starting AppSync subscription...')
       await subscribeToMessages()
@@ -166,7 +168,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
 
     try {
       setIsSending(true)
-      
+
       const response = await fetch(`/api/chat/${requestId}/messages`, {
         method: 'POST',
         headers: {
@@ -185,6 +187,9 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
         if (result.success) {
           // Don't manually add the message - real-time subscription will handle it
           setNewMessage('')
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto'
+          }
         }
       }
     } catch (error) {
@@ -198,6 +203,13 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSendMessage()
+    }
+  }
+
+  const handleTextareaInput = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px'
     }
   }
 
@@ -220,11 +232,41 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     }
   }
 
+  const formatMessageTime = (timestamp: string) => {
+    return new Date(timestamp).toLocaleTimeString('el-GR', {
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  const getDateSeparator = (timestamp: string) => {
+    const date = new Date(timestamp)
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    if (date.toDateString() === today.toDateString()) return 'Σήμερα'
+    if (date.toDateString() === yesterday.toDateString()) return 'Χθες'
+    return date.toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  }
+
+  // Group messages by date
+  const groupedMessages = messages.reduce<{ date: string; messages: Message[] }[]>((groups, message) => {
+    const dateStr = new Date(message.timestamp).toDateString()
+    const lastGroup = groups[groups.length - 1]
+    if (lastGroup && new Date(lastGroup.messages[0].timestamp).toDateString() === dateStr) {
+      lastGroup.messages.push(message)
+    } else {
+      groups.push({ date: dateStr, messages: [message] })
+    }
+    return groups
+  }, [])
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className={styles.pageCenter}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <div className={styles.loadingSpinner}></div>
           <p className={styles.bodyText}>Φόρτωση συνομιλίας...</p>
         </div>
       </div>
@@ -233,133 +275,155 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
 
   if (!requestData || !garageData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className={styles.pageCenter}>
         <div className="text-center">
-          <h2 className={`${styles.pageTitle} mb-4`}>Σφάλμα</h2>
-          <p className={styles.bodyText}>Δεν ήταν δυνατή η φόρτωση των δεδομένων.</p>
-          <Button
-            variant="secondary"
-            onClick={() => router.back()}
-            className="mt-4"
-          >
+          <div className="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center mx-auto mb-4">
+            <Icon name="error" size="lg" className="text-tertiary" />
+          </div>
+          <h2 className={`${styles.sectionTitle} mb-2`}>Σφάλμα</h2>
+          <p className={`${styles.bodyText} mb-6`}>Δεν ήταν δυνατή η φόρτωση των δεδομένων.</p>
+          <button onClick={() => router.back()} className={styles.btnOutline}>
+            <Icon name="arrow_back" size="sm" />
             Επιστροφή
-          </Button>
+          </button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex flex-col h-screen bg-surface">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => router.back()}
-              >
-                ← Επιστροφή
-              </Button>
-              <div>
-                <h1 className={`${styles.pageTitle} text-xl`}>
-                  Συνομιλία με {requestData.client.firstName} {requestData.client.lastName}
-                </h1>
-                <p className={styles.bodyText}>
-                  {requestData.vehicle.brand} {requestData.vehicle.model} - {getCategoryText(requestData.category)}
-                </p>
-              </div>
+      <div className="bg-surface-container-lowest border-b border-outline-variant/10 flex-shrink-0 z-20">
+        <div className="max-w-3xl mx-auto px-5 md:px-8">
+          <div className="flex items-center gap-3 py-3">
+            <button
+              onClick={() => router.back()}
+              className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-highest transition-colors flex-shrink-0"
+            >
+              <Icon name="arrow_back" size="sm" className="text-on-surface" />
+            </button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-base font-bold text-on-surface truncate">
+                {requestData.client?.firstName} {requestData.client?.lastName}
+              </h1>
+              <p className="text-xs text-secondary truncate">
+                {requestData.vehicle?.brand} {requestData.vehicle?.model} -- {getCategoryText(requestData.category)}
+              </p>
             </div>
+            {isReadOnly && (
+              <span className={styles.statusAppointment}>
+                Ραντεβού
+              </span>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Request Context */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <RequestDetailsPanel 
+      {/* Request Context (collapsible) */}
+      <div className="max-w-3xl mx-auto w-full px-5 md:px-8 pt-3 flex-shrink-0">
+        <RequestDetailsPanel
           request={requestData}
           allowEdit={false}
         />
       </div>
 
       {/* Chat Messages */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <Card className="h-96 flex flex-col">
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                <p className={styles.bodyText}>
-                  Δεν υπάρχουν μηνύματα ακόμα. Ξεκινήστε τη συνομιλία!
-                </p>
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-5 md:px-8 py-4">
+          {messages.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center mx-auto mb-4">
+                <Icon name="chat_bubble_outline" size="lg" className="text-secondary" />
               </div>
-            ) : (
-              messages.map((message, index) => {
-                // Debug: Log message data to identify key issues
-                console.log(`[ChatPage] Message ${index}:`, { id: message.id, timestamp: message.timestamp, senderType: message.senderType })
-                
-                // Ensure we have a valid key - use index as fallback if message.id is missing
-                const messageKey = message.id || `message-${index}-${message.timestamp}`
-                return (
-                  <div
-                    key={messageKey}
-                    className={`flex ${message.senderType === 'garage' ? 'justify-end' : 'justify-start'}`}
-                  >
-                  <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                      message.senderType === 'garage'
-                        ? 'bg-orange-500 text-white'
-                        : 'bg-gray-200 text-gray-900'
-                    }`}
-                  >
-                    <p className={styles.bodyText}>{message.message}</p>
-                    <p className={`text-xs mt-1 ${
-                      message.senderType === 'garage' ? 'text-orange-100' : 'text-gray-500'
-                    }`}>
-                      {message.senderName} - {new Date(message.timestamp).toLocaleString('el-GR')}
-                    </p>
-                  </div>
-                </div>
-                )
-              })
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Message Input / Read-only notice */}
-          {isReadOnly ? (
-            <div className="border-t p-4 bg-gray-50">
-              <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800 text-center">
-                Η συνομιλία είναι μόνο για ανάγνωση επειδή έχει προγραμματιστεί ραντεβού για αυτό το αίτημα.
-              </div>
+              <p className="text-sm font-bold text-on-surface mb-1">Δεν υπάρχουν μηνύματα ακόμα</p>
+              <p className="text-xs text-secondary">Ξεκινήστε τη συνομιλία!</p>
             </div>
           ) : (
-            <div className="border-t p-4">
-              <div className="flex space-x-2">
-                <Input
-                  value={newMessage}
-                  onChange={setNewMessage}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Γράψτε το μήνυμά σας..."
-                  className="flex-1"
-                  disabled={isSending}
-                />
-                <Button
-                  variant="primary"
-                  onClick={handleSendMessage}
-                  disabled={!newMessage.trim() || isSending}
-                  loading={isSending}
-                >
-                  Αποστολή
-                </Button>
+            groupedMessages.map((group, groupIndex) => (
+              <div key={groupIndex}>
+                {/* Date Separator */}
+                <div className="flex justify-center my-4">
+                  <span className="text-[10px] uppercase tracking-[0.15em] text-secondary bg-surface-container px-4 py-1 rounded-full">
+                    {getDateSeparator(group.messages[0].timestamp)}
+                  </span>
+                </div>
+
+                {/* Messages in this group */}
+                {group.messages.map((message) => {
+                  const messageKey = message.id || `message-${groupIndex}-${message.timestamp}`
+                  const isGarage = message.senderType === 'garage'
+
+                  return (
+                    <div
+                      key={messageKey}
+                      className={`flex mb-3 ${isGarage ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className={`max-w-[75%] ${
+                        isGarage
+                          ? 'machined-gradient text-white rounded-xl rounded-tr-none'
+                          : 'bg-surface-container-low text-on-surface rounded-xl rounded-tl-none'
+                      } px-4 py-2.5`}>
+                        {!isGarage && (
+                          <p className="text-[10px] font-bold text-primary mb-0.5">{message.senderName}</p>
+                        )}
+                        <p className="text-sm leading-relaxed">{message.message}</p>
+                        <p className={`text-[10px] mt-1 ${
+                          isGarage ? 'text-white/60' : 'text-secondary'
+                        }`}>
+                          {formatMessageTime(message.timestamp)}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            </div>
+            ))
           )}
-        </Card>
+          <div ref={messagesEndRef} />
+        </div>
       </div>
+
+      {/* Message Input / Read-only notice */}
+      {isReadOnly ? (
+        <div className="flex-shrink-0 border-t border-outline-variant/10 bg-surface-container-lowest/80 backdrop-blur-xl">
+          <div className="max-w-3xl mx-auto px-5 md:px-8 py-3">
+            <div className="flex items-center gap-2 justify-center text-sm text-secondary bg-surface-container rounded-xl px-4 py-3">
+              <Icon name="lock" size="sm" className="text-secondary" />
+              <span>Η συνομιλία είναι μόνο για ανάγνωση -- έχει προγραμματιστεί ραντεβού.</span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex-shrink-0 border-t border-outline-variant/10 bg-surface-container-lowest/80 backdrop-blur-xl">
+          <div className="max-w-3xl mx-auto px-5 md:px-8 py-3">
+            <div className="flex items-end gap-2">
+              <textarea
+                ref={textareaRef}
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyDown={handleKeyPress}
+                onInput={handleTextareaInput}
+                placeholder="Γράψτε μήνυμα..."
+                className="flex-1 bg-surface-container-highest border-0 rounded-xl px-4 py-3 text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all resize-none max-h-[120px]"
+                rows={1}
+                disabled={isSending}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!newMessage.trim() || isSending}
+                className="w-10 h-10 rounded-full machined-gradient flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95 shadow-lg shadow-primary/20 flex-shrink-0 mb-0.5"
+              >
+                {isSending ? (
+                  <div className="w-4 h-4 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
+                ) : (
+                  <Icon name="send" size="sm" className="text-on-primary" filled />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
-
-

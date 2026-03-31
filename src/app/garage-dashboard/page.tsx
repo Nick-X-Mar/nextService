@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { styles } from '@/styles/styles'
 
 export default function Page() {
   const router = useRouter()
@@ -23,10 +24,10 @@ export default function Page() {
   }, [router, userType, garage, isLoading])
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className={styles.pageCenter}>
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-        <p className="text-gray-600">Ανακατεύθυνση...</p>
+        <div className={styles.loadingSpinner}></div>
+        <p className={styles.bodyText}>Ανακατεύθυνση...</p>
       </div>
     </div>
   )

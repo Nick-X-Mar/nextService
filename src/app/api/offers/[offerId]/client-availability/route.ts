@@ -11,10 +11,10 @@ const docClient = DynamoDBDocumentClient.from(client)
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { offerId: string } }
+  { params }: { params: Promise<{ offerId: string }> }
 ) {
   try {
-    const { offerId } = params
+    const { offerId } = await params
 
     if (!offerId) {
       return NextResponse.json(

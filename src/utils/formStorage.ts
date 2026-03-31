@@ -17,6 +17,7 @@ export interface ServiceFormData {
   fuelType: 'petrol' | 'diesel' | ''
   isAutomatic: boolean
   is4x4: boolean
+  isTurbo: boolean
   engineNumber: string
   estimatedPrice: number | null
   // Original vehicle tracking (for detecting changes)
@@ -75,6 +76,7 @@ export const loadFormData = (): ServiceFormData => {
     fuelType: '',
     isAutomatic: false,
     is4x4: false,
+    isTurbo: false,
     engineNumber: '',
     estimatedPrice: null,
     originalVehicleId: undefined,

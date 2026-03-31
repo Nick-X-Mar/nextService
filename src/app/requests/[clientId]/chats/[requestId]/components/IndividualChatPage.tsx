@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { HiArrowLeft, HiChatBubbleLeftRight, HiUser, HiPaperAirplane, HiPhoto } from 'react-icons/hi2'
+import Icon from '@/components/ui/Icon'
 import { styles } from '../../../../../../styles/styles'
 import { useToast } from '../../../../../../hooks/useToast'
-import ClientNavigation from '../../../../../../components/ClientNavigation'
+// Navigation handled by AppShell
 import { RequestDetailsPanel } from '../../../../../../components'
 import { ServiceRequestStatus } from '../../../../../../types/statuses'
 import type { ServiceRequest } from '../../../../../../types/requests'
@@ -39,7 +39,7 @@ interface IndividualChatPageProps {
 export default function IndividualChatPage({ clientId, requestId }: IndividualChatPageProps) {
   const router = useRouter()
   const { showToast } = useToast()
-  
+
   const [garages, setGarages] = useState<Garage[]>([])
   const [selectedGarage, setSelectedGarage] = useState<Garage | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -48,7 +48,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   const [sending, setSending] = useState(false)
   const [requestDetails, setRequestDetails] = useState<ServiceRequest | null>(null)
   const isReadOnly = requestDetails?.status === ServiceRequestStatus.APPOINTMENT
-  
+
   const subscriptionRef = useRef<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -114,49 +114,49 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
     if (subscriptionRef.current) {
       appSyncService.unsubscribe(subscriptionRef.current)
     }
-    
+
     const channelName = `request-${requestId}-garage-${garageId}`
     console.log(`[Client] Subscribing to AppSync channel: ${channelName}`)
-    
+
     try {
       // Connect to AppSync if not already connected
       if (!appSyncService.getConnectionStatus()) {
         await appSyncService.connect()
       }
-      
+
       // Subscribe to the channel
       appSyncService.subscribe(channelName, (newMessage: ChatMessage) => {
         console.log('[Client] Real-time message received:', newMessage)
-        
+
         setMessages(prev => {
           console.log('[Client] setMessages - prev messages:', prev)
           console.log('[Client] setMessages - newMessage:', newMessage)
-          
+
           // Prevent duplicate messages
           const exists = prev.some(msg => msg.id === newMessage.id)
           console.log('[Client] setMessages - message exists:', exists)
-          
+
           if (exists) {
             console.log('[Client] setMessages - message already exists, not adding')
             return prev
           }
-          
+
           // Add new message and sort by timestamp
-          const newMessages = [...prev, newMessage].sort((a, b) => 
+          const newMessages = [...prev, newMessage].sort((a, b) =>
             new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
           )
           console.log('[Client] setMessages - new messages array:', newMessages)
           return newMessages
         })
       })
-      
+
       subscriptionRef.current = channelName
     } catch (error) {
       console.error('[Client] Error subscribing to AppSync:', error)
       showToast({ type: 'error', title: 'Σφάλμα στη σύνδεση για πραγματικό χρόνο' })
     }
   }
-  
+
   // Stop subscription
   const stopSubscription = () => {
     if (subscriptionRef.current) {
@@ -313,14 +313,12 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
 
   if (loading) {
     return (
-      <section className="bg-white min-h-screen">
-        <ClientNavigation clientId={clientId} />
-        <div className={`${styles.container} py-24`}>
-          <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-400 mx-auto mb-4"></div>
-              <p className="text-base text-gray-600">Φόρτωση συνομιλιών...</p>
-            </div>
+      <section className="min-h-screen bg-surface">
+
+        <div className={styles.pageCenter}>
+          <div className="text-center">
+            <div className={styles.loadingSpinner}></div>
+            <p className={styles.bodyText}>Φόρτωση συνομιλιών...</p>
           </div>
         </div>
       </section>
@@ -328,24 +326,12 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   }
 
   return (
-    <section className="bg-white min-h-screen">
-      <ClientNavigation clientId={clientId} />
-      <div className={`${styles.container} py-24`}>
-        <div className="flex items-center gap-4 mb-6">
-          <button
-            onClick={() => router.push(`/requests/${clientId}/chats`)}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <HiArrowLeft className="h-5 w-5" />
-            <span className="text-sm font-medium">Πίσω</span>
-          </button>
-          <h1 className="text-2xl font-bold text-gray-900">Συνομιλία</h1>
-        </div>
-
+    <section className="min-h-screen bg-surface">
+      <div className="px-5 max-w-4xl mx-auto pt-4 pb-8">
         {/* Request and Car Details */}
         {requestDetails && (
           <div className="mb-6">
-            <RequestDetailsPanel 
+            <RequestDetailsPanel
               request={requestDetails}
               allowEdit={true}
               onUpdate={(updatedRequest) => {
@@ -356,72 +342,92 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="flex h-[600px]">
+        <div className="bg-surface-container-lowest rounded-2xl shadow-[0_4px_24px_rgba(27,28,28,0.06)] border border-outline-variant/10 overflow-hidden">
+          <div className="flex h-[calc(100vh-280px)] min-h-[500px]">
             {/* Sidebar with garages */}
-            <div className="w-80 border-r border-gray-200 bg-gray-50">
-              <div className="p-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Συνεργεία</h2>
+            <div className="w-80 border-r border-outline-variant/10 bg-surface flex flex-col">
+              <div className="p-4 border-b border-outline-variant/10">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => router.push(`/requests/${clientId}/chats`)}
+                    className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container transition-colors"
+                  >
+                    <Icon name="arrow_back" size="md" className="text-on-surface" />
+                  </button>
+                  <h2 className="text-base font-bold text-on-surface">Συνεργεία</h2>
+                </div>
               </div>
-              
-              <div className="overflow-y-auto h-full">
+
+              <div className="overflow-y-auto flex-1">
                 {garages.length === 0 ? (
-                  <div className="p-4 text-center text-gray-500">
-                    <HiChatBubbleLeftRight className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm">Δεν υπάρχουν συνομιλίες</p>
+                  <div className="p-6 text-center">
+                    <div className="w-14 h-14 bg-surface-container rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Icon name="chat_bubble_outline" size="lg" className="text-outline" />
+                    </div>
+                    <p className="text-sm text-secondary">Δεν υπάρχουν συνομιλίες</p>
                   </div>
                 ) : (
-                  <div className="p-2">
+                  <div className="p-2 space-y-1">
                     {garages.map((garage) => (
                       <button
                         key={garage.id}
                         onClick={() => handleGarageSelect(garage)}
-                        className={`w-full p-3 rounded-lg text-left transition-colors mb-2 ${
+                        className={`w-full p-3 rounded-xl text-left transition-all duration-200 ${
                           selectedGarage?.id === garage.id
-                            ? 'bg-orange-100 border border-orange-200'
-                            : 'hover:bg-gray-100'
+                            ? 'bg-primary/10 border border-primary/20'
+                            : 'hover:bg-surface-container-low border border-transparent'
                         }`}
                       >
                         <div className="flex items-center gap-3">
                           {/* Garage Avatar */}
-                          <div className="flex-shrink-0">
+                          <div className="relative flex-shrink-0">
                             {garage.logoUrl ? (
                               <img
                                 src={garage.logoUrl}
                                 alt={garage.companyName}
-                                className="w-10 h-10 rounded-full object-cover"
+                                className="w-11 h-11 rounded-full object-cover"
                               />
                             ) : (
-                              <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center">
-                                <span className="text-white font-semibold text-sm">
+                              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary to-primary-container flex items-center justify-center">
+                                <span className="text-on-primary font-bold text-xs">
                                   {getGarageInitials(garage.companyName)}
                                 </span>
                               </div>
                             )}
+                            {/* Online dot */}
+                            {garage.hasUnreadMessages && (
+                              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-surface rounded-full" />
+                            )}
                           </div>
-                          
+
                           {/* Garage Info */}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <h3 className="text-sm font-medium text-gray-900 truncate">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <h3 className={`text-sm truncate ${
+                                garage.hasUnreadMessages ? 'font-bold text-on-surface' : 'font-medium text-on-surface'
+                              }`}>
                                 {garage.companyName}
                               </h3>
-                              {garage.hasUnreadMessages && (
-                                <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center font-bold">
-                                  !
+                              {garage.lastMessageTime && (
+                                <span className="text-[10px] text-secondary ml-2 flex-shrink-0">
+                                  {formatTime(garage.lastMessageTime)}
                                 </span>
                               )}
                             </div>
-                            {garage.lastMessage && (
-                              <p className="text-xs text-gray-500 truncate mt-1">
-                                {garage.lastMessage}
-                              </p>
-                            )}
-                            {garage.lastMessageTime && (
-                              <p className="text-xs text-gray-400 mt-1">
-                                {formatTime(garage.lastMessageTime)}
-                              </p>
-                            )}
+                            <div className="flex items-center justify-between">
+                              {garage.lastMessage && (
+                                <p className={`text-xs truncate ${
+                                  garage.hasUnreadMessages ? 'text-on-surface font-medium' : 'text-secondary'
+                                }`}>
+                                  {garage.lastMessage}
+                                </p>
+                              )}
+                              {garage.hasUnreadMessages && (
+                                <div className="bg-primary text-on-primary text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center flex-shrink-0 ml-2">
+                                  !
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </button>
@@ -432,71 +438,90 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
             </div>
 
             {/* Main chat area */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col bg-surface-container-low/50">
               {selectedGarage ? (
                 <>
                   {/* Chat header */}
-                  <div className="p-4 border-b border-gray-200 bg-white">
+                  <div className="px-5 py-3.5 border-b border-outline-variant/10 bg-surface-container-lowest">
                     <div className="flex items-center gap-3">
-                      {selectedGarage.logoUrl ? (
-                        <img
-                          src={selectedGarage.logoUrl}
-                          alt={selectedGarage.companyName}
-                          className="w-8 h-8 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center">
-                          <span className="text-white font-semibold text-xs">
-                            {getGarageInitials(selectedGarage.companyName)}
-                          </span>
-                        </div>
-                      )}
+                      {/* Mobile back button (hidden on desktop since sidebar is visible) */}
+                      <button
+                        onClick={() => router.push(`/requests/${clientId}/chats`)}
+                        className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container transition-colors md:hidden"
+                      >
+                        <Icon name="arrow_back" size="md" className="text-on-surface" />
+                      </button>
+                      <div className="relative">
+                        {selectedGarage.logoUrl ? (
+                          <img
+                            src={selectedGarage.logoUrl}
+                            alt={selectedGarage.companyName}
+                            className="w-10 h-10 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary-container flex items-center justify-center">
+                            <span className="text-on-primary font-bold text-xs">
+                              {getGarageInitials(selectedGarage.companyName)}
+                            </span>
+                          </div>
+                        )}
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-surface-container-lowest rounded-full" />
+                      </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900">{selectedGarage.companyName}</h3>
-                        <p className="text-sm text-gray-500">Συνεργείο</p>
+                        <h3 className="text-sm font-bold text-on-surface">{selectedGarage.companyName}</h3>
+                        <p className="text-[11px] text-green-600 font-medium">Online</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Messages */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
                     {messages.length === 0 ? (
-                      <div className="text-center text-gray-500 py-8">
-                        <HiChatBubbleLeftRight className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                        <p>Δεν υπάρχουν μηνύματα ακόμα</p>
-                        <p className="text-sm mt-2">Ξεκινήστε τη συνομιλία!</p>
+                      <div className="text-center py-16">
+                        <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mx-auto mb-4">
+                          <Icon name="chat_bubble_outline" size="xl" className="text-outline" />
+                        </div>
+                        <p className="text-sm font-medium text-on-surface mb-1">Δεν υπάρχουν μηνύματα ακόμα</p>
+                        <p className="text-xs text-secondary">Ξεκινήστε τη συνομιλία!</p>
                       </div>
                     ) : (
                       messages.map((message, index) => {
                         // Debug: Log message data to identify key issues
                         console.log(`[IndividualChatPage] Message ${index}:`, { id: message.id, timestamp: message.timestamp, senderType: message.senderType })
-                        
+
                         const isClient = message.senderType === 'client'
-                        const showDate = index === 0 || 
+                        const showDate = index === 0 ||
                           formatDate(message.timestamp) !== formatDate(messages[index - 1].timestamp)
-                        
+
                         // Ensure we have a valid key - use index as fallback if message.id is missing
                         const messageKey = message.id || `message-${index}-${message.timestamp}`
-                        
+
                         return (
                           <div key={messageKey}>
                             {showDate && (
-                              <div className="text-center text-xs text-gray-500 py-2">
-                                {formatDate(message.timestamp)}
+                              <div className="flex justify-center my-4">
+                                <span className="text-[10px] uppercase tracking-[0.15em] text-secondary bg-surface-container px-4 py-1 rounded-full">
+                                  {formatDate(message.timestamp)}
+                                </span>
                               </div>
                             )}
                             <div className={`flex ${isClient ? 'justify-end' : 'justify-start'}`}>
-                              <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                                isClient 
-                                  ? 'bg-orange-500 text-white' 
-                                  : 'bg-gray-100 text-gray-900'
+                              <div className={`max-w-[75%] lg:max-w-[60%] px-4 py-2.5 ${
+                                isClient
+                                  ? 'machined-gradient text-white rounded-xl rounded-tr-none'
+                                  : 'bg-surface-container-low text-on-surface rounded-xl rounded-tl-none'
                               }`}>
-                                <p className="text-sm">{message.message}</p>
-                                <p className={`text-xs mt-1 ${
-                                  isClient ? 'text-orange-100' : 'text-gray-500'
-                                }`}>
-                                  {formatTime(message.timestamp)}
-                                </p>
+                                <p className="text-sm leading-relaxed">{message.message}</p>
+                                <div className={`flex items-center gap-1 mt-1 ${isClient ? 'justify-end' : 'justify-start'}`}>
+                                  <p className={`text-[10px] ${
+                                    isClient ? 'text-white/70' : 'text-secondary'
+                                  }`}>
+                                    {formatTime(message.timestamp)}
+                                  </p>
+                                  {isClient && (
+                                    <Icon name="done_all" size="sm" className="text-white/70" />
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -509,32 +534,50 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
 
                   {/* Message input / Read-only notice */}
                   {isReadOnly ? (
-                    <div className="p-4 border-t border-gray-200 bg-gray-50">
-                      <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800 text-center">
-                        Η συνομιλία είναι μόνο για ανάγνωση επειδή έχει προγραμματιστεί ραντεβού για αυτό το αίτημα.
+                    <div className="px-5 py-3 border-t border-outline-variant/10 bg-surface-container-lowest/80 backdrop-blur-sm">
+                      <div className="rounded-xl bg-surface-container px-4 py-3 flex items-center gap-3">
+                        <Icon name="lock" size="sm" className="text-secondary" />
+                        <p className="text-xs text-secondary">
+                          Η συνομιλία είναι μόνο για ανάγνωση επειδή έχει προγραμματιστεί ραντεβού για αυτό το αίτημα.
+                        </p>
                       </div>
                     </div>
                   ) : (
-                    <div className="p-4 border-t border-gray-200 bg-white">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newMessage}
-                          onChange={(e) => setNewMessage(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                          placeholder="Γράψτε το μήνυμά σας..."
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                          disabled={sending}
-                        />
+                    <div className="px-4 py-3 border-t border-outline-variant/10 bg-surface-container-lowest/80 backdrop-blur-sm">
+                      <div className="flex items-end gap-2">
+                        {/* Attachment button */}
+                        <button className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors flex-shrink-0 mb-0.5">
+                          <Icon name="add" size="md" className="text-on-surface-variant" />
+                        </button>
+
+                        {/* Text input */}
+                        <div className="flex-1">
+                          <textarea
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault()
+                                sendMessage()
+                              }
+                            }}
+                            placeholder="Γράψτε μήνυμα..."
+                            rows={1}
+                            className="w-full bg-surface-container-low border-0 rounded-2xl px-4 py-2.5 text-sm font-medium text-on-surface placeholder:text-outline focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all resize-none max-h-24"
+                            disabled={sending}
+                          />
+                        </div>
+
+                        {/* Send button */}
                         <button
                           onClick={sendMessage}
                           disabled={!newMessage.trim() || sending}
-                          className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                          className="w-10 h-10 rounded-full machined-gradient flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95 shadow-lg shadow-primary/20 flex-shrink-0 mb-0.5"
                         >
                           {sending ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
                           ) : (
-                            <HiPaperAirplane className="h-4 w-4" />
+                            <Icon name="send" filled size="sm" className="text-white" />
                           )}
                         </button>
                       </div>
@@ -542,10 +585,13 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                   )}
                 </>
               ) : (
-                <div className="flex-1 flex items-center justify-center text-gray-500">
+                <div className="flex-1 flex items-center justify-center">
                   <div className="text-center">
-                    <HiChatBubbleLeftRight className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                    <p>Επιλέξτε ένα συνεργείο για να ξεκινήσετε τη συνομιλία</p>
+                    <div className="w-20 h-20 bg-surface-container rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Icon name="chat_bubble_outline" size="xl" className="text-outline" />
+                    </div>
+                    <p className="text-sm font-medium text-on-surface mb-1">Επιλέξτε ένα συνεργείο</p>
+                    <p className="text-xs text-secondary">για να ξεκινήσετε τη συνομιλία</p>
                   </div>
                 </div>
               )}

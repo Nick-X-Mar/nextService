@@ -3,11 +3,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { styles } from '../../../../styles/styles'
-import ClientNavigation from '../../../../components/ClientNavigation'
+// Navigation handled by AppShell
 import UserInfoSection from './UserInfoSection'
 import VehiclesSection from './VehiclesSection'
 import { useToast } from '../../../../hooks/useToast'
 import { useAuth } from '../../../../contexts/AuthContext'
+import Icon from '@/components/ui/Icon'
 
 interface Client {
   id: string
@@ -50,7 +51,7 @@ interface ProfilePageProps {
 export default function ProfilePage({ clientId }: ProfilePageProps) {
   const router = useRouter()
   const { success, error } = useToast()
-  const { client, refreshClient } = useAuth()
+  const { client, refreshClient, logout } = useAuth()
   const [clientData, setClientData] = useState<Client | null>(null)
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -145,6 +146,7 @@ export default function ProfilePage({ clientId }: ProfilePageProps) {
           await refreshClient(clientId)
           return true
         }
+        return false
       } else {
         const errorData = await response.json()
         error('Σφάλμα', errorData.error || 'Δεν ήταν δυνατή η αποθήκευση')
@@ -177,6 +179,7 @@ export default function ProfilePage({ clientId }: ProfilePageProps) {
           success('Επιτυχία', 'Τα στοιχεία οχήματος αποθηκεύτηκαν επιτυχώς')
           return true
         }
+        return false
       } else {
         const errorData = await response.json()
         error('Σφάλμα', errorData.error || 'Δεν ήταν δυνατή η αποθήκευση')
@@ -191,8 +194,7 @@ export default function ProfilePage({ clientId }: ProfilePageProps) {
 
   if (isLoading) {
     return (
-      <section className="bg-white min-h-screen">
-        <ClientNavigation clientId={clientId} />
+      <section className={styles.pageWrapper}>
         <div className={styles.pageCenter}>
           <div className="text-center">
             <div className={styles.loadingSpinner}></div>
@@ -205,10 +207,12 @@ export default function ProfilePage({ clientId }: ProfilePageProps) {
 
   if (!isValidClientId || !clientData) {
     return (
-      <section className="bg-white min-h-screen">
-        <ClientNavigation clientId={clientId} />
+      <section className={styles.pageWrapper}>
         <div className={styles.pageCenter}>
           <div className="text-center">
+            <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mx-auto mb-4">
+              <Icon name="person_off" className="text-on-surface-variant" size="lg" />
+            </div>
             <p className={styles.bodyText}>Δεν βρέθηκαν στοιχεία</p>
           </div>
         </div>
@@ -216,31 +220,69 @@ export default function ProfilePage({ clientId }: ProfilePageProps) {
     )
   }
 
+  const displayName = [clientData.firstName, clientData.lastName].filter(Boolean).join(' ')
+
   return (
-    <section className="bg-white min-h-screen">
-      <ClientNavigation clientId={clientId} />
-      <div className={`${styles.container} py-24`}>
-        <div className="text-center mb-8">
-          <h1 className={styles.pageTitle}>
-            Προφίλ <span className={styles.titleHighlight}>Χρήστη</span>
+    <section className={styles.pageWrapper}>
+      <div className="px-5 pt-4 pb-28 max-w-4xl mx-auto">
+
+        {/* Profile Avatar + Name */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-20 h-20 rounded-full bg-surface-container-high flex items-center justify-center mb-4 border-2 border-primary-container/30 overflow-hidden">
+            <Icon name="person" filled className="text-primary" size="xl" />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-on-surface text-center">
+            {displayName}
           </h1>
         </div>
 
-        <div className="max-w-4xl mx-auto space-y-6">
-          {/* User Information Section */}
+        {/* User Information Section */}
+        <div id="user-info-section" className="mb-6">
           <UserInfoSection
             client={clientData}
             onUpdate={handleClientUpdate}
           />
+        </div>
 
-          {/* Vehicles Section */}
+        {/* Vehicles Section */}
+        <div id="vehicles-section" className="mb-6">
           <VehiclesSection
             vehicles={vehicles}
             onUpdate={handleVehicleUpdate}
           />
         </div>
+
+        {/* Navigation Menu Items */}
+        <div className="space-y-1 mb-6">
+          {[
+            { icon: 'calendar_month', label: 'Τα Ραντεβού μου', href: `/requests/${clientId}?tab=appointment` },
+            { icon: 'settings', label: 'Ρυθμίσεις', href: '#settings' },
+          ].map((item) => (
+            <button
+              key={item.label}
+              onClick={() => {
+                if (item.href.startsWith('/')) {
+                  router.push(item.href)
+                }
+              }}
+              className="w-full flex items-center gap-4 px-3 py-3.5 rounded-xl hover:bg-surface-container transition-colors group"
+            >
+              <Icon name={item.icon} className="text-primary" />
+              <span className="flex-1 text-left text-sm font-bold text-on-surface">{item.label}</span>
+              <Icon name="chevron_right" className="text-on-surface-variant/50" />
+            </button>
+          ))}
+        </div>
+
+        {/* Logout Button */}
+        <button
+          onClick={logout}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3.5 text-tertiary hover:bg-error-container/30 rounded-xl transition-colors"
+        >
+          <Icon name="logout" className="text-tertiary" />
+          <span className="text-sm font-bold">Αποσύνδεση</span>
+        </button>
       </div>
     </section>
   )
 }
-

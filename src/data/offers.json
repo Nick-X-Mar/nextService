@@ -1,17 +1,26 @@
 [
   {
-    "image": "/path/to/image1.jpg",
-    "title": "Σκας; Όχι πια",
-    "description": "Προστάτεψε το σπίτι σου έγκαιρα, με τη βοήθειά μας."
+    "image": "",
+    "title": "Πλήρες Service Λαδιών",
+    "description": "Περιλαμβάνει 4lt λάδι & φίλτρο",
+    "price": "€45.00",
+    "originalPrice": "€60.00",
+    "discount": "-25%"
   },
   {
-    "image": "/path/to/image2.jpg",
-    "title": "Μάθε τις πιο hot δουλειές για το σπίτι σου",
-    "description": "Οι ανάγκες του σπιτιού δεν περιμένουν!"
+    "image": "",
+    "title": "Έλεγχος Φρένων & Τακάκια",
+    "description": "Εμπρόσθιος άξονας, εργασία & ανταλλακτικά",
+    "price": "€82.00",
+    "originalPrice": "€98.00",
+    "discount": "-15%"
   },
   {
-    "image": "/path/to/image3.jpg",
-    "title": "Μάθε πως καινοτομούμε για σένα",
-    "description": "Κάνουμε τις δουλειές στο σπίτι ευκολότερες"
+    "image": "",
+    "title": "Διαγνωστικός Έλεγχος",
+    "description": "Πλήρης έλεγχος εγκεφάλου αυτοκινήτου",
+    "price": "€25.00",
+    "originalPrice": "€45.00",
+    "discount": "-40%"
   }
 ]

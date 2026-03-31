@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { HiMagnifyingGlass } from 'react-icons/hi2'
-import { styles } from '../../../styles/styles'
 import { saveFormData, loadFormData } from '../../../utils/formStorage'
+import Icon from '@/components/ui/Icon'
+import GearSubmitButton from '@/components/GearSubmitButton'
 
 interface CategorySelectorProps {
   selectedCategory: string
@@ -50,17 +50,11 @@ export default function CategorySelector({ selectedCategory, onCategorySelect }:
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
 
-
-  // Load saved data on component mount
   useEffect(() => {
     setMounted(true)
     const savedData = loadFormData()
-    if (savedData.category) {
-      onCategorySelect(savedData.category)
-    }
-    if (savedData.description) {
-      setDescription(savedData.description)
-    }
+    if (savedData.category) onCategorySelect(savedData.category)
+    if (savedData.description) setDescription(savedData.description)
     if (savedData.brand) {
       setSelectedBrand(savedData.brand)
       setIsBrandOther(savedData.isBrandOther)
@@ -73,18 +67,11 @@ export default function CategorySelector({ selectedCategory, onCategorySelect }:
     }
   }, [onCategorySelect])
 
-  // Save data whenever it changes
   useEffect(() => {
     if (mounted) {
       saveFormData({
-        category: selectedCategory,
-        description: description,
-        brand: selectedBrand,
-        model: selectedModel,
-        isBrandOther,
-        isModelOther,
-        customBrand,
-        customModel
+        category: selectedCategory, description, brand: selectedBrand, model: selectedModel,
+        isBrandOther, isModelOther, customBrand, customModel
       })
     }
   }, [selectedCategory, description, selectedBrand, selectedModel, isBrandOther, isModelOther, customBrand, customModel, mounted])
@@ -92,13 +79,12 @@ export default function CategorySelector({ selectedCategory, onCategorySelect }:
   const handleBrandChange = (brand: string) => {
     if (brand === 'other') {
       setIsBrandOther(true)
-      setSelectedBrand('') // Clear parent brand while user types
+      setSelectedBrand('')
     } else {
       setIsBrandOther(false)
-      setCustomBrand('') // Clear custom brand
+      setCustomBrand('')
       setSelectedBrand(brand)
     }
-    // Always reset model when brand changes
     setIsModelOther(false)
     setCustomModel('')
     setSelectedModel('')
@@ -106,185 +92,175 @@ export default function CategorySelector({ selectedCategory, onCategorySelect }:
 
   const handleCustomBrandChange = (value: string) => {
     setCustomBrand(value)
-    setSelectedBrand(value) // Update parent state with custom brand
+    setSelectedBrand(value)
   }
 
   const handleModelChange = (model: string) => {
     if (model === 'other') {
       setIsModelOther(true)
-      setSelectedModel('') // Clear parent model while user types
+      setSelectedModel('')
     } else {
       setIsModelOther(false)
-      setCustomModel('') // Clear custom model
+      setCustomModel('')
       setSelectedModel(model)
     }
   }
 
   const handleCustomModelChange = (value: string) => {
     setCustomModel(value)
-    setSelectedModel(value) // Update parent state with custom model
+    setSelectedModel(value)
   }
 
-  // Form validation - check if we have category/description and basic car info
   const currentBrand = isBrandOther ? customBrand : selectedBrand
   const currentModel = isModelOther ? customModel : selectedModel
-  const isFormValid = 
-    (selectedCategory.trim() !== '' || description.trim() !== '') &&
-    currentBrand.trim() !== '' && 
+  const isFormValid =
+    selectedCategory.trim() !== '' &&
+    description.trim() !== '' &&
+    currentBrand.trim() !== '' &&
     currentModel.trim() !== ''
 
   const availableModels = !isBrandOther && selectedBrand ? carBrands[selectedBrand as keyof typeof carBrands] || [] : []
 
   const handleSubmit = () => {
     if (isFormValid) {
-      // Use the correct brand and model (either from dropdown or custom input)
       const finalBrand = isBrandOther ? customBrand : selectedBrand
       const finalModel = isModelOther ? customModel : selectedModel
-      
-      // Save current data before navigation
       saveFormData({
-        category: selectedCategory,
-        description: description,
-        brand: finalBrand,
-        model: finalModel,
-        isBrandOther,
-        isModelOther,
-        customBrand,
-        customModel
+        category: selectedCategory, description, brand: finalBrand, model: finalModel,
+        isBrandOther, isModelOther, customBrand, customModel
       })
       router.push('/car-details')
     }
   }
+
   return (
-    <div className="mt-5 max-w-md mx-auto md:mt-8">
-      <div className={styles.card}>
-        <label className={`${styles.label} text-lg text-center`}>
-          Κατηγορία:
-        </label>
-        <select 
-          value={selectedCategory}
-          onChange={(e) => onCategorySelect(e.target.value)}
-          className={styles.select}
-        >
-          <option value="">Επιλέξτε...</option>
-          <option value="service">Service</option>
-                        <option value="fanopeia">Φανοποιεία</option>
-          <option value="oils">Λάδια</option>
-          <option value="disk">Δίσκος</option>
-        </select>
-        
-        {/* Brand and Model Selection - Side by side */}
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Brand Selection */}
-          <div>
-            <label className={styles.label}>
-              Μάρκα:
-            </label>
-            <select 
-              value={isBrandOther ? 'other' : selectedBrand}
-              onChange={(e) => handleBrandChange(e.target.value)}
-              className={styles.select}
+    <div id="create-request" className="scroll-mt-20 bg-surface-container-low rounded-2xl p-6 shadow-sm border border-outline-variant/10">
+      <div className="mb-8">
+        <h3 className="text-2xl font-black italic tracking-tighter mb-1">Δημιουργία Αιτήματος</h3>
+        <p className="text-on-surface-variant/70 text-sm">Βήμα 1 από 3: Λεπτομέρειες Οχήματος</p>
+      </div>
+
+      <div className="space-y-5">
+        {/* Category */}
+        <div className="relative group">
+          <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-2 ml-1">Κατηγορία <span className="text-error">*</span></label>
+          <div className="relative">
+            <select
+              value={selectedCategory}
+              onChange={(e) => onCategorySelect(e.target.value)}
+              className="w-full h-14 bg-surface-container-highest rounded-xl px-4 border-none focus:ring-2 focus:ring-primary appearance-none font-bold text-sm"
             >
               <option value="">Επιλέξτε...</option>
-              {Object.keys(carBrands).map((brand) => (
-                <option key={brand} value={brand}>
-                  {brand.charAt(0).toUpperCase() + brand.slice(1)}
-                </option>
-              ))}
-              <option value="other">Άλλο</option>
+              <option value="service">Service</option>
+              <option value="kteo">ΚΤΕΟ</option>
+              <option value="elastika">Ελαστικά</option>
+              <option value="fanopeia">Φανοποιεία</option>
+              <option value="oils">Λάδια</option>
+              <option value="disk">Δίσκος</option>
             </select>
+            <Icon name="expand_more" className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant" />
           </div>
+        </div>
 
-          {/* Model Selection - Only show if brand is selected and not custom */}
-          {selectedBrand && !isBrandOther && (
-            <div>
-              <label className={styles.label}>
-                Μοντέλο:
-              </label>
-              <select 
-                value={isModelOther ? 'other' : selectedModel}
-                onChange={(e) => handleModelChange(e.target.value)}
-                className={styles.select}
+        {/* Brand & Model */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="relative group">
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-2 ml-1">Μάρκα <span className="text-error">*</span></label>
+            <div className="relative">
+              <select
+                value={isBrandOther ? 'other' : selectedBrand}
+                onChange={(e) => handleBrandChange(e.target.value)}
+                className="w-full h-14 bg-surface-container-highest rounded-xl px-4 border-none focus:ring-2 focus:ring-primary appearance-none font-bold text-sm"
               >
                 <option value="">Επιλέξτε...</option>
-                {availableModels.map((model) => (
-                  <option key={model} value={model}>
-                    {model}
+                {Object.keys(carBrands).map((brand) => (
+                  <option key={brand} value={brand}>
+                    {brand.charAt(0).toUpperCase() + brand.slice(1)}
                   </option>
                 ))}
                 <option value="other">Άλλο</option>
               </select>
+              <Icon name="expand_more" className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant" />
+            </div>
+          </div>
+
+          {selectedBrand && !isBrandOther && (
+            <div className="relative group">
+              <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-2 ml-1">Μοντέλο <span className="text-error">*</span></label>
+              <div className="relative">
+                <select
+                  value={isModelOther ? 'other' : selectedModel}
+                  onChange={(e) => handleModelChange(e.target.value)}
+                  className="w-full h-14 bg-surface-container-highest rounded-xl px-4 border-none focus:ring-2 focus:ring-primary appearance-none font-bold text-sm"
+                >
+                  <option value="">Επιλέξτε...</option>
+                  {availableModels.map((model) => (
+                    <option key={model} value={model}>{model}</option>
+                  ))}
+                  <option value="other">Άλλο</option>
+                </select>
+                <Icon name="expand_more" className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant" />
+              </div>
             </div>
           )}
         </div>
 
-        {/* Custom Brand Input - Show if "Άλλο" is selected */}
+        {/* Custom Brand Input */}
         {isBrandOther && (
-          <div className="mt-4">
-            <label className={styles.label}>
-              Μάρκα:
-            </label>
+          <div className="relative group">
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-2 ml-1">Μάρκα <span className="text-error">*</span></label>
             <input
               type="text"
               value={customBrand}
               onChange={(e) => handleCustomBrandChange(e.target.value)}
               placeholder="π.χ. Lada, Smart, Proton..."
-              className={styles.input}
+              className="w-full h-14 bg-surface-container-highest rounded-xl px-4 border-none focus:ring-2 focus:ring-primary font-bold text-sm"
             />
           </div>
         )}
 
-        {/* Custom Model Input - Show if model "Άλλο" is selected OR brand is custom */}
+        {/* Custom Model Input */}
         {(isModelOther || (isBrandOther && customBrand.trim() !== '')) && (
-          <div className="mt-4">
-            <label className={styles.label}>
-              Μοντέλο:
-            </label>
+          <div className="relative group">
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-2 ml-1">Μοντέλο <span className="text-error">*</span></label>
             <input
               type="text"
               value={customModel}
               onChange={(e) => handleCustomModelChange(e.target.value)}
               placeholder="π.χ. Samara, ForTwo, Wira..."
-              className={styles.input}
+              className="w-full h-14 bg-surface-container-highest rounded-xl px-4 border-none focus:ring-2 focus:ring-primary font-bold text-sm"
             />
           </div>
         )}
 
-        {/* Description - Last field */}
-        <div className="mt-4">
-          <label className={styles.label}>
-            Περιγραφή:
-          </label>
-          <textarea 
-            className={styles.textarea}
-            rows={2}
-            placeholder="Θέλω να κάνω service και να δούμε και για δίσκο"
+        {/* Description */}
+        <div className="relative group">
+          <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 mb-2 ml-1">Περιγραφή Προβλήματος <span className="text-error">*</span></label>
+          <textarea
+            className="w-full bg-surface-container-highest rounded-xl px-4 py-3 border-none focus:ring-2 focus:ring-primary font-medium text-sm resize-none placeholder:text-on-surface-variant/30"
+            rows={3}
+            placeholder="Περιγράψτε τι χρειάζεται το αυτοκίνητό σας..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
         </div>
-        
-        <button 
-          onClick={handleSubmit}
-          disabled={!isFormValid}
-          className={`w-full mt-4 justify-center px-6 py-3 text-base ${
-            isFormValid 
-              ? styles.btnPrimary 
-              : styles.btnDisabled
-          }`}
-        >
-          <HiMagnifyingGlass className="h-5 w-5" />
-          Επόμενο
-        </button>
-      </div>
-      <div className="mt-4 text-center">
-        <a
-          href="/register-professional"
-          className="inline-block text-black font-medium transition-colors duration-200 text-base hover:text-orange-500"
-        >
-          Γίνε Επαγγελματίας →
-        </a>
+
+        {/* Submit */}
+        <div className="pt-4">
+          <GearSubmitButton onClick={handleSubmit} disabled={!isFormValid} />
+        </div>
+
+        {/* Professional Link */}
+        <div className="mt-6 text-center">
+          <a
+            href="/register-professional"
+            className="inline-flex items-center gap-2 text-primary font-bold tracking-widest text-[10px] uppercase group"
+          >
+            ΓΙΝΕ ΕΠΑΓΓΕΛΜΑΤΙΑΣ
+            <Icon name="arrow_forward" size="sm" />
+          </a>
+        </div>
       </div>
     </div>
   )
-} 
+}

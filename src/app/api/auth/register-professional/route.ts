@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { hashPassword } from '@/utils/passwordService'
 
 // Simple in-memory rate limiting (in production, use Redis or database)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
@@ -28,7 +29,7 @@ function checkRateLimit(identifier: string, maxAttempts: number = 3, windowMs: n
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { companyName, tin, email, taxAuthority, address, mobile, benefits } = body
+    const { companyName, tin, email, password, taxAuthority, address, mobile, benefits } = body
 
     // Validate required fields
     if (!companyName || typeof companyName !== 'string' || !companyName.trim()) {
@@ -67,6 +68,12 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+
+    if (!password || typeof password !== 'string' || password.length < 6) {
+      return NextResponse.json({
+        error: 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες'
+      }, { status: 400 })
+    }
 
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -127,16 +134,19 @@ export async function POST(request: NextRequest) {
     const garageId = `garage-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
     // Create new garage
+    const passwordHash = await hashPassword(password)
+
     const garageData = {
       id: garageId,
       companyName: companyName.trim(),
       tin: cleanTin,
       email: email.trim().toLowerCase(),
+      passwordHash,
       taxAuthority: taxAuthority.trim(),
       address: address.trim(),
       mobile: cleanMobile,
-      isActive: false, // Will be activated after manual review
-      description: 'Εταιρεία εγγεγραμμένη στο NextService', // Default description
+      isActive: false,
+      description: 'Εταιρεία εγγεγραμμένη στο NextService',
       benefits: benefits && Array.isArray(benefits) ? benefits : [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()

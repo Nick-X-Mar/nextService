@@ -1,11 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { HiPencil, HiCheck, HiXMark, HiChevronDown, HiChevronUp } from 'react-icons/hi2'
 import { SegmentedControl } from './index'
 import { styles } from '../styles/styles'
 import { ServiceRequestStatus } from '../types/statuses'
 import type { ServiceRequest } from '../types/requests'
+import Icon from '@/components/ui/Icon'
 
 interface RequestDetailsPanelProps {
   request: ServiceRequest
@@ -63,20 +63,20 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
     }
   }
 
-  const getStatusColor = (status: ServiceRequestStatus) => {
+  const getStatusStyle = (status: ServiceRequestStatus) => {
     switch (status) {
       case ServiceRequestStatus.PENDING:
-        return 'bg-yellow-100 text-yellow-800'
+        return styles.statusPending
       case ServiceRequestStatus.IN_PROGRESS:
-        return 'bg-blue-100 text-blue-800'
+        return styles.statusInProgress
       case ServiceRequestStatus.COMPLETED:
-        return 'bg-green-100 text-green-800'
+        return styles.statusCompleted
       case ServiceRequestStatus.CANCELLED:
-        return 'bg-red-100 text-red-800'
+        return styles.statusCancelled
       case ServiceRequestStatus.APPOINTMENT:
-        return 'bg-purple-100 text-purple-800'
+        return styles.statusAppointment
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'text-[0.65rem] font-black uppercase tracking-[0.1em] text-secondary bg-surface-container px-2 py-1 rounded-sm'
     }
   }
 
@@ -122,60 +122,60 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+    <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10 overflow-hidden">
       {/* Header - Always visible */}
-      <div 
-        className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+      <div
+        className="flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-surface-container-low transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="flex items-center gap-3">
-          <h3 className="text-lg font-semibold text-gray-900">Λεπτομέρειες Αιτήματος & Οχήματος</h3>
-          <div className="flex items-center gap-2">
-            {/* Status badge - always visible */}
-            <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(request.status)}`}>
-              {getStatusText(request.status)}
-            </span>
-          </div>
+        <div className="flex items-center gap-3 min-w-0">
+          <Icon name="assignment" size="sm" className="text-primary flex-shrink-0" filled />
+          <p className={`${styles.labelUpper} flex-shrink-0`}>Λεπτομέρειες</p>
+          <span className={getStatusStyle(request.status)}>
+            {getStatusText(request.status)}
+          </span>
           {/* Quick summary when collapsed */}
           {!isExpanded && request.vehicle && (
-            <div className="text-sm text-gray-500 ml-2">
+            <span className="text-xs text-secondary truncate hidden sm:inline">
               {request.vehicle.brand} {request.vehicle.model} ({request.vehicle.modelYear})
-            </div>
+            </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {allowEdit && isExpanded && (
             <button
               onClick={(e) => {
                 e.stopPropagation()
                 setIsEditing(!isEditing)
               }}
-              className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+              className="w-7 h-7 rounded-full hover:bg-surface-container flex items-center justify-center transition-colors"
             >
-              <HiPencil className="h-4 w-4" />
+              <Icon name="edit" size="sm" className="text-on-surface-variant" />
             </button>
           )}
-          <button className="p-1 text-gray-400 hover:text-gray-600 transition-colors">
-            {isExpanded ? <HiChevronUp className="h-5 w-5" /> : <HiChevronDown className="h-5 w-5" />}
-          </button>
+          <Icon
+            name={isExpanded ? 'expand_less' : 'expand_more'}
+            size="sm"
+            className="text-on-surface-variant"
+          />
         </div>
       </div>
 
       {/* Collapsible Content */}
       {isExpanded && (
-        <div className="px-4 pb-4 border-t border-gray-200">
+        <div className="px-5 pb-5 border-t border-outline-variant/10">
           <div className="pt-4 space-y-4">
 
         {/* Request Details */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Category */}
           <div>
-            <label className="text-sm font-medium text-gray-600">Κατηγορία</label>
+            <label className={styles.label}>Κατηγορία</label>
             {isEditing && allowEdit ? (
               <select
                 value={editData.category}
                 onChange={(e) => setEditData({ ...editData, category: e.target.value })}
-                className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className={`${styles.select} mt-1`}
               >
                 <option value="service">Συντήρηση</option>
                 <option value="fanopeia">Φανοποιεία</option>
@@ -183,33 +183,34 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
                 <option value="disk">Δισκόφρενα</option>
               </select>
             ) : (
-              <p className="text-sm text-gray-900 mt-1">{getCategoryText(request.category)}</p>
+              <p className="text-sm font-medium text-on-surface mt-1">{getCategoryText(request.category)}</p>
             )}
           </div>
-
-          
         </div>
 
         {/* Description */}
         <div>
-          <label className="text-sm font-medium text-gray-600">Περιγραφή</label>
+          <label className={styles.label}>Περιγραφή</label>
           {isEditing && allowEdit ? (
             <textarea
               value={editData.description}
               onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-              className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className={`${styles.textarea} mt-1`}
               rows={3}
             />
           ) : (
-            <p className="text-sm text-gray-900 mt-1">{request.description}</p>
+            <p className="text-sm font-medium text-on-surface mt-1">{request.description}</p>
           )}
         </div>
 
         {/* Vehicle Details */}
         {request.vehicle && (
-          <div className="border-t border-gray-200 pt-4">
-            <h4 className="text-md font-medium text-gray-900 mb-4">Στοιχεία Οχήματος</h4>
-            
+          <div className="border-t border-outline-variant/10 pt-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Icon name="directions_car" size="sm" className="text-primary" filled />
+              <p className={styles.labelUpper}>Στοιχεία Οχήματος</p>
+            </div>
+
             {/* Basic Vehicle Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               {/* Brand */}
@@ -220,10 +221,10 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
                     type="text"
                     value={editData.brand}
                     onChange={(e) => setEditData({ ...editData, brand: e.target.value })}
-                    className={styles.input}
+                    className={`${styles.input} mt-1`}
                   />
                 ) : (
-                  <p className="text-sm text-gray-900 mt-1">{request.vehicle.brand}</p>
+                  <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.brand}</p>
                 )}
               </div>
 
@@ -235,10 +236,10 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
                     type="text"
                     value={editData.model}
                     onChange={(e) => setEditData({ ...editData, model: e.target.value })}
-                    className={styles.input}
+                    className={`${styles.input} mt-1`}
                   />
                 ) : (
-                  <p className="text-sm text-gray-900 mt-1">{request.vehicle.model}</p>
+                  <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.model}</p>
                 )}
               </div>
 
@@ -250,11 +251,11 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
                     type="text"
                     value={editData.modelYear}
                     onChange={(e) => setEditData({ ...editData, modelYear: e.target.value })}
-                    className={styles.input}
+                    className={`${styles.input} mt-1`}
                     maxLength={4}
                   />
                 ) : (
-                  <p className="text-sm text-gray-900 mt-1">{request.vehicle.modelYear}</p>
+                  <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.modelYear}</p>
                 )}
               </div>
 
@@ -266,10 +267,10 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
                     type="text"
                     value={editData.licensePlate}
                     onChange={(e) => setEditData({ ...editData, licensePlate: e.target.value })}
-                    className={styles.input}
+                    className={`${styles.input} mt-1`}
                   />
                 ) : (
-                  <p className="text-sm text-gray-900 mt-1">{request.vehicle.licensePlate}</p>
+                  <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.licensePlate}</p>
                 )}
               </div>
             </div>
@@ -284,11 +285,11 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
                     type="text"
                     value={editData.engineCC}
                     onChange={(e) => setEditData({ ...editData, engineCC: e.target.value })}
-                    className={styles.input}
+                    className={`${styles.input} mt-1`}
                     maxLength={4}
                   />
                 ) : (
-                  <p className="text-sm text-gray-900 mt-1">{request.vehicle.engineCC}</p>
+                  <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.engineCC}</p>
                 )}
               </div>
 
@@ -300,10 +301,10 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
                     type="text"
                     value={editData.engineNumber}
                     onChange={(e) => setEditData({ ...editData, engineNumber: e.target.value })}
-                    className={styles.input}
+                    className={`${styles.input} mt-1`}
                   />
                 ) : (
-                  <p className="text-sm text-gray-900 mt-1">{request.vehicle.engineNumber}</p>
+                  <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.engineNumber}</p>
                 )}
               </div>
 
@@ -315,10 +316,10 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
                     type="text"
                     value={editData.vinNumber}
                     onChange={(e) => setEditData({ ...editData, vinNumber: e.target.value })}
-                    className={styles.input}
+                    className={`${styles.input} mt-1`}
                   />
                 ) : (
-                  <p className="text-sm text-gray-900 mt-1">{request.vehicle.vinNumber}</p>
+                  <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.vinNumber}</p>
                 )}
               </div>
             </div>
@@ -340,7 +341,7 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
                     size="md"
                   />
                 ) : (
-                  <p className="text-sm text-gray-900 mt-1">
+                  <p className="text-sm font-medium text-on-surface mt-1">
                     {request.vehicle.fuelType === 'petrol' ? 'Βενζίνη' : 'Πετρέλαιο'}
                   </p>
                 )}
@@ -361,7 +362,7 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
                     size="md"
                   />
                 ) : (
-                  <p className="text-sm text-gray-900 mt-1">
+                  <p className="text-sm font-medium text-on-surface mt-1">
                     {request.vehicle.isAutomatic ? 'Αυτόματο' : 'Χειροκίνητο'}
                   </p>
                 )}
@@ -383,7 +384,7 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
                   size="md"
                 />
               ) : (
-                <p className="text-sm text-gray-900 mt-1">
+                <p className="text-sm font-medium text-on-surface mt-1">
                   {request.vehicle.is4x4 ? '4x4' : '2WD'}
                 </p>
               )}
@@ -393,27 +394,30 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
 
         {/* Photos count */}
         {request.photoUrls && request.photoUrls.length > 0 && (
-          <div className="border-t border-gray-200 pt-4">
-            <label className="text-sm font-medium text-gray-600">Φωτογραφίες</label>
-            <p className="text-sm text-gray-900 mt-1">{request.photoUrls.length} φωτογραφία/ες</p>
+          <div className="border-t border-outline-variant/10 pt-4">
+            <label className={styles.label}>Φωτογραφίες</label>
+            <div className="flex items-center gap-2 mt-1">
+              <Icon name="photo_library" size="sm" className="text-primary" filled />
+              <p className="text-sm font-medium text-on-surface">{request.photoUrls.length} φωτογραφία/ες</p>
+            </div>
           </div>
         )}
 
         {/* Edit Actions */}
         {isEditing && allowEdit && (
-          <div className="flex gap-2 pt-4 border-t border-gray-200">
+          <div className="flex gap-2 pt-4 border-t border-outline-variant/10">
             <button
               onClick={handleSave}
-              className="flex items-center gap-1 px-3 py-1 bg-green-500 text-white text-sm rounded-md hover:bg-green-600 transition-colors"
+              className={styles.btnPrimary}
             >
-              <HiCheck className="h-3 w-3" />
+              <Icon name="check" size="sm" />
               Αποθήκευση
             </button>
             <button
               onClick={handleCancel}
-              className="flex items-center gap-1 px-3 py-1 bg-gray-500 text-white text-sm rounded-md hover:bg-gray-600 transition-colors"
+              className={styles.btnOutline}
             >
-              <HiXMark className="h-3 w-3" />
+              <Icon name="close" size="sm" />
               Ακύρωση
             </button>
           </div>

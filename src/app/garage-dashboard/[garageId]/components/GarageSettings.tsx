@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, Input, Button } from '@/components'
+import { Input } from '@/components'
 import { styles } from '@/styles/styles'
 import { useToast } from '@/hooks/useToast'
+import Icon from '@/components/ui/Icon'
 
 interface GarageData {
   id: string
@@ -61,7 +62,7 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
   const handleSave = async () => {
     try {
       setIsLoading(true)
-      
+
       const response = await fetch(`/api/garage/${formData.id}`, {
         method: 'PUT',
         headers: {
@@ -69,24 +70,24 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
         },
         body: JSON.stringify(formData)
       })
-      
+
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Failed to update garage data')
       }
-      
+
       const data = await response.json()
-      
+
       if (data.success) {
         onUpdate(data.garage)
         setHasChanges(false)
-        success('Επιτυχής Ενημέρωση', 'Τα στοιχεία του συνεργείου ενημερώθηκαν επιτυχώς!')
+        success('Επιτυχης Ενημερωση', 'Τα στοιχεια του συνεργειου ενημερωθηκαν επιτυχως!')
       } else {
         throw new Error(data.error || 'Failed to update garage data')
       }
     } catch (err) {
       console.error('Error updating garage data:', err)
-      error('Σφάλμα', err instanceof Error ? err.message : 'Δεν ήταν δυνατή η ενημέρωση των στοιχείων. Παρακαλώ δοκιμάστε ξανά.')
+      error('Σφαλμα', err instanceof Error ? err.message : 'Δεν ηταν δυνατη η ενημερωση των στοιχειων. Παρακαλω δοκιμαστε ξανα.')
     } finally {
       setIsLoading(false)
     }
@@ -97,144 +98,96 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
     setHasChanges(false)
   }
 
+  const infoFields = [
+    { icon: 'business', label: 'ΕΠΩΝΥΜΙΑ', field: 'companyName' as keyof GarageData, placeholder: 'π.χ. Συνεργειο Παπαδοπουλος', required: true },
+    { icon: 'receipt_long', label: 'ΑΦΜ', field: 'tin' as keyof GarageData, placeholder: '123456789', required: true },
+    { icon: 'mail', label: 'EMAIL', field: 'email' as keyof GarageData, placeholder: 'info@garage.gr', required: true, type: 'email' },
+    { icon: 'phone', label: 'ΤΗΛΕΦΩΝΟ', field: 'mobile' as keyof GarageData, placeholder: '+306984959044', required: true },
+    { icon: 'location_on', label: 'ΔΙΕΥΘΥΝΣΗ', field: 'address' as keyof GarageData, placeholder: 'Λεωφορος Πατησιων 123, Αθηνα', required: true, fullWidth: true },
+    { icon: 'account_balance', label: 'ΔΟΥ', field: 'taxAuthority' as keyof GarageData, placeholder: 'ΔΟΥ Αθηνων', required: true },
+    { icon: 'description', label: 'ΠΕΡΙΓΡΑΦΗ', field: 'description' as keyof GarageData, placeholder: 'Συντομη περιγραφη του συνεργειου...', required: false },
+  ]
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className={`${styles.sectionTitle} mb-2`}>
-          Ρυθμίσεις Συνεργείου
+        <h2 className="text-3xl font-bold tracking-tight text-on-surface">
+          Προφιλ Συνεργειου
         </h2>
-        <p className={styles.bodyText}>
-          Διαχειριστείτε τα στοιχεία και τις ρυθμίσεις του συνεργείου σας
+        <p className="text-base text-secondary leading-relaxed mt-1">
+          Διαχειριστειτε τα στοιχεια του συνεργειου σας
         </p>
       </div>
 
       {/* Company Information */}
-      <Card className="p-6">
-        <h3 className={`${styles.sectionTitle} mb-4`}>
-          Στοιχεία Εταιρείας
-        </h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className={`${styles.label} block mb-2`}>
-              Επωνυμία Εταιρείας *
-            </label>
-            <Input
-              value={formData.companyName}
-              onChange={(value) => handleInputChange('companyName', value)}
-              placeholder="π.χ. ΑΕ Συνεργείο Αυτοκινήτων Παπαδόπουλος"
-              required
-            />
+      <article className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center justify-center h-14 w-14 rounded-full bg-surface-container text-primary">
+            <Icon name="business" filled size="md" />
           </div>
-
           <div>
-            <label className={`${styles.label} block mb-2`}>
-              ΑΦΜ *
-            </label>
-            <Input
-              value={formData.tin}
-              onChange={(value) => handleInputChange('tin', value)}
-              placeholder="123456789"
-              required
-            />
-          </div>
-
-          <div>
-            <label className={`${styles.label} block mb-2`}>
-              Email *
-            </label>
-            <Input
-              type="email"
-              value={formData.email}
-              onChange={(value) => handleInputChange('email', value)}
-              placeholder="info@garage.gr"
-              required
-            />
-          </div>
-
-          <div>
-            <label className={`${styles.label} block mb-2`}>
-              Κινητό Τηλέφωνο *
-            </label>
-            <Input
-              value={formData.mobile}
-              onChange={(value) => handleInputChange('mobile', value)}
-              placeholder="+306984959044"
-              required
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className={`${styles.label} block mb-2`}>
-              Διεύθυνση *
-            </label>
-            <Input
-              value={formData.address}
-              onChange={(value) => handleInputChange('address', value)}
-              placeholder="Λεωφόρος Πατησιών 123, Αθήνα"
-              required
-            />
-          </div>
-
-          <div>
-            <label className={`${styles.label} block mb-2`}>
-              ΔΟΥ *
-            </label>
-            <Input
-              value={formData.taxAuthority}
-              onChange={(value) => handleInputChange('taxAuthority', value)}
-              placeholder="ΔΟΥ Αθηνών"
-              required
-            />
-          </div>
-
-          <div>
-            <label className={`${styles.label} block mb-2`}>
-              Περιγραφή
-            </label>
-            <Input
-              value={formData.description || ''}
-              onChange={(value) => handleInputChange('description', value)}
-              placeholder="Σύντομη περιγραφή του συνεργείου..."
-            />
+            <h3 className="text-lg font-bold text-on-surface">Στοιχεια Εταιρειας</h3>
+            <p className="text-xs text-secondary">Βασικα στοιχεια επικοινωνιας</p>
           </div>
         </div>
-      </Card>
 
-      {/* Benefits Management */}
-      <Card className="p-6">
-        <h3 className={`${styles.sectionTitle} mb-4`}>
-          Παροχές Εργασίας
-        </h3>
-        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {infoFields.map((item) => (
+            <div key={item.field} className={item.fullWidth ? 'md:col-span-2' : ''}>
+              <div className="flex items-center gap-2 mb-2">
+                <Icon name={item.icon} size="sm" className="text-primary" />
+                <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
+                  {item.label} {item.required && '*'}
+                </label>
+              </div>
+              <Input
+                type={(item.type || 'text') as 'text' | 'email' | 'tel' | 'number'}
+                value={(formData[item.field] as string) || ''}
+                onChange={(value) => handleInputChange(item.field, value)}
+                placeholder={item.placeholder}
+                required={item.required}
+              />
+            </div>
+          ))}
+        </div>
+      </article>
+
+      {/* Benefits / Free Services */}
+      <article className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center justify-center h-14 w-14 rounded-full bg-surface-container text-primary">
+            <Icon name="star" filled size="md" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-on-surface">Παροχες Εργασιας</h3>
+            <p className="text-xs text-secondary">Δωρεαν παροχες για τους πελατες σας</p>
+          </div>
+        </div>
+
         <div className="mb-4">
-          <label className={`${styles.label} block mb-2`}>
-            Δωρεάν Παροχές
-          </label>
-          <p className={`${styles.smallText} text-gray-600 mb-3`}>
-            Προσθέστε τις δωρεάν παροχές που προσφέρετε στους πελάτες σας
-          </p>
-          
-          <div className="flex gap-2 mb-4">
-            <Input
-              value={newBenefit}
-              onChange={(value) => setNewBenefit(value)}
-              placeholder="π.χ. Δωρεάν διαγνωστική"
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  handleAddBenefit()
-                }
-              }}
-            />
-            <Button
-              variant="primary"
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Input
+                value={newBenefit}
+                onChange={(value) => setNewBenefit(value)}
+                placeholder="π.χ. Δωρεαν διαγνωστικη"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleAddBenefit()
+                  }
+                }}
+              />
+            </div>
+            <button
               onClick={handleAddBenefit}
               disabled={!newBenefit.trim()}
+              className={newBenefit.trim() ? styles.btnPrimary : styles.btnDisabled}
             >
-              Προσθήκη
-            </Button>
+              <Icon name="add" size="sm" />
+              Προσθηκη
+            </button>
           </div>
         </div>
 
@@ -242,79 +195,99 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
         <div className="space-y-2">
           {formData.benefits && formData.benefits.length > 0 ? (
             formData.benefits.map((benefit, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <span className={styles.bodyText}>{benefit}</span>
-                <Button
-                  variant="secondary"
-                  size="sm"
+              <div key={index} className="flex items-center justify-between p-3 bg-surface-container-low rounded-xl group">
+                <div className="flex items-center gap-3">
+                  <Icon name="check_circle" filled size="sm" className="text-green-600" />
+                  <span className="text-sm font-medium text-on-surface">{benefit}</span>
+                </div>
+                <button
                   onClick={() => handleRemoveBenefit(index)}
-                  className="text-red-600 hover:text-red-700"
+                  className="text-tertiary hover:text-tertiary/80 opacity-0 group-hover:opacity-100 transition-opacity p-1"
                 >
-                  Αφαίρεση
-                </Button>
+                  <Icon name="close" size="sm" />
+                </button>
               </div>
             ))
           ) : (
-            <p className={`${styles.smallText} text-gray-500 italic`}>
-              Δεν έχουν προστεθεί παροχές ακόμα
-            </p>
-          )}
-        </div>
-      </Card>
-
-      {/* Action Buttons */}
-      {hasChanges && (
-        <Card className="p-6 bg-orange-50 border-orange-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className={`${styles.label} mb-1`}>
-                Έχετε μη αποθηκευμένες αλλαγές
-              </h4>
-              <p className={styles.smallText}>
-                Κάντε κλικ στο "Αποθήκευση" για να αποθηκεύσετε τις αλλαγές σας
+            <div className="text-center py-6">
+              <Icon name="inventory_2" size="lg" className="text-outline/40 mx-auto mb-2" />
+              <p className="text-sm text-on-surface-variant italic">
+                Δεν εχουν προστεθει παροχες ακομα
               </p>
             </div>
-            <div className="flex space-x-3">
-              <Button
-                variant="secondary"
-                onClick={handleReset}
-                disabled={isLoading}
-              >
-                Ακύρωση
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleSave}
-                loading={isLoading}
-              >
-                Αποθήκευση
-              </Button>
+          )}
+        </div>
+      </article>
+
+      {/* Unsaved Changes Bar */}
+      {hasChanges && (
+        <div className="sticky bottom-4 z-10">
+          <div className="bg-gradient-to-br from-primary to-primary-container rounded-xl p-4 shadow-xl shadow-primary/20">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Icon name="edit_note" size="md" className="text-on-primary" />
+                <div>
+                  <p className="text-sm font-bold text-on-primary">Μη αποθηκευμενες αλλαγες</p>
+                  <p className="text-xs text-on-primary/70">Αποθηκευστε τις αλλαγες σας</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleReset}
+                  disabled={isLoading}
+                  className="px-4 py-2 rounded-lg text-sm font-bold text-on-primary/80 hover:bg-white/10 transition-colors"
+                >
+                  Ακυρωση
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={isLoading}
+                  className="px-5 py-2 bg-surface-container-lowest text-primary rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all active:scale-95"
+                >
+                  {isLoading ? (
+                    <span className="flex items-center gap-2">
+                      <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></span>
+                      Αποθηκευση...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Icon name="save" size="sm" />
+                      Αποθηκευση
+                    </span>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Information Card */}
-      <Card className="p-6 bg-blue-50 border-blue-200">
-        <div className="flex items-start space-x-3">
-          <div className="text-blue-500 mt-1">
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-            </svg>
+      <article className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-primary/10 bg-primary/[0.03]">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+            <Icon name="info" size="sm" className="text-primary" />
           </div>
           <div>
-            <h4 className={`${styles.label} mb-1`}>
-              Σημαντικές Πληροφορίες
+            <h4 className="text-sm font-bold text-on-surface mb-2">
+              Σημαντικες Πληροφοριες
             </h4>
-            <ul className={`${styles.smallText} space-y-1`}>
-              <li>• Τα πεδία με * είναι υποχρεωτικά</li>
-              <li>• Το ΑΦΜ πρέπει να είναι 9 ψηφία</li>
-              <li>• Το email θα χρησιμοποιηθεί για ειδοποιήσεις</li>
-              <li>• Το κινητό τηλέφωνο θα χρησιμοποιηθεί για SMS</li>
+            <ul className="space-y-1.5">
+              {[
+                'Τα πεδια με * ειναι υποχρεωτικα',
+                'Το ΑΦΜ πρεπει να ειναι 9 ψηφια',
+                'Το email θα χρησιμοποιηθει για ειδοποιησεις',
+                'Το κινητο τηλεφωνο θα χρησιμοποιηθει για SMS'
+              ].map((item, i) => (
+                <li key={i} className="flex items-center gap-2">
+                  <Icon name="check" size="sm" className="text-primary" />
+                  <span className="text-sm text-on-surface-variant">{item}</span>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
-      </Card>
+      </article>
     </div>
   )
 }

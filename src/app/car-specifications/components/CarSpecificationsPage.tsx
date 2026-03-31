@@ -4,13 +4,12 @@ import { useState, useEffect } from 'react'
 import CarSpecsForm from './components/CarSpecsForm'
 import BodyWorkPhotosForm from './components/BodyWorkPhotosForm'
 import { loadFormData } from '../../../utils/formStorage'
-import { styles } from '../../../styles/styles'
 
 export default function CarSpecificationsPage() {
-  const [savedData, setSavedData] = useState({ 
-    category: '', 
-    description: '', 
-    brand: '', 
+  const [savedData, setSavedData] = useState({
+    category: '',
+    description: '',
+    brand: '',
     model: '',
     modelYear: '',
     vinNumber: '',
@@ -43,10 +42,10 @@ export default function CarSpecificationsPage() {
 
   if (isLoading) {
     return (
-      <div className={styles.pageCenter}>
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
-          <div className={styles.loadingSpinner}></div>
-          <p className={styles.bodyText}>Φόρτωση...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-base text-secondary leading-relaxed">Φορτωση...</p>
         </div>
       </div>
     )
@@ -55,7 +54,7 @@ export default function CarSpecificationsPage() {
       // Show body work photos form for φανοποιεία category
   if (savedData.category === 'fanopeia') {
     return (
-      <div className={styles.pageWrapper}>
+      <div className="bg-surface">
         <BodyWorkPhotosForm savedData={savedData} />
       </div>
     )
@@ -63,8 +62,8 @@ export default function CarSpecificationsPage() {
 
   // Show car specs form for all other categories
   return (
-    <div className={styles.pageWrapper}>
+    <div className="bg-surface">
       <CarSpecsForm savedData={savedData} />
     </div>
   )
-} 
+}

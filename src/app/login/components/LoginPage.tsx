@@ -2,352 +2,233 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { HiArrowRightOnRectangle, HiExclamationTriangle } from 'react-icons/hi2'
+import Icon from '@/components/ui/Icon'
 import { useToast } from '@/hooks/useToast'
 import { useUser } from '@/contexts/UserContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { styles } from '@/styles/styles'
-import { Input, Card, SegmentedControl } from '@/components'
+import { SegmentedControl } from '@/components'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [showRegisterOption, setShowRegisterOption] = useState(false)
-  const [notFoundEmail, setNotFoundEmail] = useState('')
+  const [mode, setMode] = useState<'login' | 'register'>('login')
   const [userType, setUserType] = useState('client')
-  
+
   const router = useRouter()
   const { success, error } = useToast()
   const { refreshUser } = useUser()
-  const { refreshClient, refreshGarage, logout } = useAuth()
+  const { refreshClient, refreshGarage } = useAuth()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!email.trim()) {
-      error('Σφάλμα', 'Παρακαλώ εισάγετε το email σας')
+
+    if (!email.trim() || !password) {
+      error('Σφάλμα', 'Συμπληρώστε email και κωδικό')
       return
     }
 
     setIsLoading(true)
-    setShowRegisterOption(false)
-    setNotFoundEmail('')
 
     try {
-      // Search for user with this email (client or garage)
       const response = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          email: email.trim(),
-          userType: userType
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password, userType })
       })
 
       const data = await response.json()
 
-      if (response.ok && data.success) {
-        if (data.user) {
-          const user = data.user
-          
-          if (userType === 'garage') {
-            // Garage login flow - clear client authentication first
-            localStorage.removeItem('clientId')
-            localStorage.setItem('garageId', user.id)
-            await refreshGarage(user.id)
-            
-            success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.companyName}!`)
-            
-            // Redirect to garage dashboard
-            router.push('/garage-dashboard')
-          } else {
-            // Client login flow - check if there's pending vehicle data to deduplicate
-            const pendingDataStr = localStorage.getItem('pendingRegistrationData')
-            let pendingData = null
-            
-            if (pendingDataStr) {
-              pendingData = JSON.parse(pendingDataStr)
-              // Check if the data is not too old (within 1 hour)
-              const oneHourAgo = Date.now() - (60 * 60 * 1000)
-              if (pendingData.timestamp < oneHourAgo) {
-                // Data is too old, ignore it
-                pendingData = null
-                localStorage.removeItem('pendingRegistrationData')
-              }
-            }
+      if (data.success && data.user) {
+        const user = data.user
 
-            // If there's pending vehicle data, handle deduplication
-            if (pendingData) {
-              try {
-                const dedupeResponse = await fetch('/api/auth/register-with-vehicle', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({ 
-                    email: email.trim(),
-                    firstName: user.firstName,
-                    vehicleData: pendingData.vehicleData,
-                    serviceRequestId: pendingData.serviceRequestId
-                  }),
-                })
-
-                const dedupeData = await dedupeResponse.json()
-                
-                if (dedupeResponse.ok && dedupeData.success) {
-                  // Clear pending registration data
-                  localStorage.removeItem('pendingRegistrationData')
-                  
-                  let message = `Καλώς ήρθατε, ${user.firstName}!`
-                  if (dedupeData.vehicleDeduplicated) {
-                    const matchReason = dedupeData.vehicleMatchReason === 'VIN' ? 'VIN' : 'Αριθμό Κινητήρα'
-                    message += ` Βρέθηκε και συνδέθηκε το υπάρχον όχημά σας (${matchReason}).`
-                  }
-                  
-                  success('Επιτυχής Σύνδεση', message)
-                  
-                  // Redirect to their requests page
-                  router.push(`/requests/${user.id}`)
-                  return
-                }
-              } catch (dedupeError) {
-                console.error('Vehicle deduplication error:', dedupeError)
-                // Continue with normal login if deduplication fails
-              }
-            }
-            
-            // Normal client login flow - clear garage authentication first
-            localStorage.removeItem('garageId')
-            localStorage.setItem('clientId', user.id)
-            await refreshClient(user.id)
-            await refreshUser(user.id) // Keep for backward compatibility
-            
-            success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.firstName}!`)
-            
-            // Redirect to their requests page
-            router.push(`/requests/${user.id}`)
-          }
+        if (userType === 'garage') {
+          localStorage.removeItem('clientId')
+          localStorage.setItem('garageId', user.id)
+          await refreshGarage(user.id)
+          success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.companyName}!`)
+          router.push('/garage-dashboard')
         } else {
-          // User not found - show registration option
-          setNotFoundEmail(email.trim())
-          setShowRegisterOption(true)
+          localStorage.removeItem('garageId')
+          localStorage.setItem('clientId', user.id)
+          await refreshClient(user.id)
+          await refreshUser(user.id)
+          success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.firstName}!`)
+          router.push(`/requests/${user.id}`)
         }
       } else {
-        // Rate limit or other error
-        error('Σφάλμα Σύνδεσης', data.error || 'Προέκυψε σφάλμα κατά τη σύνδεση')
+        error('Σφάλμα Σύνδεσης', data.error || 'Λάθος email ή κωδικός')
       }
-    } catch (err) {
-      console.error('Login error:', err)
-      error('Σφάλμα Σύνδεσης', 'Δεν ήταν δυνατή η σύνδεση. Παρακαλώ δοκιμάστε ξανά.')
+    } catch {
+      error('Σφάλμα Σύνδεσης', 'Δεν ήταν δυνατή η σύνδεση. Δοκιμάστε ξανά.')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleRegister = async () => {
-    if (!notFoundEmail) return
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!email.trim() || !password) {
+      error('Σφάλμα', 'Συμπληρώστε όλα τα πεδία')
+      return
+    }
+
+    if (password.length < 6) {
+      error('Σφάλμα', 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες')
+      return
+    }
+
+    if (password !== confirmPassword) {
+      error('Σφάλμα', 'Οι κωδικοί δεν ταιριάζουν')
+      return
+    }
+
+    if (userType === 'garage') {
+      router.push('/register-professional')
+      return
+    }
 
     setIsLoading(true)
 
     try {
-      if (userType === 'garage') {
-        // Garage registration - redirect to professional registration page
-        router.push('/register-professional')
-        return
-      }
-
-      // Client registration flow
-      // Check if there's pending registration data from a service request
-      const pendingDataStr = localStorage.getItem('pendingRegistrationData')
-      let pendingData = null
-      
-      if (pendingDataStr) {
-        pendingData = JSON.parse(pendingDataStr)
-        // Check if the data is not too old (within 1 hour)
-        const oneHourAgo = Date.now() - (60 * 60 * 1000)
-        if (pendingData.timestamp < oneHourAgo) {
-          // Data is too old, ignore it
-          pendingData = null
-          localStorage.removeItem('pendingRegistrationData')
-        }
-      }
-
-      let response
-      
-      if (pendingData) {
-        // Use the new endpoint with vehicle data for deduplication
-        response = await fetch('/api/auth/register-with-vehicle', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            email: notFoundEmail,
-            firstName: 'Επισκέπτης', // Default name
-            vehicleData: pendingData.vehicleData,
-            serviceRequestId: pendingData.serviceRequestId
-          }),
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password,
+          firstName: email.trim().split('@')[0]
         })
-      } else {
-        // Use the regular registration endpoint
-        response = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            email: notFoundEmail,
-            firstName: 'Επισκέπτης' // Default name
-          }),
-        })
-      }
+      })
 
       const data = await response.json()
 
-      if (response.ok && data.success) {
-        // Clear pending registration data since we've processed it
-        if (pendingData) {
-          localStorage.removeItem('pendingRegistrationData')
-        }
-        
-        // Registration successful - log them in - clear garage authentication first
+      if (data.success) {
         localStorage.removeItem('garageId')
         localStorage.setItem('clientId', data.client.id)
         await refreshClient(data.client.id)
-        await refreshUser(data.client.id) // Keep for backward compatibility
-        
-        let message = 'Ο λογαριασμός σας δημιουργήθηκε επιτυχώς!'
-        
-        if (data.isExistingUser) {
-          message = 'Συνδεθήκατε επιτυχώς στον υπάρχοντα λογαριασμό σας!'
-          if (data.vehicleDeduplicated) {
-            const matchReason = data.vehicleMatchReason === 'VIN' ? 'VIN' : 'Αριθμό Κινητήρα'
-            message += ` Βρέθηκε και συνδέθηκε το υπάρχον όχημά σας (${matchReason}).`
-          }
-        }
-        
-        success('Επιτυχής Εγγραφή', message)
-        
-        // Redirect to their requests page
+        await refreshUser(data.client.id)
+        success('Επιτυχής Εγγραφή', 'Ο λογαριασμός σας δημιουργήθηκε!')
         router.push(`/requests/${data.client.id}`)
       } else {
         error('Σφάλμα Εγγραφής', data.error || 'Δεν ήταν δυνατή η εγγραφή')
       }
-    } catch (err) {
-      console.error('Registration error:', err)
-      error('Σφάλμα Εγγραφής', 'Δεν ήταν δυνατή η εγγραφή. Παρακαλώ δοκιμάστε ξανά.')
+    } catch {
+      error('Σφάλμα Εγγραφής', 'Δεν ήταν δυνατή η εγγραφή. Δοκιμάστε ξανά.')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleTryAnotherEmail = () => {
-    setShowRegisterOption(false)
-    setNotFoundEmail('')
-    setEmail('')
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="w-full max-w-md mx-auto px-4">
+    <div className="min-h-screen bg-surface flex items-center justify-center px-4">
+      <div className="w-full max-w-md">
+        {/* Logo / Brand */}
         <div className="text-center mb-8">
-              <h2 className={`${styles.pageTitle} mb-2`}>
-            Σύνδεση στον Λογαριασμό σας
-          </h2>
-          
+          <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary-container rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-primary/20">
+            <Icon name={mode === 'login' ? 'login' : 'person_add'} filled className="text-on-primary" size="lg" />
+          </div>
+          <h1 className="text-3xl font-black tracking-tight text-on-surface mb-2">
+            {mode === 'login' ? 'Σύνδεση' : 'Εγγραφή'}
+          </h1>
           <p className={styles.bodyText}>
-            Εισάγετε το email σας για να συνδεθείτε
+            {mode === 'login' ? 'Εισάγετε τα στοιχεία σας' : 'Δημιουργήστε τον λογαριασμό σας'}
           </p>
         </div>
-        <Card className={`py-8 px-4 ${styles.shadowLg} sm:rounded-lg sm:px-10`}>
-          {!showRegisterOption ? (
-            <form onSubmit={handleLogin} className="space-y-6">
-              {/* User Type Switch */}
-              <SegmentedControl
-                options={[
-                  { value: 'client', label: 'Πελάτης' },
-                  { value: 'garage', label: 'Συνεργείο' }
-                ]}
-                value={userType}
-                onChange={setUserType}
-                variant="orange"
-                className="max-w-xs mx-auto"
-              />
 
-              <div>
-                <label className={`${styles.label} block mb-2`}>
-                  Email
-                </label>
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={setEmail}
-                  placeholder="π.χ. example@email.com"
+        {/* Card */}
+        <div className="bg-surface-container-lowest rounded-2xl p-8 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10">
+          <form onSubmit={mode === 'login' ? handleLogin : handleRegister} className="space-y-5">
+            {/* User Type Switch */}
+            <SegmentedControl
+              options={[
+                { value: 'client', label: 'Πελάτης' },
+                { value: 'garage', label: 'Συνεργείο' }
+              ]}
+              value={userType}
+              onChange={setUserType}
+              variant="orange"
+              className="max-w-xs mx-auto"
+            />
+
+            <div className="space-y-2">
+              <label className={styles.labelUpper}>Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="π.χ. example@email.com"
+                required
+                disabled={isLoading}
+                className={styles.input}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className={styles.labelUpper}>Κωδικός πρόσβασης</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={mode === 'register' ? 'Τουλάχιστον 6 χαρακτήρες' : 'Εισάγετε τον κωδικό σας'}
+                required
+                disabled={isLoading}
+                className={styles.input}
+              />
+            </div>
+
+            {mode === 'register' && (
+              <div className="space-y-2">
+                <label className={styles.labelUpper}>Επιβεβαίωση κωδικού</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Επαναλάβετε τον κωδικό"
                   required
                   disabled={isLoading}
-                  className="text-gray-900"
+                  className={styles.input}
                 />
+                {confirmPassword && password !== confirmPassword && (
+                  <p className="text-xs text-error">Οι κωδικοί δεν ταιριάζουν</p>
+                )}
               </div>
+            )}
 
-              <button
-                type="submit"
-                className={`${styles.btnPrimary} w-full text-base py-3`}
-                disabled={isLoading || !email.trim()}
-              >
-                <HiArrowRightOnRectangle className="h-5 w-5" />
-                {isLoading ? 'Σύνδεση...' : 'Σύνδεση'}
-              </button>
-            </form>
-          ) : (
-            <div className="space-y-6">
-              <div className="text-center">
-                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100">
-                  <HiExclamationTriangle className="h-6 w-6 text-yellow-600" />
-                </div>
-                
-                <h3 className={`${styles.sectionTitle} mt-4`}>
-                  Δεν βρέθηκε λογαριασμός
-                </h3>
-                
-                <p className={`${styles.bodyText} mt-2`}>
-                  Δεν υπάρχει {userType === 'garage' ? 'συνεργείο' : 'λογαριασμός'} με το email{' '}
-                  <span className="font-medium text-gray-900">{notFoundEmail}</span>
-                </p>
-              </div>
+            <button
+              type="submit"
+              className={`${styles.btnPrimary} w-full justify-center text-base py-3.5 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={isLoading}
+            >
+              <Icon name={mode === 'login' ? 'login' : 'person_add'} size="sm" />
+              {isLoading ? 'Παρακαλώ περιμένετε...' : (mode === 'login' ? 'Σύνδεση' : 'Εγγραφή')}
+            </button>
+          </form>
 
-              <div className="space-y-3">
-                <button
-                  onClick={handleRegister}
-                  className={`${styles.btnPrimary} w-full text-base py-3`}
-                  disabled={isLoading}
-                >
-                  {isLoading ? 'Δημιουργία...' : (userType === 'garage' ? 'Εγγραφή ως Συνεργείο' : 'Δημιουργία Νέου Λογαριασμού')}
-                </button>
-                
-                <button
-                  onClick={handleTryAnotherEmail}
-                  className={`${styles.btnSecondary} w-full text-base py-3`}
-                  disabled={isLoading}
-                >
-                  Δοκιμή Άλλου Email
-                </button>
-              </div>
-            </div>
-          )}
-        </Card>
+          <div className="mt-5 text-center">
+            <button
+              onClick={() => {
+                setMode(mode === 'login' ? 'register' : 'login')
+                setPassword('')
+                setConfirmPassword('')
+              }}
+              className={styles.linkText}
+            >
+              {mode === 'login' ? 'Δεν έχετε λογαριασμό; Εγγραφείτε' : 'Έχετε λογαριασμό; Συνδεθείτε'}
+            </button>
+          </div>
+        </div>
 
         <div className="mt-6 text-center">
-          <p className={styles.smallText}>
-            Δεν έχετε λογαριασμό;{' '}
-            <button
-              onClick={() => router.push('/')}
-              className={`font-medium ${styles.linkText}`}
-            >
-              Επιστροφή στην Αρχική
-            </button>
-          </p>
+          <button
+            onClick={() => router.push('/')}
+            className={styles.linkText}
+          >
+            Επιστροφή στην Αρχική
+          </button>
         </div>
       </div>
     </div>

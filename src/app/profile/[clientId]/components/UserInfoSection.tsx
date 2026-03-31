@@ -1,10 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { HiUser, HiPencil, HiCheck, HiXMark, HiEnvelope, HiPhone, HiMapPin } from 'react-icons/hi2'
-import Card from '../../../../components/Card'
-import Button from '../../../../components/Button'
-import Input from '../../../../components/Input'
+import Icon from '@/components/ui/Icon'
 import { styles } from '../../../../styles/styles'
 
 interface Client {
@@ -76,161 +73,83 @@ export default function UserInfoSection({ client, onUpdate }: UserInfoSectionPro
     setIsEditing(false)
   }
 
+  const fields: { key: keyof typeof formData; label: string; icon: string; type: string; placeholder: string; colSpan?: boolean }[] = [
+    { key: 'firstName', label: 'Όνομα', icon: 'person', type: 'text', placeholder: 'Όνομα' },
+    { key: 'lastName', label: 'Επώνυμο', icon: 'badge', type: 'text', placeholder: 'Επώνυμο' },
+    { key: 'email', label: 'Email', icon: 'mail', type: 'email', placeholder: 'example@email.com' },
+    { key: 'phoneNumber', label: 'Τηλέφωνο', icon: 'phone', type: 'tel', placeholder: 'π.χ. 6912345678' },
+    { key: 'address', label: 'Διεύθυνση', icon: 'location_on', type: 'text', placeholder: 'Διεύθυνση', colSpan: true },
+  ]
+
   return (
-    <Card variant="default" padding="lg">
+    <div className={styles.card}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
+      <div className="flex items-center justify-between mb-6 pb-4 border-b border-outline-variant/10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-            <HiUser className="h-5 w-5 text-orange-600" />
+          <div className="w-10 h-10 bg-surface-container rounded-lg flex items-center justify-center">
+            <Icon name="person" filled className="text-primary" />
           </div>
           <h2 className={`${styles.sectionTitle} mb-0`}>Στοιχεία Χρήστη</h2>
         </div>
         {!isEditing && (
-          <Button
-            variant="outline"
-            size="sm"
+          <button
             onClick={() => setIsEditing(true)}
+            className={styles.btnOutline}
           >
-            <HiPencil className="h-4 w-4" />
+            <Icon name="edit" size="sm" />
             Επεξεργασία
-          </Button>
+          </button>
         )}
       </div>
 
       {/* Content */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* First Name */}
-        <div className="space-y-2">
-          <label className={`${styles.label} flex items-center gap-2`}>
-            <HiUser className="h-4 w-4 text-gray-500" />
-            Όνομα
-          </label>
-          {isEditing ? (
-            <Input
-              type="text"
-              value={formData.firstName}
-              onChange={(value) => handleInputChange('firstName', value)}
-              placeholder="Όνομα"
-              required
-            />
-          ) : (
-            <div className="px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-              <p className={`${styles.bodyText} text-gray-900 font-medium`}>
-                {client.firstName || '-'}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Last Name */}
-        <div className="space-y-2">
-          <label className={styles.label}>Επώνυμο</label>
-          {isEditing ? (
-            <Input
-              type="text"
-              value={formData.lastName}
-              onChange={(value) => handleInputChange('lastName', value)}
-              placeholder="Επώνυμο"
-            />
-          ) : (
-            <div className="px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-              <p className={`${styles.bodyText} text-gray-900 font-medium`}>
-                {client.lastName || '-'}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Email */}
-        <div className="space-y-2">
-          <label className={`${styles.label} flex items-center gap-2`}>
-            <HiEnvelope className="h-4 w-4 text-gray-500" />
-            Email
-          </label>
-          {isEditing ? (
-            <Input
-              type="email"
-              value={formData.email}
-              onChange={(value) => handleInputChange('email', value)}
-              placeholder="example@email.com"
-            />
-          ) : (
-            <div className="px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-              <p className={`${styles.bodyText} text-gray-900 font-medium`}>
-                {client.email || '-'}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Phone Number */}
-        <div className="space-y-2">
-          <label className={`${styles.label} flex items-center gap-2`}>
-            <HiPhone className="h-4 w-4 text-gray-500" />
-            Τηλέφωνο
-          </label>
-          {isEditing ? (
-            <Input
-              type="tel"
-              value={formData.phoneNumber}
-              onChange={(value) => handleInputChange('phoneNumber', value)}
-              placeholder="π.χ. 6912345678"
-            />
-          ) : (
-            <div className="px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-              <p className={`${styles.bodyText} text-gray-900 font-medium`}>
-                {client.phoneNumber || '-'}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Address - Full width */}
-        <div className="space-y-2 md:col-span-2">
-          <label className={`${styles.label} flex items-center gap-2`}>
-            <HiMapPin className="h-4 w-4 text-gray-500" />
-            Διεύθυνση
-          </label>
-          {isEditing ? (
-            <Input
-              type="text"
-              value={formData.address}
-              onChange={(value) => handleInputChange('address', value)}
-              placeholder="Διεύθυνση"
-            />
-          ) : (
-            <div className="px-4 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-              <p className={`${styles.bodyText} text-gray-900 font-medium`}>
-                {client.address || '-'}
-              </p>
-            </div>
-          )}
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {fields.map((field) => (
+          <div key={field.key} className={`space-y-2 ${field.colSpan ? 'md:col-span-2' : ''}`}>
+            <label className={`${styles.labelUpper} flex items-center gap-2`}>
+              <Icon name={field.icon} size="sm" className="text-on-surface-variant" />
+              {field.label}
+            </label>
+            {isEditing ? (
+              <input
+                type={field.type}
+                value={formData[field.key]}
+                onChange={(e) => handleInputChange(field.key, e.target.value)}
+                placeholder={field.placeholder}
+                className={styles.input}
+              />
+            ) : (
+              <div className="px-4 py-3.5 bg-surface-container-highest/50 rounded-xl">
+                <p className="text-sm font-medium text-on-surface">
+                  {client[field.key] || '-'}
+                </p>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
       {/* Edit Action Buttons */}
       {isEditing && (
-        <div className="flex gap-3 pt-6 mt-6 border-t border-gray-200">
-          <Button
-            variant="primary"
+        <div className="flex gap-3 pt-6 mt-6 border-t border-outline-variant/10">
+          <button
             onClick={handleSave}
-            loading={isSubmitting}
-            disabled={!formData.firstName.trim()}
+            disabled={isSubmitting || !formData.firstName.trim()}
+            className={`${styles.btnPrimary} ${(isSubmitting || !formData.firstName.trim()) ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            <HiCheck className="h-4 w-4" />
-            Αποθήκευση
-          </Button>
-          <Button
-            variant="secondary"
+            <Icon name="check" size="sm" />
+            {isSubmitting ? 'Αποθήκευση...' : 'Αποθήκευση'}
+          </button>
+          <button
             onClick={handleCancel}
             disabled={isSubmitting}
+            className={styles.btnOutline}
           >
-            <HiXMark className="h-4 w-4" />
+            <Icon name="close" size="sm" />
             Ακύρωση
-          </Button>
+          </button>
         </div>
       )}
-    </Card>
+    </div>
   )
 }

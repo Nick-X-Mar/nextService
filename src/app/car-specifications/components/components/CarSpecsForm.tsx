@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { HiArrowRight, HiCloudArrowUp, HiPhoto, HiInformationCircle } from 'react-icons/hi2'
-import { styles } from '../../../../styles/styles'
+import Icon from '@/components/ui/Icon'
+import GearSubmitButton from '@/components/GearSubmitButton'
+import LoginModal from '@/components/LoginModal'
 import { saveFormData, loadFormData } from '../../../../utils/formStorage'
 import { useToast } from '../../../../hooks/useToast'
-import { Button } from '@/components'
 import Image from 'next/image'
 
 interface CarSpecsFormProps {
@@ -30,6 +30,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   const { success, error } = useToast()
   const [vinNumber, setVinNumber] = useState('')
   const [engineNumber, setEngineNumber] = useState('')
+  const [email, setEmail] = useState('')
   const [hasLicensePhoto, setHasLicensePhoto] = useState(false)
   const [licensePhoto, setLicensePhoto] = useState<File | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -38,14 +39,22 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   const [estimatedPrice, setEstimatedPrice] = useState<number | null>(null)
   const [isEstimatingPrice, setIsEstimatingPrice] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [emailExists, setEmailExists] = useState(false)
+  const [emailCheckName, setEmailCheckName] = useState('')
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false)
 
   // Load saved data on component mount
   useEffect(() => {
     setMounted(true)
+    setIsLoggedIn(!!localStorage.getItem('clientId'))
     const data = loadFormData()
     if (data.vinNumber) setVinNumber(data.vinNumber)
     if (data.engineNumber) setEngineNumber(data.engineNumber)
-    
+
     // Estimate price when component mounts if not already estimated
     if (!data.estimatedPrice && data.brand && data.model && data.modelYear && data.engineCC && data.fuelType) {
       estimatePrice(data)
@@ -76,7 +85,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
       })
 
       const result = await response.json()
-      
+
       if (result.success && result.estimation) {
         setEstimatedPrice(result.estimation.estimatedCost)
         // Save estimated price to form data
@@ -110,26 +119,59 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
     }
   }
 
-  const isFormValid = 
+  const isEmailValid = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
+  const isPasswordValid = password.length >= 6 && password === confirmPassword
+
+  // Debounced email check
+  const checkEmail = useCallback(async (emailToCheck: string) => {
+    if (!isEmailValid(emailToCheck)) return
+    setIsCheckingEmail(true)
+    try {
+      const res = await fetch('/api/auth/check-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailToCheck, userType: 'client' })
+      })
+      const data = await res.json()
+      setEmailExists(data.exists)
+      setEmailCheckName(data.firstName || '')
+    } catch {
+      setEmailExists(false)
+    } finally {
+      setIsCheckingEmail(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!mounted || isLoggedIn || !isEmailValid(email)) {
+      setEmailExists(false)
+      return
+    }
+    const timer = setTimeout(() => checkEmail(email), 800)
+    return () => clearTimeout(timer)
+  }, [email, mounted, isLoggedIn, checkEmail])
+
+  const isFormValid =
     vinNumber.trim() !== '' &&
-    (engineNumber.trim() !== '' || licensePhoto !== null)
+    (engineNumber.trim() !== '' || licensePhoto !== null) &&
+    (isLoggedIn || (isEmailValid(email) && !emailExists && isPasswordValid))
 
   const handleSubmit = async () => {
     if (isFormValid) {
       setIsSubmitting(true)
-      
+
       // Save final data
       saveFormData({
         vinNumber,
         engineNumber
       })
-      
+
       // Get client ID from localStorage if user is logged in
       const loggedInClientId = localStorage.getItem('clientId')
-      
+
       // Load latest form data to include originalVehicleId and originalVehicleData
       const latestFormData = loadFormData()
-      
+
       const serviceRequest = {
         ...savedData,
         vinNumber,
@@ -139,9 +181,11 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
         ...(latestFormData.originalVehicleId && { originalVehicleId: latestFormData.originalVehicleId }),
         ...(latestFormData.originalVehicleData && { originalVehicleData: latestFormData.originalVehicleData }),
         // Include client ID if user is logged in
-        ...(loggedInClientId && { clientId: loggedInClientId })
+        ...(loggedInClientId && { clientId: loggedInClientId }),
+        // Include email and password for new users
+        ...(!loggedInClientId && email && { email, password })
       }
-      
+
       try {
         const response = await fetch('/api/service-request', {
           method: 'POST',
@@ -152,17 +196,17 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
         })
 
         const result = await response.json()
-        
+
         if (!response.ok) {
-          error('Σφάλμα', result.error || 'Σφάλμα κατά την αποστολή')
+          error('Λείπουν στοιχεία', result.error || 'Σφάλμα κατά την αποστολή')
           return
         }
-        
+
         if (result.success) {
-          const fuelText = savedData.fuelType === 'petrol' ? 'Βενζίνη' : 'Πετρέλαιο'
-          const transmissionText = savedData.isAutomatic ? 'Αυτόματο' : 'Χειροκίνητο'
+          const fuelText = savedData.fuelType === 'petrol' ? 'Βενζινη' : 'Πετρελαιο'
+          const transmissionText = savedData.isAutomatic ? 'Αυτοματο' : 'Χειροκινητο'
           const driveText = savedData.is4x4 ? '4x4' : '2WD'
-          
+
           // Store service request and vehicle data in localStorage for potential deduplication (only for guest users)
           if (!loggedInClientId) {
             const pendingRegistrationData = {
@@ -182,15 +226,15 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
               clientId: result.clientId,
               timestamp: Date.now()
             }
-            
+
             localStorage.setItem('pendingRegistrationData', JSON.stringify(pendingRegistrationData))
           }
-          
+
           success(
-            'Επιτυχία!', 
-            `${savedData.brand} ${savedData.model} (${savedData.modelYear}), ${savedData.engineCC}cc, ${fuelText}, ${transmissionText}, ${driveText}\n\n📱 Στάλθηκε ειδοποίηση σε ${result.notificationsSent} συνεργεία μέσω SMS!\n\nΑνακατεύθυνση στη σελίδα αιτημάτων...`
+            'Επιτυχια!',
+            `${savedData.brand} ${savedData.model} (${savedData.modelYear}), ${savedData.engineCC}cc, ${fuelText}, ${transmissionText}, ${driveText}\n\nΣταλθηκε ειδοποιηση σε ${result.notificationsSent} συνεργεια μεσω SMS!\n\nΑνακατευθυνση στη σελιδα αιτηματων...`
           )
-          
+
           // Redirect to requests page with clientId
           if (result.clientId) {
             router.push(`/requests/${result.clientId}`)
@@ -201,11 +245,11 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
             router.push('/requests')
           }
         } else {
-          error('Σφάλμα', result.error || 'Άγνωστο σφάλμα')
+          error('Σφαλμα', result.error || 'Αγνωστο σφαλμα')
         }
       } catch (err) {
         console.error('Error submitting service request:', err)
-        error('Σφάλμα', 'Σφάλμα κατά την αποστολή. Παρακαλώ δοκιμάστε ξανά.')
+        error('Σφαλμα', 'Σφαλμα κατα την αποστολη. Παρακαλω δοκιμαστε ξανα.')
       } finally {
         setIsSubmitting(false)
       }
@@ -217,209 +261,350 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   }
 
   return (
-    <section className="bg-white">
-      <div className={`${styles.container} py-24`}>
-        <div className="text-center">
-          <h1 className={styles.pageTitle}>
-            Τεχνικά <span className={styles.titleHighlight}>Στοιχεία</span>
-          </h1>
-          <p className={`mt-3 max-w-md mx-auto ${styles.bodyText} sm:text-lg md:mt-5 md:text-xl md:max-w-3xl`}>
-            Παρακαλώ συμπληρώστε τα προχωρημένα τεχνικά στοιχεία του αυτοκινήτου σας
-          </p>
-          
-          {/* Show selected car details */}
-          <div className={`${styles.cardSimple} mt-8 max-w-md mx-auto`}>
-            <h3 className={`${styles.cardTitle} mb-2`}>Επιλεγμένο Όχημα:</h3>
-            <p className={styles.smallText}>{savedData.brand} {savedData.model} ({savedData.modelYear})</p>
-            <p className={styles.smallText}>Κυβισμός: {savedData.engineCC}cc</p>
-            <p className={styles.smallText}>Κατηγορία: {savedData.category}</p>
-          </div>
+    <section className="pb-4 pt-8">
+      <div className="max-w-lg mx-auto px-5">
+        {/* Step progress indicator - 4 bars */}
+        <div className="flex gap-2 mb-6">
+          <div className="flex-1 h-1 rounded-full bg-primary-container" />
+          <div className="flex-1 h-1 rounded-full bg-primary-container" />
+          <div className="flex-1 h-1 rounded-full bg-surface-container-highest" />
+          <div className="flex-1 h-1 rounded-full bg-surface-container-highest" />
+        </div>
 
-          {/* Show estimated cost */}
-          {(estimatedPrice || isEstimatingPrice) && (
-            <div className={`${styles.cardSimple} mt-4 max-w-md mx-auto bg-orange-50 border-orange-200`}>
-              <h3 className={`${styles.cardTitle} mb-2 text-orange-800`}>Εκτιμώμενο Κόστος:</h3>
-              {isEstimatingPrice ? (
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-600"></div>
-                  <p className="text-lg text-orange-600">Υπολογισμός...</p>
-                </div>
-              ) : (
-                <p className="text-2xl font-bold text-orange-600">{estimatedPrice}€</p>
-              )}
-              <p className="text-xs text-orange-600 mt-1">
-                Για να λάβετε πραγματικές προσφορές από συνεργεία, συμπληρώστε τα τεχνικά στοιχεία παρακάτω
+        {/* Page title */}
+        <h1 className="text-[2rem] font-black tracking-[-0.02em] text-on-surface">
+          Τεχνικα Στοιχεια
+        </h1>
+        <p className="mt-1 text-sm text-on-surface-variant leading-relaxed">
+          Συμπληρωστε τα προχωρημενα τεχνικα στοιχεια του οχηματος σας
+        </p>
+
+        {/* Selected Vehicle summary card */}
+        <div className="mt-6 bg-surface-container-lowest rounded-2xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Icon name="directions_car" className="text-primary" size="md" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
+                ΕΠΙΛΕΓΜΕΝΟ ΟΧΗΜΑ
               </p>
-            </div>
-          )}
-          
-          <div className="mt-8 max-w-md mx-auto">
-            <div className={styles.card}>
-              {/* Engine Number or License Photo */}
-              <div className={styles.fieldGroup}>
-                <div className={styles.fieldLabelWithIcon}>
-                  <label className={styles.label}>
-                    Κινητήρας ή Άδεια:
-                  </label>
-                  <div className="relative">
-                    <HiInformationCircle 
-                      className={styles.infoIcon}
-                      onMouseEnter={() => setShowEngineInfo(true)}
-                      onMouseLeave={() => setShowEngineInfo(false)}
-                    />
-                    {showEngineInfo && (
-                      <div className={styles.tooltip}>
-                        <div className="text-left">
-                          <p className={styles.tooltipTitle}>Πού να βρείτε τον αριθμό κινητήρα:</p>
-                          <Image 
-                            src="/images/engine-number-location.jpg" 
-                            alt="Θέση αριθμού κινητήρα"
-                            width={300}
-                            height={200}
-                            className={styles.tooltipImage}
-                            onError={(e) => {
-                              e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEyOCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NzM4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkVuZ2luZSBOdW1iZXIgTG9jYXRpb248L3RleHQ+PC9zdmc+'
-                            }}
-                          />
-                          <p className={styles.tooltipText}>
-                            Συνήθως βρίσκεται στο μπλοκ του κινητήρα ή στην άδεια κυκλοφορίας
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                <div className={styles.fieldContainer}>
-                  {/* Toggle between text input and photo upload */}
-                  <div className={styles.toggleContainer}>
-                    <button
-                      type="button"
-                      onClick={() => setHasLicensePhoto(false)}
-                      className={!hasLicensePhoto ? styles.toggleBtnActive : styles.toggleBtnInactive}
-                    >
-                      Αριθμός
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setHasLicensePhoto(true)}
-                      className={hasLicensePhoto ? styles.toggleBtnActive : styles.toggleBtnInactive}
-                    >
-                      Φωτό
-                    </button>
-                  </div>
-
-                  {!hasLicensePhoto ? (
-                    <input
-                      type="text"
-                      value={engineNumber}
-                      onChange={(e) => setEngineNumber(e.target.value)}
-                      placeholder="π.χ. ABC123456"
-                      className={styles.input}
-                    />
-                  ) : (
-                    <div className={styles.fileUploadArea}>
-                      <input
-                        type="file"
-                        id="license-photo"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
-                      <label htmlFor="license-photo" className="cursor-pointer">
-                        {licensePhoto ? (
-                          <div className={styles.fileUploadSelected}>
-                            <HiPhoto className={styles.fileUploadIcon} />
-                            <p className={styles.fileUploadText}>{licensePhoto.name}</p>
-                            <p className={styles.fileUploadSubtext}>Κάντε κλικ για αλλαγή</p>
-                          </div>
-                        ) : (
-                          <div className={styles.fileUploadPlaceholder}>
-                            <HiCloudArrowUp className={styles.fileUploadIcon} />
-                            <p className={styles.fileUploadText}>Κάντε κλικ για ανέβασμα</p>
-                            <p className={styles.fileUploadSubtext}>JPG, PNG μέχρι 10MB</p>
-                          </div>
-                        )}
-                      </label>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* VIN Number - Now last field */}
-              <div className={styles.fieldGroup}>
-                <div className={styles.fieldLabelWithIcon}>
-                  <label className={styles.label}>
-                    VIN:
-                  </label>
-                  <div className="relative">
-                    <HiInformationCircle 
-                      className={styles.infoIcon}
-                      onMouseEnter={() => setShowVinInfo(true)}
-                      onMouseLeave={() => setShowVinInfo(false)}
-                    />
-                    {showVinInfo && (
-                      <div className={styles.tooltip}>
-                        <div className="text-left">
-                          <p className={styles.tooltipTitle}>Πού να βρείτε τον αριθμό πλαισίου:</p>
-                          <Image 
-                            src="/images/vin-number-location.jpg" 
-                            alt="Θέση αριθμού πλαισίου VIN"
-                            width={300}
-                            height={200}
-                            className={styles.tooltipImage}
-                            onError={(e) => {
-                              e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEyOCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NzM4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPldJTiBOdW1iZXIgTG9jYXRpb248L3RleHQ+PC9zdmc+'
-                            }}
-                          />
-                          <p className={styles.tooltipText}>
-                            Βρίσκεται στο ντασμπόρτ (κάτω από το παρμπρίζ), στο πλαίσιο της πόρτας οδηγού, ή στην άδεια κυκλοφορίας
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <input
-                  type="text"
-                  value={vinNumber}
-                  onChange={(e) => setVinNumber(e.target.value.toUpperCase())}
-                  placeholder="π.χ. WVWZZZ1JZ3W386752"
-                  className={styles.input}
-                  maxLength={17}
-                />
-                {vinNumber && vinNumber.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    {vinNumber.length}/17 χαρακτήρες
-                  </p>
-                )}
-              </div>
-              
-              <Button 
-                onClick={handleSubmit}
-                disabled={!isFormValid}
-                loading={isSubmitting}
-                variant="primary"
-                size="lg"
-                fullWidth
-                className="mt-4"
-              >
-                Ζήτα προσφορές
-                <HiArrowRight className="h-5 w-5" />
-              </Button>
-            </div>
-            
-            <div className="mt-4 text-center">
-              <button
-                onClick={handleGoBack}
-                className={`inline-block ${styles.linkText} font-medium transition-colors duration-200`}
-              >
-                ← Επιστροφή
-              </button>
+              <p className="text-sm font-bold text-on-surface">
+                {savedData.brand} {savedData.model} ({savedData.modelYear})
+              </p>
+              <p className="text-xs text-on-surface-variant">
+                {savedData.engineCC}cc &middot; {savedData.category}
+              </p>
             </div>
           </div>
         </div>
+
+        {/* Estimated cost card */}
+        {(estimatedPrice || isEstimatingPrice) && (
+          <div className="mt-3 bg-primary/5 rounded-2xl border border-primary/10 p-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Icon name="payments" className="text-primary" size="md" />
+              </div>
+              <div className="flex-1">
+                <p className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
+                  Εκτιμωμενο Κοστος
+                </p>
+                {isEstimatingPrice ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    <p className="text-sm text-primary font-medium">Υπολογισμος...</p>
+                  </div>
+                ) : (
+                  <p className="text-xl font-black text-primary">{estimatedPrice}EUR</p>
+                )}
+              </div>
+            </div>
+            <p className="text-[10px] text-on-surface-variant mt-2 ml-[52px]">
+              Συμπληρωστε τα στοιχεια για πραγματικες προσφορες
+            </p>
+          </div>
+        )}
+
+        {/* Main form card */}
+        <div className="mt-6 space-y-6">
+
+          {/* Email & Password for guest users */}
+          {mounted && !isLoggedIn && (
+            <div className="space-y-5">
+              {/* Email */}
+              <div className="space-y-3">
+                <label className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
+                  Email <span className="text-error">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="π.χ. example@email.com"
+                    className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 pr-12 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
+                  />
+                  <Icon name={isCheckingEmail ? 'progress_activity' : 'mail'} className={`absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/50 ${isCheckingEmail ? 'animate-spin' : ''}`} size="md" />
+                </div>
+                {email && !isEmailValid(email) && (
+                  <p className="text-xs text-error flex items-center gap-1">
+                    <Icon name="error" size="sm" className="text-error" /> Μη έγκυρη διεύθυνση email
+                  </p>
+                )}
+                {emailExists && (
+                  <div className="bg-primary/5 border border-primary/10 rounded-xl p-4 space-y-3">
+                    <p className="text-sm text-on-surface">
+                      Αυτό το email χρησιμοποιείται ήδη. Συνδεθείτε για να συνεχίσετε.
+                    </p>
+                    <button
+                      onClick={() => setShowLoginModal(true)}
+                      className="w-full h-10 rounded-xl bg-primary text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+                    >
+                      <Icon name="login" size="sm" />
+                      Σύνδεση
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Password fields - only if email is valid and doesn't exist */}
+              {isEmailValid(email) && !emailExists && (
+                <>
+                  <div className="space-y-3">
+                    <label className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
+                      Κωδικός πρόσβασης <span className="text-error">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Τουλάχιστον 6 χαρακτήρες"
+                        className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 pr-12 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
+                      />
+                      <Icon name="lock" className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/50" size="md" />
+                    </div>
+                    {password && password.length < 6 && (
+                      <p className="text-xs text-error flex items-center gap-1">
+                        <Icon name="error" size="sm" className="text-error" /> Τουλάχιστον 6 χαρακτήρες
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
+                      Επιβεβαίωση κωδικού <span className="text-error">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Επαναλάβετε τον κωδικό"
+                        className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 pr-12 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
+                      />
+                      <Icon name="lock" className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/50" size="md" />
+                    </div>
+                    {confirmPassword && password !== confirmPassword && (
+                      <p className="text-xs text-error flex items-center gap-1">
+                        <Icon name="error" size="sm" className="text-error" /> Οι κωδικοί δεν ταιριάζουν
+                      </p>
+                    )}
+                    {confirmPassword && password === confirmPassword && password.length >= 6 && (
+                      <p className="text-xs text-green-600 flex items-center gap-1">
+                        <Icon name="check_circle" size="sm" className="text-green-600" /> Θα δημιουργηθεί ο λογαριασμός σας κατά την υποβολή
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Engine Number or License Photo */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <label className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
+                Κινητηρας η Αδεια
+              </label>
+              <div className="relative">
+                <Icon
+                  name="info"
+                  size="sm"
+                  className="text-primary cursor-help"
+                  onClick={() => setShowEngineInfo(!showEngineInfo)}
+                />
+                {showEngineInfo && (
+                  <div className="absolute top-6 left-0 z-50 bg-surface-container-lowest border border-outline-variant/20 rounded-xl shadow-lg p-4 w-64">
+                    <div className="text-left">
+                      <p className="text-sm font-bold text-on-surface mb-2">Που να βρειτε τον αριθμο κινητηρα:</p>
+                      <Image
+                        src="/images/engine-number-location.jpg"
+                        alt="Θεση αριθμου κινητηρα"
+                        width={300}
+                        height={200}
+                        className="w-full h-32 object-cover rounded-lg mb-2"
+                        onError={(e) => {
+                          e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEyOCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NzM4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkVuZ2luZSBOdW1iZXIgTG9jYXRpb248L3RleHQ+PC9zdmc+'
+                        }}
+                      />
+                      <p className="text-xs text-secondary">
+                        Συνηθως βρισκεται στο μπλοκ του κινητηρα η στην αδεια κυκλοφοριας
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Toggle between text input and photo upload */}
+            <div className="bg-surface-container-high p-1.5 rounded-full flex gap-1">
+              <button
+                type="button"
+                onClick={() => setHasLicensePhoto(false)}
+                className={
+                  !hasLicensePhoto
+                    ? 'flex-1 py-2.5 rounded-full font-bold text-xs bg-primary-container text-white shadow-lg text-center transition-all'
+                    : 'flex-1 py-2.5 rounded-full font-bold text-xs text-on-surface-variant hover:bg-surface-variant text-center transition-all'
+                }
+              >
+                Αριθμος
+              </button>
+              <button
+                type="button"
+                onClick={() => setHasLicensePhoto(true)}
+                className={
+                  hasLicensePhoto
+                    ? 'flex-1 py-2.5 rounded-full font-bold text-xs bg-primary-container text-white shadow-lg text-center transition-all'
+                    : 'flex-1 py-2.5 rounded-full font-bold text-xs text-on-surface-variant hover:bg-surface-variant text-center transition-all'
+                }
+              >
+                Φωτο
+              </button>
+            </div>
+
+            {!hasLicensePhoto ? (
+              <input
+                type="text"
+                value={engineNumber}
+                onChange={(e) => setEngineNumber(e.target.value)}
+                placeholder="π.χ. ABC123456"
+                className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
+              />
+            ) : (
+              <div className="border-2 border-dashed border-outline-variant/30 rounded-2xl p-8 text-center hover:border-primary transition-colors">
+                <input
+                  type="file"
+                  id="license-photo"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <label htmlFor="license-photo" className="cursor-pointer">
+                  {licensePhoto ? (
+                    <div className="text-green-600">
+                      <Icon name="photo" size="lg" className="mx-auto mb-2" />
+                      <p className="text-sm font-bold">{licensePhoto.name}</p>
+                      <p className="text-xs text-on-surface-variant">Κανε κλικ για αλλαγη</p>
+                    </div>
+                  ) : (
+                    <div className="text-on-surface-variant">
+                      <Icon name="cloud_upload" size="lg" className="mx-auto mb-2" />
+                      <p className="text-sm font-bold">Κανε κλικ για ανεβασμα</p>
+                      <p className="text-xs text-on-surface-variant">JPG, PNG μεχρι 10MB</p>
+                    </div>
+                  )}
+                </label>
+              </div>
+            )}
+          </div>
+
+          {/* VIN Number */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <label className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
+                VIN (Αριθμος Πλαισιου)
+              </label>
+              <div className="relative">
+                <Icon
+                  name="info"
+                  size="sm"
+                  className="text-primary cursor-help"
+                  onClick={() => setShowVinInfo(!showVinInfo)}
+                />
+                {showVinInfo && (
+                  <div className="absolute top-6 left-0 z-50 bg-surface-container-lowest border border-outline-variant/20 rounded-xl shadow-lg p-4 w-64">
+                    <div className="text-left">
+                      <p className="text-sm font-bold text-on-surface mb-2">Που να βρειτε τον αριθμο πλαισιου:</p>
+                      <Image
+                        src="/images/vin-number-location.jpg"
+                        alt="Θεση αριθμου πλαισιου VIN"
+                        width={300}
+                        height={200}
+                        className="w-full h-32 object-cover rounded-lg mb-2"
+                        onError={(e) => {
+                          e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEyOCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NzM4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPldJTiBOdW1iZXIgTG9jYXRpb248L3RleHQ+PC9zdmc+'
+                        }}
+                      />
+                      <p className="text-xs text-secondary">
+                        Βρισκεται στο ντασμπορντ (κατω απο το παρμπριζ), στο πλαισιο της πορτας οδηγου, η στην αδεια κυκλοφοριας
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                value={vinNumber}
+                onChange={(e) => setVinNumber(e.target.value.toUpperCase())}
+                placeholder="π.χ. WVWZZZ1JZ3W386752"
+                className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 pr-12 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
+                maxLength={17}
+              />
+              <Icon name="pin" className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/50" size="md" />
+            </div>
+            {vinNumber && vinNumber.length > 0 && (
+              <p className="text-xs text-on-surface-variant">
+                {vinNumber.length}/17 χαρακτηρες
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Submit section */}
+        <div className="mt-8">
+          <GearSubmitButton
+            onClick={handleSubmit}
+            disabled={!isFormValid}
+            isLoading={isSubmitting}
+          />
+
+          {/* Back link */}
+          <div className="mt-3 text-center">
+            <button
+              onClick={handleGoBack}
+              className="text-primary hover:text-primary-container font-bold text-sm transition-colors duration-200"
+            >
+              Επιστροφη
+            </button>
+          </div>
+        </div>
       </div>
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        email={email}
+        firstName={emailCheckName}
+        onLoginSuccess={(clientId) => {
+          setIsLoggedIn(true)
+          localStorage.setItem('clientId', clientId)
+        }}
+      />
     </section>
   )
-} 
+}

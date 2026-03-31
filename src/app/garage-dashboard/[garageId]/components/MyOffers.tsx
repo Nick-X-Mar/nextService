@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card, Badge } from '@/components'
 import { styles } from '@/styles/styles'
 import { OfferStatus } from '@/types/statuses'
+import Icon from '@/components/ui/Icon'
 
 interface Offer {
   id: string
@@ -49,7 +49,7 @@ export default function MyOffers({ garageId }: MyOffersProps) {
   const loadOffers = async () => {
     try {
       setIsLoading(true)
-      
+
       const response = await fetch(`/api/garage/offers?garageId=${garageId}`)
       const data = await response.json()
 
@@ -67,33 +67,48 @@ export default function MyOffers({ garageId }: MyOffersProps) {
     }
   }
 
-  const getStatusBadgeVariant = (status: OfferStatus) => {
+  const getStatusStyle = (status: OfferStatus) => {
     switch (status) {
       case OfferStatus.PENDING:
-        return 'warning'
+        return 'text-[0.65rem] font-black uppercase tracking-[0.1em] text-primary bg-primary/10 px-2 py-1 rounded-sm'
       case OfferStatus.ACCEPTED:
-        return 'success'
+        return 'text-[0.65rem] font-black uppercase tracking-[0.1em] text-green-700 bg-green-100 px-2 py-1 rounded-sm'
       case OfferStatus.REJECTED:
-        return 'danger'
+        return 'text-[0.65rem] font-black uppercase tracking-[0.1em] text-red-700 bg-red-100 px-2 py-1 rounded-sm'
       case OfferStatus.EXPIRED:
-        return 'secondary'
+        return 'text-[0.65rem] font-black uppercase tracking-[0.1em] text-on-surface-variant bg-surface-container px-2 py-1 rounded-sm'
       default:
-        return 'secondary'
+        return 'text-[0.65rem] font-black uppercase tracking-[0.1em] text-on-surface-variant bg-surface-container px-2 py-1 rounded-sm'
     }
   }
 
   const getStatusText = (status: OfferStatus) => {
     switch (status) {
       case OfferStatus.PENDING:
-        return 'Εκκρεμείς'
+        return 'Εκκρεμης'
       case OfferStatus.ACCEPTED:
-        return 'Αποδεκτές'
+        return 'Αποδεκτη'
       case OfferStatus.REJECTED:
-        return 'Απορριφθείσες'
+        return 'Απορριφθηκε'
       case OfferStatus.EXPIRED:
-        return 'Λήξασες'
+        return 'Εληξε'
       default:
         return status
+    }
+  }
+
+  const getStatusIcon = (status: OfferStatus) => {
+    switch (status) {
+      case OfferStatus.PENDING:
+        return 'schedule'
+      case OfferStatus.ACCEPTED:
+        return 'check_circle'
+      case OfferStatus.REJECTED:
+        return 'cancel'
+      case OfferStatus.EXPIRED:
+        return 'timer_off'
+      default:
+        return 'help'
     }
   }
 
@@ -106,16 +121,16 @@ export default function MyOffers({ garageId }: MyOffersProps) {
     if (offer.status === OfferStatus.ACCEPTED && offer.appointmentDate) {
       return false
     }
-    
+
     if (filter === 'all') return true
     return offer.status === filter
   })
 
   if (isLoading) {
     return (
-      <div className="text-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
-        <p className={styles.bodyText}>Φόρτωση προσφορών...</p>
+      <div className="text-center py-12">
+        <div className={styles.loadingSpinner}></div>
+        <p className="text-sm text-secondary">Φορτωση προσφορων...</p>
       </div>
     )
   }
@@ -123,131 +138,138 @@ export default function MyOffers({ garageId }: MyOffersProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className={`${styles.sectionTitle} mb-2`}>
-            Οι Προσφορές μου
-          </h2>
-          <p className={styles.bodyText}>
-            Δείτε όλες τις προσφορές που έχετε κάνει για αιτήματα υπηρεσιών
-          </p>
-        </div>
-        <div className="text-sm text-gray-500">
-          Σύνολο: {filteredOffers.length} προσφορές
-        </div>
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight text-on-surface">
+          Οι Προσφορες μου
+        </h2>
+        <p className="text-base text-secondary leading-relaxed mt-1">
+          {filteredOffers.length} προσφορες συνολικα
+        </p>
       </div>
 
-      {/* Filter */}
-      <div className="flex space-x-2">
+      {/* Filter Chips */}
+      <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
         {(['all', OfferStatus.PENDING, OfferStatus.REJECTED] as const).map((status) => (
           <button
             key={status}
             onClick={() => setFilter(status)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === status
-                ? 'bg-orange-500 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            className={filter === status
+              ? 'bg-primary text-on-primary px-5 py-2 rounded-full text-sm font-bold whitespace-nowrap'
+              : 'bg-secondary-container text-on-secondary-container px-5 py-2 rounded-full text-sm font-bold whitespace-nowrap hover:bg-surface-container-high transition-colors cursor-pointer'
+            }
           >
-            {status === 'all' ? 'Όλες' : getStatusText(status)}
+            {status === 'all' ? 'Ολες' : getStatusText(status)}
           </button>
         ))}
       </div>
 
       {/* Offers List */}
       {filteredOffers.length === 0 ? (
-        <Card className="p-8 text-center">
-          <div className="text-gray-400 mb-4">
-            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          <h3 className={`${styles.sectionTitle} mb-2`}>
-            Δεν υπάρχουν προσφορές
-          </h3>
-          <p className={styles.bodyText}>
-            {filter === 'all' 
-              ? 'Δεν έχετε κάνει ακόμα καμία προσφορά. Ξεκινήστε να κάνετε προσφορές σε διαθέσιμα αιτήματα για να δείτε τις προσφορές σας εδώ.'
-              : `Δεν υπάρχουν προσφορές με κατάσταση "${getStatusText(filter)}".`
-            }
-          </p>
-          {filter === 'all' && (
-            <div className="mt-4">
+        <article className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10">
+          <div className="text-center py-8">
+            <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mx-auto mb-4">
+              <Icon name="description" size="lg" className="text-outline" />
+            </div>
+            <h3 className="text-2xl font-bold tracking-tight text-on-surface mb-2">
+              Δεν υπαρχουν προσφορες
+            </h3>
+            <p className="text-base text-secondary leading-relaxed mb-4">
+              {filter === 'all'
+                ? 'Δεν εχετε κανει ακομα καμια προσφορα.'
+                : `Δεν υπαρχουν προσφορες με κατασταση "${getStatusText(filter)}".`
+              }
+            </p>
+            {filter === 'all' && (
               <button
                 onClick={() => {
-                  // This would switch to the available requests tab
-                  // We'll need to pass a callback from the parent component
                   window.location.hash = 'available'
                 }}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-orange-500 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors"
+                className={styles.btnPrimary}
               >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Δείτε Διαθέσιμα Αιτήματα
+                <Icon name="add" size="sm" />
+                Δειτε Διαθεσιμα Αιτηματα
               </button>
-            </div>
-          )}
-        </Card>
+            )}
+          </div>
+        </article>
       ) : (
         <div className="space-y-4">
           {filteredOffers.map((offer) => (
-            <Card 
-              key={offer.id} 
-              className={`p-6 transition-shadow ${
+            <article
+              key={offer.id}
+              className={`bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10 transition-all duration-300 ${
                 offer.status === OfferStatus.REJECTED
-                  ? 'bg-gray-50 opacity-70 cursor-default'
-                  : 'cursor-pointer hover:shadow-lg'
-              }`} 
+                  ? 'opacity-60 cursor-default'
+                  : 'cursor-pointer hover:shadow-2xl hover:shadow-on-surface/5'
+              }`}
               onClick={() => {
                 if (offer.status !== OfferStatus.REJECTED) {
                   handleOfferClick(offer)
                 }
               }}
             >
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <h3 className={`${styles.sectionTitle} text-lg`}>
-                      {offer.serviceRequest.vehicle.brand} {offer.serviceRequest.vehicle.model} ({offer.serviceRequest.vehicle.year})
-                    </h3>
-                    <Badge variant={getStatusBadgeVariant(offer.status)}>
-                      {getStatusText(offer.status)}
-                    </Badge>
-                  </div>
-                  <p className={`${styles.bodyText} mb-2`}>
-                    <strong>Πελάτης:</strong> {offer.serviceRequest.client.firstName} {offer.serviceRequest.client.lastName}
-                  </p>
-                  <p className={`${styles.bodyText} mb-2`}>
-                    <strong>Αίτημα:</strong> {offer.serviceRequest.description}
-                  </p>
-                  <p className={`${styles.bodyText} mb-2`}>
-                    <strong>Κατηγορία:</strong> {offer.serviceRequest.category}
-                  </p>
-                  
-                </div>
+              {/* Status + Price row */}
+              <div className="flex items-start justify-between mb-4">
+                <span className={getStatusStyle(offer.status)}>
+                  {getStatusText(offer.status)}
+                </span>
                 <div className="text-right">
-                  <div className={`${styles.sectionTitle} text-2xl text-orange-600`}>
+                  <p className="text-2xl font-black text-primary tracking-tight">
                     {typeof offer.appointmentPrice === 'number'
                       ? offer.appointmentPrice
                       : offer.price}{' '}
-                    {offer.currency}
-                  </div>
-                  <p className={`${styles.smallText} text-gray-500`}>
+                    <span className="text-sm font-bold text-on-surface-variant">{offer.currency}</span>
+                  </p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mt-1">
                     {new Date(offer.createdAt).toLocaleDateString('el-GR')}
                   </p>
                 </div>
               </div>
-              
-              <div className="border-t pt-4">
-                <h4 className={`${styles.label} mb-2`}>Περιγραφή Προσφοράς:</h4>
-                <p className={styles.bodyText}>
+
+              {/* Vehicle Spec Bento Grid */}
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
+                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Μαρκα</span>
+                  <span className="text-xs font-bold text-on-surface">{offer.serviceRequest.vehicle.brand}</span>
+                </div>
+                <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
+                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Μοντελο</span>
+                  <span className="text-xs font-bold text-on-surface">{offer.serviceRequest.vehicle.model}</span>
+                </div>
+                <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
+                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Ετος</span>
+                  <span className="text-xs font-bold text-on-surface">{offer.serviceRequest.vehicle.year}</span>
+                </div>
+              </div>
+
+              {/* Client info bar */}
+              <div className="flex items-center gap-3 p-3 bg-surface-container-low rounded-lg mb-4">
+                <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black uppercase">
+                  {offer.serviceRequest.client.firstName?.charAt(0)}{offer.serviceRequest.client.lastName?.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-on-surface truncate">
+                    {offer.serviceRequest.client.firstName} {offer.serviceRequest.client.lastName}
+                  </p>
+                  <p className="text-xs text-secondary truncate">{offer.serviceRequest.category}</p>
+                </div>
+                <Icon name={getStatusIcon(offer.status)} filled size="sm" className={
+                  offer.status === OfferStatus.PENDING ? 'text-primary' :
+                  offer.status === OfferStatus.ACCEPTED ? 'text-green-600' :
+                  offer.status === OfferStatus.REJECTED ? 'text-tertiary' : 'text-secondary'
+                } />
+              </div>
+
+              {/* Offer description */}
+              <div className="border-t border-outline-variant/10 pt-4">
+                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mb-1">Περιγραφη Προσφορας</p>
+                <p className="text-sm text-on-surface-variant line-clamp-2">
                   {offer.description}
                 </p>
                 {offer.status === OfferStatus.ACCEPTED && offer.appointmentDate && (
-                  <p className={`${styles.smallText} text-green-700 mt-2`}>
-                    Ραντεβού:{' '}
-                    <span className="font-medium">
+                  <div className="flex items-center gap-2 mt-3 p-2 bg-green-50 rounded-lg">
+                    <Icon name="event" filled size="sm" className="text-green-700" />
+                    <span className="text-xs font-bold text-green-700">
                       {new Date(`${offer.appointmentDate}T00:00:00`).toLocaleDateString('el-GR', {
                         day: '2-digit',
                         month: '2-digit',
@@ -255,10 +277,10 @@ export default function MyOffers({ garageId }: MyOffersProps) {
                         weekday: 'long'
                       })}
                     </span>
-                  </p>
+                  </div>
                 )}
               </div>
-            </Card>
+            </article>
           ))}
         </div>
       )}

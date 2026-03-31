@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card, Badge, Button } from '@/components'
 import { styles } from '@/styles/styles'
 import { ServiceRequestStatus } from '@/types/statuses'
+import Icon from '@/components/ui/Icon'
 import type { ServiceRequest } from '@/types/requests'
 
 interface AvailableRequestsProps {
@@ -26,7 +26,7 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
   const loadAvailableRequests = async () => {
     try {
       setIsLoading(true)
-      
+
       const response = await fetch(`/api/garage/available-requests?garageId=${garageId}`)
       const data = await response.json()
 
@@ -44,21 +44,20 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
     }
   }
 
-
   const getCategoryText = (category: string) => {
     switch (category) {
       case 'service':
-        return 'Συντήρηση'
+        return 'Συντηρηση'
       case 'brakes':
-        return 'Φρένα'
+        return 'Φρενα'
       case 'tires':
-        return 'Λάστιχα'
+        return 'Λαστιχα'
       case 'engine':
-        return 'Κινητήρας'
+        return 'Κινητηρας'
       case 'electrical':
-        return 'Ηλεκτρικά'
+        return 'Ηλεκτρικα'
       case 'oils':
-        return 'Λάδια'
+        return 'Λαδια'
       default:
         return category
     }
@@ -68,15 +67,15 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
     if (!fuelType) return '-'
     switch (fuelType.toLowerCase()) {
       case 'petrol':
-        return 'Βενζίνη'
+        return 'Βενζινη'
       case 'diesel':
-        return 'Πετρέλαιο'
+        return 'Πετρελαιο'
       case 'electric':
-        return 'Ηλεκτρικό'
+        return 'Ηλεκτρικο'
       case 'hybrid':
-        return 'Υβριδικό'
+        return 'Υβριδικο'
       case 'lpg':
-        return 'Υγραέριο'
+        return 'Υγραεριο'
       default:
         return fuelType
     }
@@ -107,9 +106,9 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
 
   if (isLoading) {
     return (
-      <div className="text-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
-        <p className={styles.bodyText}>Φόρτωση αιτημάτων...</p>
+      <div className="text-center py-12">
+        <div className={styles.loadingSpinner}></div>
+        <p className="text-sm text-secondary">Φορτωση αιτηματων...</p>
       </div>
     )
   }
@@ -117,41 +116,34 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className={`${styles.sectionTitle} mb-2`}>
-            Διαθέσιμα Αιτήματα
-          </h2>
-          <p className={styles.bodyText}>
-            Αιτήματα υπηρεσιών που μπορείτε να κάνετε προσφορά
-          </p>
-        </div>
-        <div className="text-sm text-gray-500">
-          Σύνολο: {requests.length} αιτήματα
-        </div>
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight text-on-surface">
+          Νεα Αιτηματα
+        </h2>
+        <p className="text-base text-secondary leading-relaxed mt-1">
+          {requests.length} αιτηματα υπηρεσιων διαθεσιμα
+        </p>
       </div>
 
-      {/* Filter */}
-      <div className="flex space-x-2">
+      {/* Category filter chips — horizontal scroll */}
+      <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
         <button
           onClick={() => setFilter('all')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            filter === 'all'
-              ? 'bg-orange-500 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
+          className={filter === 'all'
+            ? 'bg-primary text-on-primary px-5 py-2 rounded-full text-sm font-bold whitespace-nowrap'
+            : 'bg-secondary-container text-on-secondary-container px-5 py-2 rounded-full text-sm font-bold whitespace-nowrap hover:bg-surface-container-high transition-colors cursor-pointer'
+          }
         >
-          Όλα
+          Ολα
         </button>
         {getUniqueCategories().map((category) => (
           <button
             key={category}
             onClick={() => setFilter(category)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === category
-                ? 'bg-orange-500 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            className={filter === category
+              ? 'bg-primary text-on-primary px-5 py-2 rounded-full text-sm font-bold whitespace-nowrap'
+              : 'bg-secondary-container text-on-secondary-container px-5 py-2 rounded-full text-sm font-bold whitespace-nowrap hover:bg-surface-container-high transition-colors cursor-pointer'
+            }
           >
             {getCategoryText(category)}
           </button>
@@ -160,180 +152,160 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
 
       {/* Requests List */}
       {filteredRequests.length === 0 ? (
-        <Card className="p-8 text-center">
-          <div className="text-gray-400 mb-4">
-            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
+        <article className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10">
+          <div className="text-center py-8">
+            <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mx-auto mb-4">
+              <Icon name="inbox" size="lg" className="text-outline" />
+            </div>
+            <h3 className="text-2xl font-bold tracking-tight text-on-surface mb-2">
+              Δεν υπαρχουν αιτηματα
+            </h3>
+            <p className="text-base text-secondary leading-relaxed">
+              {filter === 'all'
+                ? 'Δεν υπαρχουν αιτηματα υπηρεσιων διαθεσιμα αυτη τη στιγμη.'
+                : `Δεν υπαρχουν αιτηματα στην κατηγορια "${getCategoryText(filter)}".`
+              }
+            </p>
           </div>
-          <h3 className={`${styles.sectionTitle} mb-2`}>
-            Δεν υπάρχουν διαθέσιμα αιτήματα
-          </h3>
-          <p className={styles.bodyText}>
-            {filter === 'all' 
-              ? 'Δεν υπάρχουν αιτήματα υπηρεσιών διαθέσιμα αυτή τη στιγμή.'
-              : `Δεν υπάρχουν αιτήματα στην κατηγορία "${getCategoryText(filter)}".`
-            }
-          </p>
-        </Card>
+        </article>
       ) : (
         <div className="space-y-4">
           {filteredRequests.map((request) => (
-            <Card key={request.id} className="p-6 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleCardClick(request)}>
-              <div className="flex justify-between items-start gap-6">
-                <div className="flex-1">
-                  {/* Header with Vehicle Info and Category */}
-                  <div className="flex items-center space-x-3 mb-4">
-                    <h3 className={`${styles.sectionTitle} text-lg`}>
-                      {request.vehicle.brand} {request.vehicle.model}
-                    </h3>
-                    <Badge variant="secondary">
-                      {getCategoryText(request.category)}
-                    </Badge>
-                    {/* Photo Indicator - only show when photos exist */}
-                    {request.photoUrls && request.photoUrls.length > 0 && (
-                      <div className="flex items-center gap-1 text-green-600">
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span className="text-sm font-medium">Φωτογραφίες</span>
-                      </div>
-                    )}
-                  </div>
+            <article
+              key={request.id}
+              className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10 hover:shadow-2xl hover:shadow-on-surface/5 transition-all duration-300 cursor-pointer"
+              onClick={() => handleCardClick(request)}
+            >
+              {/* Category badge + date row */}
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-[0.65rem] font-black uppercase tracking-[0.1em] text-primary bg-primary/10 px-2 py-1 rounded-sm">
+                  {getCategoryText(request.category)}
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
+                  {new Date(request.createdAt).toLocaleDateString('el-GR')}
+                </span>
+              </div>
 
-                  {/* Vehicle Details Grid */}
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-2 mb-4">
-                    <div>
-                      <p className={`${styles.bodyText} text-sm`}>
-                        <span className="text-gray-600">Έτος Μοντέλου:</span> <strong>{request.vehicle.modelYear || request.vehicle.year}</strong>
-                      </p>
-                    </div>
-                    <div>
-                      <p className={`${styles.bodyText} text-sm`}>
-                        <span className="text-gray-600">Καύσιμο:</span> <strong>{getFuelTypeText(request.vehicle.fuelType)}</strong>
-                      </p>
-                    </div>
-                    <div>
-                      <p className={`${styles.bodyText} text-sm`}>
-                        <span className="text-gray-600">Κυβικά:</span> <strong>{request.vehicle.engineCC ? `${request.vehicle.engineCC} cc` : '-'}</strong>
-                      </p>
-                    </div>
-                    <div>
-                      <p className={`${styles.bodyText} text-sm`}>
-                        <span className="text-gray-600">Κιβώτιο:</span> <strong>{request.vehicle.isAutomatic ? 'Αυτόματο' : 'Χειροκίνητο'}</strong>
-                      </p>
-                    </div>
-                    <div>
-                      <p className={`${styles.bodyText} text-sm`}>
-                        <span className="text-gray-600">4x4:</span> <strong>{request.vehicle.is4x4 ? 'Ναι' : 'Όχι'}</strong>
-                      </p>
-                    </div>
-                    <div>
-                      <p className={`${styles.bodyText} text-sm`}>
-                        <span className="text-gray-600">Turbo:</span> <strong>{request.vehicle.isTurbo ? 'Ναι' : 'Όχι'}</strong>
-                      </p>
-                    </div>
-                    {request.vehicle.vinNumber && (
-                      <div className="col-span-2">
-                        <p className={`${styles.bodyText} text-sm`}>
-                          <span className="text-gray-600">VIN:</span> <strong>{request.vehicle.vinNumber}</strong>
-                        </p>
-                      </div>
-                    )}
-                    {request.vehicle.engineNumber && (
-                      <div className="col-span-2">
-                        <p className={`${styles.bodyText} text-sm`}>
-                          <span className="text-gray-600">Αρ. Κινητήρα:</span> <strong>{request.vehicle.engineNumber}</strong>
-                        </p>
-                      </div>
-                    )}
-                  </div>
+              {/* Title */}
+              <h3 className="text-xl font-bold font-headline text-on-surface mb-4">
+                {request.vehicle?.brand} {request.vehicle?.model} &mdash; {getCategoryText(request.category)}
+              </h3>
 
-                  {/* Client Info */}
-                  <div className="border-t pt-3 mb-3">
-                    <p className={`${styles.bodyText} text-sm mb-1`}>
-                      <span className="text-gray-600">Πελάτης:</span> <strong>{request.client.firstName} {request.client.lastName}</strong>
-                    </p>
-                    <p className={`${styles.bodyText} text-sm`}>
-                      <span className="text-gray-600">Τηλέφωνο:</span> <strong>{request.client.phoneNumber}</strong>
-                    </p>
-                  </div>
-
-                  {/* Description */}
-                  <div className="border-t pt-3">
-                    <p className={`${styles.bodyText} text-sm`}>
-                      <span className="text-gray-600">Περιγραφή:</span>
-                    </p>
-                    <p className={`${styles.bodyText} mt-1`}>
-                      {request.description}
-                    </p>
-                  </div>
+              {/* Client info bar */}
+              <div className="flex items-center gap-3 p-3 bg-surface-container-low rounded-lg mb-4">
+                <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black uppercase">
+                  {request.client?.firstName?.charAt(0)}{request.client?.lastName?.charAt(0)}
                 </div>
-
-                {/* Actions */}
-                <div className="text-right flex-shrink-0">
-                  <p className={`${styles.smallText} text-gray-500 mb-4`}>
-                    {new Date(request.createdAt).toLocaleDateString('el-GR')}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-on-surface truncate">
+                    {request.client?.firstName} {request.client?.lastName}
                   </p>
-                  <div className="flex flex-col space-y-2">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleMakeOffer(request)
-                      }}
-                    >
-                      Κάνε Προσφορά
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleOpenChat(request)
-                      }}
-                    >
-                      Συνομιλία
-                    </Button>
-                  </div>
+                  <p className="text-xs text-secondary truncate">
+                    {new Date(request.createdAt).toLocaleDateString('el-GR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                  </p>
                 </div>
               </div>
-            </Card>
+
+              {/* Vehicle Spec Bento Grid */}
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
+                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Μαρκα</span>
+                  <span className="text-xs font-bold text-on-surface">{request.vehicle?.brand || '-'}</span>
+                </div>
+                <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
+                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Μοντελο</span>
+                  <span className="text-xs font-bold text-on-surface">{request.vehicle?.model || '-'}</span>
+                </div>
+                <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
+                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Κυβικα</span>
+                  <span className="text-xs font-bold text-on-surface">{request.vehicle?.engineCC ? `${request.vehicle.engineCC}` : '-'}</span>
+                </div>
+                <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
+                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Ετος</span>
+                  <span className="text-xs font-bold text-on-surface">{request.vehicle?.modelYear || '-'}</span>
+                </div>
+                <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
+                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Καυσιμο</span>
+                  <span className="text-xs font-bold text-on-surface">{getFuelTypeText(request.vehicle?.fuelType)}</span>
+                </div>
+                <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
+                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Κιβωτιο</span>
+                  <span className="text-xs font-bold text-on-surface">{request.vehicle?.isAutomatic ? 'Auto' : 'Manual'}</span>
+                </div>
+              </div>
+
+              {/* Description preview */}
+              {request.description && (
+                <p className="text-sm text-on-surface-variant line-clamp-2 mb-4">
+                  {request.description}
+                </p>
+              )}
+
+              {/* Photo indicator */}
+              {request.photoUrls && request.photoUrls.length > 0 && (
+                <div className="flex items-center gap-1.5 text-primary mb-4">
+                  <Icon name="image" filled size="sm" />
+                  <span className="text-xs font-bold">{request.photoUrls.length} Φωτογραφιες</span>
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleMakeOffer(request)
+                  }}
+                  className="bg-gradient-to-br from-primary to-primary-container text-on-primary px-6 py-3 rounded-lg text-sm font-bold transition-all duration-200 active:scale-95 shadow-lg shadow-primary/20 flex items-center gap-2 flex-1 justify-center"
+                >
+                  <Icon name="send" size="sm" />
+                  Κανε Προσφορα
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleOpenChat(request)
+                  }}
+                  className="bg-surface-variant text-on-surface-variant hover:bg-surface-container-high px-4 py-3 rounded-lg text-sm font-bold transition-colors duration-200 flex items-center gap-2"
+                >
+                  <Icon name="chat" size="sm" />
+                </button>
+              </div>
+            </article>
           ))}
         </div>
       )}
 
       {/* Offer Modal - TODO: Implement this */}
       {showOfferModal && selectedRequest && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className={`${styles.sectionTitle} mb-4`}>
-              Κάνε Προσφορά
+        <div className="fixed inset-0 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10 max-w-md w-full">
+            <h3 className="text-2xl font-bold tracking-tight text-on-surface mb-4">
+              Κανε Προσφορα
             </h3>
-            <p className={styles.bodyText}>
-              Προσφορά για: {selectedRequest.vehicle.brand} {selectedRequest.vehicle.model}
+            <p className="text-base text-secondary leading-relaxed">
+              Προσφορα για: {selectedRequest.vehicle?.brand} {selectedRequest.vehicle?.model}
             </p>
-            <div className="mt-6 flex space-x-3">
-              <Button
-                variant="primary"
+            <div className="mt-6 flex gap-3">
+              <button
                 onClick={() => {
                   // TODO: Implement offer submission
                   setShowOfferModal(false)
                   setSelectedRequest(null)
                 }}
+                className={styles.btnPrimary}
               >
-                Υποβολή Προσφοράς
-              </Button>
-              <Button
-                variant="secondary"
+                Υποβολη Προσφορας
+              </button>
+              <button
                 onClick={() => {
                   setShowOfferModal(false)
                   setSelectedRequest(null)
                 }}
+                className={styles.btnSecondary}
               >
-                Ακύρωση
-              </Button>
+                Ακυρωση
+              </button>
             </div>
           </div>
         </div>

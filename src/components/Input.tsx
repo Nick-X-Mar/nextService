@@ -40,39 +40,26 @@ export default function Input({
   pattern,
   autoComplete
 }: InputProps) {
-  // Size classes using design system
   const sizeClasses = {
-    sm: 'px-3 py-1.5',
-    md: 'px-4 py-2', 
-    lg: 'px-4 py-3'
-  }
-  
-  const labelSizeClasses = {
-    sm: '',
+    sm: '!h-10 text-sm',
     md: '',
-    lg: ''
+    lg: '!h-16 text-base'
   }
-  
-  // Use consistent input styling from design system
-  const baseClasses = styles.input
-  
-  const inputClasses = `${baseClasses} ${sizeClasses[size]} ${
-    error ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
-  } ${className}`
-  
+
+  const errorClasses = error ? 'ring-2 ring-error/50 bg-error-container/10' : ''
+
+  const inputClasses = `${styles.input} ${sizeClasses[size]} ${errorClasses} ${className}`
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(e.target.value)
   }
-  
+
   return (
-    <div className="w-full">
+    <div className="w-full space-y-2">
       {label && (
-        <label 
-          htmlFor={id}
-          className={`${styles.label} ${labelSizeClasses[size]}`}
-        >
+        <label htmlFor={id} className={styles.label}>
           {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
+          {required && <span className="text-tertiary ml-1">*</span>}
         </label>
       )}
       <input
@@ -93,9 +80,9 @@ export default function Input({
         aria-describedby={error ? `${id}-error` : undefined}
       />
       {error && (
-        <p 
+        <p
           id={id ? `${id}-error` : undefined}
-          className="mt-1 text-sm text-red-600"
+          className="text-xs text-error font-medium"
           role="alert"
         >
           {error}

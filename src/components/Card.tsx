@@ -20,38 +20,27 @@ export default function Card({
   onClick,
   hover = false
 }: CardProps) {
-  // Base classes
-  const baseClasses = 'rounded-lg transition-all duration-200'
-  
-  // Variant classes using design system
   const variantClasses = {
     default: styles.card,
-    outlined: 'bg-white border-2 border-gray-300 rounded-lg p-4',
-    elevated: styles.card,
+    outlined: 'bg-surface-container-lowest border-2 border-outline-variant/30 rounded-xl',
+    elevated: styles.cardHover,
     simple: styles.cardSimple
   }
-  
-  // Padding classes
+
   const paddingClasses = {
-    none: '',
-    sm: 'p-3',
-    md: 'p-4',
-    lg: 'p-6'
+    none: '!p-0',
+    sm: '!p-3',
+    md: '!p-5',
+    lg: '!p-8'
   }
-  
-  // Hover classes
-  const hoverClasses = hover ? 'hover:shadow-md hover:border-gray-300 cursor-pointer' : ''
-  
-  // Click classes
+
+  const hoverClasses = hover ? 'hover:shadow-2xl hover:shadow-on-surface/5 cursor-pointer transition-all duration-300' : ''
   const clickClasses = onClick ? 'cursor-pointer' : ''
-  
+
   const cardClasses = `${variantClasses[variant]} ${paddingClasses[padding]} ${hoverClasses} ${clickClasses} ${className}`
-  
+
   return (
-    <div 
-      className={cardClasses}
-      onClick={onClick}
-    >
+    <div className={cardClasses} onClick={onClick}>
       {children}
     </div>
   )

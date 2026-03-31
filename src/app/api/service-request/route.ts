@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isSMSConfigured } from '@/utils/notificationService'
 import { dynamoDB } from '@/utils/dynamoService'
-import { PutCommand } from '@aws-sdk/lib-dynamodb'
+import { PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { ServiceRequestStatus } from '@/types/statuses'
+import { hashPassword } from '@/utils/passwordService'
 
 // Helper function to normalize string values for comparison
 const normalizeString = (value: string | undefined | null): string => {
@@ -68,9 +69,15 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     const { category, description, brand, model, clientId: existingClientId } = body
     
-    if (!category || !description || !brand || !model) {
+    const missingFields: string[] = []
+    if (!category) missingFields.push('Κατηγορία')
+    if (!description) missingFields.push('Περιγραφή')
+    if (!brand) missingFields.push('Μάρκα')
+    if (!model) missingFields.push('Μοντέλο')
+
+    if (missingFields.length > 0) {
       return NextResponse.json(
-        { error: 'Λείπουν απαραίτητα στοιχεία' },
+        { error: `Λείπουν: ${missingFields.join(', ')}` },
         { status: 400 }
       )
     }
@@ -129,8 +136,30 @@ export async function POST(request: NextRequest) {
         shouldCreateNewVehicle = true
         console.log('Vehicle data changed, creating new vehicle with ID:', vehicleId)
       }
+    } else if (existingClientId) {
+      // Logged-in user: check for existing vehicle by VIN or engine number
+      const existingVehicles = await dynamoDB.send(new ScanCommand({
+        TableName: 'Vehicles',
+        FilterExpression: 'clientId = :clientId',
+        ExpressionAttributeValues: { ':clientId': existingClientId }
+      }))
+
+      const matchedVehicle = existingVehicles.Items?.find(v => {
+        if (body.vinNumber && v.vinNumber && normalizeString(body.vinNumber) === normalizeString(v.vinNumber)) return true
+        if (body.engineNumber && v.engineNumber && normalizeString(body.engineNumber) === normalizeString(v.engineNumber)) return true
+        return false
+      })
+
+      if (matchedVehicle) {
+        vehicleId = matchedVehicle.id
+        shouldCreateNewVehicle = false
+        console.log('Matched existing vehicle for logged-in user:', vehicleId)
+      } else {
+        vehicleId = `vehicle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        shouldCreateNewVehicle = true
+      }
     } else {
-      // No original vehicle data - create new vehicle (default behavior)
+      // New guest user - create new vehicle
       vehicleId = `vehicle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       shouldCreateNewVehicle = true
     }
@@ -238,33 +267,29 @@ export async function POST(request: NextRequest) {
       console.log('Using existing vehicle, skipping vehicle creation:', vehicleId)
     }
     
-    // Only create client if it doesn't already exist (new guest user)
+    // Only create client if it doesn't already exist
     if (!existingClientId) {
-      // Save client data to DynamoDB - remove null values
-      const clientData: {
-        id: string
-        firstName: string
-        isActive: boolean
-        createdAt: string
-        updatedAt: string
-        lastName?: string
-        email?: string
-        phoneNumber?: string
-        address?: string
-      } = {
+      if (!body.email || !body.password) {
+        return NextResponse.json({ error: 'Email και κωδικός είναι υποχρεωτικά' }, { status: 400 })
+      }
+
+      const normalizedEmail = body.email.trim().toLowerCase()
+      const passwordHash = await hashPassword(body.password)
+
+      const clientData: Record<string, unknown> = {
         id: clientId,
-        firstName: body.firstName || 'Επισκέπτης',
+        firstName: normalizedEmail.split('@')[0],
+        email: normalizedEmail,
+        passwordHash,
         isActive: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
-      
-      // Only add optional fields if they have values
+
       if (body.lastName) clientData.lastName = body.lastName
-      if (body.email) clientData.email = body.email
       if (body.phoneNumber) clientData.phoneNumber = body.phoneNumber
       if (body.address) clientData.address = body.address
-      
+
       await dynamoDB.send(new PutCommand({
         TableName: 'Clients',
         Item: clientData
