@@ -1,0 +1,16 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "NextService" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img "NextService" [ref=e6]
+      - navigation [ref=e7]:
+        - link "Αρχική" [ref=e8] [cursor=pointer]:
+          - /url: /
+        - link "Επαγγελματίες" [ref=e9] [cursor=pointer]:
+          - /url: /register-professional
+      - link "Σύνδεση" [ref=e11] [cursor=pointer]:
+        - /url: /login
+  - main [ref=e12]:
+    - paragraph [ref=e16]: Φόρτωση συνομιλίας...
+  - alert [ref=e17]

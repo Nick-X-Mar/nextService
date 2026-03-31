@@ -47,15 +47,15 @@ export default function LoginPage() {
         if (userType === 'garage') {
           localStorage.removeItem('clientId')
           localStorage.setItem('garageId', user.id)
-          await refreshGarage(user.id)
           success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.companyName}!`)
+          refreshGarage(user.id)
           router.push('/garage-dashboard')
         } else {
           localStorage.removeItem('garageId')
           localStorage.setItem('clientId', user.id)
-          await refreshClient(user.id)
-          await refreshUser(user.id)
           success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.firstName}!`)
+          refreshClient(user.id)
+          refreshUser(user.id)
           router.push(`/requests/${user.id}`)
         }
       } else {

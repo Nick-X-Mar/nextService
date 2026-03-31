@@ -1,0 +1,53 @@
+- generic [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "NextService" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img "NextService" [ref=e6]
+      - navigation [ref=e7]:
+        - link "Αρχική" [ref=e8] [cursor=pointer]:
+          - /url: /
+        - link "Dashboard" [ref=e36] [cursor=pointer]:
+          - /url: /garage-dashboard/garage-1774995714582-lhibgz34r
+        - link "Επαγγελματίες" [ref=e9] [cursor=pointer]:
+          - /url: /register-professional
+      - generic [ref=e37]:
+        - generic [ref=e38]: AutoFix Αθήνα
+        - generic [ref=e40]: account_circle
+        - button "logout" [ref=e41] [cursor=pointer]:
+          - generic [ref=e42]: logout
+  - complementary [ref=e43]:
+    - generic [ref=e44]:
+      - generic [ref=e45]: Συνεργείο
+      - generic [ref=e46]: AutoFix Αθήνα
+    - navigation [ref=e47]:
+      - link "list_alt Νέα Αιτήματα" [ref=e48] [cursor=pointer]:
+        - /url: /garage-dashboard/garage-1774995714582-lhibgz34r?tab=requests
+        - generic [ref=e49]: list_alt
+        - generic [ref=e50]: Νέα Αιτήματα
+      - link "local_offer Προσφορές" [ref=e51] [cursor=pointer]:
+        - /url: /garage-dashboard/garage-1774995714582-lhibgz34r?tab=offers
+        - generic [ref=e52]: local_offer
+        - generic [ref=e53]: Προσφορές
+      - link "calendar_today Ραντεβού" [ref=e54] [cursor=pointer]:
+        - /url: /garage-dashboard/garage-1774995714582-lhibgz34r?tab=appointments
+        - generic [ref=e55]: calendar_today
+        - generic [ref=e56]: Ραντεβού
+      - link "chat Ανοιχτές Συνομιλίες" [active] [ref=e57] [cursor=pointer]:
+        - /url: /garage-dashboard/garage-1774995714582-lhibgz34r/chats
+        - generic [ref=e58]: chat
+        - generic [ref=e59]: Ανοιχτές Συνομιλίες
+      - link "forum Συνομιλίες Ραντεβού" [ref=e60] [cursor=pointer]:
+        - /url: /garage-dashboard/garage-1774995714582-lhibgz34r/chats/appointments
+        - generic [ref=e61]: forum
+        - generic [ref=e62]: Συνομιλίες Ραντεβού
+      - link "settings Ρυθμίσεις" [ref=e63] [cursor=pointer]:
+        - /url: /garage-dashboard/garage-1774995714582-lhibgz34r?tab=settings
+        - generic [ref=e64]: settings
+        - generic [ref=e65]: Ρυθμίσεις
+    - button "logout Αποσύνδεση" [ref=e67] [cursor=pointer]:
+      - generic [ref=e68]: logout
+      - generic [ref=e69]: Αποσύνδεση
+  - main [ref=e12]:
+    - paragraph [ref=e146]: Φόρτωση συνομιλιών...
+  - alert [ref=e35]: NextService - Πλατφόρμα Επαγγελματιών

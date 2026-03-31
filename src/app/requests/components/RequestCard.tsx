@@ -68,7 +68,7 @@ export default function RequestCard({
       case 'elastika':
         return 'tire_repair'
       default:
-        return 'miscellaneous_services'
+        return 'handyman'
     }
   }
 

@@ -451,7 +451,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
         {/* Page header */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold tracking-tight mb-2">Τα Αιτήματά μου</h2>
-          <p className="text-on-surface-variant text-sm">Διαχειριστείτε τις εργασίες και τα ραντεβού για το γκαράζ σας.</p>
+          <p className="text-on-surface-variant text-sm">Διαχειριστείτε τα αιτήματα και τα ραντεβού σας.</p>
         </div>
 
         {/* Guest User Registration Prompt */}

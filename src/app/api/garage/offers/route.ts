@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
               ? {
                   brand: vehicle.brand,
                   model: vehicle.model,
-                  year: vehicle.year
+                  year: vehicle.modelYear || vehicle.year
                 }
               : null
           }

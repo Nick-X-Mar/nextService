@@ -1,0 +1,163 @@
+- generic [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "NextService" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img "NextService" [ref=e6]
+      - navigation [ref=e7]:
+        - link "Αρχική" [ref=e8] [cursor=pointer]:
+          - /url: /
+        - link "Αιτήματα" [ref=e9] [cursor=pointer]:
+          - /url: /requests/client-1774995707252-vg592lapb
+        - link "Μηνύματα" [ref=e10] [cursor=pointer]:
+          - /url: /requests/client-1774995707252-vg592lapb/chats
+        - link "Επαγγελματίες" [ref=e11] [cursor=pointer]:
+          - /url: /register-professional
+      - generic [ref=e13]:
+        - generic [ref=e14]: Μαρία
+        - link "Μ" [ref=e16] [cursor=pointer]:
+          - /url: /profile/client-1774995707252-vg592lapb
+        - button "logout" [ref=e17] [cursor=pointer]:
+          - generic [ref=e18]: logout
+  - complementary [ref=e19]:
+    - generic [ref=e20]:
+      - generic [ref=e21]: Πελάτης
+      - generic [ref=e22]: Μαρία
+    - navigation [ref=e23]:
+      - link "add_circle Νέο Αίτημα" [ref=e24] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e25]: add_circle
+        - generic [ref=e26]: Νέο Αίτημα
+      - link "build Αιτήματα" [ref=e27] [cursor=pointer]:
+        - /url: /requests/client-1774995707252-vg592lapb
+        - generic [ref=e28]: build
+        - generic [ref=e29]: Αιτήματα
+      - link "calendar_today Ραντεβού" [ref=e30] [cursor=pointer]:
+        - /url: /requests/client-1774995707252-vg592lapb?tab=appointment
+        - generic [ref=e31]: calendar_today
+        - generic [ref=e32]: Ραντεβού
+      - link "chat Μηνύματα" [ref=e33] [cursor=pointer]:
+        - /url: /requests/client-1774995707252-vg592lapb/chats
+        - generic [ref=e34]: chat
+        - generic [ref=e35]: Μηνύματα
+      - link "person Προφίλ" [ref=e36] [cursor=pointer]:
+        - /url: /profile/client-1774995707252-vg592lapb
+        - generic [ref=e37]: person
+        - generic [ref=e38]: Προφίλ
+    - button "logout Αποσύνδεση" [ref=e40] [cursor=pointer]:
+      - generic [ref=e41]: logout
+      - generic [ref=e42]: Αποσύνδεση
+  - main [ref=e43]:
+    - generic [ref=e44]:
+      - generic [ref=e45]:
+        - generic [ref=e46]:
+          - heading "Τα Αιτήματά μου" [level=2] [ref=e50]
+          - paragraph [ref=e48]: Διαχειριστείτε τις εργασίες και τα ραντεβού για το γκαράζ σας.
+        - generic [ref=e52]:
+          - button "Αιτήματα" [ref=e53] [cursor=pointer]: Αιτήματα
+          - button "Ραντεβού" [ref=e55] [cursor=pointer]
+          - button "Κλειστά" [ref=e56] [cursor=pointer]
+        - generic [ref=e58] [cursor=pointer]:
+          - generic [ref=e60]:
+            - generic [ref=e61]: Εκκρεμές
+            - heading "Toyota Yaris 2020" [level=3] [ref=e62]
+            - generic [ref=e63]:
+              - generic [ref=e64]: calendar_month
+              - generic [ref=e65]: 01 Απριλίου 2026
+          - generic [ref=e66]:
+            - generic [ref=e67]: miscellaneous_services
+            - generic [ref=e68]: Συντήρηση
+          - paragraph [ref=e69]: Αλλαγή λαδιών και φίλτρων. Το αυτοκίνητο έχει κάνει 15000km από το τελευταίο service.
+          - generic [ref=e70]:
+            - button "Συνομιλία" [ref=e71]
+            - button "Λεπτομέρειες" [active] [ref=e72]
+      - generic [ref=e74]:
+        - generic [ref=e75]:
+          - heading "Λεπτομέρειες Αιτήματος" [level=2] [ref=e76]
+          - button "close" [ref=e77] [cursor=pointer]:
+            - generic [ref=e78]: close
+        - generic [ref=e80]:
+          - generic [ref=e81]:
+            - generic [ref=e82]: schedule
+            - generic [ref=e83]: Εκκρεμές
+          - generic [ref=e84]:
+            - generic [ref=e85]:
+              - generic [ref=e86]:
+                - generic [ref=e87]: build
+                - paragraph [ref=e88]: Εργασία - Όχημα
+              - button "Επεξεργασία στοιχείων οχήματος" [ref=e89] [cursor=pointer]:
+                - generic [ref=e90]: edit
+            - generic [ref=e91]:
+              - generic [ref=e92]:
+                - paragraph [ref=e93]: Εργασία
+                - paragraph [ref=e94]: Αλλαγή λαδιών και φίλτρων. Το αυτοκίνητο έχει κάνει 15000km από το τελευταίο service.
+              - generic [ref=e95]:
+                - paragraph [ref=e96]: Κατηγορία
+                - paragraph [ref=e97]: Συντήρηση
+            - generic [ref=e98]:
+              - generic [ref=e99]:
+                - paragraph [ref=e100]: Μάρκα
+                - paragraph [ref=e101]: Toyota
+              - generic [ref=e102]:
+                - paragraph [ref=e103]: Μοντέλο
+                - paragraph [ref=e104]: Yaris
+              - generic [ref=e105]:
+                - paragraph [ref=e106]: Κυβικά
+                - paragraph [ref=e107]: 1500 cc
+              - generic [ref=e108]:
+                - paragraph [ref=e109]: Έτος
+                - paragraph [ref=e110]: "2020"
+              - generic [ref=e111]:
+                - paragraph [ref=e112]: Καύσιμο
+                - paragraph [ref=e113]: Βενζίνη
+              - generic [ref=e114]:
+                - paragraph [ref=e115]: Κιβώτιο
+                - paragraph [ref=e116]: Χειροκίνητο
+              - generic [ref=e117]:
+                - paragraph [ref=e118]: 4x4
+                - paragraph [ref=e119]: Όχι
+              - generic [ref=e120]:
+                - paragraph [ref=e121]: Turbo
+                - paragraph [ref=e122]: Όχι
+          - generic [ref=e123]:
+            - heading "local_offer Προσφορές από Συνεργεία" [level=3] [ref=e124]:
+              - generic [ref=e125]: local_offer
+              - text: Προσφορές από Συνεργεία
+            - generic [ref=e126]:
+              - button "Προσφορά 1 AutoFix Αθήνα location_on Αθήνα Τιμή 120 € 0 Παροχές Εργασίας Το συνεργείο δεν έχει δηλώσει παροχές εργασίας για αυτή την προσφορά. Διαθεσιμότητα συνεργείου Offer_20260331_804 Το συνεργείο δεν έχει δηλώσει ακόμη διαθέσιμες ημερομηνίες για την προσφορά αυτή. check_circle Αποδοχή προσφοράς" [ref=e127] [cursor=pointer]:
+                - generic [ref=e128]:
+                  - generic [ref=e129]:
+                    - paragraph [ref=e130]: Προσφορά 1
+                    - paragraph [ref=e131]: AutoFix Αθήνα
+                    - paragraph [ref=e132]:
+                      - generic [ref=e133]: location_on
+                      - text: Αθήνα
+                  - generic [ref=e134]:
+                    - paragraph [ref=e135]: Τιμή
+                    - paragraph [ref=e136]: 120 €
+                    - text: "0"
+                - generic [ref=e137]:
+                  - generic [ref=e138]:
+                    - paragraph [ref=e139]: Παροχές Εργασίας
+                    - paragraph [ref=e140]: Το συνεργείο δεν έχει δηλώσει παροχές εργασίας για αυτή την προσφορά.
+                  - generic [ref=e141]:
+                    - paragraph [ref=e142]: Διαθεσιμότητα συνεργείου
+                    - generic [ref=e143]: Offer_20260331_804
+                  - paragraph [ref=e144]: Το συνεργείο δεν έχει δηλώσει ακόμη διαθέσιμες ημερομηνίες για την προσφορά αυτή.
+                  - button "check_circle Αποδοχή προσφοράς" [disabled] [ref=e146]:
+                    - generic [ref=e147]: check_circle
+                    - text: Αποδοχή προσφοράς
+              - button "Προσφορά 2 SpeedService Πειραιάς location_on Πειραιάς Τιμή 95 € 0" [ref=e148] [cursor=pointer]:
+                - generic [ref=e149]:
+                  - generic [ref=e150]:
+                    - paragraph [ref=e151]: Προσφορά 2
+                    - paragraph [ref=e152]: SpeedService Πειραιάς
+                    - paragraph [ref=e153]:
+                      - generic [ref=e154]: location_on
+                      - text: Πειραιάς
+                  - generic [ref=e155]:
+                    - paragraph [ref=e156]: Τιμή
+                    - paragraph [ref=e157]: 95 €
+                    - text: "0"
+        - button "Κλείσιμο" [ref=e159] [cursor=pointer]
+  - alert [ref=e49]

@@ -96,7 +96,10 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       const response = await fetch(`/api/chat/${requestId}/messages?garageId=${garageId}`)
       if (response.ok) {
         const data = await response.json()
-        setMessages(data.messages || [])
+        const validMessages = (data.messages || []).filter(
+          (msg: ChatMessage) => msg.timestamp && !isNaN(new Date(msg.timestamp).getTime())
+        )
+        setMessages(validMessages)
         // Scroll to bottom after messages are loaded
         setTimeout(() => {
           scrollToBottom()
@@ -128,25 +131,18 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       appSyncService.subscribe(channelName, (newMessage: ChatMessage) => {
         console.log('[Client] Real-time message received:', newMessage)
 
-        setMessages(prev => {
-          console.log('[Client] setMessages - prev messages:', prev)
-          console.log('[Client] setMessages - newMessage:', newMessage)
+        // Ignore subscription system events (e.g. {status: "subscribed"})
+        if (!newMessage.id || !newMessage.timestamp || !newMessage.message) return
 
+        setMessages(prev => {
           // Prevent duplicate messages
           const exists = prev.some(msg => msg.id === newMessage.id)
-          console.log('[Client] setMessages - message exists:', exists)
-
-          if (exists) {
-            console.log('[Client] setMessages - message already exists, not adding')
-            return prev
-          }
+          if (exists) return prev
 
           // Add new message and sort by timestamp
-          const newMessages = [...prev, newMessage].sort((a, b) =>
+          return [...prev, newMessage].sort((a, b) =>
             new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
           )
-          console.log('[Client] setMessages - new messages array:', newMessages)
-          return newMessages
         })
       })
 

@@ -1,0 +1,36 @@
+- generic [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "NextService" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img "NextService" [ref=e6]
+      - navigation [ref=e7]:
+        - link "Αρχική" [ref=e8] [cursor=pointer]:
+          - /url: /
+        - link "Επαγγελματίες" [ref=e9] [cursor=pointer]:
+          - /url: /register-professional
+      - link "Σύνδεση" [ref=e11] [cursor=pointer]:
+        - /url: /login
+  - main [ref=e12]:
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e17]: login
+        - heading "Σύνδεση" [level=1] [ref=e18]
+        - paragraph [ref=e19]: Εισάγετε τα στοιχεία σας
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - generic [ref=e22]:
+            - button "Πελάτης" [ref=e23] [cursor=pointer]
+            - button "Συνεργείο" [active] [ref=e24] [cursor=pointer]
+          - generic [ref=e25]:
+            - text: Email
+            - textbox "π.χ. example@email.com" [ref=e26]: maria.test@example.com
+          - generic [ref=e27]:
+            - text: Κωδικός πρόσβασης
+            - textbox "Εισάγετε τον κωδικό σας" [ref=e28]: Test123!
+          - button "login Σύνδεση" [ref=e29] [cursor=pointer]:
+            - generic [ref=e30]: login
+            - text: Σύνδεση
+        - button "Δεν έχετε λογαριασμό; Εγγραφείτε" [ref=e32] [cursor=pointer]
+      - button "Επιστροφή στην Αρχική" [ref=e34] [cursor=pointer]
+  - alert [ref=e35]

@@ -25,6 +25,7 @@ interface Offer {
   clientAvailabilityDates?: string[]
   appointmentDate?: string
   appointmentPrice?: number
+  benefits?: string[]
 }
 
 interface GarageSummary {
@@ -829,9 +830,11 @@ export default function RequestDetailsContent({
                 const customError = customDateErrors[offer.id]
                 const customSuccess = customDateSuccesses[offer.id]
                 const isSaving = savingCustomDates[offer.id] || false
-                const benefits = Array.isArray(offer.garage?.benefits)
-                  ? offer.garage?.benefits ?? []
-                  : []
+                const benefits = Array.isArray(offer.benefits) && offer.benefits.length > 0
+                  ? offer.benefits
+                  : Array.isArray(offer.garage?.benefits) && offer.garage.benefits.length > 0
+                    ? offer.garage.benefits
+                    : []
                 const isAcceptedOffer = request.acceptedOfferId === offer.id
 
                 return (

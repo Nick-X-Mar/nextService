@@ -95,6 +95,9 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
       appSyncService.subscribe(channelName, (newMessage: Message) => {
         console.log('[Garage] Real-time message received:', newMessage)
 
+        // Ignore subscription system events (e.g. {status: "subscribed"})
+        if (!newMessage.id || !newMessage.timestamp || !newMessage.message) return
+
         setMessages(prev => {
           // Prevent duplicate messages
           const exists = prev.some(msg => msg.id === newMessage.id)
@@ -149,7 +152,10 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
       if (messagesResponse.ok) {
         const messagesResult = await messagesResponse.json()
         if (messagesResult.success) {
-          setMessages(messagesResult.messages)
+          const validMessages = (messagesResult.messages || []).filter(
+            (msg: Message) => msg.timestamp && !isNaN(new Date(msg.timestamp).getTime())
+          )
+          setMessages(validMessages)
         }
       }
 
