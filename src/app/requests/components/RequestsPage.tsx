@@ -434,7 +434,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
 
   if (isLoading || isRegisteredUser === null) {
     return (
-      <section className="min-h-screen bg-surface">
+      <section className="bg-surface">
         <div className={styles.pageCenter}>
           <div className="text-center">
             <div className={styles.loadingSpinner}></div>
@@ -446,8 +446,8 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
   }
 
   return (
-    <section className="min-h-screen bg-surface">
-      <div className="px-5 max-w-4xl mx-auto pt-4 pb-28">
+    <section className="bg-surface">
+      <div className="px-5 max-w-4xl mx-auto pt-2 pb-4">
         {/* Page header */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold tracking-tight mb-2">Τα Αιτήματά μου</h2>

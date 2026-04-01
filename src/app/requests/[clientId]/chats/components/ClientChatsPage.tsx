@@ -508,8 +508,8 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
 
   if (isLoading) {
     return (
-      <section className="min-h-screen bg-surface">
-        <div className="max-w-2xl mx-auto px-4 pt-8 pb-12">
+      <section className="bg-surface">
+        <div className="max-w-2xl mx-auto px-4 pt-2 pb-4">
           <div className="text-center py-20">
             <div className="animate-spin w-8 h-8 border-3 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
             <p className="text-sm text-on-surface-variant">Φόρτωση συνομιλιών...</p>
@@ -520,8 +520,8 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
   }
 
   return (
-    <section className="min-h-screen bg-surface">
-      <div className="max-w-2xl mx-auto px-4 pt-8 pb-12">
+    <section className="bg-surface">
+      <div className="max-w-2xl mx-auto px-4 pt-2 pb-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-on-surface">
