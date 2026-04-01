@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/useToast'
 import { useUser } from '@/contexts/UserContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { styles } from '@/styles/styles'
-import { SegmentedControl } from '@/components'
+import SegmentedControl from '@/components/SegmentedControl'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -55,7 +55,6 @@ export default function LoginPage() {
           localStorage.setItem('clientId', user.id)
           success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.firstName}!`)
           refreshClient(user.id)
-          refreshUser(user.id)
           router.push(`/requests/${user.id}`)
         }
       } else {
@@ -124,14 +123,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-surface flex items-center justify-center px-4">
+    <div className="bg-surface flex items-start justify-center px-4 pt-2 md:pt-12 pb-4">
       <div className="w-full max-w-md">
-        {/* Logo / Brand */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary-container rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-primary/20">
-            <Icon name={mode === 'login' ? 'login' : 'person_add'} filled className="text-on-primary" size="lg" />
-          </div>
-          <h1 className="text-3xl font-black tracking-tight text-on-surface mb-2">
+        {/* Header */}
+        <div className="text-center mb-3">
+          <h1 className="text-xl font-black tracking-tight text-on-surface mb-0.5">
             {mode === 'login' ? 'Σύνδεση' : 'Εγγραφή'}
           </h1>
           <p className={styles.bodyText}>
@@ -140,8 +136,8 @@ export default function LoginPage() {
         </div>
 
         {/* Card */}
-        <div className="bg-surface-container-lowest rounded-2xl p-8 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10">
-          <form onSubmit={mode === 'login' ? handleLogin : handleRegister} className="space-y-5">
+        <div className="bg-surface-container-lowest rounded-2xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10">
+          <form onSubmit={mode === 'login' ? handleLogin : handleRegister} className="space-y-4">
             {/* User Type Switch */}
             <SegmentedControl
               options={[
@@ -154,7 +150,7 @@ export default function LoginPage() {
               className="max-w-xs mx-auto"
             />
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <label className={styles.labelUpper}>Email</label>
               <input
                 type="email"
@@ -167,7 +163,7 @@ export default function LoginPage() {
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <label className={styles.labelUpper}>Κωδικός πρόσβασης</label>
               <input
                 type="password"
@@ -181,7 +177,7 @@ export default function LoginPage() {
             </div>
 
             {mode === 'register' && (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className={styles.labelUpper}>Επιβεβαίωση κωδικού</label>
                 <input
                   type="password"
@@ -200,7 +196,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className={`${styles.btnPrimary} w-full justify-center text-base py-3.5 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`${styles.btnPrimary} w-full justify-center text-base py-3 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               disabled={isLoading}
             >
               <Icon name={mode === 'login' ? 'login' : 'person_add'} size="sm" />
@@ -208,7 +204,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-5 text-center">
+          <div className="mt-4 text-center">
             <button
               onClick={() => {
                 setMode(mode === 'login' ? 'register' : 'login')
@@ -220,15 +216,6 @@ export default function LoginPage() {
               {mode === 'login' ? 'Δεν έχετε λογαριασμό; Εγγραφείτε' : 'Έχετε λογαριασμό; Συνδεθείτε'}
             </button>
           </div>
-        </div>
-
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => router.push('/')}
-            className={styles.linkText}
-          >
-            Επιστροφή στην Αρχική
-          </button>
         </div>
       </div>
     </div>

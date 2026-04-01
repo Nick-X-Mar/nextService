@@ -1,0 +1,42 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - button "menu" [ref=e5] [cursor=pointer]:
+          - generic [ref=e6]: menu
+        - link "NextService" [ref=e7] [cursor=pointer]:
+          - /url: /
+          - img "NextService" [ref=e8]
+      - link "Σύνδεση" [ref=e10] [cursor=pointer]:
+        - /url: /login
+  - main [ref=e11]:
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - heading "Σύνδεση" [level=1] [ref=e15]
+        - paragraph [ref=e16]: Εισάγετε τα στοιχεία σας
+      - generic [ref=e17]:
+        - generic [ref=e18]:
+          - generic [ref=e19]:
+            - button "Πελάτης" [ref=e20] [cursor=pointer]
+            - button "Συνεργείο" [ref=e21] [cursor=pointer]
+          - generic [ref=e22]:
+            - text: Email
+            - textbox "π.χ. example@email.com" [ref=e23]
+          - generic [ref=e24]:
+            - text: Κωδικός πρόσβασης
+            - textbox "Εισάγετε τον κωδικό σας" [ref=e25]
+          - button "login Σύνδεση" [ref=e26] [cursor=pointer]:
+            - generic [ref=e27]: login
+            - text: Σύνδεση
+        - button "Δεν έχετε λογαριασμό; Εγγραφείτε" [ref=e29] [cursor=pointer]
+  - navigation [ref=e30]:
+    - generic [ref=e31]:
+      - link "home Αρχική" [ref=e32] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e33]: home
+        - generic [ref=e34]: Αρχική
+      - link "login Σύνδεση" [ref=e35] [cursor=pointer]:
+        - /url: /login
+        - generic [ref=e36]: login
+        - generic [ref=e37]: Σύνδεση
+  - alert [ref=e38]

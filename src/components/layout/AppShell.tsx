@@ -13,13 +13,14 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
   const isLanding = pathname === '/'
+  const isFullPage = pathname.startsWith('/offer/') || pathname === '/login'
   const showSidebar = userType === 'client' || userType === 'garage'
 
   return (
     <>
       <TopHeader />
       {showSidebar && <Sidebar />}
-      <main className={`min-h-screen ${isLanding ? '' : 'pt-14'} pb-24 md:pb-0 ${showSidebar ? 'md:ml-64' : ''}`}>
+      <main className={`${isLanding ? '' : isFullPage ? 'pt-0' : 'pt-14'} ${isFullPage ? 'pb-0' : 'pb-24'} md:pb-0 ${showSidebar ? 'md:ml-64' : ''}`}>
         {children}
       </main>
       {isLanding && <Footer />}

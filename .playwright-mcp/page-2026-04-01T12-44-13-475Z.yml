@@ -1,0 +1,219 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "NextService" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img "NextService" [ref=e6]
+      - navigation [ref=e7]:
+        - link "Αρχική" [ref=e8] [cursor=pointer]:
+          - /url: /
+        - link "Επαγγελματίες" [ref=e9] [cursor=pointer]:
+          - /url: /register-professional
+      - link "Σύνδεση" [ref=e11] [cursor=pointer]:
+        - /url: /login
+  - main [ref=e12]:
+    - generic [ref=e13]:
+      - generic [ref=e16]:
+        - generic [ref=e17]:
+          - generic [ref=e18]:
+            - generic [ref=e19] [cursor=pointer]:
+              - generic [ref=e20]: search
+              - generic [ref=e21]: Τι χρειάζεται το αυτοκίνητό σου;
+            - button "Άνοιγμα" [ref=e22] [cursor=pointer]
+          - generic [ref=e23]:
+            - generic [ref=e24] [cursor=pointer]:
+              - generic [ref=e25]:
+                - generic [ref=e26]: home_repair_service
+                - generic [ref=e27]: Service
+              - generic [ref=e28]: arrow_forward
+            - generic [ref=e29] [cursor=pointer]:
+              - generic [ref=e30]:
+                - generic [ref=e31]: verified
+                - generic [ref=e32]: ΚΤΕΟ
+              - generic [ref=e33]: arrow_forward
+            - generic [ref=e34] [cursor=pointer]:
+              - generic [ref=e35]:
+                - generic [ref=e36]: tire_repair
+                - generic [ref=e37]: Ελαστικά
+              - generic [ref=e38]: arrow_forward
+            - generic [ref=e39] [cursor=pointer]:
+              - generic [ref=e40]:
+                - generic [ref=e41]: car_crash
+                - generic [ref=e42]: Φανοποιεία
+              - generic [ref=e43]: arrow_forward
+            - generic [ref=e44] [cursor=pointer]:
+              - generic [ref=e45]:
+                - generic [ref=e46]: oil_barrel
+                - generic [ref=e47]: Λάδια
+              - generic [ref=e48]: arrow_forward
+            - generic [ref=e49] [cursor=pointer]:
+              - generic [ref=e50]:
+                - generic [ref=e51]: settings
+                - generic [ref=e52]: Δίσκος
+              - generic [ref=e53]: arrow_forward
+        - button "settings ΣΥΝΕΧΕΙΑ" [disabled] [ref=e55]:
+          - generic [ref=e57]: settings
+          - generic [ref=e58]: ΣΥΝΕΧΕΙΑ
+      - generic [ref=e60]:
+        - generic [ref=e61]:
+          - generic [ref=e62]:
+            - heading "Κορυφαίες Προσφορές" [level=3] [ref=e63]
+            - paragraph [ref=e64]: Οι καλύτερες τιμές της αγοράς
+          - link "Δες Ολες arrow_forward" [ref=e65] [cursor=pointer]:
+            - /url: /offers
+            - text: Δες Ολες
+            - generic [ref=e66]: arrow_forward
+        - generic [ref=e67]:
+          - generic [ref=e68] [cursor=pointer]:
+            - generic [ref=e69]: "-25%"
+            - generic [ref=e72]: oil_barrel
+            - generic [ref=e73]:
+              - generic [ref=e74]:
+                - generic [ref=e75]: schedule
+                - generic [ref=e76]: 45 λεπτά
+              - heading "Πλήρες Service Λαδιών" [level=4] [ref=e77]
+              - paragraph [ref=e78]: Περιλαμβάνει 4lt λάδι & φίλτρο
+              - generic [ref=e79]:
+                - generic [ref=e80]:
+                  - generic [ref=e81]: €45.00
+                  - generic [ref=e82]: €60.00
+                - generic [ref=e84]: arrow_forward
+            - generic [ref=e86]:
+              - generic [ref=e87]:
+                - heading "Πλήρες Service Λαδιών" [level=4] [ref=e88]
+                - paragraph [ref=e89]: Περιλαμβάνει 4lt λάδι & φίλτρο
+              - generic [ref=e90]:
+                - paragraph [ref=e91]: Τι περιλαμβάνει
+                - generic [ref=e92]:
+                  - generic [ref=e93]: check_circle
+                  - generic [ref=e94]: Αλλαγή λαδιού κινητήρα
+                - generic [ref=e95]:
+                  - generic [ref=e96]: check_circle
+                  - generic [ref=e97]: Αλλαγή φίλτρου λαδιού
+                - generic [ref=e98]:
+                  - generic [ref=e99]: check_circle
+                  - generic [ref=e100]: Έλεγχος στάθμης υγρών
+                - generic [ref=e101]:
+                  - generic [ref=e102]: check_circle
+                  - generic [ref=e103]: Οπτικός έλεγχος
+              - generic [ref=e104]:
+                - generic [ref=e105]:
+                  - generic [ref=e106]: €45.00
+                  - generic [ref=e107]: €60.00
+                  - generic [ref=e108]: Κερδίζεις 25%
+                - link "build Κλείσε Ραντεβού" [ref=e109]:
+                  - /url: /
+                  - generic [ref=e110]: build
+                  - text: Κλείσε Ραντεβού
+          - generic [ref=e111] [cursor=pointer]:
+            - generic [ref=e112]: "-40%"
+            - generic [ref=e115]: search_insights
+            - generic [ref=e116]:
+              - generic [ref=e117]:
+                - generic [ref=e118]: schedule
+                - generic [ref=e119]: 30 λεπτά
+              - heading "Διαγνωστικός Έλεγχος" [level=4] [ref=e120]
+              - paragraph [ref=e121]: Πλήρης έλεγχος εγκεφάλου αυτοκινήτου
+              - generic [ref=e122]:
+                - generic [ref=e123]:
+                  - generic [ref=e124]: €25.00
+                  - generic [ref=e125]: €45.00
+                - generic [ref=e127]: arrow_forward
+            - generic [ref=e129]:
+              - generic [ref=e130]:
+                - heading "Διαγνωστικός Έλεγχος" [level=4] [ref=e131]
+                - paragraph [ref=e132]: Πλήρης έλεγχος εγκεφάλου αυτοκινήτου
+              - generic [ref=e133]:
+                - paragraph [ref=e134]: Τι περιλαμβάνει
+                - generic [ref=e135]:
+                  - generic [ref=e136]: check_circle
+                  - generic [ref=e137]: Ανάγνωση σφαλμάτων
+                - generic [ref=e138]:
+                  - generic [ref=e139]: check_circle
+                  - generic [ref=e140]: Έλεγχος αισθητήρων
+                - generic [ref=e141]:
+                  - generic [ref=e142]: check_circle
+                  - generic [ref=e143]: Διαγραφή σφαλμάτων
+                - generic [ref=e144]:
+                  - generic [ref=e145]: check_circle
+                  - generic [ref=e146]: Αναφορά κατάστασης
+              - generic [ref=e147]:
+                - generic [ref=e148]:
+                  - generic [ref=e149]: €25.00
+                  - generic [ref=e150]: €45.00
+                  - generic [ref=e151]: Κερδίζεις 44%
+                - link "build Κλείσε Ραντεβού" [ref=e152]:
+                  - /url: /
+                  - generic [ref=e153]: build
+                  - text: Κλείσε Ραντεβού
+          - generic [ref=e154] [cursor=pointer]:
+            - generic [ref=e155]: "-30%"
+            - generic [ref=e158]: ac_unit
+            - generic [ref=e159]:
+              - generic [ref=e160]:
+                - generic [ref=e161]: schedule
+                - generic [ref=e162]: 1 ώρα
+              - heading "Κλιματισμός - Πλήρης Συντήρηση" [level=4] [ref=e163]
+              - paragraph [ref=e164]: Αναπλήρωση φρέον & απολύμανση
+              - generic [ref=e165]:
+                - generic [ref=e166]:
+                  - generic [ref=e167]: €55.00
+                  - generic [ref=e168]: €80.00
+                - generic [ref=e170]: arrow_forward
+            - generic [ref=e172]:
+              - generic [ref=e173]:
+                - heading "Κλιματισμός - Πλήρης Συντήρηση" [level=4] [ref=e174]
+                - paragraph [ref=e175]: Αναπλήρωση φρέον & απολύμανση
+              - generic [ref=e176]:
+                - paragraph [ref=e177]: Τι περιλαμβάνει
+                - generic [ref=e178]:
+                  - generic [ref=e179]: check_circle
+                  - generic [ref=e180]: Αναπλήρωση ψυκτικού υγρού
+                - generic [ref=e181]:
+                  - generic [ref=e182]: check_circle
+                  - generic [ref=e183]: Απολύμανση εσωτερικού
+                - generic [ref=e184]:
+                  - generic [ref=e185]: check_circle
+                  - generic [ref=e186]: Έλεγχος διαρροών
+                - generic [ref=e187]:
+                  - generic [ref=e188]: check_circle
+                  - generic [ref=e189]: Καθαρισμός φίλτρου καμπίνας
+              - generic [ref=e190]:
+                - generic [ref=e191]:
+                  - generic [ref=e192]: €55.00
+                  - generic [ref=e193]: €80.00
+                  - generic [ref=e194]: Κερδίζεις 31%
+                - link "build Κλείσε Ραντεβού" [ref=e195]:
+                  - /url: /
+                  - generic [ref=e196]: build
+                  - text: Κλείσε Ραντεβού
+  - contentinfo [ref=e197]:
+    - generic [ref=e198]:
+      - generic [ref=e199]:
+        - link "NextService" [ref=e200] [cursor=pointer]:
+          - /url: /
+          - img "NextService" [ref=e201]
+        - paragraph [ref=e202]: Η πλατφόρμα που συνδέει ιδιοκτήτες οχημάτων με αξιόπιστα συνεργεία. Βρες τον κατάλληλο επαγγελματία για το αυτοκίνητό σου, γρήγορα και εύκολα.
+      - generic [ref=e204]:
+        - navigation [ref=e205]:
+          - link "Σχετικά" [ref=e206] [cursor=pointer]:
+            - /url: /about
+          - link "Όροι Χρήσης" [ref=e207] [cursor=pointer]:
+            - /url: /terms
+          - link "Πολιτική Απορρήτου" [ref=e208] [cursor=pointer]:
+            - /url: /privacy
+          - link "Επικοινωνία" [ref=e209] [cursor=pointer]:
+            - /url: /contact
+        - generic [ref=e210]:
+          - button "Email" [ref=e211] [cursor=pointer]:
+            - link "mail" [ref=e212]:
+              - /url: mailto:info@nextservice.gr
+              - generic [ref=e213]: mail
+          - button "Facebook" [ref=e214] [cursor=pointer]:
+            - link [ref=e215]:
+              - /url: https://facebook.com/nextservice.gr
+              - img [ref=e216]
+          - button "Share" [ref=e218] [cursor=pointer]:
+            - generic [ref=e219]: share
+      - paragraph [ref=e221]: © 2026 NextService. All rights reserved.
+  - alert [ref=e222]

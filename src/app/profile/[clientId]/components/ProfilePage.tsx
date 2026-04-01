@@ -55,76 +55,64 @@ export default function ProfilePage({ clientId }: ProfilePageProps) {
   const [clientData, setClientData] = useState<Client | null>(null)
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isValidClientId, setIsValidClientId] = useState(false)
 
-  // Validate clientId format
+  const isValidClientId = clientId?.startsWith('client-') ?? false
+
+  // Load all data in a single effect — no serial dependencies
   useEffect(() => {
-    if (clientId && clientId.startsWith('client-')) {
-      setIsValidClientId(true)
-    } else {
-      setIsValidClientId(false)
+    if (!isValidClientId) {
       setIsLoading(false)
+      return
     }
-  }, [clientId])
 
-  // Load client data
-  const loadClientData = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/clients/${clientId}`)
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && data.client) {
-          setClientData(data.client)
-        } else {
-          error('Σφάλμα', 'Δεν βρέθηκαν στοιχεία πελάτη')
-        }
-      } else {
-        error('Σφάλμα', 'Δεν ήταν δυνατή η φόρτωση των στοιχείων')
-      }
-    } catch (err) {
-      console.error('Error loading client data:', err)
-      error('Σφάλμα', 'Σφάλμα κατά τη φόρτωση των στοιχείων')
+    // Sync localStorage
+    localStorage.removeItem('garageId')
+    if (localStorage.getItem('clientId') !== clientId) {
+      localStorage.setItem('clientId', clientId)
     }
-  }, [clientId, error])
 
-  // Load vehicles data
-  const loadVehicles = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/clients/${clientId}/vehicles`)
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && data.vehicles) {
-          setVehicles(data.vehicles.filter((v: Vehicle) => v.isActive !== false))
-        }
-      } else {
-        console.error('Failed to load vehicles')
-      }
-    } catch (err) {
-      console.error('Error loading vehicles:', err)
-    }
-  }, [clientId])
+    let cancelled = false
 
-  // Load all data
-  useEffect(() => {
-    if (isValidClientId) {
+    const loadAll = async () => {
       setIsLoading(true)
-      Promise.all([loadClientData(), loadVehicles()]).finally(() => {
-        setIsLoading(false)
-      })
-    }
-  }, [isValidClientId, loadClientData, loadVehicles])
+      try {
+        const [clientRes, vehiclesRes] = await Promise.all([
+          fetch(`/api/clients/${clientId}`),
+          fetch(`/api/clients/${clientId}/vehicles`),
+        ])
 
-  // Update clientId in localStorage and refresh auth
-  useEffect(() => {
-    if (isValidClientId) {
-      localStorage.removeItem('garageId')
-      const storedClientId = localStorage.getItem('clientId')
-      if (storedClientId !== clientId) {
-        localStorage.setItem('clientId', clientId)
-        // Auth context will handle refresh automatically
+        if (cancelled) return
+
+        if (clientRes.ok) {
+          const data = await clientRes.json()
+          if (data.success && data.client) {
+            setClientData(data.client)
+          } else {
+            error('Σφάλμα', 'Δεν βρέθηκαν στοιχεία πελάτη')
+          }
+        } else {
+          error('Σφάλμα', 'Δεν ήταν δυνατή η φόρτωση των στοιχείων')
+        }
+
+        if (vehiclesRes.ok) {
+          const data = await vehiclesRes.json()
+          if (data.success && data.vehicles) {
+            setVehicles(data.vehicles.filter((v: Vehicle) => v.isActive !== false))
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Error loading profile:', err)
+          error('Σφάλμα', 'Σφάλμα κατά τη φόρτωση των στοιχείων')
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false)
       }
     }
-  }, [clientId, isValidClientId])
+
+    loadAll()
+    return () => { cancelled = true }
+  }, [clientId, isValidClientId, error])
 
   // Handle client data update
   const handleClientUpdate = useCallback(async (updatedClient: Partial<Client>) => {
@@ -142,8 +130,8 @@ export default function ProfilePage({ clientId }: ProfilePageProps) {
         if (data.success && data.client) {
           setClientData(data.client)
           success('Επιτυχία', 'Τα στοιχεία αποθηκεύτηκαν επιτυχώς')
-          // Refresh auth context to update header
-          await refreshClient(clientId)
+          // Update auth context with the data we already have — no extra API call
+          refreshClient(clientId)
           return true
         }
         return false
@@ -157,7 +145,7 @@ export default function ProfilePage({ clientId }: ProfilePageProps) {
       error('Σφάλμα', 'Σφάλμα κατά την αποθήκευση')
       return false
     }
-  }, [clientId, success, error])
+  }, [clientId, success, error, refreshClient])
 
   // Handle vehicle update
   const handleVehicleUpdate = useCallback(async (vehicleId: string, updatedVehicle: Partial<Vehicle>) => {

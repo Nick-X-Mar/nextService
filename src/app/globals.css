@@ -10,6 +10,14 @@
   --foreground: #1b1c1c;
 }
 
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -69,6 +77,13 @@ body {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+html:has(.landing-page) {
+  scrollbar-width: none;
+}
+html:has(.landing-page)::-webkit-scrollbar {
+  display: none;
 }
 
 /* Active tab indicator */

@@ -8,12 +8,12 @@ import GearSubmitButton from '@/components/GearSubmitButton'
 import { saveFormData } from '@/utils/formStorage'
 
 const categories = [
-  { icon: 'home_repair_service', label: 'Service', value: 'service' },
-  { icon: 'verified', label: 'ΚΤΕΟ', value: 'kteo' },
-  { icon: 'tire_repair', label: 'Ελαστικά', value: 'elastika' },
-  { icon: 'car_crash', label: 'Φανοποιεία', value: 'fanopeia' },
-  { icon: 'oil_barrel', label: 'Λάδια', value: 'oils' },
-  { icon: 'settings', label: 'Δίσκος', value: 'disk' },
+  { icon: 'settings', label: 'Συμπλέκτης', value: 'symplektis' },
+  { icon: 'conveyor_belt', label: 'Ιμάντας', value: 'imantas' },
+  { icon: 'format_paint', label: 'Ολική Βαφή', value: 'oliki-vafi' },
+  { icon: 'brush', label: 'Μερική Βαφή', value: 'meriki-vafi' },
+  { icon: 'sensors', label: 'Αισθητήρες', value: 'aisthitires' },
+  { icon: 'oil_barrel', label: 'Αλλαγή λαδιών', value: 'allagi-ladion' },
 ]
 
 export default function HeroSection() {
@@ -61,18 +61,7 @@ export default function HeroSection() {
 
   return (
     <section className="relative min-h-screen flex flex-col justify-center">
-      {/* Background Image */}
-      <picture>
-        <source media="(max-width: 767px)" srcSet="/road_mobile.webp" type="image/webp" />
-        <source media="(max-width: 767px)" srcSet="/road_mobile.jpg" type="image/jpeg" />
-        <source media="(min-width: 768px)" srcSet="/road_desktop.webp" type="image/webp" />
-        <img
-          src="/road_desktop.jpg"
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-      </picture>
-      <div className="absolute inset-0 bg-black/30" />
+      {/* Overlay removed — now applied globally in LandingPage */}
 
       {/* Content */}
       <div className="relative z-10 px-5 flex flex-col items-center">
@@ -141,6 +130,13 @@ export default function HeroSection() {
             disabled={!selectedCategory}
             label="ΣΥΝΕΧΕΙΑ"
           />
+        </div>
+      </div>
+
+      {/* Scroll down arrow — desktop only */}
+      <div className="hidden md:flex absolute bottom-8 left-1/2 -translate-x-1/2 z-10 animate-bounce">
+        <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center">
+          <Icon name="keyboard_arrow_down" size="md" className="text-white/70" />
         </div>
       </div>
     </section>
