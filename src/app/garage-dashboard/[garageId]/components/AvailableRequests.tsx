@@ -6,6 +6,7 @@ import { styles } from '@/styles/styles'
 import { ServiceRequestStatus } from '@/types/statuses'
 import Icon from '@/components/ui/Icon'
 import type { ServiceRequest } from '@/types/requests'
+import { getCategoryText } from '@/utils/categoryLabels'
 
 interface AvailableRequestsProps {
   garageId: string
@@ -41,25 +42,6 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
       setRequests([])
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const getCategoryText = (category: string) => {
-    switch (category) {
-      case 'service':
-        return 'Συντηρηση'
-      case 'brakes':
-        return 'Φρενα'
-      case 'tires':
-        return 'Λαστιχα'
-      case 'engine':
-        return 'Κινητηρας'
-      case 'electrical':
-        return 'Ηλεκτρικα'
-      case 'oils':
-        return 'Λαδια'
-      default:
-        return category
     }
   }
 

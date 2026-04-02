@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/useToast'
 import { ServiceRequestStatus } from '@/types/statuses'
 import type { ServiceRequest } from '@/types/requests'
 import Icon from '@/components/ui/Icon'
+import { getCategoryText } from '@/utils/categoryLabels'
 
 interface ChatRequest extends Omit<ServiceRequest, 'vehicle'> {
   vehicle?: {
@@ -144,7 +145,7 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
                 return {
                   ...request,
                   lastMessage: {
-                    content: lastMessage.content,
+                    content: lastMessage.message || lastMessage.content,
                     timestamp: lastMessage.timestamp,
                     sender: (lastMessage.senderType === 'garage' ? 'garage' : 'client') as 'garage' | 'client'
                   },
@@ -217,25 +218,6 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
     return `Σε ${diffDays} ημέρες`
   }
 
-  const getCategoryText = (category: string) => {
-    switch (category) {
-      case 'service':
-        return 'Συντήρηση'
-      case 'brakes':
-        return 'Φρένα'
-      case 'tires':
-        return 'Λάστιχα'
-      case 'engine':
-        return 'Κινητήρας'
-      case 'electrical':
-        return 'Ηλεκτρικά'
-      case 'oils':
-        return 'Λάδια'
-      default:
-        return category
-    }
-  }
-
   const handleChatClick = (requestId: string) => {
     router.push(`/garage-dashboard/${garageId}/chat/${requestId}`)
   }
@@ -300,7 +282,7 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
                         {formatAppointmentDate(request.appointmentDate)}
                       </p>
                     </div>
-                    {request.unreadCount && request.unreadCount > 0 && (
+                    {request.unreadCount != null && request.unreadCount > 0 && (
                       <span className="bg-primary text-on-primary text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center">
                         {request.unreadCount}
                       </span>

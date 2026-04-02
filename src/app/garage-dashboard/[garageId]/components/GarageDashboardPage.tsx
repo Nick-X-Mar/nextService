@@ -44,6 +44,12 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
       return
     }
 
+    // Check if garage is pending validation
+    if (userType === 'garage' && authGarage && !authGarage.isActive) {
+      router.push('/login')
+      return
+    }
+
     // Check if user is authenticated as a garage
     if (userType !== 'garage' || !authGarage || authGarage.id !== garageId) {
       // User is not authenticated as this garage or is a client
@@ -187,7 +193,7 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
     return (
       <>
         {/* SegmentedControl for requests/offers/appointments */}
-        <div className="mb-8">
+        <div className="mb-4">
           <SegmentedControl
             options={[
               { value: 'requests', label: `Αιτηματα (${counts.requests})` },
@@ -211,7 +217,7 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
   }
 
   return (
-    <div className="py-8">
+    <div className="pt-2 pb-8">
       <div className={styles.container}>
         {renderContent()}
       </div>

@@ -6,6 +6,7 @@ import { styles } from '../styles/styles'
 import { ServiceRequestStatus } from '../types/statuses'
 import type { ServiceRequest } from '../types/requests'
 import Icon from '@/components/ui/Icon'
+import { getCategoryText } from '@/utils/categoryLabels'
 
 interface RequestDetailsPanelProps {
   request: ServiceRequest
@@ -30,21 +31,6 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
     is4x4: request.vehicle?.is4x4 || false,
     isAutomatic: request.vehicle?.isAutomatic || false
   })
-
-  const getCategoryText = (category: string) => {
-    switch (category) {
-      case 'service':
-        return 'Συντήρηση'
-      case 'fanopeia':
-        return 'Φανοποιεία'
-      case 'oils':
-        return 'Λάδια & Υγρά'
-      case 'disk':
-        return 'Δισκόφρενα'
-      default:
-        return category
-    }
-  }
 
   const getStatusText = (status: ServiceRequestStatus) => {
     switch (status) {

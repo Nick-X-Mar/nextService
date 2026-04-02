@@ -6,6 +6,7 @@ import Icon from '@/components/ui/Icon'
 import { useToast } from '../../../../../hooks/useToast'
 import { ServiceRequestStatus } from '../../../../../types/statuses'
 import type { ServiceRequest } from '../../../../../types/requests'
+import { getCategoryText } from '@/utils/categoryLabels'
 
 interface ChatRequest extends Omit<ServiceRequest, 'vehicle'> {
   vehicle?: {
@@ -340,21 +341,6 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
         day: '2-digit',
         month: '2-digit'
       })
-    }
-  }
-
-  const getCategoryText = (category: string) => {
-    switch (category) {
-      case 'service':
-        return 'Συντήρηση'
-      case 'fanopeia':
-        return 'Φανοποιεία'
-      case 'oils':
-        return 'Λάδια & Υγρά'
-      case 'disk':
-        return 'Δισκόφρενα'
-      default:
-        return category
     }
   }
 

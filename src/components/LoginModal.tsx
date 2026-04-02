@@ -14,6 +14,7 @@ interface LoginModalProps {
 
 export default function LoginModal({ isOpen, onClose, email, firstName, onLoginSuccess }: LoginModalProps) {
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
@@ -75,7 +76,7 @@ export default function LoginModal({ isOpen, onClose, email, firstName, onLoginS
           </label>
           <div className="relative">
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => { setPassword(e.target.value); setError('') }}
               onKeyDown={handleKeyDown}
@@ -83,7 +84,13 @@ export default function LoginModal({ isOpen, onClose, email, firstName, onLoginS
               className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 pr-12 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
               autoFocus
             />
-            <Icon name="lock" className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/50" size="md" />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/50 hover:text-on-surface transition-colors"
+            >
+              <Icon name={showPassword ? 'visibility_off' : 'visibility'} size="md" />
+            </button>
           </div>
           {error && (
             <p className="text-xs text-error flex items-center gap-1">

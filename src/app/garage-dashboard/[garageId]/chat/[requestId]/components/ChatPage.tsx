@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import Icon from '@/components/ui/Icon'
 import '@/lib/amplify-config'
 import appSyncService from '@/lib/appsync-service'
+import { getCategoryText } from '@/utils/categoryLabels'
 
 interface Message {
   id: string
@@ -216,25 +217,6 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
       textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px'
-    }
-  }
-
-  const getCategoryText = (category: string) => {
-    switch (category) {
-      case 'service':
-        return 'Συντήρηση'
-      case 'brakes':
-        return 'Φρένα'
-      case 'tires':
-        return 'Λάστιχα'
-      case 'engine':
-        return 'Κινητήρας'
-      case 'electrical':
-        return 'Ηλεκτρικά'
-      case 'oils':
-        return 'Λάδια'
-      default:
-        return category
     }
   }
 

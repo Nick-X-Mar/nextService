@@ -29,7 +29,7 @@ export default function TopHeader() {
           >
             <Icon name={mobileMenuOpen ? 'close' : 'menu'} className={isLanding ? 'text-white' : 'text-on-surface'} />
           </button>
-          <Link href="/" className="flex items-center">
+          <Link href={userType === 'garage' && garage ? `/garage-dashboard/${garage.id}` : '/'} className="flex items-center">
             <Image
               src="/logo.png"
               alt="NextService"
@@ -42,9 +42,11 @@ export default function TopHeader() {
 
         {/* Center: Desktop nav links */}
         <nav className="hidden md:flex items-center gap-8 font-body text-sm font-medium">
-          <Link href="/" className={`${isLanding ? 'text-white/80 hover:text-white' : 'text-secondary hover:text-on-surface'} transition-colors`}>
-            Αρχική
-          </Link>
+          {userType !== 'garage' && (
+            <Link href="/" className={`${isLanding ? 'text-white/80 hover:text-white' : 'text-secondary hover:text-on-surface'} transition-colors`}>
+              Αρχική
+            </Link>
+          )}
           {userType === 'client' && client && (
             <>
               <Link href={`/requests/${client.id}`} className="text-secondary hover:text-on-surface transition-colors">
@@ -56,15 +58,15 @@ export default function TopHeader() {
             </>
           )}
           {userType === 'garage' && garage && (
-            <>
-              <Link href={`/garage-dashboard/${garage.id}`} className="text-secondary hover:text-on-surface transition-colors">
-                Dashboard
-              </Link>
-            </>
+            <Link href={`/garage-dashboard/${garage.id}`} className="text-secondary hover:text-on-surface transition-colors">
+              Dashboard
+            </Link>
           )}
-          <Link href="/register-professional" className={`${isLanding ? 'text-white/80 hover:text-white' : 'text-secondary hover:text-on-surface'} transition-colors`}>
-            Επαγγελματίες
-          </Link>
+          {userType !== 'garage' && (
+            <Link href="/register-professional" className={`${isLanding ? 'text-white/80 hover:text-white' : 'text-secondary hover:text-on-surface'} transition-colors`}>
+              Επαγγελματίες
+            </Link>
+          )}
         </nav>
 
         {/* Right: Actions */}
@@ -110,10 +112,12 @@ export default function TopHeader() {
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-surface border-t border-outline-variant/20 px-5 py-4 space-y-2">
-          <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
-            <Icon name="home" className="text-primary" />
-            <span className="font-medium">Αρχική</span>
-          </Link>
+          {userType !== 'garage' && (
+            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
+              <Icon name="home" className="text-primary" />
+              <span className="font-medium">Αρχική</span>
+            </Link>
+          )}
           {userType === 'client' && client && (
             <>
               <Link href={`/requests/${client.id}`} onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
@@ -136,10 +140,12 @@ export default function TopHeader() {
               <span className="font-medium">Dashboard</span>
             </Link>
           )}
-          <Link href="/register-professional" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
-            <Icon name="handyman" className="text-primary" />
-            <span className="font-medium">Εγγραφή Επαγγελματία</span>
-          </Link>
+          {userType !== 'garage' && (
+            <Link href="/register-professional" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
+              <Icon name="handyman" className="text-primary" />
+              <span className="font-medium">Εγγραφή Επαγγελματία</span>
+            </Link>
+          )}
           {userType && userType !== 'guest' && (
             <button onClick={() => { logout(); setMobileMenuOpen(false) }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors w-full text-tertiary">
               <Icon name="logout" className="text-tertiary" />

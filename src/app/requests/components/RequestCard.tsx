@@ -3,6 +3,7 @@
 import Icon from '@/components/ui/Icon'
 import { ServiceRequestStatus } from '../../../types/statuses'
 import type { ServiceRequest } from '../../../types/requests'
+import { getCategoryText } from '@/utils/categoryLabels'
 
 interface RequestCardProps {
   request: ServiceRequest
@@ -32,25 +33,6 @@ export default function RequestCard({
       month: 'long',
       year: 'numeric',
     })
-  }
-
-  const getCategoryText = (category: string) => {
-    switch (category) {
-      case 'service':
-        return 'Γενικό Service'
-      case 'fanopeia':
-        return 'Φανοποιεία'
-      case 'oils':
-        return 'Λάδια & Υγρά'
-      case 'disk':
-        return 'Δισκόφρενα'
-      case 'kteo':
-        return 'ΚΤΕΟ'
-      case 'elastika':
-        return 'Ελαστικά'
-      default:
-        return category
-    }
   }
 
   const getCategoryIcon = (category: string) => {

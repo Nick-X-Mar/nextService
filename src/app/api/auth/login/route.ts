@@ -85,6 +85,20 @@ export async function POST(request: NextRequest) {
 
     // Strip passwordHash from response
     if (userType === 'garage') {
+      // Check if garage is validated/active
+      if (!user.isActive) {
+        return NextResponse.json({
+          success: true,
+          pendingValidation: true,
+          user: {
+            id: user.id,
+            companyName: user.companyName,
+            email: user.email,
+            isActive: false
+          }
+        })
+      }
+
       return NextResponse.json({
         success: true,
         user: {

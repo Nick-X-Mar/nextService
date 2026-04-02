@@ -13,7 +13,10 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [pendingValidation, setPendingValidation] = useState<{ companyName: string } | null>(null)
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [userType, setUserType] = useState('client')
 
@@ -40,6 +43,11 @@ export default function LoginPage() {
       })
 
       const data = await response.json()
+
+      if (data.success && data.pendingValidation) {
+        setPendingValidation({ companyName: data.user.companyName })
+        return
+      }
 
       if (data.success && data.user) {
         const user = data.user
@@ -86,6 +94,8 @@ export default function LoginPage() {
     }
 
     if (userType === 'garage') {
+      sessionStorage.setItem('garageRegEmail', email.trim().toLowerCase())
+      sessionStorage.setItem('garageRegPassword', password)
       router.push('/register-professional')
       return
     }
@@ -120,6 +130,44 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (pendingValidation) {
+    return (
+      <div className="bg-surface flex items-start justify-center px-4 pt-8 md:pt-16 pb-4">
+        <div className="w-full max-w-md">
+          <div className="bg-surface-container-lowest rounded-2xl p-8 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10 text-center">
+            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-amber-50 mb-6">
+              <Icon name="hourglass_top" filled className="text-amber-600" size="xl" />
+            </div>
+
+            <h2 className="text-xl font-black tracking-tight text-on-surface mb-3">
+              Η αίτησή σας εξετάζεται
+            </h2>
+
+            <p className={`${styles.bodyText} mb-2`}>
+              Η εταιρεία <strong className="text-on-surface">{pendingValidation.companyName}</strong> έχει εγγραφεί επιτυχώς.
+            </p>
+
+            <p className={`${styles.bodyText} mb-8`}>
+              Η αίτησή σας βρίσκεται υπό έλεγχο. Θα ενημερωθείτε μόλις ενεργοποιηθεί ο λογαριασμός σας.
+            </p>
+
+            <button
+              onClick={() => {
+                setPendingValidation(null)
+                setPassword('')
+                setEmail('')
+              }}
+              className={`${styles.btnOutline} w-full justify-center py-3.5`}
+            >
+              <Icon name="logout" size="sm" />
+              Επιστροφή
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -165,29 +213,47 @@ export default function LoginPage() {
 
             <div className="space-y-1.5">
               <label className={styles.labelUpper}>Κωδικός πρόσβασης</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={mode === 'register' ? 'Τουλάχιστον 6 χαρακτήρες' : 'Εισάγετε τον κωδικό σας'}
-                required
-                disabled={isLoading}
-                className={styles.input}
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={mode === 'register' ? 'Τουλάχιστον 6 χαρακτήρες' : 'Εισάγετε τον κωδικό σας'}
+                  required
+                  disabled={isLoading}
+                  className={`${styles.input} pr-10`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors"
+                >
+                  <Icon name={showPassword ? 'visibility_off' : 'visibility'} size="sm" />
+                </button>
+              </div>
             </div>
 
             {mode === 'register' && (
               <div className="space-y-1.5">
                 <label className={styles.labelUpper}>Επιβεβαίωση κωδικού</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Επαναλάβετε τον κωδικό"
-                  required
-                  disabled={isLoading}
-                  className={styles.input}
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Επαναλάβετε τον κωδικό"
+                    required
+                    disabled={isLoading}
+                    className={`${styles.input} pr-10`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors"
+                  >
+                    <Icon name={showConfirmPassword ? 'visibility_off' : 'visibility'} size="sm" />
+                  </button>
+                </div>
                 {confirmPassword && password !== confirmPassword && (
                   <p className="text-xs text-error">Οι κωδικοί δεν ταιριάζουν</p>
                 )}

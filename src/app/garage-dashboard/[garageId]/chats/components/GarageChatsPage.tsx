@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/useToast'
 import { ServiceRequestStatus } from '@/types/statuses'
 import type { ServiceRequest } from '@/types/requests'
 import Icon from '@/components/ui/Icon'
+import { getCategoryText } from '@/utils/categoryLabels'
 
 interface ChatRequest extends Omit<ServiceRequest, 'vehicle'> {
   vehicle?: {
@@ -56,22 +57,31 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
     try {
       setIsLoading(true)
 
-      // Get all offers made by this garage
-      const offersResponse = await fetch(`/api/garage/offers?garageId=${garageId}`)
-      if (!offersResponse.ok) {
-        throw new Error('Failed to fetch offers')
+      // Get request IDs from both offers and chat messages
+      const [offersResponse, chatsResponse] = await Promise.all([
+        fetch(`/api/garage/offers?garageId=${garageId}`),
+        fetch(`/api/chat/garage-chats?garageId=${garageId}`)
+      ])
+
+      const requestIdsSet = new Set<string>()
+
+      // Add request IDs from offers
+      if (offersResponse.ok) {
+        const offersData = await offersResponse.json()
+        if (offersData.success && offersData.offers) {
+          offersData.offers.forEach((offer: any) => requestIdsSet.add(offer.serviceRequestId))
+        }
       }
 
-      const offersData = await offersResponse.json()
-
-      if (!offersData.success || !offersData.offers) {
-        setChatRequests([])
-        setIsLoading(false)
-        return
+      // Add request IDs from chat messages
+      if (chatsResponse.ok) {
+        const chatsData = await chatsResponse.json()
+        if (chatsData.success && chatsData.requestIds) {
+          chatsData.requestIds.forEach((id: string) => requestIdsSet.add(id))
+        }
       }
 
-      // Get unique request IDs from offers
-      const requestIds: string[] = [...new Set<string>(offersData.offers.map((offer: any) => offer.serviceRequestId as string))]
+      const requestIds = [...requestIdsSet]
 
       if (requestIds.length === 0) {
         setChatRequests([])
@@ -119,7 +129,7 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
                 return {
                   ...request,
                   lastMessage: {
-                    content: lastMessage.content,
+                    content: lastMessage.message || lastMessage.content,
                     timestamp: lastMessage.timestamp,
                     sender: (lastMessage.senderType === 'garage' ? 'garage' : 'client') as 'garage' | 'client'
                   },
@@ -183,25 +193,6 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
         return styles.statusInProgress
       default:
         return 'text-[0.65rem] font-black uppercase tracking-[0.1em] text-secondary bg-surface-container px-2 py-1 rounded-sm'
-    }
-  }
-
-  const getCategoryText = (category: string) => {
-    switch (category) {
-      case 'service':
-        return 'Συντήρηση'
-      case 'brakes':
-        return 'Φρένα'
-      case 'tires':
-        return 'Λάστιχα'
-      case 'engine':
-        return 'Κινητήρας'
-      case 'electrical':
-        return 'Ηλεκτρικά'
-      case 'oils':
-        return 'Λάδια'
-      default:
-        return category
     }
   }
 
@@ -278,7 +269,7 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
                             {formatLastMessageTime(request.lastMessage.timestamp)}
                           </span>
                         )}
-                        {request.unreadCount && request.unreadCount > 0 && (
+                        {request.unreadCount != null && request.unreadCount > 0 && (
                           <span className="bg-primary text-on-primary text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center">
                             {request.unreadCount}
                           </span>

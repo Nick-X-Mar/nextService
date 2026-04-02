@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { styles } from '@/styles/styles'
 import { OfferStatus } from '@/types/statuses'
 import Icon from '@/components/ui/Icon'
+import { getCategoryText } from '@/utils/categoryLabels'
 
 interface Offer {
   id: string
@@ -91,25 +92,6 @@ export default function Appointments({ garageId }: AppointmentsProps) {
       setAppointments([])
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const getCategoryText = (category: string) => {
-    switch (category) {
-      case 'service':
-        return 'Συντηρηση'
-      case 'brakes':
-        return 'Φρενα'
-      case 'tires':
-        return 'Λαστιχα'
-      case 'engine':
-        return 'Κινητηρας'
-      case 'electrical':
-        return 'Ηλεκτρικα'
-      case 'oils':
-        return 'Λαδια'
-      default:
-        return category
     }
   }
 

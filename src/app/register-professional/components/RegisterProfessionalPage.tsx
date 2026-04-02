@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
 import { useToast } from '@/hooks/useToast'
@@ -24,11 +24,23 @@ export default function RegisterProfessionalPage() {
     address: '',
     mobile: ''
   })
+  const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
 
   const router = useRouter()
   const { success, error } = useToast()
+
+  useEffect(() => {
+    const savedEmail = sessionStorage.getItem('garageRegEmail')
+    const savedPassword = sessionStorage.getItem('garageRegPassword')
+    if (savedEmail) {
+      setFormData(prev => ({ ...prev, email: savedEmail }))
+    }
+    if (savedPassword) {
+      setPassword(savedPassword)
+    }
+  }, [])
 
 
   const handleInputChange = (field: keyof GarageFormData, value: string) => {
@@ -110,12 +122,14 @@ export default function RegisterProfessionalPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, password }),
       })
 
       const data = await response.json()
 
       if (response.ok && data.success) {
+        sessionStorage.removeItem('garageRegEmail')
+        sessionStorage.removeItem('garageRegPassword')
         setIsSubmitted(true)
         success('Επιτυχής Εγγραφή', 'Το συνεργείο σας εγγράφηκε επιτυχώς! Θα επικοινωνήσουμε μαζί σας σύντομα.')
       } else {

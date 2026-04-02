@@ -2,6 +2,7 @@
 
 import { styles } from '@/styles/styles'
 import Icon from '@/components/ui/Icon'
+import { getCategoryText } from '@/utils/categoryLabels'
 
 interface VehicleDetails {
   brand?: string | null
@@ -30,17 +31,6 @@ interface ServiceVehicleCardProps {
   className?: string
   editable?: boolean
   onEditClick?: () => void
-}
-
-const CATEGORY_LABELS: Record<string, string> = {
-  service: 'Συντήρηση',
-  brakes: 'Φρένα',
-  tires: 'Λάστιχα',
-  engine: 'Κινητήρας',
-  electrical: 'Ηλεκτρικά',
-  oils: 'Λάδια & Υγρά',
-  fanopeia: 'Φανοποιεία',
-  disk: 'Δισκόφρενα'
 }
 
 const normalizeBoolean = (value?: boolean | string | null) => {
@@ -121,13 +111,11 @@ const formatCurrency = (value?: number | string | null) => {
   }).format(numericValue)
 }
 
-const getCategoryText = (category?: string | null) => {
+const getCategoryTextOrDefault = (category?: string | null) => {
   if (!category) {
     return 'Δεν έχει δηλωθεί'
   }
-
-  const normalized = category.trim().toLowerCase()
-  return CATEGORY_LABELS[normalized] || category
+  return getCategoryText(category)
 }
 
 export default function ServiceVehicleCard({
@@ -189,7 +177,7 @@ export default function ServiceVehicleCard({
           {showCategory && (
             <div>
               <p className={styles.label}>Κατηγορία</p>
-              <p className="text-sm font-medium text-on-surface mt-1">{getCategoryText(category)}</p>
+              <p className="text-sm font-medium text-on-surface mt-1">{getCategoryTextOrDefault(category)}</p>
             </div>
           )}
         </div>
