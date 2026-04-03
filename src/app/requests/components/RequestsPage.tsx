@@ -5,13 +5,28 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
 import { styles } from '../../../styles/styles'
 import RequestCard from './RequestCard'
+import OfferSummaryCard from './OfferSummaryCard'
 import RequestDetailsModal from './RequestDetailsModal'
 import { useToast } from '../../../hooks/useToast'
 import { useUser } from '../../../contexts/UserContext'
 import { useAuth } from '../../../contexts/AuthContext'
 // Navigation is handled by AppShell
-import { ServiceRequestStatus } from '../../../types/statuses'
+import { ServiceRequestStatus, OfferStatus } from '../../../types/statuses'
 import type { ServiceRequest } from '../../../types/requests'
+
+interface OfferSummary {
+  id: string
+  offerAmount: number
+  appointmentPrice?: number
+  status?: OfferStatus
+  garageId?: string
+  benefits?: string[]
+  garage?: {
+    companyName?: string
+    address?: string
+    benefits?: string[]
+  } | null
+}
 
 interface RequestsPageProps {
   clientId: string
@@ -50,6 +65,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [garageMessagesMap, setGarageMessagesMap] = useState<Record<string, boolean>>({})
+  const [offersMap, setOffersMap] = useState<Record<string, OfferSummary[]>>({})
 
   // Check if clientId is valid (starts with 'client-')
   const isValidClientId = clientId && clientId.startsWith('client-')
@@ -74,6 +90,53 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     }
 
     setGarageMessagesMap(messagesMap)
+  }, [])
+
+  const loadOffersForRequests = useCallback(async (requestIds: string[]) => {
+    const map: Record<string, OfferSummary[]> = {}
+
+    await Promise.all(
+      requestIds.map(async (requestId) => {
+        try {
+          const response = await fetch(`/api/offers?serviceRequestId=${requestId}`)
+          if (!response.ok) return
+          const data = await response.json()
+          const offers = data.offers || data
+          if (!Array.isArray(offers) || offers.length === 0) return
+
+          // Fetch garage details for each offer
+          const offersWithGarage: OfferSummary[] = await Promise.all(
+            offers.map(async (offer: OfferSummary) => {
+              if (!offer.garageId) return offer
+              try {
+                const garageRes = await fetch(`/api/garage/${offer.garageId}`)
+                if (garageRes.ok) {
+                  const garageResult = await garageRes.json()
+                  const garageData = garageResult.garage || garageResult
+                  return {
+                    ...offer,
+                    garage: {
+                      companyName: garageData.companyName,
+                      address: garageData.address,
+                      benefits: Array.isArray(garageData.benefits) ? garageData.benefits : []
+                    }
+                  }
+                }
+              } catch {
+                // ignore garage fetch errors
+              }
+              return offer
+            })
+          )
+
+          map[requestId] = offersWithGarage
+        } catch {
+          // ignore individual request offer fetch errors
+        }
+      })
+    )
+
+    setOffersMap(map)
   }, [])
 
   const loadRequests = useCallback(async () => {
@@ -118,6 +181,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
         const requestIds = result.requests.map((req: ServiceRequest) => req.id)
         if (requestIds.length > 0) {
           checkGarageMessages(requestIds)
+          loadOffersForRequests(requestIds)
         }
       } else {
         console.error('API error:', result.error)
@@ -129,7 +193,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     } finally {
       setIsLoading(false)
     }
-  }, [clientId, isValidClientId, checkGarageMessages])
+  }, [clientId, isValidClientId, checkGarageMessages, loadOffersForRequests])
 
   const { refreshClient } = useAuth()
 
@@ -269,8 +333,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
   ]
 
   const handleViewDetails = (request: ServiceRequest) => {
-    setSelectedRequest(request)
-    setShowModal(true)
+    router.push(`/requests/${clientId}/details/${request.id}`)
   }
 
   const handleCloseModal = () => {
@@ -596,23 +659,39 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
         {/* Request list */}
         <div className="space-y-6">
           {currentRequests.length > 0 ? (
-            currentRequests.map((request) => (
-              <RequestCard
-                key={request.id}
-                request={request}
-                onViewDetails={() => handleViewDetails(request)}
-                onChatClick={() => handleChatClick(request.id)}
-                hasGarageMessages={garageMessagesMap[request.id] || false}
-                getStatusIcon={getStatusIcon}
-                getStatusText={getStatusText}
-                getStatusColor={getStatusColor}
-                disabled={
-                  activeTab === 'closed' &&
-                  request.status === ServiceRequestStatus.APPOINTMENT &&
-                  isPastAppointment(request.appointmentDate)
-                }
-              />
-            ))
+            currentRequests.map((request) => {
+              const requestOffers = offersMap[request.id] || []
+              const hasRequestOffers = requestOffers.length > 0
+
+              return (
+                <div key={request.id}>
+                  <RequestCard
+                    request={request}
+                    onViewDetails={() => handleViewDetails(request)}
+                    onChatClick={() => handleChatClick(request.id)}
+                    hasGarageMessages={garageMessagesMap[request.id] || false}
+                    getStatusIcon={getStatusIcon}
+                    getStatusText={getStatusText}
+                    getStatusColor={getStatusColor}
+                    disabled={
+                      activeTab === 'closed' &&
+                      request.status === ServiceRequestStatus.APPOINTMENT &&
+                      isPastAppointment(request.appointmentDate)
+                    }
+                    hasOffers={hasRequestOffers}
+                  />
+                  {hasRequestOffers && requestOffers.map((offer, index) => (
+                    <OfferSummaryCard
+                      key={offer.id}
+                      offer={offer}
+                      index={index}
+                      isLast={index === requestOffers.length - 1}
+                      onClick={() => handleViewDetails(request)}
+                    />
+                  ))}
+                </div>
+              )
+            })
           ) : (
             /* Empty states */
             requests.length === 0 && !isLoading ? (

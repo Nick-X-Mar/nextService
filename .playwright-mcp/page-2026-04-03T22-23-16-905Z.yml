@@ -1,0 +1,64 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - button "menu" [ref=e5] [cursor=pointer]:
+          - generic [ref=e6]: menu
+        - link "NextService" [ref=e7] [cursor=pointer]:
+          - /url: /
+          - img "NextService" [ref=e8]
+      - link "N" [ref=e44] [cursor=pointer]:
+        - /url: /profile/client-1774975237732-85x12ql77
+  - main [ref=e11]:
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - heading "Σύνδεση" [level=1] [ref=e15]
+        - paragraph [ref=e16]: Εισάγετε τα στοιχεία σας
+      - generic [ref=e17]:
+        - generic [ref=e18]:
+          - generic [ref=e19]:
+            - button "Πελάτης" [ref=e20] [cursor=pointer]
+            - button "Συνεργείο" [ref=e21] [cursor=pointer]
+          - generic [ref=e22]:
+            - text: Email
+            - textbox "π.χ. example@email.com" [ref=e23]: garage@gmail.com
+          - generic [ref=e24]:
+            - text: Κωδικός πρόσβασης
+            - generic [ref=e25]:
+              - textbox "Εισάγετε τον κωδικό σας" [ref=e26]: Test123!
+              - button "visibility" [ref=e27] [cursor=pointer]:
+                - generic [ref=e28]: visibility
+          - button "login Σύνδεση" [ref=e29] [cursor=pointer]:
+            - generic [ref=e30]: login
+            - text: Σύνδεση
+        - button "Δεν έχετε λογαριασμό; Εγγραφείτε" [ref=e32] [cursor=pointer]
+  - navigation [ref=e33]:
+    - generic [ref=e34]:
+      - link "home Αρχική" [ref=e35] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e36]: home
+        - generic [ref=e37]: Αρχική
+      - link "build Αιτήματα" [ref=e45] [cursor=pointer]:
+        - /url: /requests/client-1774975237732-85x12ql77
+        - generic [ref=e46]: build
+        - generic [ref=e47]: Αιτήματα
+      - link "chat_bubble Μηνύματα" [ref=e48] [cursor=pointer]:
+        - /url: /requests/client-1774975237732-85x12ql77/chats
+        - generic [ref=e49]: chat_bubble
+        - generic [ref=e50]: Μηνύματα
+      - link "person Προφίλ" [ref=e51] [cursor=pointer]:
+        - /url: /profile/client-1774975237732-85x12ql77
+        - generic [ref=e52]: person
+        - generic [ref=e53]: Προφίλ
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - generic: cancel
+          - generic:
+            - heading "Σφάλμα Σύνδεσης" [level=4]
+            - paragraph: Λάθος κωδικός πρόσβασης
+          - button "close":
+            - generic: close
+  - alert [ref=e41]

@@ -16,6 +16,7 @@ interface Offer {
   createdAt: string
   appointmentDate?: string
   appointmentPrice?: number
+  clientAvailabilityDates?: string[]
   serviceRequest: {
     id: string
     description: string
@@ -259,6 +260,24 @@ export default function MyOffers({ garageId }: MyOffersProps) {
                   offer.status === OfferStatus.REJECTED ? 'text-tertiary' : 'text-secondary'
                 } />
               </div>
+
+              {/* Client proposed dates notification */}
+              {offer.clientAvailabilityDates && offer.clientAvailabilityDates.length > 0 && offer.status === OfferStatus.PENDING && (
+                <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4 animate-pulse-subtle">
+                  <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <Icon name="event_note" filled size="sm" className="text-amber-700" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-amber-900">
+                      Ο πελάτης πρότεινε {offer.clientAvailabilityDates.length} νέες ημερομηνίες
+                    </p>
+                    <p className="text-[10px] text-amber-700">
+                      Πατήστε για να δείτε τις προτεινόμενες ημερομηνίες
+                    </p>
+                  </div>
+                  <Icon name="arrow_forward" size="sm" className="text-amber-600 flex-shrink-0" />
+                </div>
+              )}
 
               {/* Offer description */}
               <div className="border-t border-outline-variant/10 pt-4">

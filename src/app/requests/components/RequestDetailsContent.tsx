@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Icon from '@/components/ui/Icon'
 import { DayPicker } from 'react-day-picker'
 import 'react-day-picker/dist/style.css'
-import { addDays, addWeeks, format, isWeekend } from 'date-fns'
+import { addDays, addMonths, format, isWeekend } from 'date-fns'
 import { el } from 'date-fns/locale'
 import { ServiceVehicleCard, Modal, Input, Button, Checkbox } from '@/components'
 import { styles } from '../../../styles/styles'
@@ -740,7 +740,7 @@ export default function RequestDetailsContent({
           vehicle={vehicleDetails}
           photoCount={request.photoUrls.length}
           showEstimatedCost={request.estimatedCost !== undefined && request.estimatedCost !== null}
-          editable={Boolean(request.vehicleId)}
+          editable={Boolean(request.vehicleId) && request.status !== ServiceRequestStatus.APPOINTMENT}
           onEditClick={handleOpenVehicleModal}
         />
 
@@ -936,26 +936,37 @@ export default function RequestDetailsContent({
                         {availabilityDates.length > 0 ? (
                           <div className="space-y-3">
                             <p className="text-sm text-on-surface-variant">
-                              Επιλέξτε μία από τις διαθέσιμες ημερομηνίες του συνεργείου.
+                              {request.status === ServiceRequestStatus.APPOINTMENT
+                                ? 'Διαθέσιμες ημερομηνίες συνεργείου:'
+                                : 'Επιλέξτε μία από τις διαθέσιμες ημερομηνίες του συνεργείου.'}
                             </p>
                             <div className="flex flex-wrap gap-2">
-                              {availabilityDates.map((date) => (
-                                <button
-                                  key={date}
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation()
-                                    handleSelectOfferDate(offer.id, date)
-                                  }}
-                                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all duration-200 ${
-                                    selectedDate === date
-                                      ? 'bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-lg shadow-primary/20'
-                                      : 'bg-surface-container border border-outline-variant/20 text-on-surface hover:border-primary/30'
-                                  }`}
-                                >
-                                  {formatAvailabilityDate(date)}
-                                </button>
-                              ))}
+                              {availabilityDates.map((date) => {
+                                const isSelected = selectedDate === date
+                                const isAppointment = request.status === ServiceRequestStatus.APPOINTMENT
+                                const isDisabled = isAppointment || (selectedDate !== null && !isSelected)
+
+                                return (
+                                  <button
+                                    key={date}
+                                    type="button"
+                                    disabled={isDisabled}
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      handleSelectOfferDate(offer.id, date)
+                                    }}
+                                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all duration-200 ${
+                                      isSelected
+                                        ? 'bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-lg shadow-primary/20'
+                                        : isDisabled
+                                          ? 'bg-surface-container border border-outline-variant/10 text-on-surface-variant/40 cursor-not-allowed'
+                                          : 'bg-surface-container border border-outline-variant/20 text-on-surface hover:border-primary/30'
+                                    }`}
+                                  >
+                                    {formatAvailabilityDate(date)}
+                                  </button>
+                                )
+                              })}
                             </div>
                             {selectedDate && (
                               <div className="mt-2 p-3 bg-primary/5 border border-primary/10 rounded-xl text-sm text-on-surface flex items-center gap-2">
@@ -996,7 +1007,7 @@ export default function RequestDetailsContent({
                         )}
 
                         {/* Custom date picker toggle */}
-                        {hasAvailability && (
+                        {hasAvailability && request.status !== ServiceRequestStatus.APPOINTMENT && (
                           <>
                             <button
                               type="button"
@@ -1014,9 +1025,9 @@ export default function RequestDetailsContent({
                             </button>
 
                             {isCustomOpen && (
-                              <div className="space-y-4">
+                              <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
                                 <p className="text-sm text-on-surface-variant">
-                                  Επιλέξτε έως 5 ημερομηνίες (Δευτέρα - Παρασκευή) που σας εξυπηρετούν. Θα ενημερώσουμε το συγκεκριμένο συνεργείο.
+                                  Επιλέξτε έως 5 ημερομηνίες (Δευτέρα - Παρασκευή) που σας εξυπηρετούν. Θα ενημερώσουμε το συνεργείο.
                                 </p>
                                 <div className="flex justify-center">
                                   <DayPicker
@@ -1027,10 +1038,10 @@ export default function RequestDetailsContent({
                                     disabled={[
                                       { before: addDays(new Date(), 1) },
                                       (date) => isWeekend(date),
-                                      { after: addWeeks(new Date(), 2) }
+                                      { after: addMonths(new Date(), 2) }
                                     ]}
                                     fromDate={addDays(new Date(), 1)}
-                                    toDate={addWeeks(new Date(), 2)}
+                                    toDate={addMonths(new Date(), 2)}
                                     className="border border-outline-variant/10 rounded-xl p-4"
                                     modifiersClassNames={{
                                       selected: 'bg-primary text-on-primary hover:bg-primary-container',

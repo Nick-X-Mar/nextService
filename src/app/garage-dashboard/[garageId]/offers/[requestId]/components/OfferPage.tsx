@@ -7,7 +7,7 @@ import { styles } from '@/styles/styles'
 import { OfferStatus } from '@/types/statuses'
 import Icon from '@/components/ui/Icon'
 import { DayPicker } from 'react-day-picker'
-import { addDays, addWeeks, isWeekend, startOfDay, isBefore, format } from 'date-fns'
+import { addDays, addMonths, isWeekend, startOfDay, isBefore, format } from 'date-fns'
 import { el } from 'date-fns/locale'
 import 'react-day-picker/dist/style.css'
 
@@ -95,6 +95,8 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
   const [existingOffer, setExistingOffer] = useState<any>(null)
   const [originalOffer, setOriginalOffer] = useState<any>(null)
   const [selectedDates, setSelectedDates] = useState<Date[]>([])
+  const [clientAvailabilityDates, setClientAvailabilityDates] = useState<string[]>([])
+  const [addingClientDate, setAddingClientDate] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -184,6 +186,11 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
           if (latestOffer.availabilityDates && latestOffer.availabilityDates.length > 0) {
             setSelectedDates(latestOffer.availabilityDates.map((d: string) => new Date(d)))
           }
+
+          // Set client availability dates if any
+          if (latestOffer.clientAvailabilityDates && latestOffer.clientAvailabilityDates.length > 0) {
+            setClientAvailabilityDates(latestOffer.clientAvailabilityDates)
+          }
         }
       }
     } catch (error) {
@@ -200,6 +207,61 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
     const year = now.getFullYear().toString().slice(-2)
     const randomNum = Math.floor(Math.random() * 9) + 1 // 1-9
     return `Offer_${day}${month}${year}_${randomNum}`
+  }
+
+  const handleAddClientDateToAvailability = async (dateStr: string) => {
+    // Check if already in selectedDates
+    const dateObj = new Date(`${dateStr}T00:00:00`)
+    const alreadySelected = selectedDates.some(d => format(d, 'yyyy-MM-dd') === dateStr)
+    if (alreadySelected) return
+
+    setAddingClientDate(dateStr)
+
+    // Add to local state
+    const newSelectedDates = [...selectedDates, dateObj]
+    setSelectedDates(newSelectedDates)
+
+    // Auto-save to API
+    if (existingOffer) {
+      try {
+        const updateData = {
+          offerId: existingOffer.id,
+          offerAmount: offer.offerAmount,
+          benefits: selectedBenefits,
+          availabilityDates: newSelectedDates.map(d => format(d, 'yyyy-MM-dd')),
+          status: OfferStatus.PENDING
+        }
+
+        const response = await fetch('/api/offers', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updateData),
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          if (result.success) {
+            setOriginalOffer({
+              offerAmount: offer.offerAmount,
+              benefits: selectedBenefits,
+              availabilityDates: newSelectedDates.map(d => format(d, 'yyyy-MM-dd'))
+            })
+            showToast({
+              type: 'success',
+              title: 'Ημερομηνία προστέθηκε',
+              message: 'Η ημερομηνία προστέθηκε στη διαθεσιμότητά σας.',
+              duration: 2000
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Error updating availability:', error)
+        // Revert on error
+        setSelectedDates(prev => prev.filter(d => format(d, 'yyyy-MM-dd') !== dateStr))
+      }
+    }
+
+    setAddingClientDate(null)
   }
 
   const handleOfferAmountChange = (value: string) => {
@@ -393,6 +455,8 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
     }
   }
 
+  const isAccepted = existingOffer?.status === OfferStatus.ACCEPTED
+
   if (isLoading) {
     return (
       <div className={styles.pageCenter}>
@@ -445,12 +509,14 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
                 {serviceRequest.vehicle.brand} {serviceRequest.vehicle.model} -- {serviceRequest.client.firstName} {serviceRequest.client.lastName}
               </p>
             </div>
-            <button
-              onClick={() => router.push(`/garage-dashboard/${garageId}/chat/${requestId}`)}
-              className="w-10 h-10 rounded-full machined-gradient flex items-center justify-center shadow-lg shadow-primary/20 active:scale-95 transition-transform"
-            >
-              <Icon name="chat" size="sm" className="text-on-primary" filled />
-            </button>
+            {!isAccepted && (
+              <button
+                onClick={() => router.push(`/garage-dashboard/${garageId}/chat/${requestId}`)}
+                className="w-10 h-10 rounded-full machined-gradient flex items-center justify-center shadow-lg shadow-primary/20 active:scale-95 transition-transform"
+              >
+                <Icon name="chat" size="sm" className="text-on-primary" filled />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -556,6 +622,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
                 placeholder="Εισάγετε ποσό"
                 className={styles.input}
                 required
+                disabled={isAccepted}
               />
             </div>
 
@@ -580,25 +647,22 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
             </p>
           </div>
           <p className="text-xs text-secondary mb-5">
-            Επιλέξτε τις ημέρες που μπορείτε να δεχτείτε το όχημα (Δευτέρα - Παρασκευή)
+            Επιλέξτε τις ημέρες που μπορείτε να δεχτείτε το όχημα (Δευτέρα - Παρασκευή, έως 2 μήνες)
           </p>
 
-          <div className="flex justify-center">
+          <div className={`flex justify-center ${isAccepted ? 'opacity-50 pointer-events-none' : ''}`}>
             <DayPicker
               mode="multiple"
               selected={selectedDates}
-              onSelect={(dates) => setSelectedDates(dates || [])}
+              onSelect={isAccepted ? undefined : (dates) => setSelectedDates(dates || [])}
               locale={el}
               disabled={[
-                // Disable past dates and today
                 { before: addDays(new Date(), 1) },
-                // Disable weekends
                 (date) => isWeekend(date),
-                // Disable dates beyond 2 weeks
-                { after: addWeeks(new Date(), 2) }
+                { after: addMonths(new Date(), 2) }
               ]}
               fromDate={addDays(new Date(), 1)}
-              toDate={addWeeks(new Date(), 2)}
+              toDate={addMonths(new Date(), 2)}
               className="border border-outline-variant/20 rounded-xl p-4 bg-surface-container-lowest"
               modifiersClassNames={{
                 selected: '!bg-primary !text-on-primary hover:!bg-primary/90 !rounded-lg',
@@ -636,6 +700,61 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
           )}
         </div>
 
+        {/* Client Proposed Dates Section */}
+        {clientAvailabilityDates.length > 0 && !isAccepted && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <Icon name="event_note" filled size="sm" className="text-amber-700" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-amber-900">Ο πελάτης πρότεινε νέες ημερομηνίες</p>
+                <p className="text-xs text-amber-700">Οι ημερομηνίες που δηλώσατε δεν τον εξυπηρετούν. Προτείνει τις παρακάτω:</p>
+              </div>
+            </div>
+            <p className="text-xs text-amber-700 mb-2">Πατήστε σε όσες ημερομηνίες σας εξυπηρετούν ώστε να διαλέξει τελικά μία ο πελάτης:</p>
+            <div className="flex flex-wrap gap-2">
+              {clientAvailabilityDates
+                .slice()
+                .sort()
+                .map((date) => {
+                  const alreadyAdded = selectedDates.some(d => format(d, 'yyyy-MM-dd') === date)
+                  const isAdding = addingClientDate === date
+
+                  return (
+                    <button
+                      key={date}
+                      type="button"
+                      disabled={alreadyAdded || isAdding}
+                      onClick={() => handleAddClientDateToAvailability(date)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 flex items-center gap-1.5 ${
+                        alreadyAdded
+                          ? 'bg-green-100 border border-green-300 text-green-800 cursor-default'
+                          : isAdding
+                            ? 'bg-amber-200 border border-amber-400 text-amber-900 cursor-wait'
+                            : 'bg-amber-100 border border-amber-300 text-amber-900 hover:bg-primary/10 hover:border-primary/30 hover:text-primary cursor-pointer'
+                      }`}
+                    >
+                      <Icon
+                        name={alreadyAdded ? 'check_circle' : isAdding ? 'hourglass_top' : 'add_circle'}
+                        size="sm"
+                        filled={alreadyAdded}
+                        className={alreadyAdded ? 'text-green-600' : isAdding ? 'text-amber-700' : 'text-amber-700'}
+                      />
+                      {new Date(`${date}T00:00:00`).toLocaleDateString('el-GR', {
+                        weekday: 'long',
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      })}
+                      {alreadyAdded && <span className="text-[9px] uppercase tracking-wider">Προστέθηκε</span>}
+                    </button>
+                  )
+                })}
+            </div>
+          </div>
+        )}
+
         {/* Garage Benefits Section */}
         {garage.benefits && garage.benefits.length > 0 && (
           <div className={styles.card}>
@@ -645,11 +764,11 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
             </div>
             <p className="text-xs text-secondary mb-5">Δωρεάν Παροχές</p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${isAccepted ? 'pointer-events-none opacity-60' : ''}`}>
               {garage.benefits.map((benefit, index) => (
                 <label
                   key={index}
-                  className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
+                  className={`flex items-center gap-3 p-3 rounded-xl ${isAccepted ? 'cursor-default' : 'cursor-pointer'} transition-all ${
                     selectedBenefits.includes(benefit)
                       ? 'bg-primary/5 border border-primary/20'
                       : 'bg-surface-container border border-transparent'
@@ -677,41 +796,53 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
             <div className="flex items-center gap-3">
               <p className={styles.labelUpper}>Κατάσταση</p>
               <span className={`text-[10px] font-black uppercase tracking-[0.1em] px-3 py-1 rounded-full ${
-                offer.status === OfferStatus.DRAFT
-                  ? 'bg-primary/10 text-primary'
-                  : 'bg-blue-100 text-blue-700'
+                isAccepted
+                  ? 'bg-green-100 text-green-700'
+                  : offer.status === OfferStatus.DRAFT
+                    ? 'bg-primary/10 text-primary'
+                    : 'bg-blue-100 text-blue-700'
               }`}>
-                {offer.status === OfferStatus.DRAFT ? 'Draft' : 'Pending'}
+                {isAccepted ? 'Αποδεκτή' : offer.status === OfferStatus.DRAFT ? 'Draft' : 'Pending'}
               </span>
             </div>
           </div>
 
-          <div className="flex gap-3 mt-5">
-            <button
-              onClick={() => router.push(`/garage-dashboard/${garageId}#available`)}
-              className={`${styles.btnOutline} flex-1 justify-center`}
-            >
-              Ακύρωση
-            </button>
-            <button
-              onClick={handleSendOffer}
-              disabled={isSubmitting || (existingOffer && !hasChanges())}
-              className={`${
-                isSubmitting || (existingOffer && !hasChanges())
-                  ? styles.btnDisabled
-                  : styles.btnPrimary
-              } flex-1 justify-center`}
-            >
-              {isSubmitting ? (
-                <div className="w-5 h-5 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
-              ) : (
-                <>
-                  <Icon name={existingOffer ? 'sync' : 'send'} size="sm" />
-                  {existingOffer ? 'Ενημέρωση Προσφοράς' : 'Αποστολή Προσφοράς'}
-                </>
-              )}
-            </button>
-          </div>
+          {isAccepted ? (
+            <div className="mt-4 p-4 bg-green-50 border border-green-100 rounded-xl flex items-start gap-3">
+              <Icon name="check_circle" filled size="md" className="text-green-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-green-900">Η προσφορά έχει γίνει αποδεκτή</p>
+                <p className="text-xs text-green-700">Ο πελάτης αποδέχτηκε την προσφορά σας. Το ραντεβού έχει προγραμματιστεί.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => router.push(`/garage-dashboard/${garageId}#available`)}
+                className={`${styles.btnOutline} flex-1 justify-center`}
+              >
+                Ακύρωση
+              </button>
+              <button
+                onClick={handleSendOffer}
+                disabled={isSubmitting || (existingOffer && !hasChanges())}
+                className={`${
+                  isSubmitting || (existingOffer && !hasChanges())
+                    ? styles.btnDisabled
+                    : styles.btnPrimary
+                } flex-1 justify-center`}
+              >
+                {isSubmitting ? (
+                  <div className="w-5 h-5 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Icon name={existingOffer ? 'sync' : 'send'} size="sm" />
+                    {existingOffer ? 'Ενημέρωση Προσφοράς' : 'Αποστολή Προσφοράς'}
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

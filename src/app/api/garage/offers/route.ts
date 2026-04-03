@@ -85,6 +85,7 @@ export async function GET(request: NextRequest) {
           createdAt: offer.createdAt,
           appointmentDate: offer.appointmentDate,
           appointmentPrice: offer.appointmentPrice,
+          clientAvailabilityDates: offer.clientAvailabilityDates || [],
           serviceRequest: {
             id: serviceRequest.id,
             description: serviceRequest.description,
