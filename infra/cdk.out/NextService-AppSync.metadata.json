@@ -1,0 +1,74 @@
+{
+  "/NextService-AppSync/ChatEventsApi": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ChatEventsApi"
+    }
+  ],
+  "/NextService-AppSync/ChatApiKey": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ChatApiKey"
+    }
+  ],
+  "/NextService-AppSync/DefaultNamespace": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DefaultNamespace"
+    }
+  ],
+  "/NextService-AppSync/AppSyncApiId": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppSyncApiId"
+    }
+  ],
+  "/NextService-AppSync/AppSyncHttpEndpoint": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppSyncHttpEndpoint"
+    }
+  ],
+  "/NextService-AppSync/AppSyncRealtimeEndpoint": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppSyncRealtimeEndpoint"
+    }
+  ],
+  "/NextService-AppSync/AppSyncApiKey": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppSyncApiKey"
+    }
+  ],
+  "/NextService-AppSync/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/NextService-AppSync/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/NextService-AppSync/CDKMetadata/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CDKMetadata"
+    }
+  ],
+  "/NextService-AppSync/Exports/Output{\"Fn::GetAtt\":[\"ChatEventsApi\",\"ApiId\"]}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputFnGetAttChatEventsApiApiId96C43684"
+    }
+  ],
+  "/NextService-AppSync/Exports/Output{\"Fn::GetAtt\":[\"ChatApiKey\",\"ApiKey\"]}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputFnGetAttChatApiKeyApiKeyCBB19482"
+    }
+  ]
+}

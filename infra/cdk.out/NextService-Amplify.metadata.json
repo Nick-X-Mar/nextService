@@ -1,0 +1,62 @@
+{
+  "/NextService-Amplify/NextServiceApp": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "NextServiceApp"
+    }
+  ],
+  "/NextService-Amplify/MainBranch": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MainBranch"
+    }
+  ],
+  "/NextService-Amplify/AmplifyAppId": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AmplifyAppId"
+    }
+  ],
+  "/NextService-Amplify/AmplifyAppUrl": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AmplifyAppUrl"
+    }
+  ],
+  "/NextService-Amplify/AmplifyRoleArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AmplifyRoleArn"
+    }
+  ],
+  "/NextService-Amplify/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/NextService-Amplify/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/NextService-Amplify/AmplifyRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AmplifyRole7A8FD9BC"
+    }
+  ],
+  "/NextService-Amplify/CDKMetadata/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CDKMetadata"
+    }
+  ],
+  "/NextService-Amplify/AmplifyRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AmplifyRoleDefaultPolicyBCD6AD91"
+    }
+  ]
+}

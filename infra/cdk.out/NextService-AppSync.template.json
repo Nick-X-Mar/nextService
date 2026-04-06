@@ -1,0 +1,193 @@
+{
+ "Resources": {
+  "ChatEventsApi": {
+   "Type": "AWS::AppSync::Api",
+   "Properties": {
+    "EventConfig": {
+     "AuthProviders": [
+      {
+       "AuthType": "API_KEY"
+      }
+     ],
+     "ConnectionAuthModes": [
+      {
+       "AuthType": "API_KEY"
+      }
+     ],
+     "DefaultPublishAuthModes": [
+      {
+       "AuthType": "API_KEY"
+      }
+     ],
+     "DefaultSubscribeAuthModes": [
+      {
+       "AuthType": "API_KEY"
+      }
+     ]
+    },
+    "Name": "nextservice-chat-events"
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/ChatEventsApi"
+   }
+  },
+  "ChatApiKey": {
+   "Type": "AWS::AppSync::ApiKey",
+   "Properties": {
+    "ApiId": {
+     "Fn::GetAtt": [
+      "ChatEventsApi",
+      "ApiId"
+     ]
+    },
+    "Description": "NextService chat events API key",
+    "Expires": 1807020348
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/ChatApiKey"
+   }
+  },
+  "DefaultNamespace": {
+   "Type": "AWS::AppSync::ChannelNamespace",
+   "Properties": {
+    "ApiId": {
+     "Fn::GetAtt": [
+      "ChatEventsApi",
+      "ApiId"
+     ]
+    },
+    "Name": "default"
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/DefaultNamespace"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/yXIwQqCQBCA4WfxvjuVBnUNj4FFPUBM24aTOg3NLLKI7x7i6fv5Syj3R9gWOKoPr8739ITpbhg6h6M+UEQzB5jqN5+E3Mo55qXqFplj3+AQVTDEeZmXZJJsdtds7Zc3FewqOBQfJfK/xEZDhNvqH4QYIeB7AAAA"
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "AppSyncApiId": {
+   "Value": {
+    "Fn::GetAtt": [
+     "ChatEventsApi",
+     "ApiId"
+    ]
+   },
+   "Export": {
+    "Name": "NextService-AppSyncApiId"
+   }
+  },
+  "AppSyncHttpEndpoint": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      {
+       "Fn::GetAtt": [
+        "ChatEventsApi",
+        "ApiId"
+       ]
+      },
+      ".appsync-api.eu-central-1.amazonaws.com"
+     ]
+    ]
+   },
+   "Export": {
+    "Name": "NextService-AppSyncHttpEndpoint"
+   }
+  },
+  "AppSyncRealtimeEndpoint": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      {
+       "Fn::GetAtt": [
+        "ChatEventsApi",
+        "ApiId"
+       ]
+      },
+      ".appsync-realtime-api.eu-central-1.amazonaws.com"
+     ]
+    ]
+   },
+   "Export": {
+    "Name": "NextService-AppSyncRealtimeEndpoint"
+   }
+  },
+  "AppSyncApiKey": {
+   "Value": {
+    "Fn::GetAtt": [
+     "ChatApiKey",
+     "ApiKey"
+    ]
+   },
+   "Export": {
+    "Name": "NextService-AppSyncApiKey"
+   }
+  },
+  "ExportsOutputFnGetAttChatEventsApiApiId96C43684": {
+   "Value": {
+    "Fn::GetAtt": [
+     "ChatEventsApi",
+     "ApiId"
+    ]
+   },
+   "Export": {
+    "Name": "NextService-AppSync:ExportsOutputFnGetAttChatEventsApiApiId96C43684"
+   }
+  },
+  "ExportsOutputFnGetAttChatApiKeyApiKeyCBB19482": {
+   "Value": {
+    "Fn::GetAtt": [
+     "ChatApiKey",
+     "ApiKey"
+    ]
+   },
+   "Export": {
+    "Name": "NextService-AppSync:ExportsOutputFnGetAttChatApiKeyApiKeyCBB19482"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

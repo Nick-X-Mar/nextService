@@ -1,0 +1,56 @@
+{
+  "/NextService-S3/BucketName": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BucketName"
+    }
+  ],
+  "/NextService-S3/BucketArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BucketArn"
+    }
+  ],
+  "/NextService-S3/BucketDomainName": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BucketDomainName"
+    }
+  ],
+  "/NextService-S3/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/NextService-S3/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/NextService-S3/UploadsBucket/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "UploadsBucket5E5E9B64"
+    }
+  ],
+  "/NextService-S3/CDKMetadata/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CDKMetadata"
+    }
+  ],
+  "/NextService-S3/Exports/Output{\"Ref\":\"UploadsBucket5E5E9B64\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefUploadsBucket5E5E9B64F2F56CC2"
+    }
+  ],
+  "/NextService-S3/UploadsBucket/Policy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "UploadsBucketPolicy34A32B0B"
+    }
+  ]
+}

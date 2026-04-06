@@ -1,0 +1,315 @@
+{
+ "Resources": {
+  "AmplifyRole7A8FD9BC": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "amplify.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "RoleName": "nextservice-amplify-role"
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Amplify/AmplifyRole/Resource"
+   }
+  },
+  "AmplifyRoleDefaultPolicyBCD6AD91": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/Clients",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/Clients/index/*",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/Garages",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/Garages/index/*",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/Vehicles",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/Vehicles/index/*",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/ServiceRequests",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/ServiceRequests/index/*",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/Offers",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/Offers/index/*",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/ChatMessages",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/ChatMessages/index/*"
+       ],
+       "Sid": "DynamoDBAccess"
+      },
+      {
+       "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::Join": [
+          "",
+          [
+           "arn:aws:s3:::",
+           {
+            "Fn::ImportValue": "NextService-S3:ExportsOutputRefUploadsBucket5E5E9B64F2F56CC2"
+           }
+          ]
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           "arn:aws:s3:::",
+           {
+            "Fn::ImportValue": "NextService-S3:ExportsOutputRefUploadsBucket5E5E9B64F2F56CC2"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ],
+       "Sid": "S3Access"
+      },
+      {
+       "Action": [
+        "appsync:GraphQL",
+        "appsync:Connect"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:appsync:eu-central-1:766671488262:apis/*",
+       "Sid": "AppSyncAccess"
+      },
+      {
+       "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogGroups",
+        "logs:DescribeLogStreams"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:logs:eu-central-1:766671488262:log-group:/nextservice/*",
+       "Sid": "CloudWatchLogs"
+      },
+      {
+       "Action": "sns:Publish",
+       "Effect": "Allow",
+       "Resource": "arn:aws:sns:eu-central-1:766671488262:*",
+       "Sid": "SNSPublish"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "AmplifyRoleDefaultPolicyBCD6AD91",
+    "Roles": [
+     {
+      "Ref": "AmplifyRole7A8FD9BC"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Amplify/AmplifyRole/DefaultPolicy/Resource"
+   }
+  },
+  "NextServiceApp": {
+   "Type": "AWS::Amplify::App",
+   "Properties": {
+    "AccessToken": "{{resolve:secretsmanager:nextservice/github-token:SecretString:::}}",
+    "BuildSpec": "version: 1\nfrontend:\n  phases:\n    preBuild:\n      commands:\n        - npm ci\n    build:\n      commands:\n        - npm run build\n  artifacts:\n    baseDirectory: .next\n    files:\n      - '**/*'\n  cache:\n    paths:\n      - node_modules/**/*\n      - .next/cache/**/*\n",
+    "EnvironmentVariables": [
+     {
+      "Name": "REGION",
+      "Value": "eu-central-1"
+     },
+     {
+      "Name": "S3_BUCKET_NAME",
+      "Value": {
+       "Fn::ImportValue": "NextService-S3:ExportsOutputRefUploadsBucket5E5E9B64F2F56CC2"
+      }
+     },
+     {
+      "Name": "NEXT_PUBLIC_APPSYNC_REGION",
+      "Value": "eu-central-1"
+     },
+     {
+      "Name": "NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT",
+      "Value": {
+       "Fn::Join": [
+        "",
+        [
+         {
+          "Fn::ImportValue": "NextService-AppSync:ExportsOutputFnGetAttChatEventsApiApiId96C43684"
+         },
+         ".appsync-api.eu-central-1.amazonaws.com"
+        ]
+       ]
+      }
+     },
+     {
+      "Name": "NEXT_PUBLIC_APPSYNC_WEBSOCKET_ENDPOINT",
+      "Value": {
+       "Fn::Join": [
+        "",
+        [
+         {
+          "Fn::ImportValue": "NextService-AppSync:ExportsOutputFnGetAttChatEventsApiApiId96C43684"
+         },
+         ".appsync-realtime-api.eu-central-1.amazonaws.com"
+        ]
+       ]
+      }
+     },
+     {
+      "Name": "NEXT_PUBLIC_APPSYNC_API_KEY",
+      "Value": {
+       "Fn::ImportValue": "NextService-AppSync:ExportsOutputFnGetAttChatApiKeyApiKeyCBB19482"
+      }
+     },
+     {
+      "Name": "AMPLIFY_ROLE_ARN",
+      "Value": {
+       "Fn::GetAtt": [
+        "AmplifyRole7A8FD9BC",
+        "Arn"
+       ]
+      }
+     }
+    ],
+    "IAMServiceRole": {
+     "Fn::GetAtt": [
+      "AmplifyRole7A8FD9BC",
+      "Arn"
+     ]
+    },
+    "Name": "nextservice-web",
+    "Platform": "WEB_COMPUTE",
+    "Repository": "https://github.com/Nick-X-Mar/nextService"
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Amplify/NextServiceApp"
+   }
+  },
+  "MainBranch": {
+   "Type": "AWS::Amplify::Branch",
+   "Properties": {
+    "AppId": {
+     "Fn::GetAtt": [
+      "NextServiceApp",
+      "AppId"
+     ]
+    },
+    "BranchName": "dev",
+    "EnableAutoBuild": true,
+    "Stage": "PRODUCTION"
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Amplify/MainBranch"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/yWJSwrCMBQAz9J98tRW0K32AJZ6AHnGhj6bH01CCSF3l9jVzDAttOcrHBvcPBefhSt6Q34GFAvDzb8yoYY8WjWxXpo/B6tIpJq7FYbaKZIJci/Nzbm67isaMZdS/RGDi6GwIYXZmkMHpw4uzdcT8TWaQHqCcecPRXcBVo0AAAA="
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Amplify/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "AmplifyAppId": {
+   "Value": {
+    "Fn::GetAtt": [
+     "NextServiceApp",
+     "AppId"
+    ]
+   },
+   "Export": {
+    "Name": "NextService-AmplifyAppId"
+   }
+  },
+  "AmplifyAppUrl": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://dev.",
+      {
+       "Fn::GetAtt": [
+        "NextServiceApp",
+        "DefaultDomain"
+       ]
+      }
+     ]
+    ]
+   },
+   "Export": {
+    "Name": "NextService-AmplifyAppUrl"
+   }
+  },
+  "AmplifyRoleArn": {
+   "Value": {
+    "Fn::GetAtt": [
+     "AmplifyRole7A8FD9BC",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "NextService-AmplifyRoleArn"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

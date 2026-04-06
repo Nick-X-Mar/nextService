@@ -1,0 +1,241 @@
+{
+ "Resources": {
+  "AlertTopic2720D535": {
+   "Type": "AWS::SNS::Topic",
+   "Properties": {
+    "DisplayName": "NextService Alerts",
+    "TopicName": "nextservice-alerts"
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Monitoring/AlertTopic/Resource"
+   }
+  },
+  "AlertTopicnmarianos93gmailcomBDD43B05": {
+   "Type": "AWS::SNS::Subscription",
+   "Properties": {
+    "Endpoint": "nmarianos93@gmail.com",
+    "Protocol": "email",
+    "TopicArn": {
+     "Ref": "AlertTopic2720D535"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Monitoring/AlertTopic/nmarianos93@gmail.com/Resource"
+   }
+  },
+  "AppLogGroup7D8CD952": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": "/nextservice/app",
+    "RetentionInDays": 30
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "NextService-Monitoring/AppLogGroup/Resource"
+   }
+  },
+  "ApiLogGroup1DEDFC07": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": "/nextservice/api",
+    "RetentionInDays": 30
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "NextService-Monitoring/ApiLogGroup/Resource"
+   }
+  },
+  "5xxFilter17D0C5CE": {
+   "Type": "AWS::Logs::MetricFilter",
+   "Properties": {
+    "FilterPattern": "?\"HTTP 500\" ?\"HTTP 502\" ?\"HTTP 503\" ?\"HTTP 504\" ?\"status: 500\" ?\"status: 502\" ?\"status: 503\" ?\"status: 504\" ?\"statusCode: 500\" ?\"statusCode: 502\"",
+    "LogGroupName": {
+     "Ref": "AppLogGroup7D8CD952"
+    },
+    "MetricTransformations": [
+     {
+      "DefaultValue": 0,
+      "MetricName": "5xxErrors",
+      "MetricNamespace": "NextService",
+      "MetricValue": "1"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Monitoring/5xxFilter/Resource"
+   }
+  },
+  "4xxFilterC302CCBB": {
+   "Type": "AWS::Logs::MetricFilter",
+   "Properties": {
+    "FilterPattern": "?\"HTTP 400\" ?\"HTTP 401\" ?\"HTTP 403\" ?\"HTTP 404\" ?\"HTTP 409\" ?\"HTTP 422\" ?\"HTTP 429\" ?\"status: 400\" ?\"status: 401\" ?\"status: 403\" ?\"status: 404\" ?\"status: 429\"",
+    "LogGroupName": {
+     "Ref": "AppLogGroup7D8CD952"
+    },
+    "MetricTransformations": [
+     {
+      "DefaultValue": 0,
+      "MetricName": "4xxErrors",
+      "MetricNamespace": "NextService",
+      "MetricValue": "1"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Monitoring/4xxFilter/Resource"
+   }
+  },
+  "5xxAlarmC9DE1E39": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Ref": "AlertTopic2720D535"
+     }
+    ],
+    "AlarmDescription": "5xx errors > 5 in 5 minutes",
+    "AlarmName": "NextService-5xx-Errors",
+    "ComparisonOperator": "GreaterThanThreshold",
+    "EvaluationPeriods": 1,
+    "MetricName": "5xxErrors",
+    "Namespace": "NextService",
+    "OKActions": [
+     {
+      "Ref": "AlertTopic2720D535"
+     }
+    ],
+    "Period": 300,
+    "Statistic": "Sum",
+    "Threshold": 5,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Monitoring/5xxAlarm/Resource"
+   }
+  },
+  "4xxAlarm83158A48": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Ref": "AlertTopic2720D535"
+     }
+    ],
+    "AlarmDescription": "4xx errors > 50 in 5 minutes",
+    "AlarmName": "NextService-4xx-Errors",
+    "ComparisonOperator": "GreaterThanThreshold",
+    "EvaluationPeriods": 1,
+    "MetricName": "4xxErrors",
+    "Namespace": "NextService",
+    "OKActions": [
+     {
+      "Ref": "AlertTopic2720D535"
+     }
+    ],
+    "Period": 300,
+    "Statistic": "Sum",
+    "Threshold": 50,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Monitoring/4xxAlarm/Resource"
+   }
+  },
+  "NextServiceDashboardFA4D70DB": {
+   "Type": "AWS::CloudWatch::Dashboard",
+   "Properties": {
+    "DashboardBody": {
+     "Fn::Join": [
+      "",
+      [
+       "{\"widgets\":[{\"type\":\"metric\",\"width\":12,\"height\":6,\"x\":0,\"y\":0,\"properties\":{\"view\":\"timeSeries\",\"title\":\"5xx Errors\",\"region\":\"",
+       {
+        "Ref": "AWS::Region"
+       },
+       "\",\"metrics\":[[\"NextService\",\"5xxErrors\",{\"stat\":\"Sum\"}]],\"yAxis\":{}}},{\"type\":\"metric\",\"width\":12,\"height\":6,\"x\":12,\"y\":0,\"properties\":{\"view\":\"timeSeries\",\"title\":\"4xx Errors\",\"region\":\"",
+       {
+        "Ref": "AWS::Region"
+       },
+       "\",\"metrics\":[[\"NextService\",\"4xxErrors\",{\"stat\":\"Sum\"}]],\"yAxis\":{}}}]}"
+      ]
+     ]
+    },
+    "DashboardName": "NextService-Overview"
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Monitoring/NextServiceDashboard/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/02KUQuCMBSFf4vv81Ya1GsU9VIU2XvMaXpzbrLdITH232MI4tP5vnNOBtl2D+uEjzYVVZdKLMEXxEXH+Gjf3ioL/qUHFOz4URMUrrTC4ECoVWyXHpjUjQV/1c3FaDfEfeZbTQbFGSXVJg5LD0xI7aqRk2jBHyQ3fbxMcOK2LTU3VaxmCSHq3dHgKLDHj1qtVjlsctglX4uYGqcI+xqeU/4BYdkEg+wAAAA="
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Monitoring/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "AlertTopicArn": {
+   "Value": {
+    "Ref": "AlertTopic2720D535"
+   },
+   "Export": {
+    "Name": "NextService-AlertTopicArn"
+   }
+  },
+  "AppLogGroupName": {
+   "Value": {
+    "Ref": "AppLogGroup7D8CD952"
+   },
+   "Export": {
+    "Name": "NextService-AppLogGroupName"
+   }
+  },
+  "DashboardName": {
+   "Value": {
+    "Ref": "NextServiceDashboardFA4D70DB"
+   },
+   "Export": {
+    "Name": "NextService-DashboardName"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

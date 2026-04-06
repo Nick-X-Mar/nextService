@@ -1,0 +1,92 @@
+{
+  "/NextService-Monitoring/AlertTopicArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AlertTopicArn"
+    }
+  ],
+  "/NextService-Monitoring/AppLogGroupName": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppLogGroupName"
+    }
+  ],
+  "/NextService-Monitoring/DashboardName": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DashboardName"
+    }
+  ],
+  "/NextService-Monitoring/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/NextService-Monitoring/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/NextService-Monitoring/AlertTopic/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AlertTopic2720D535"
+    }
+  ],
+  "/NextService-Monitoring/AppLogGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppLogGroup7D8CD952"
+    }
+  ],
+  "/NextService-Monitoring/ApiLogGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ApiLogGroup1DEDFC07"
+    }
+  ],
+  "/NextService-Monitoring/5xxFilter/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "5xxFilter17D0C5CE"
+    }
+  ],
+  "/NextService-Monitoring/4xxFilter/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "4xxFilterC302CCBB"
+    }
+  ],
+  "/NextService-Monitoring/5xxAlarm/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "5xxAlarmC9DE1E39"
+    }
+  ],
+  "/NextService-Monitoring/4xxAlarm/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "4xxAlarm83158A48"
+    }
+  ],
+  "/NextService-Monitoring/NextServiceDashboard/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "NextServiceDashboardFA4D70DB"
+    }
+  ],
+  "/NextService-Monitoring/CDKMetadata/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CDKMetadata"
+    }
+  ],
+  "/NextService-Monitoring/AlertTopic/nmarianos93@gmail.com/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AlertTopicnmarianos93gmailcomBDD43B05"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "version": "53.0.0",
+  "files": {
+    "d244b7f54942b8a56cabfe532fde0431355483ea45bf23b79322b5619b614266": {
+      "displayName": "NextService-Amplify Template",
+      "source": {
+        "path": "NextService-Amplify.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "766671488262-eu-central-1-c7a37a77": {
+          "bucketName": "cdk-hnb659fds-assets-766671488262-eu-central-1",
+          "objectKey": "d244b7f54942b8a56cabfe532fde0431355483ea45bf23b79322b5619b614266.json",
+          "region": "eu-central-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-file-publishing-role-766671488262-eu-central-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

@@ -1,0 +1,140 @@
+{
+  "/NextService-DynamoDB/ClientsTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "ClientsTableC30D35A3"
+      }
+    }
+  ],
+  "/NextService-DynamoDB/GaragesTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "GaragesTable80195EE3"
+      }
+    }
+  ],
+  "/NextService-DynamoDB/VehiclesTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "VehiclesTable2BED75CE"
+      }
+    }
+  ],
+  "/NextService-DynamoDB/ServiceRequestsTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "ServiceRequestsTable5933C500"
+      }
+    }
+  ],
+  "/NextService-DynamoDB/OffersTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "OffersTable328D9350"
+      }
+    }
+  ],
+  "/NextService-DynamoDB/ChatMessagesTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "ChatMessagesTableB5D45C8B"
+      }
+    }
+  ],
+  "/NextService-DynamoDB/ClientsTableArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClientsTableArn"
+    }
+  ],
+  "/NextService-DynamoDB/GaragesTableArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "GaragesTableArn"
+    }
+  ],
+  "/NextService-DynamoDB/VehiclesTableArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "VehiclesTableArn"
+    }
+  ],
+  "/NextService-DynamoDB/ServiceRequestsTableArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ServiceRequestsTableArn"
+    }
+  ],
+  "/NextService-DynamoDB/OffersTableArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "OffersTableArn"
+    }
+  ],
+  "/NextService-DynamoDB/ChatMessagesTableArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ChatMessagesTableArn"
+    }
+  ],
+  "/NextService-DynamoDB/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/NextService-DynamoDB/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/NextService-DynamoDB/ClientsTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClientsTableC30D35A3"
+    }
+  ],
+  "/NextService-DynamoDB/GaragesTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "GaragesTable80195EE3"
+    }
+  ],
+  "/NextService-DynamoDB/VehiclesTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "VehiclesTable2BED75CE"
+    }
+  ],
+  "/NextService-DynamoDB/ServiceRequestsTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ServiceRequestsTable5933C500"
+    }
+  ],
+  "/NextService-DynamoDB/OffersTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "OffersTable328D9350"
+    }
+  ],
+  "/NextService-DynamoDB/ChatMessagesTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ChatMessagesTableB5D45C8B"
+    }
+  ],
+  "/NextService-DynamoDB/CDKMetadata/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CDKMetadata"
+    }
+  ]
+}
