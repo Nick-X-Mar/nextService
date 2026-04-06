@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Image from 'next/image'
 import CarSpecsForm from './components/CarSpecsForm'
 import BodyWorkPhotosForm from './components/BodyWorkPhotosForm'
 import { loadFormData } from '../../../utils/formStorage'
@@ -57,25 +56,8 @@ export default function CarSpecificationsPage() {
     : <CarSpecsForm savedData={savedData} />
 
   return (
-    <div className="bg-surface relative overflow-hidden min-h-screen">
-      {/* Persona — desktop: stuck to the right side of the form area */}
-      <div className="hidden lg:block absolute top-1/2 -translate-y-1/2 left-1/2 pointer-events-none z-0" style={{ marginLeft: 'calc(256px + 2vw)' }}>
-        <div className="w-[20vw]">
-          <Image
-            src="/images/persona.webp"
-            alt=""
-            width={600}
-            height={600}
-            className="select-none w-full h-auto"
-            priority={false}
-          />
-        </div>
-      </div>
-
-
-      <div className="relative z-10">
-        {formContent}
-      </div>
+    <div className="bg-surface min-h-screen">
+      {formContent}
     </div>
   )
 }

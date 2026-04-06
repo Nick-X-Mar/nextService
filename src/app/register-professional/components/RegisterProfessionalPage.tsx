@@ -6,8 +6,19 @@ import Icon from '@/components/ui/Icon'
 import { useToast } from '@/hooks/useToast'
 import { styles } from '@/styles/styles'
 
+const extraServices = [
+  { icon: 'car_rental', label: 'Όχημα Αντικατάστασης', value: 'replacement-vehicle' },
+  { icon: 'local_shipping', label: 'Παραλαβή από το σπίτι', value: 'home-pickup' },
+  { icon: 'local_shipping', label: 'Παράδοση στο σπίτι', value: 'home-delivery' },
+  { icon: 'credit_card', label: 'Πληρωμή με κάρτα', value: 'card-payment' },
+  { icon: 'receipt_long', label: 'Δωρεάν Εγγύηση Εργασίας', value: 'work-warranty' },
+  { icon: 'schedule', label: 'Εξυπηρέτηση Σαββατοκύριακο', value: 'weekend-service' },
+]
+
 interface GarageFormData {
   companyName: string
+  contactFirstName: string
+  contactLastName: string
   tin: string
   email: string
   taxAuthority: string
@@ -18,6 +29,8 @@ interface GarageFormData {
 export default function RegisterProfessionalPage() {
   const [formData, setFormData] = useState<GarageFormData>({
     companyName: '',
+    contactFirstName: '',
+    contactLastName: '',
     tin: '',
     email: '',
     taxAuthority: '',
@@ -25,6 +38,10 @@ export default function RegisterProfessionalPage() {
     mobile: ''
   })
   const [password, setPassword] = useState('')
+  const [emailLocked, setEmailLocked] = useState(false)
+  const [selectedServices, setSelectedServices] = useState<string[]>([])
+  const [customServices, setCustomServices] = useState<string[]>([])
+  const [customServiceInput, setCustomServiceInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
 
@@ -36,6 +53,7 @@ export default function RegisterProfessionalPage() {
     const savedPassword = sessionStorage.getItem('garageRegPassword')
     if (savedEmail) {
       setFormData(prev => ({ ...prev, email: savedEmail }))
+      setEmailLocked(true)
     }
     if (savedPassword) {
       setPassword(savedPassword)
@@ -54,6 +72,16 @@ export default function RegisterProfessionalPage() {
   const validateForm = (): boolean => {
     if (!formData.companyName.trim()) {
       error('Σφάλμα', 'Η επωνυμία της εταιρείας είναι υποχρεωτική')
+      return false
+    }
+
+    if (!formData.contactFirstName.trim()) {
+      error('Σφάλμα', 'Το όνομα υπεύθυνου είναι υποχρεωτικό')
+      return false
+    }
+
+    if (!formData.contactLastName.trim()) {
+      error('Σφάλμα', 'Το επώνυμο υπεύθυνου είναι υποχρεωτικό')
       return false
     }
 
@@ -122,7 +150,7 @@ export default function RegisterProfessionalPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ ...formData, password }),
+        body: JSON.stringify({ ...formData, password, services: [...selectedServices, ...customServices] }),
       })
 
       const data = await response.json()
@@ -175,12 +203,17 @@ export default function RegisterProfessionalPage() {
                   setIsSubmitted(false)
                   setFormData({
                     companyName: '',
+                    contactFirstName: '',
+                    contactLastName: '',
                     tin: '',
                     email: '',
                     taxAuthority: '',
                     address: '',
                     mobile: ''
                   })
+                  setSelectedServices([])
+                  setCustomServices([])
+                  setCustomServiceInput('')
                 }}
                 className={`${styles.btnOutline} w-full justify-center py-3.5`}
               >
@@ -196,12 +229,30 @@ export default function RegisterProfessionalPage() {
 
   const formFields: { key: keyof GarageFormData; label: string; icon: string; type: string; placeholder: string; maxLength?: number }[] = [
     { key: 'companyName', label: 'Επωνυμία Εταιρείας', icon: 'business', type: 'text', placeholder: 'π.χ. ΑΕ Συνεργείο Αυτοκινήτων Παπαδόπουλος' },
+    { key: 'contactFirstName', label: 'Όνομα Υπεύθυνου', icon: 'person', type: 'text', placeholder: 'π.χ. Γιώργος' },
+    { key: 'contactLastName', label: 'Επώνυμο Υπεύθυνου', icon: 'person', type: 'text', placeholder: 'π.χ. Παπαδόπουλος' },
     { key: 'tin', label: 'ΑΦΜ', icon: 'pin', type: 'text', placeholder: 'π.χ. 123456789', maxLength: 9 },
     { key: 'email', label: 'Email', icon: 'mail', type: 'email', placeholder: 'π.χ. info@company.gr' },
     { key: 'taxAuthority', label: 'ΔΟΥ', icon: 'account_balance', type: 'text', placeholder: 'π.χ. ΔΟΥ Αθηνών' },
     { key: 'address', label: 'Διεύθυνση', icon: 'location_on', type: 'text', placeholder: 'π.χ. Λεωφόρος Πατησιών 123, Αθήνα' },
     { key: 'mobile', label: 'Κινητό Τηλέφωνο', icon: 'phone_iphone', type: 'tel', placeholder: 'π.χ. 6971234567 ή +30 6971234567' },
   ]
+
+  const toggleService = (value: string) => {
+    setSelectedServices(prev =>
+      prev.includes(value)
+        ? prev.filter(s => s !== value)
+        : [...prev, value]
+    )
+  }
+
+  const addCustomService = () => {
+    const trimmed = customServiceInput.trim()
+    if (trimmed && !customServices.includes(trimmed)) {
+      setCustomServices(prev => [...prev, trimmed])
+      setCustomServiceInput('')
+    }
+  }
 
   return (
     <div className="min-h-screen bg-surface">
@@ -253,24 +304,110 @@ export default function RegisterProfessionalPage() {
 
             {/* Form Fields */}
             <div className="space-y-5">
-              {formFields.map((field) => (
-                <div key={field.key} className="space-y-2">
-                  <label className={`${styles.labelUpper} flex items-center gap-2`}>
-                    <Icon name={field.icon} size="sm" className="text-on-surface-variant" />
-                    {field.label} *
-                  </label>
-                  <input
-                    type={field.type}
-                    value={formData[field.key]}
-                    onChange={(e) => handleInputChange(field.key, e.target.value)}
-                    placeholder={field.placeholder}
-                    required
-                    disabled={isLoading}
-                    maxLength={field.maxLength}
-                    className={`${styles.input} ${isLoading ? 'opacity-50' : ''}`}
-                  />
+              {formFields.map((field) => {
+                const isEmailField = field.key === 'email'
+                const isLocked = isEmailField && emailLocked
+                return (
+                  <div key={field.key} className="space-y-2">
+                    <label className={`${styles.labelUpper} flex items-center gap-2`}>
+                      <Icon name={field.icon} size="sm" className="text-on-surface-variant" />
+                      {field.label} *
+                      {isLocked && <Icon name="lock" size="sm" className="text-on-surface-variant/50" />}
+                    </label>
+                    <input
+                      type={field.type}
+                      value={formData[field.key]}
+                      onChange={(e) => handleInputChange(field.key, e.target.value)}
+                      placeholder={field.placeholder}
+                      required
+                      disabled={isLoading || isLocked}
+                      readOnly={isLocked}
+                      maxLength={field.maxLength}
+                      className={`${styles.input} ${isLoading ? 'opacity-50' : ''} ${isLocked ? 'opacity-60 cursor-not-allowed bg-surface-container' : ''}`}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Extra Services Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 pb-4 border-b border-outline-variant/10">
+                <div className="w-10 h-10 bg-surface-container rounded-lg flex items-center justify-center">
+                  <Icon name="star" filled className="text-primary" />
                 </div>
-              ))}
+                <div>
+                  <h2 className={styles.sectionTitle}>
+                    Επιπλέον Υπηρεσίες
+                  </h2>
+                  <p className="text-xs text-on-surface-variant">Τι extra προσφέρετε στους πελάτες σας; (προαιρετικό)</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {extraServices.map((service) => {
+                  const isSelected = selectedServices.includes(service.value)
+                  return (
+                    <button
+                      key={service.value}
+                      type="button"
+                      onClick={() => toggleService(service.value)}
+                      className={`flex items-center gap-2 p-3 rounded-xl text-left transition-all ${
+                        isSelected
+                          ? 'bg-primary/10 border-2 border-primary'
+                          : 'bg-surface-container border-2 border-transparent hover:bg-surface-container-high'
+                      }`}
+                    >
+                      <Icon
+                        name={service.icon}
+                        size="sm"
+                        className={isSelected ? 'text-primary' : 'text-on-surface-variant/60'}
+                      />
+                      <span className={`text-xs font-bold ${isSelected ? 'text-primary' : 'text-on-surface'}`}>
+                        {service.label}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Custom services */}
+              {customServices.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {customServices.map((cs) => (
+                    <div key={cs} className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 rounded-full px-3 py-1.5">
+                      <span className="text-xs font-bold text-primary">{cs}</span>
+                      <button
+                        type="button"
+                        onClick={() => setCustomServices(prev => prev.filter(s => s !== cs))}
+                        className="text-primary/60 hover:text-primary"
+                      >
+                        <Icon name="close" size="sm" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add custom service input */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={customServiceInput}
+                  onChange={(e) => setCustomServiceInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomService() } }}
+                  placeholder="Προσθέστε δική σας υπηρεσία..."
+                  className={`${styles.input} flex-1`}
+                />
+                <button
+                  type="button"
+                  onClick={addCustomService}
+                  disabled={!customServiceInput.trim()}
+                  className="px-4 rounded-xl bg-primary text-on-primary font-bold text-sm disabled:opacity-30 transition-opacity"
+                >
+                  <Icon name="add" size="sm" />
+                </button>
+              </div>
             </div>
 
             {/* Submit Button */}

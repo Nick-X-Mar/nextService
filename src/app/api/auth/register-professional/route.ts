@@ -29,7 +29,7 @@ function checkRateLimit(identifier: string, maxAttempts: number = 3, windowMs: n
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { companyName, tin, email, password, taxAuthority, address, mobile, benefits } = body
+    const { companyName, contactFirstName, contactLastName, tin, email, password, taxAuthority, address, mobile, benefits, services } = body
 
     // Validate required fields
     if (!companyName || typeof companyName !== 'string' || !companyName.trim()) {
@@ -139,6 +139,8 @@ export async function POST(request: NextRequest) {
     const garageData = {
       id: garageId,
       companyName: companyName.trim(),
+      contactFirstName: contactFirstName ? contactFirstName.trim() : '',
+      contactLastName: contactLastName ? contactLastName.trim() : '',
       tin: cleanTin,
       email: email.trim().toLowerCase(),
       passwordHash,
@@ -148,6 +150,7 @@ export async function POST(request: NextRequest) {
       isActive: false,
       description: 'Εταιρεία εγγεγραμμένη στο NextService',
       benefits: benefits && Array.isArray(benefits) ? benefits : [],
+      services: services && Array.isArray(services) ? services : [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }
