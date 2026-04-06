@@ -4,7 +4,6 @@ import React, { useState, useLayoutEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { gsap } from 'gsap'
 import Icon from '@/components/ui/Icon'
-import GearSubmitButton from '@/components/GearSubmitButton'
 import { saveFormData } from '@/utils/formStorage'
 
 const categories = [
@@ -51,12 +50,10 @@ export default function HeroSection() {
     setSelectedCategory(value)
     if (tlRef.current) tlRef.current.reverse()
     setIsOpen(false)
-  }
-
-  const handleSubmit = () => {
-    if (!selectedCategory) return
-    saveFormData({ category: selectedCategory })
-    router.push('/car-details')
+    saveFormData({ category: value })
+    setTimeout(() => {
+      router.push('/car-details')
+    }, 500)
   }
 
   return (
@@ -123,14 +120,6 @@ export default function HeroSection() {
           </div>
         </div>
 
-        {/* Submit Button */}
-        <div className="w-full max-w-[480px] mt-5">
-          <GearSubmitButton
-            onClick={handleSubmit}
-            disabled={!selectedCategory}
-            label="ΣΥΝΕΧΕΙΑ"
-          />
-        </div>
       </div>
 
       {/* Scroll down arrow — desktop only */}

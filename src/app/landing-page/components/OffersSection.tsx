@@ -128,40 +128,53 @@ export default function OffersSection() {
               >
                 <div className="relative h-[420px] md:h-[480px] rounded-2xl overflow-hidden shadow-xl border border-white/10 bg-surface-container-lowest">
                   {/* Main content */}
-                  <div className="size-full bg-gradient-to-br from-primary-container/40 via-primary-container/20 to-surface-container-lowest flex flex-col items-center justify-center gap-5 p-6 relative transition-transform duration-300">
-                    {/* Icon */}
-                    <div className="w-28 h-28 rounded-full bg-primary-container/25 flex items-center justify-center">
-                      <span
-                        className="material-symbols-outlined text-primary"
-                        style={{
-                          fontSize: 56,
-                          fontVariationSettings: "'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 48",
-                        }}
-                      >
-                        {offer.icon}
-                      </span>
-                    </div>
+                  <div className="size-full relative transition-transform duration-300">
+                    {/* Background image */}
+                    {offer.image ? (
+                      <img
+                        src={offer.image}
+                        alt={offer.title}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary-container/40 via-primary-container/20 to-surface-container-lowest flex items-center justify-center">
+                        <span
+                          className="material-symbols-outlined text-primary/40"
+                          style={{
+                            fontSize: 80,
+                            fontVariationSettings: "'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 48",
+                          }}
+                        >
+                          {offer.icon}
+                        </span>
+                      </div>
+                    )}
 
-                    {/* Title & Price */}
-                    <h4 className="font-bold text-xl text-on-surface text-center">
-                      {offer.title}
-                    </h4>
-                    <p className="text-on-surface-variant text-sm text-center">
-                      {offer.subtitle}
-                    </p>
+                    {/* Gradient overlay for text readability */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
 
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black text-tertiary">
-                        {offer.price}
-                      </span>
-                    </div>
+                    {/* Text content over image */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-end gap-3 p-6 pb-8">
+                      <h4 className="font-bold text-xl text-white text-center drop-shadow-lg">
+                        {offer.title}
+                      </h4>
+                      <p className="text-white/80 text-sm text-center drop-shadow">
+                        {offer.subtitle}
+                      </p>
 
-                    {/* Includes note */}
-                    <div className="inline-flex items-center gap-1.5 bg-surface-container-lowest/80 backdrop-blur-sm px-3 py-1.5 rounded-full">
-                      <Icon name="verified" size="sm" className="text-green-600" />
-                      <span className="text-xs font-bold text-on-surface-variant">
-                        Εργασία & ανταλλακτικά
-                      </span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-black text-tertiary drop-shadow-lg">
+                          {offer.price}
+                        </span>
+                      </div>
+
+                      {/* Includes note */}
+                      <div className="inline-flex items-center gap-1.5 bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                        <Icon name="verified" size="sm" className="text-green-600" />
+                        <span className="text-xs font-bold text-white/90">
+                          Εργασία & ανταλλακτικά
+                        </span>
+                      </div>
                     </div>
                   </div>
 

@@ -53,6 +53,8 @@ export default function CarBrandModelSelector({
   const [customBrand, setCustomBrand] = useState('')
   const [customModel, setCustomModel] = useState('')
   const [description, setDescription] = useState('')
+  const [descriptionPhotos, setDescriptionPhotos] = useState<File[]>([])
+  const [category, setCategory] = useState('')
   const [engineCC, setEngineCC] = useState('')
   const [modelYear, setModelYear] = useState('')
   const [fuelType, setFuelType] = useState<'petrol' | 'diesel' | ''>('petrol')
@@ -119,6 +121,7 @@ export default function CarBrandModelSelector({
       if (data.isModelOther) { setIsModelOther(true); setCustomModel(data.model) }
       else setModel(data.model)
     }
+    if (data.category) setCategory(data.category)
     if (data.description) setDescription(data.description)
     if (data.engineCC) setEngineCC(data.engineCC)
     if (data.modelYear) setModelYear(data.modelYear)
@@ -192,6 +195,80 @@ export default function CarBrandModelSelector({
       {/* Main form card */}
       <div className="bg-surface-container-lowest rounded-3xl shadow-[0_4px_24px_rgba(27,28,28,0.04)] p-6">
         <div className="space-y-8">
+
+          {/* Description */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
+              Περιγραφή Προβλήματος <span className="text-error">*</span>
+            </label>
+            <textarea
+              className="w-full bg-surface-container-highest rounded-xl px-4 py-3 border-none focus:ring-2 focus:ring-primary font-medium text-sm resize-none"
+              rows={3}
+              placeholder="Περιγράψτε τι χρειάζεται το αυτοκίνητό σας..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+
+            {/* Photo recommendation for painting categories */}
+            {(category === 'oliki-vafi' || category === 'meriki-vafi' || category === 'fanopeia') && descriptionPhotos.length === 0 && (
+              <div className="bg-tertiary/10 border border-tertiary/20 rounded-xl p-3 flex items-start gap-2">
+                <Icon name="photo_camera" size="sm" className="text-tertiary mt-0.5 shrink-0" />
+                <p className="text-xs text-on-surface-variant">
+                  <span className="font-bold text-on-surface">Προτείνουμε</span> να ανεβάσετε φωτογραφίες της ζημιάς για πιο ακριβείς προσφορές από τα συνεργεία.
+                </p>
+              </div>
+            )}
+
+            {/* Photo upload area */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
+                  Φωτογραφίες (προαιρετικά)
+                </label>
+                <span className="text-[10px] text-on-surface-variant/50">{descriptionPhotos.length}/5</span>
+              </div>
+
+              {/* Photo previews */}
+              {descriptionPhotos.length > 0 && (
+                <div className="flex gap-2 flex-wrap">
+                  {descriptionPhotos.map((photo, index) => (
+                    <div key={index} className="relative w-20 h-20 rounded-xl overflow-hidden group">
+                      <img
+                        src={URL.createObjectURL(photo)}
+                        alt={`Φωτο ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setDescriptionPhotos(prev => prev.filter((_, i) => i !== index))}
+                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Icon name="close" size="sm" className="text-white" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {descriptionPhotos.length < 5 && (
+                <label className="flex items-center gap-2 cursor-pointer text-primary hover:text-primary/80 transition-colors w-fit">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || [])
+                      setDescriptionPhotos(prev => [...prev, ...files].slice(0, 5))
+                      e.target.value = ''
+                    }}
+                  />
+                  <Icon name="add_photo_alternate" size="sm" />
+                  <span className="text-xs font-bold">Προσθήκη φωτογραφίας</span>
+                </label>
+              )}
+            </div>
+          </div>
 
           {/* Brand */}
           <div className="space-y-2">
@@ -344,20 +421,6 @@ export default function CarBrandModelSelector({
               />
             </div>
           )}
-
-          {/* Description */}
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
-              Περιγραφή Προβλήματος <span className="text-error">*</span>
-            </label>
-            <textarea
-              className="w-full bg-surface-container-highest rounded-xl px-4 py-3 border-none focus:ring-2 focus:ring-primary font-medium text-sm resize-none"
-              rows={3}
-              placeholder="Περιγράψτε τι χρειάζεται το αυτοκίνητό σας..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
 
           {/* Model Year */}
           <div className="space-y-2">

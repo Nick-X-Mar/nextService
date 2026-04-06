@@ -2,7 +2,7 @@
   {
     "id": "offer-1",
     "slug": "set_disk_all_cars",
-    "image": "",
+    "image": "/images/offers/diskos.jpeg",
     "title": "Συμπλέκτης",
     "subtitle": "Daewoo Matiz 1000cc Βενζίνη",
     "description": "Περιλαμβάνεται εργασία και επώνυμα ανταλλακτικά",
@@ -18,7 +18,7 @@
   {
     "id": "offer-2",
     "slug": "set-imantas-xronismou",
-    "image": "",
+    "image": "/images/offers/imantas.jpeg",
     "title": "Ιμάντας Χρονισμού με Αντλία Νερού",
     "subtitle": "Ford Focus 1600cc Βενζίνη",
     "description": "Περιλαμβάνεται εργασία και επώνυμα ανταλλακτικά",
@@ -34,7 +34,7 @@
   {
     "id": "offer-3",
     "slug": "service-auto",
-    "image": "",
+    "image": "/images/offers/service.jpeg",
     "title": "Μεγάλο Service Αυτοκινήτου",
     "subtitle": "Seat Ibiza 1000cc Βενζίνη",
     "description": "Περιλαμβάνεται εργασία και επώνυμα ανταλλακτικά",
@@ -50,7 +50,7 @@
   {
     "id": "offer-4",
     "slug": "vafi-oliki",
-    "image": "",
+    "image": "/images/offers/phano.jpeg",
     "title": "Ολική Βαφή",
     "subtitle": "Mercedes SLK",
     "description": "Περιλαμβάνεται εργασία και επώνυμα ανταλλακτικά",
@@ -66,7 +66,7 @@
   {
     "id": "offer-5",
     "slug": "vafi-profylaktira-portas",
-    "image": "",
+    "image": "/images/offers/phano_2.jpeg",
     "title": "Μερική Βαφή - Φανοποιεία",
     "subtitle": "VW Golf 4",
     "description": "Βαφή προφυλακτήρα. Περιλαμβάνεται εργασία και επώνυμα ανταλλακτικά",

@@ -295,6 +295,11 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
               <p className="text-xs text-on-surface-variant">
                 {savedData.engineCC}cc &middot; {savedData.category}
               </p>
+              {savedData.description && (
+                <p className="text-xs text-on-surface-variant mt-1 italic">
+                  {savedData.description}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -320,8 +325,8 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                 )}
               </div>
             </div>
-            <p className="text-[10px] text-on-surface-variant mt-2 ml-[52px]">
-              Συμπληρωστε τα στοιχεια για πραγματικες προσφορες
+            <p className="text-xs font-semibold text-tertiary mt-3 ml-[52px]">
+              Ενδεικτική εκτίμηση — συμπληρώστε τα στοιχεία σας για να λάβετε πραγματικές προσφορές από συνεργεία
             </p>
           </div>
         )}
@@ -485,42 +490,53 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
             </div>
 
             {!hasLicensePhoto ? (
-              <input
-                type="text"
-                value={engineNumber}
-                onChange={(e) => setEngineNumber(e.target.value)}
-                placeholder="π.χ. ABC123456"
-                className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
-              />
-            ) : (
-              <div className="border-2 border-dashed border-outline-variant/30 rounded-2xl p-8 text-center hover:border-primary transition-colors">
+              <>
                 <input
-                  type="file"
-                  id="license-photo"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
+                  type="text"
+                  value={engineNumber}
+                  onChange={(e) => setEngineNumber(e.target.value)}
+                  placeholder="π.χ. ABC123456"
+                  className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
                 />
-                <label htmlFor="license-photo" className="cursor-pointer">
-                  {licensePhoto ? (
-                    <div className="text-green-600">
-                      <Icon name="photo" size="lg" className="mx-auto mb-2" />
-                      <p className="text-sm font-bold">{licensePhoto.name}</p>
-                      <p className="text-xs text-on-surface-variant">Κανε κλικ για αλλαγη</p>
-                    </div>
-                  ) : (
-                    <div className="text-on-surface-variant">
-                      <Icon name="cloud_upload" size="lg" className="mx-auto mb-2" />
-                      <p className="text-sm font-bold">Κανε κλικ για ανεβασμα</p>
-                      <p className="text-xs text-on-surface-variant">JPG, PNG μεχρι 10MB</p>
-                    </div>
-                  )}
-                </label>
-              </div>
+              </>
+            ) : (
+              <>
+                <div className="bg-tertiary/10 border border-tertiary/20 rounded-xl p-3 flex items-start gap-2">
+                  <Icon name="info" size="sm" className="text-tertiary mt-0.5 shrink-0" />
+                  <p className="text-xs text-on-surface-variant">
+                    Ανεβάστε μια <span className="font-bold text-on-surface">καθαρή και ευανάγνωστη</span> φωτογραφία της άδειας κυκλοφορίας. Θα αντλήσουμε αυτόματα τα στοιχεία του οχήματος (αρ. κινητήρα, πλαισίου).
+                  </p>
+                </div>
+                <div className="border-2 border-dashed border-outline-variant/30 rounded-2xl p-8 text-center hover:border-primary transition-colors">
+                  <input
+                    type="file"
+                    id="license-photo"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <label htmlFor="license-photo" className="cursor-pointer">
+                    {licensePhoto ? (
+                      <div className="text-green-600">
+                        <Icon name="photo" size="lg" className="mx-auto mb-2" />
+                        <p className="text-sm font-bold">{licensePhoto.name}</p>
+                        <p className="text-xs text-on-surface-variant">Κανε κλικ για αλλαγη</p>
+                      </div>
+                    ) : (
+                      <div className="text-on-surface-variant">
+                        <Icon name="cloud_upload" size="lg" className="mx-auto mb-2" />
+                        <p className="text-sm font-bold">Κανε κλικ για ανεβασμα</p>
+                        <p className="text-xs text-on-surface-variant">JPG, PNG μεχρι 10MB</p>
+                      </div>
+                    )}
+                  </label>
+                </div>
+              </>
             )}
           </div>
 
-          {/* VIN Number */}
+          {/* VIN Number — only when NOT uploading license photo */}
+          {!hasLicensePhoto && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <label className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
@@ -572,6 +588,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
               </p>
             )}
           </div>
+          )}
         </div>
 
         {/* Submit section */}

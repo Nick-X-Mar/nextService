@@ -182,6 +182,11 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
                 {savedData.brand} {savedData.model}
               </p>
               <p className="text-xs text-on-surface-variant">Φανοποιεια</p>
+              {savedData.description && (
+                <p className="text-xs text-on-surface-variant mt-1 italic">
+                  {savedData.description}
+                </p>
+              )}
             </div>
           </div>
         </div>
