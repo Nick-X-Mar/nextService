@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { hashPassword } from '@/utils/passwordService'
+import { logEvent } from '@/utils/eventLogger'
+import { EventName } from '@/types/events'
 
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
 
@@ -70,6 +72,15 @@ export async function POST(request: NextRequest) {
       TableName: 'Clients',
       Item: clientData
     }))
+
+    logEvent({
+      eventName: EventName.ClientRegistered,
+      actorType: 'client',
+      actorId: clientId,
+      clientId,
+      source: 'api/auth/register',
+      metadata: { email: normalizedEmail }
+    })
 
     return NextResponse.json({
       success: true,

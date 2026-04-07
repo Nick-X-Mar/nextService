@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { logEvent } from '@/utils/eventLogger'
+import { EventName } from '@/types/events'
 
 export async function GET(
   request: NextRequest,
@@ -194,6 +196,16 @@ export async function PATCH(
     }
 
     const updatedRequest = updateResult.Attributes
+
+    logEvent({
+      eventName: EventName.ClientAvailabilityDatesSubmitted,
+      actorType: 'client',
+      actorId: updatedRequest.clientId,
+      clientId: updatedRequest.clientId,
+      requestId,
+      source: 'api/requests/[requestId]',
+      metadata: { dateCount: normalizedDates.length }
+    })
 
     // Fetch client details
     const clientScanCommand = new ScanCommand({

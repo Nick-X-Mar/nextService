@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { uploadMultipleFilesToS3, validateFile, isS3Configured } from '@/utils/s3Service'
 import { dynamoDB } from '@/utils/dynamoService'
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { logEvent } from '@/utils/eventLogger'
+import { EventName } from '@/types/events'
 
 export async function POST(request: NextRequest) {
   try {
@@ -111,6 +113,14 @@ export async function POST(request: NextRequest) {
         ':updatedAt': new Date().toISOString()
       }
     }))
+
+    logEvent({
+      eventName: EventName.DamagePhotosUploaded,
+      actorType: 'client',
+      requestId: serviceRequestId,
+      source: 'api/upload-photos',
+      metadata: { vehicleId, photoCount: photoData.length }
+    })
 
     // Return successful uploads with photo records
     const successfulUploads = uploadResults.map((result, index) => ({

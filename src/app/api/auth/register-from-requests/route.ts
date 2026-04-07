@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb'
+import { logEvent } from '@/utils/eventLogger'
+import { EventName } from '@/types/events'
 
 // Simple in-memory rate limiting (in production, use Redis or database)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
@@ -286,6 +288,15 @@ export async function POST(request: NextRequest) {
       })
       await dynamoDB.send(deleteGuestClientCommand)
 
+      logEvent({
+        eventName: EventName.GuestRegisteredFromRequest,
+        actorType: 'client',
+        actorId: existingClient.id,
+        clientId: existingClient.id,
+        source: 'api/auth/register-from-requests',
+        metadata: { guestClientId, mergedToExisting: true }
+      })
+
       return NextResponse.json({
         success: true,
         message: 'Existing user found - data merged successfully',
@@ -345,6 +356,15 @@ export async function POST(request: NextRequest) {
     if (!Attributes) {
       return NextResponse.json({ error: 'Guest client not found' }, { status: 404 })
     }
+
+    logEvent({
+      eventName: EventName.GuestRegisteredFromRequest,
+      actorType: 'client',
+      actorId: guestClientId,
+      clientId: guestClientId,
+      source: 'api/auth/register-from-requests',
+      metadata: { guestClientId, mergedToExisting: false }
+    })
 
     return NextResponse.json({
       success: true,

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import { DynamoDBDocumentClient, PutCommand, QueryCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { DynamoDBDocumentClient, PutCommand, QueryCommand, ScanCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
 import { OfferStatus } from '@/types/statuses'
+import { logEvent } from '@/utils/eventLogger'
+import { sendEmail } from '@/utils/emailService'
+import { EventName, EmailTemplate } from '@/types/events'
 
 // Initialize DynamoDB client
 const client = new DynamoDBClient({
@@ -59,6 +62,20 @@ export async function POST(request: NextRequest) {
     })
 
     await docClient.send(command)
+
+    logEvent({
+      eventName: EventName.OfferCreated,
+      actorType: 'garage',
+      actorId: garageId,
+      garageId,
+      requestId: serviceRequestId,
+      offerId,
+      source: 'api/offers',
+      metadata: { offerAmount }
+    })
+
+    // Email the client that owns this request. Best-effort lookup — never block.
+    void notifyClientAboutNewOffer({ serviceRequestId, garageId, offerId, offerAmount })
 
     return NextResponse.json({
       success: true,
@@ -183,6 +200,17 @@ export async function PUT(request: NextRequest) {
 
     const result = await docClient.send(command)
 
+    logEvent({
+      eventName: EventName.OfferUpdated,
+      actorType: 'garage',
+      actorId: result.Attributes?.garageId,
+      garageId: result.Attributes?.garageId,
+      requestId: result.Attributes?.serviceRequestId,
+      offerId,
+      source: 'api/offers',
+      metadata: { offerAmount, status: status || OfferStatus.PENDING }
+    })
+
     return NextResponse.json({
       success: true,
       offer: result.Attributes
@@ -195,5 +223,51 @@ export async function PUT(request: NextRequest) {
       success: false,
       error: 'Failed to update offer'
     }, { status: 500 })
+  }
+}
+
+/**
+ * Look up the client + garage that own a request, then fire the
+ * "new offer" email to the client. Pure side effect — errors are logged
+ * and swallowed.
+ */
+async function notifyClientAboutNewOffer(args: {
+  serviceRequestId: string
+  garageId: string
+  offerId: string
+  offerAmount: number
+}): Promise<void> {
+  try {
+    const requestRes = await docClient.send(new GetCommand({
+      TableName: 'ServiceRequests',
+      Key: { id: args.serviceRequestId }
+    }))
+    const sr = requestRes.Item
+    if (!sr?.clientId) return
+
+    const [clientRes, garageRes] = await Promise.all([
+      docClient.send(new GetCommand({ TableName: 'Clients', Key: { id: sr.clientId } })),
+      docClient.send(new GetCommand({ TableName: 'Garages', Key: { id: args.garageId } }))
+    ])
+
+    const clientEmail = clientRes.Item?.email as string | undefined
+    if (!clientEmail) return
+
+    sendEmail({
+      to: clientEmail,
+      templateName: EmailTemplate.NewOfferReceived,
+      variables: {
+        clientId: sr.clientId,
+        requestId: args.serviceRequestId,
+        garageName: (garageRes.Item?.companyName as string) || 'συνεργείο',
+        offerAmount: String(args.offerAmount)
+      },
+      triggerEvent: EventName.OfferCreated,
+      clientId: sr.clientId,
+      garageId: args.garageId,
+      requestId: args.serviceRequestId
+    })
+  } catch (err) {
+    console.error('[offers] notifyClientAboutNewOffer failed:', err)
   }
 }

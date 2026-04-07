@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { hashPassword } from '@/utils/passwordService'
+import { logEvent } from '@/utils/eventLogger'
+import { sendEmail } from '@/utils/emailService'
+import { EventName, EmailTemplate } from '@/types/events'
 
 // Simple in-memory rate limiting (in production, use Redis or database)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
@@ -161,6 +164,42 @@ export async function POST(request: NextRequest) {
     })
 
     await dynamoDB.send(putCommand)
+
+    logEvent({
+      eventName: EventName.GarageRegistered,
+      actorType: 'garage',
+      actorId: garageId,
+      garageId,
+      source: 'api/auth/register-professional',
+      metadata: { companyName: garageData.companyName, tin: cleanTin }
+    })
+
+    // Welcome the new garage and let them know we're reviewing.
+    sendEmail({
+      to: garageData.email,
+      templateName: EmailTemplate.WelcomeGarage,
+      variables: { companyName: garageData.companyName },
+      triggerEvent: EventName.GarageRegistered,
+      garageId
+    })
+
+    // Notify admin so we don't miss new garages waiting for validation.
+    const adminEmail = process.env.ADMIN_EMAIL
+    if (adminEmail) {
+      sendEmail({
+        to: adminEmail,
+        templateName: EmailTemplate.AdminNewGarageValidation,
+        variables: {
+          companyName: garageData.companyName,
+          tin: cleanTin,
+          email: garageData.email,
+          mobile: cleanMobile,
+          address: garageData.address
+        },
+        triggerEvent: EventName.GarageRegistered,
+        garageId
+      })
+    }
 
     return NextResponse.json({
       success: true,

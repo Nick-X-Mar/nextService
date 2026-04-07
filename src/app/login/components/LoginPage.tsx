@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Icon from '@/components/ui/Icon'
 import { useToast } from '@/hooks/useToast'
 import { useUser } from '@/contexts/UserContext'
@@ -231,6 +232,13 @@ export default function LoginPage() {
                   <Icon name={showPassword ? 'visibility_off' : 'visibility'} size="sm" />
                 </button>
               </div>
+              {mode === 'login' && (
+                <div className="text-right pt-1">
+                  <Link href="/forgot-password" className={`${styles.linkText} text-xs`}>
+                    Ξέχασα τον κωδικό μου
+                  </Link>
+                </div>
+              )}
             </div>
 
             {mode === 'register' && (

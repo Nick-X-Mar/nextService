@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { logEvent } from '@/utils/eventLogger'
+import { sendEmail } from '@/utils/emailService'
+import { EventName, EmailTemplate } from '@/types/events'
 
 export async function GET(
   request: NextRequest,
@@ -103,6 +106,17 @@ export async function PUT(
       }, { status: 400 })
     }
 
+    // Snapshot previous isActive so we can detect a false→true transition
+    // (i.e. "garage_validated"). Best-effort: if the lookup fails we just
+    // skip the event.
+    let wasInactive = false
+    try {
+      const prev = await dynamoDB.send(new GetCommand({ TableName: 'Garages', Key: { id: garageId } }))
+      wasInactive = prev.Item?.isActive === false
+    } catch {
+      // ignore
+    }
+
     // Update garage data
     const updateCommand = new UpdateCommand({
       TableName: 'Garages',
@@ -124,6 +138,27 @@ export async function PUT(
     })
 
     const result = await dynamoDB.send(updateCommand)
+
+    if (wasInactive && result.Attributes?.isActive === true) {
+      logEvent({
+        eventName: EventName.GarageValidated,
+        actorType: 'system',
+        garageId,
+        source: 'api/garage/[garageId]',
+        metadata: { companyName: result.Attributes?.companyName }
+      })
+
+      const garageEmail = result.Attributes?.email as string | undefined
+      if (garageEmail) {
+        sendEmail({
+          to: garageEmail,
+          templateName: EmailTemplate.GarageActivated,
+          variables: { companyName: (result.Attributes?.companyName as string) || '' },
+          triggerEvent: EventName.GarageValidated,
+          garageId
+        })
+      }
+    }
 
     return NextResponse.json({
       success: true,

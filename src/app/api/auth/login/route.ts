@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { verifyPassword } from '@/utils/passwordService'
+import { logEvent } from '@/utils/eventLogger'
+import { EventName } from '@/types/events'
 
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
 
@@ -87,6 +89,13 @@ export async function POST(request: NextRequest) {
     if (userType === 'garage') {
       // Check if garage is validated/active
       if (!user.isActive) {
+        logEvent({
+          eventName: EventName.GarageLoginPendingValidation,
+          actorType: 'garage',
+          actorId: user.id,
+          garageId: user.id,
+          source: 'api/auth/login'
+        })
         return NextResponse.json({
           success: true,
           pendingValidation: true,
@@ -98,6 +107,14 @@ export async function POST(request: NextRequest) {
           }
         })
       }
+
+      logEvent({
+        eventName: EventName.GarageLogin,
+        actorType: 'garage',
+        actorId: user.id,
+        garageId: user.id,
+        source: 'api/auth/login'
+      })
 
       return NextResponse.json({
         success: true,
@@ -112,6 +129,13 @@ export async function POST(request: NextRequest) {
         }
       })
     } else {
+      logEvent({
+        eventName: EventName.ClientLogin,
+        actorType: 'client',
+        actorId: user.id,
+        clientId: user.id,
+        source: 'api/auth/login'
+      })
       return NextResponse.json({
         success: true,
         user: {

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { logEvent } from '@/utils/eventLogger'
+import { EventName } from '@/types/events'
 
 const client = new DynamoDBClient({
   region: process.env.AWS_REGION || 'us-east-1',
@@ -67,6 +69,16 @@ export async function PATCH(
     })
 
     const result = await docClient.send(updateCommand)
+
+    logEvent({
+      eventName: EventName.OfferClientAvailabilityProposed,
+      actorType: 'client',
+      offerId,
+      garageId: result.Attributes?.garageId,
+      requestId: result.Attributes?.serviceRequestId,
+      source: 'api/offers/[offerId]/client-availability',
+      metadata: { dateCount: uniqueDates.length }
+    })
 
     return NextResponse.json({
       success: true,

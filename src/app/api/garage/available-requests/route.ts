@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { ServiceRequestStatus } from '@/types/statuses'
+import { logEvent } from '@/utils/eventLogger'
+import { EventName } from '@/types/events'
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,10 +12,18 @@ export async function GET(request: NextRequest) {
     const garageId = searchParams.get('garageId')
 
     if (!garageId) {
-      return NextResponse.json({ 
-        error: 'Garage ID is required' 
+      return NextResponse.json({
+        error: 'Garage ID is required'
       }, { status: 400 })
     }
+
+    logEvent({
+      eventName: EventName.GarageViewedAvailableRequests,
+      actorType: 'garage',
+      actorId: garageId,
+      garageId,
+      source: 'api/garage/available-requests'
+    })
 
     // Get all pending service requests
     const scanCommand = new ScanCommand({

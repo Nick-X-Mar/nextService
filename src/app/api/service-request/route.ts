@@ -4,6 +4,9 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { hashPassword } from '@/utils/passwordService'
+import { logEvent } from '@/utils/eventLogger'
+import { sendEmail } from '@/utils/emailService'
+import { EventName, EmailTemplate } from '@/types/events'
 
 // Helper function to normalize string values for comparison
 const normalizeString = (value: string | undefined | null): string => {
@@ -306,6 +309,44 @@ export async function POST(request: NextRequest) {
         messageIds: notificationResult.messageIds
       }
     })
+
+    logEvent({
+      eventName: EventName.ServiceRequestSubmitted,
+      actorType: 'client',
+      actorId: clientId,
+      clientId,
+      requestId: serviceRequestId,
+      source: 'api/service-request',
+      metadata: {
+        category: body.category,
+        brand: body.brand,
+        model: body.model,
+        vehicleId,
+        isGuest: !existingClientId
+      }
+    })
+
+    // Confirmation email to the client. For guest registrations we have the
+    // address straight from the body; for logged-in clients we'd need to look
+    // it up — skip if we don't have it locally to avoid an extra DB hit.
+    const recipientEmail = body.email && typeof body.email === 'string'
+      ? body.email.trim().toLowerCase()
+      : undefined
+    if (recipientEmail) {
+      sendEmail({
+        to: recipientEmail,
+        templateName: EmailTemplate.RequestConfirmation,
+        variables: {
+          brand: body.brand || '',
+          model: body.model || '',
+          category: body.category || '',
+          clientId
+        },
+        triggerEvent: EventName.ServiceRequestSubmitted,
+        clientId,
+        requestId: serviceRequestId
+      })
+    }
 
     // Always return success when SMS is disabled, but indicate it in the message
     return NextResponse.json({ 

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { ServiceRequestStatus, OfferStatus } from '@/types/statuses'
+import { logEvent } from '@/utils/eventLogger'
+import { sendEmail } from '@/utils/emailService'
+import { EventName, EmailTemplate } from '@/types/events'
 
 export async function PATCH(
   request: NextRequest,
@@ -139,6 +142,58 @@ export async function PATCH(
       await Promise.all(updateOfferPromises)
     }
 
+    const acceptedOffer = offers.find((o) => o.id === offerId)
+    const acceptingGarageId = (acceptedOffer?.garageId as string | undefined) ?? undefined
+
+    logEvent({
+      eventName: EventName.OfferAccepted,
+      actorType: 'client',
+      actorId: updatedRequest.clientId,
+      clientId: updatedRequest.clientId,
+      garageId: acceptingGarageId,
+      requestId,
+      offerId,
+      source: 'api/requests/[requestId]/accept-offer',
+      metadata: { appointmentDate, appointmentPrice: appointmentPrice ?? null }
+    })
+
+    logEvent({
+      eventName: EventName.AppointmentScheduled,
+      actorType: 'system',
+      clientId: updatedRequest.clientId,
+      garageId: acceptingGarageId,
+      requestId,
+      offerId,
+      source: 'api/requests/[requestId]/accept-offer',
+      metadata: { appointmentDate, appointmentPrice: appointmentPrice ?? null }
+    })
+
+    for (const offer of offers) {
+      if (offer.id !== offerId) {
+        logEvent({
+          eventName: EventName.OfferRejected,
+          actorType: 'system',
+          actorId: updatedRequest.clientId,
+          clientId: updatedRequest.clientId,
+          garageId: offer.garageId,
+          requestId,
+          offerId: offer.id,
+          source: 'api/requests/[requestId]/accept-offer',
+          metadata: { reason: 'another_offer_accepted' }
+        })
+      }
+    }
+
+    // Fire both confirmation emails (best-effort, never block).
+    void notifyAcceptanceParticipants({
+      clientId: updatedRequest.clientId,
+      garageId: acceptingGarageId,
+      requestId,
+      offerId,
+      appointmentDate,
+      appointmentPrice: typeof appointmentPrice === 'number' ? appointmentPrice : undefined
+    })
+
     return NextResponse.json({
       success: true,
       request: {
@@ -169,6 +224,64 @@ export async function PATCH(
       },
       { status: 500 }
     )
+  }
+}
+
+async function notifyAcceptanceParticipants(args: {
+  clientId: string
+  garageId?: string
+  requestId: string
+  offerId: string
+  appointmentDate: string
+  appointmentPrice?: number
+}): Promise<void> {
+  try {
+    const [clientRes, garageRes] = await Promise.all([
+      dynamoDB.send(new GetCommand({ TableName: 'Clients', Key: { id: args.clientId } })),
+      args.garageId
+        ? dynamoDB.send(new GetCommand({ TableName: 'Garages', Key: { id: args.garageId } }))
+        : Promise.resolve({ Item: undefined as Record<string, unknown> | undefined })
+    ])
+
+    const clientEmail = clientRes.Item?.email as string | undefined
+    const garageEmail = garageRes.Item?.email as string | undefined
+    const garageName = (garageRes.Item?.companyName as string) || 'συνεργείο'
+
+    if (clientEmail) {
+      sendEmail({
+        to: clientEmail,
+        templateName: EmailTemplate.AppointmentConfirmationClient,
+        variables: {
+          clientId: args.clientId,
+          requestId: args.requestId,
+          garageName,
+          appointmentDate: args.appointmentDate,
+          appointmentPrice: args.appointmentPrice !== undefined ? String(args.appointmentPrice) : ''
+        },
+        triggerEvent: EventName.OfferAccepted,
+        clientId: args.clientId,
+        garageId: args.garageId,
+        requestId: args.requestId
+      })
+    }
+
+    if (garageEmail && args.garageId) {
+      sendEmail({
+        to: garageEmail,
+        templateName: EmailTemplate.OfferAcceptedGarage,
+        variables: {
+          garageId: args.garageId,
+          appointmentDate: args.appointmentDate,
+          offerAmount: args.appointmentPrice !== undefined ? String(args.appointmentPrice) : ''
+        },
+        triggerEvent: EventName.OfferAccepted,
+        clientId: args.clientId,
+        garageId: args.garageId,
+        requestId: args.requestId
+      })
+    }
+  } catch (err) {
+    console.error('[accept-offer] notifyAcceptanceParticipants failed:', err)
   }
 }
 

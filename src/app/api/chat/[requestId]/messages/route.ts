@@ -4,6 +4,8 @@ import { ScanCommand, PutCommand } from '@aws-sdk/lib-dynamodb'
 import appSyncService from '@/lib/appsync-service'
 import { ScanCommand as RequestsScanCommand } from '@aws-sdk/lib-dynamodb'
 import { ServiceRequestStatus } from '@/types/statuses'
+import { logEvent } from '@/utils/eventLogger'
+import { EventName } from '@/types/events'
 
 export async function GET(
   request: NextRequest,
@@ -179,6 +181,21 @@ export async function POST(
     })
 
     await dynamoDB.send(putCommand)
+
+    logEvent({
+      eventName: EventName.ChatMessageSent,
+      actorType: senderType === 'garage' ? 'garage' : 'client',
+      actorId: senderId,
+      ...(senderType === 'client' ? { clientId: senderId } : {}),
+      ...(effectiveGarageId ? { garageId: effectiveGarageId } : {}),
+      requestId,
+      source: 'api/chat/[requestId]/messages',
+      metadata: { messageId, senderName, length: messageData.message.length }
+    })
+
+    // NOTE: email-on-new-chat is intentionally deferred. Without
+    // online-presence detection it would spam users for every keystroke.
+    // Add it once we have a debounced/offline detector.
 
             // Publish message to AppSync Events for real-time updates
             if (effectiveGarageId) {
