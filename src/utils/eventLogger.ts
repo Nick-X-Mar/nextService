@@ -6,6 +6,10 @@ import type { EventLogRecord, LogEventInput } from '@/types/events'
 
 const EVENT_LOGS_TABLE = process.env.EVENT_LOGS_TABLE || 'EventLogs'
 
+// Retention: 365 days. After this, DynamoDB TTL deletes the row
+// automatically. Aligned with the data retention policy in the privacy doc.
+const EVENT_LOG_TTL_SECONDS = 365 * 24 * 60 * 60
+
 /**
  * Fire-and-forget event logger. Writes a single record to the EventLogs
  * DynamoDB table. NEVER throws — failures are swallowed and logged so the
@@ -37,6 +41,10 @@ export function logEvent(input: LogEventInput): void {
   for (const [key, value] of Object.entries(record)) {
     if (value !== undefined) item[key] = value
   }
+
+  // DynamoDB TTL attribute — Unix epoch SECONDS (not ms). Items past this
+  // time get cleaned up automatically by DynamoDB within ~48h.
+  item.expiresAt = Math.floor(Date.now() / 1000) + EVENT_LOG_TTL_SECONDS
 
   ensureEventLogsTable()
     .then(() =>

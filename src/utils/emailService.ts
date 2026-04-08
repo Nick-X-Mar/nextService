@@ -17,6 +17,10 @@ const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
 const FROM_ADDRESS = process.env.SES_FROM_ADDRESS || 'no-reply@nextservice.gr'
 const SES_REGION = process.env.SES_REGION || process.env.REGION || 'eu-central-1'
 
+// Retention: 180 days for the EmailLogs records — long enough to debug
+// recent delivery issues, short enough not to hoard personal data.
+const EMAIL_LOG_TTL_SECONDS = 180 * 24 * 60 * 60
+
 /**
  * Dry-run is the default for safety. Set EMAIL_DRY_RUN=false explicitly in
  * the environment to actually hit SES. This means local dev never sends
@@ -85,15 +89,18 @@ async function sendEmailInternal(input: SendEmailInput): Promise<void> {
   const rendered = renderEmail(templateName, variables)
   const emailId = randomUUID()
   const sentAt = new Date().toISOString()
-  const bodyPreview = rendered.text.slice(0, 240)
 
+  // We deliberately DO NOT store the rendered subject/body in EmailLogs.
+  // Templates are deterministic — the admin app can re-render from the
+  // template name + ids if it ever needs the actual content. Keeping the
+  // log row PII-free reduces blast radius if the table ever leaks.
   const baseRecord: EmailLogRecord = {
     emailId,
     to,
     from: FROM_ADDRESS,
     templateName,
     subject: rendered.subject,
-    bodyPreview,
+    bodyPreview: '',
     triggerEvent,
     status: isDryRun ? 'dry_run' : 'queued',
     sentAt,
@@ -140,8 +147,15 @@ async function writeEmailLog(record: EmailLogRecord): Promise<void> {
     await ensureEmailLogsTable()
     const item: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(record)) {
-      if (v !== undefined) item[k] = v
+      // Skip undefined AND skip the empty bodyPreview field — DynamoDB
+      // doesn't accept empty strings on its own row attribute, and we
+      // intentionally aren't storing body content anyway.
+      if (v === undefined) continue
+      if (k === 'bodyPreview' && v === '') continue
+      item[k] = v
     }
+    // Auto-cleanup after 180 days via DynamoDB TTL.
+    item.expiresAt = Math.floor(Date.now() / 1000) + EMAIL_LOG_TTL_SECONDS
     await dynamoDB.send(new PutCommand({ TableName: EMAIL_LOGS_TABLE, Item: item }))
   } catch (err) {
     console.error('[emailService] Failed to write EmailLogs record:', err)

@@ -10,6 +10,8 @@ import {
   DynamoDBClient,
   CreateTableCommand,
   DescribeTableCommand,
+  DescribeTimeToLiveCommand,
+  UpdateTimeToLiveCommand,
   ResourceInUseException,
   ResourceNotFoundException,
   type CreateTableCommandInput
@@ -174,14 +176,39 @@ async function waitForActive(client: DynamoDBClient, name: string): Promise<void
   }
 }
 
+async function ensureTtl(client: DynamoDBClient, name: string): Promise<void> {
+  try {
+    const desc = await client.send(new DescribeTimeToLiveCommand({ TableName: name }))
+    const status = desc.TimeToLiveDescription?.TimeToLiveStatus
+    const attr = desc.TimeToLiveDescription?.AttributeName
+    if ((status === 'ENABLED' || status === 'ENABLING') && attr === 'expiresAt') {
+      return
+    }
+    await client.send(
+      new UpdateTimeToLiveCommand({
+        TableName: name,
+        TimeToLiveSpecification: { Enabled: true, AttributeName: 'expiresAt' }
+      })
+    )
+    console.log(`[ensureEventTables] Enabled TTL on ${name} (attribute=expiresAt)`)
+  } catch (err) {
+    // Local DynamoDB sometimes doesn't support TTL describe — non-fatal.
+    console.warn(`[ensureEventTables] TTL setup skipped/failed on ${name}:`, err instanceof Error ? err.message : err)
+  }
+}
+
 async function ensureTable(spec: CreateTableCommandInput): Promise<void> {
   const client = getRawClient()
   const name = spec.TableName!
 
   try {
     const desc = await client.send(new DescribeTableCommand({ TableName: name }))
-    if (desc.Table?.TableStatus === 'ACTIVE') return
+    if (desc.Table?.TableStatus === 'ACTIVE') {
+      await ensureTtl(client, name)
+      return
+    }
     await waitForActive(client, name)
+    await ensureTtl(client, name)
     return
   } catch (err) {
     if (!(err instanceof ResourceNotFoundException)) {
@@ -194,10 +221,12 @@ async function ensureTable(spec: CreateTableCommandInput): Promise<void> {
     await client.send(new CreateTableCommand(applyBilling(spec)))
     console.log(`[ensureEventTables] Created ${name}`)
     await waitForActive(client, name)
+    await ensureTtl(client, name)
   } catch (err) {
     if (err instanceof ResourceInUseException) {
       // Another request won the race — just wait for it.
       await waitForActive(client, name)
+      await ensureTtl(client, name)
       return
     }
     console.error(`[ensureEventTables] Failed to create ${name}:`, err)

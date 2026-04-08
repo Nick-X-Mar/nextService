@@ -39,7 +39,19 @@ export const EventName = {
 
   // Phase F — Account recovery
   PasswordResetRequested: 'password_reset_requested',
-  PasswordResetCompleted: 'password_reset_completed'
+  PasswordResetCompleted: 'password_reset_completed',
+
+  // Phase G — Account lifecycle
+  AccountDeleted: 'account_deleted',
+  AccountDataExported: 'account_data_exported',
+
+  // Phase H — Sensitive data access (audit log for GDPR)
+  // Fired when one user views the personal data of another. Used to
+  // satisfy the GDPR right of access ("who saw my data?") and to detect
+  // garages that scrape contact info without making real offers.
+  GarageViewedRequestDetails: 'garage_viewed_request_details',
+  GarageViewedClientContact: 'garage_viewed_client_contact',
+  ClientViewedGarageProfile: 'client_viewed_garage_profile'
 } as const
 
 export type EventNameValue = typeof EventName[keyof typeof EventName]

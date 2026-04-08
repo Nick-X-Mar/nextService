@@ -7,6 +7,7 @@ import GearSubmitButton from '@/components/GearSubmitButton'
 import LoginModal from '@/components/LoginModal'
 import { saveFormData, loadFormData } from '../../../../utils/formStorage'
 import { useToast } from '../../../../hooks/useToast'
+import { useAuth } from '@/contexts/AuthContext'
 import Image from 'next/image'
 
 interface CarSpecsFormProps {
@@ -28,9 +29,11 @@ interface CarSpecsFormProps {
 export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   const router = useRouter()
   const { success, error } = useToast()
+  const { refreshClient } = useAuth()
   const [vinNumber, setVinNumber] = useState('')
   const [engineNumber, setEngineNumber] = useState('')
   const [email, setEmail] = useState('')
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [hasLicensePhoto, setHasLicensePhoto] = useState(false)
   const [licensePhoto, setLicensePhoto] = useState<File | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -154,7 +157,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   const isFormValid =
     vinNumber.trim() !== '' &&
     (engineNumber.trim() !== '' || licensePhoto !== null) &&
-    (isLoggedIn || (isEmailValid(email) && !emailExists && isPasswordValid))
+    (isLoggedIn || (isEmailValid(email) && !emailExists && isPasswordValid && acceptedTerms))
 
   const handleSubmit = async () => {
     if (isFormValid) {
@@ -182,8 +185,8 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
         ...(latestFormData.originalVehicleData && { originalVehicleData: latestFormData.originalVehicleData }),
         // Include client ID if user is logged in
         ...(loggedInClientId && { clientId: loggedInClientId }),
-        // Include email and password for new users
-        ...(!loggedInClientId && email && { email, password })
+        // Include email and password for new users + the consent flag
+        ...(!loggedInClientId && email && { email, password, acceptedTerms: true })
       }
 
       try {
@@ -422,6 +425,28 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                       </p>
                     )}
                   </div>
+
+                  {/* Consent — required for GDPR */}
+                  <label className="flex items-start gap-2 cursor-pointer select-none pt-2">
+                    <input
+                      type="checkbox"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      required
+                      className="mt-0.5 h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                    />
+                    <span className="text-xs text-on-surface-variant leading-snug">
+                      Έχω διαβάσει και αποδέχομαι τους{' '}
+                      <a href="/terms" target="_blank" rel="noreferrer" className="text-primary underline">
+                        Όρους Χρήσης
+                      </a>
+                      {' '}και την{' '}
+                      <a href="/privacy" target="_blank" rel="noreferrer" className="text-primary underline">
+                        Πολιτική Απορρήτου
+                      </a>
+                      .
+                    </span>
+                  </label>
                 </>
               )}
             </div>
@@ -619,7 +644,12 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
         firstName={emailCheckName}
         onLoginSuccess={(clientId) => {
           setIsLoggedIn(true)
+          localStorage.removeItem('garageId')
           localStorage.setItem('clientId', clientId)
+          // Sync the global AuthContext so the header (and any other
+          // consumer of useAuth) immediately reflects the logged-in state.
+          // Without this the header keeps showing "Σύνδεση" until reload.
+          void refreshClient(clientId)
         }}
       />
     </section>

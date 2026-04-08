@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Input } from '@/components'
+import AccountDangerZone from '@/components/AccountDangerZone'
 import { styles } from '@/styles/styles'
 import { useToast } from '@/hooks/useToast'
 import Icon from '@/components/ui/Icon'
@@ -288,6 +289,9 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
           </div>
         </div>
       </article>
+
+      {/* GDPR Danger Zone */}
+      <AccountDangerZone userId={garageData.id} userType="garage" />
     </div>
   )
 }

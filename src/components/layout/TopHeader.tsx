@@ -42,29 +42,31 @@ export default function TopHeader() {
 
         {/* Center: Desktop nav links */}
         <nav className="hidden md:flex items-center gap-8 font-body text-sm font-medium">
-          {userType !== 'garage' && (
-            <Link href="/" className={`${isLanding ? 'text-white/80 hover:text-white' : 'text-secondary hover:text-on-surface'} transition-colors`}>
-              Αρχική
-            </Link>
-          )}
-          {userType === 'client' && client && (
+          {/* Guests still see Αρχική + Επαγγελματίες links */}
+          {(!userType || userType === 'guest') && (
             <>
-              <Link href={`/requests/${client.id}`} className="text-secondary hover:text-on-surface transition-colors">
-                Αιτήματα
+              <Link href="/" className={`${isLanding ? 'text-white/80 hover:text-white' : 'text-secondary hover:text-on-surface'} transition-colors`}>
+                Αρχική
               </Link>
-              <Link href={`/requests/${client.id}/chats`} className="text-secondary hover:text-on-surface transition-colors">
-                Μηνύματα
+              <Link href="/register-professional" className={`${isLanding ? 'text-white/80 hover:text-white' : 'text-secondary hover:text-on-surface'} transition-colors`}>
+                Επαγγελματίες
               </Link>
             </>
+          )}
+          {/* Logged-in clients see ONLY the "Νέο Αίτημα" CTA — every other
+              navigation item lives in the sidebar / bottom nav. */}
+          {userType === 'client' && client && (
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-br from-primary to-primary-container text-on-primary text-sm font-bold shadow-md active:scale-95 transition-all"
+            >
+              <Icon name="add_circle" size="sm" filled />
+              Νέο Αίτημα
+            </Link>
           )}
           {userType === 'garage' && garage && (
             <Link href={`/garage-dashboard/${garage.id}`} className="text-secondary hover:text-on-surface transition-colors">
               Dashboard
-            </Link>
-          )}
-          {userType !== 'garage' && (
-            <Link href="/register-professional" className={`${isLanding ? 'text-white/80 hover:text-white' : 'text-secondary hover:text-on-surface'} transition-colors`}>
-              Επαγγελματίες
             </Link>
           )}
         </nav>
@@ -112,38 +114,28 @@ export default function TopHeader() {
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-surface border-t border-outline-variant/20 px-5 py-4 space-y-2">
-          {userType !== 'garage' && (
-            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
-              <Icon name="home" className="text-primary" />
-              <span className="font-medium">Αρχική</span>
-            </Link>
-          )}
-          {userType === 'client' && client && (
+          {(!userType || userType === 'guest') && (
             <>
-              <Link href={`/requests/${client.id}`} onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
-                <Icon name="build" className="text-primary" />
-                <span className="font-medium">Αιτήματα</span>
+              <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
+                <Icon name="home" className="text-primary" />
+                <span className="font-medium">Αρχική</span>
               </Link>
-              <Link href={`/requests/${client.id}/chats`} onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
-                <Icon name="chat" className="text-primary" />
-                <span className="font-medium">Μηνύματα</span>
-              </Link>
-              <Link href={`/profile/${client.id}`} onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
-                <Icon name="person" className="text-primary" />
-                <span className="font-medium">Προφίλ</span>
+              <Link href="/register-professional" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
+                <Icon name="handyman" className="text-primary" />
+                <span className="font-medium">Εγγραφή Επαγγελματία</span>
               </Link>
             </>
+          )}
+          {userType === 'client' && client && (
+            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
+              <Icon name="add_circle" className="text-primary" filled />
+              <span className="font-medium">Νέο Αίτημα</span>
+            </Link>
           )}
           {userType === 'garage' && garage && (
             <Link href={`/garage-dashboard/${garage.id}`} onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
               <Icon name="dashboard" className="text-primary" />
               <span className="font-medium">Dashboard</span>
-            </Link>
-          )}
-          {userType !== 'garage' && (
-            <Link href="/register-professional" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
-              <Icon name="handyman" className="text-primary" />
-              <span className="font-medium">Εγγραφή Επαγγελματία</span>
             </Link>
           )}
           {userType && userType !== 'guest' && (

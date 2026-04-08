@@ -14,7 +14,11 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
   const isLanding = pathname === '/'
   const isFullPage = pathname.startsWith('/offer/') || pathname === '/login'
-  const showSidebar = userType === 'client' || userType === 'garage'
+  // Clients see the landing page as their "new request" entry point — the
+  // sidebar duplicates info that's already in the hero, so we hide it there.
+  // Garages always keep their sidebar.
+  const showSidebar =
+    userType === 'garage' || (userType === 'client' && !isLanding)
 
   return (
     <>

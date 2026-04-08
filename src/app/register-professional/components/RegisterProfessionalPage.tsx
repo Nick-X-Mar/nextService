@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Icon from '@/components/ui/Icon'
 import { useToast } from '@/hooks/useToast'
 import { styles } from '@/styles/styles'
@@ -42,6 +43,7 @@ export default function RegisterProfessionalPage() {
   const [selectedServices, setSelectedServices] = useState<string[]>([])
   const [customServices, setCustomServices] = useState<string[]>([])
   const [customServiceInput, setCustomServiceInput] = useState('')
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
 
@@ -51,12 +53,18 @@ export default function RegisterProfessionalPage() {
   useEffect(() => {
     const savedEmail = sessionStorage.getItem('garageRegEmail')
     const savedPassword = sessionStorage.getItem('garageRegPassword')
+    const savedAccepted = sessionStorage.getItem('garageRegAcceptedTerms') === 'true'
     if (savedEmail) {
       setFormData(prev => ({ ...prev, email: savedEmail }))
       setEmailLocked(true)
     }
     if (savedPassword) {
       setPassword(savedPassword)
+    }
+    if (savedAccepted) {
+      // Forwarded from LoginPage register flow — they already ticked the box
+      // but they still need to confirm here, so we just pre-check it.
+      setAcceptedTerms(true)
     }
   }, [])
 
@@ -132,6 +140,11 @@ export default function RegisterProfessionalPage() {
       return false
     }
 
+    if (!acceptedTerms) {
+      error('Σφάλμα', 'Πρέπει να αποδεχτείτε τους Όρους Χρήσης και την Πολιτική Απορρήτου')
+      return false
+    }
+
     return true
   }
 
@@ -150,7 +163,12 @@ export default function RegisterProfessionalPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ ...formData, password, services: [...selectedServices, ...customServices] }),
+        body: JSON.stringify({
+          ...formData,
+          password,
+          services: [...selectedServices, ...customServices],
+          acceptedTerms: true
+        }),
       })
 
       const data = await response.json()
@@ -158,6 +176,7 @@ export default function RegisterProfessionalPage() {
       if (response.ok && data.success) {
         sessionStorage.removeItem('garageRegEmail')
         sessionStorage.removeItem('garageRegPassword')
+        sessionStorage.removeItem('garageRegAcceptedTerms')
         setIsSubmitted(true)
         success('Επιτυχής Εγγραφή', 'Το συνεργείο σας εγγράφηκε επιτυχώς! Θα επικοινωνήσουμε μαζί σας σύντομα.')
       } else {
@@ -410,8 +429,32 @@ export default function RegisterProfessionalPage() {
               </div>
             </div>
 
-            {/* Submit Button */}
+            {/* Consent — required for GDPR */}
             <div className="pt-6 border-t border-outline-variant/10">
+              <label className="flex items-start gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  required
+                  className="mt-0.5 h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                />
+                <span className="text-xs text-on-surface-variant leading-snug">
+                  Έχω διαβάσει και αποδέχομαι τους{' '}
+                  <Link href="/terms" target="_blank" className="text-primary underline">
+                    Όρους Χρήσης
+                  </Link>
+                  {' '}και την{' '}
+                  <Link href="/privacy" target="_blank" className="text-primary underline">
+                    Πολιτική Απορρήτου
+                  </Link>
+                  . Αναγνωρίζω ότι τα στοιχεία επικοινωνίας των πελατών είναι εμπιστευτικά και θα χρησιμοποιηθούν αποκλειστικά για το συγκεκριμένο αίτημα service.
+                </span>
+              </label>
+            </div>
+
+            {/* Submit Button */}
+            <div className="pt-4">
               <button
                 type="submit"
                 disabled={isLoading}

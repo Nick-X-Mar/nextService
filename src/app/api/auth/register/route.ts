@@ -20,10 +20,14 @@ function checkRateLimit(identifier: string, maxAttempts: number = 3, windowMs: n
   return true
 }
 
+// Bumped whenever the legal text changes — every signup record has the
+// version it agreed to so we can prove what they accepted at the time.
+const CURRENT_TERMS_VERSION = '1.0'
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, password, firstName } = body
+    const { email, password, firstName, acceptedTerms } = body
 
     if (!email || typeof email !== 'string') {
       return NextResponse.json({ error: 'Το email είναι υποχρεωτικό' }, { status: 400 })
@@ -31,6 +35,13 @@ export async function POST(request: NextRequest) {
 
     if (!password || typeof password !== 'string' || password.length < 6) {
       return NextResponse.json({ error: 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες' }, { status: 400 })
+    }
+
+    if (acceptedTerms !== true) {
+      return NextResponse.json(
+        { error: 'Πρέπει να αποδεχτείς τους Όρους Χρήσης και την Πολιτική Απορρήτου' },
+        { status: 400 }
+      )
     }
 
     const clientIP = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
@@ -58,14 +69,17 @@ export async function POST(request: NextRequest) {
     const clientId = `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     const passwordHash = await hashPassword(password)
 
+    const nowIso = new Date().toISOString()
     const clientData = {
       id: clientId,
       firstName: firstName || normalizedEmail.split('@')[0],
       email: normalizedEmail,
       passwordHash,
       isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      acceptedTermsAt: nowIso,
+      acceptedTermsVersion: CURRENT_TERMS_VERSION,
+      createdAt: nowIso,
+      updatedAt: nowIso
     }
 
     await dynamoDB.send(new PutCommand({

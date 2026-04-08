@@ -20,6 +20,7 @@ export default function LoginPage() {
   const [pendingValidation, setPendingValidation] = useState<{ companyName: string } | null>(null)
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [userType, setUserType] = useState('client')
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
 
   const router = useRouter()
   const { success, error } = useToast()
@@ -94,9 +95,15 @@ export default function LoginPage() {
       return
     }
 
+    if (!acceptedTerms) {
+      error('Σφάλμα', 'Πρέπει να αποδεχτείς τους Όρους Χρήσης και την Πολιτική Απορρήτου')
+      return
+    }
+
     if (userType === 'garage') {
       sessionStorage.setItem('garageRegEmail', email.trim().toLowerCase())
       sessionStorage.setItem('garageRegPassword', password)
+      sessionStorage.setItem('garageRegAcceptedTerms', 'true')
       router.push('/register-professional')
       return
     }
@@ -110,7 +117,8 @@ export default function LoginPage() {
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
           password,
-          firstName: email.trim().split('@')[0]
+          firstName: email.trim().split('@')[0],
+          acceptedTerms: true
         })
       })
 
@@ -266,6 +274,29 @@ export default function LoginPage() {
                   <p className="text-xs text-error">Οι κωδικοί δεν ταιριάζουν</p>
                 )}
               </div>
+            )}
+
+            {mode === 'register' && (
+              <label className="flex items-start gap-2 cursor-pointer select-none pt-1">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  required
+                  className="mt-0.5 h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                />
+                <span className="text-xs text-on-surface-variant leading-snug">
+                  Έχω διαβάσει και αποδέχομαι τους{' '}
+                  <Link href="/terms" target="_blank" className="text-primary underline">
+                    Όρους Χρήσης
+                  </Link>
+                  {' '}και την{' '}
+                  <Link href="/privacy" target="_blank" className="text-primary underline">
+                    Πολιτική Απορρήτου
+                  </Link>
+                  .
+                </span>
+              </label>
             )}
 
             <button

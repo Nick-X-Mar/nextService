@@ -6,6 +6,7 @@ import { styles } from '../../../../styles/styles'
 // Navigation handled by AppShell
 import UserInfoSection from './UserInfoSection'
 import VehiclesSection from './VehiclesSection'
+import AccountDangerZone from '@/components/AccountDangerZone'
 import { useToast } from '../../../../hooks/useToast'
 import { useAuth } from '../../../../contexts/AuthContext'
 import Icon from '@/components/ui/Icon'
@@ -262,10 +263,13 @@ export default function ProfilePage({ clientId }: ProfilePageProps) {
           ))}
         </div>
 
+        {/* GDPR Danger Zone */}
+        <AccountDangerZone userId={clientId} userType="client" />
+
         {/* Logout Button */}
         <button
           onClick={logout}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3.5 text-tertiary hover:bg-error-container/30 rounded-xl transition-colors"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3.5 text-tertiary hover:bg-error-container/30 rounded-xl transition-colors mt-6"
         >
           <Icon name="logout" className="text-tertiary" />
           <span className="text-sm font-bold">Αποσύνδεση</span>

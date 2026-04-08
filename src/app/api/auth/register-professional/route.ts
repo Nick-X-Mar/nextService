@@ -29,10 +29,21 @@ function checkRateLimit(identifier: string, maxAttempts: number = 3, windowMs: n
   return true
 }
 
+// Bumped whenever the legal text changes — every signup record has the
+// version it agreed to so we can prove what they accepted at the time.
+const CURRENT_TERMS_VERSION = '1.0'
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { companyName, contactFirstName, contactLastName, tin, email, password, taxAuthority, address, mobile, benefits, services } = body
+    const { companyName, contactFirstName, contactLastName, tin, email, password, taxAuthority, address, mobile, benefits, services, acceptedTerms } = body
+
+    if (acceptedTerms !== true) {
+      return NextResponse.json(
+        { error: 'Πρέπει να αποδεχτείτε τους Όρους Χρήσης και την Πολιτική Απορρήτου' },
+        { status: 400 }
+      )
+    }
 
     // Validate required fields
     if (!companyName || typeof companyName !== 'string' || !companyName.trim()) {
@@ -139,6 +150,7 @@ export async function POST(request: NextRequest) {
     // Create new garage
     const passwordHash = await hashPassword(password)
 
+    const nowIso = new Date().toISOString()
     const garageData = {
       id: garageId,
       companyName: companyName.trim(),
@@ -154,8 +166,10 @@ export async function POST(request: NextRequest) {
       description: 'Εταιρεία εγγεγραμμένη στο NextService',
       benefits: benefits && Array.isArray(benefits) ? benefits : [],
       services: services && Array.isArray(services) ? services : [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      acceptedTermsAt: nowIso,
+      acceptedTermsVersion: CURRENT_TERMS_VERSION,
+      createdAt: nowIso,
+      updatedAt: nowIso
     }
 
     const putCommand = new PutCommand({

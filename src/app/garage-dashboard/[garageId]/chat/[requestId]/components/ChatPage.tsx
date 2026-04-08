@@ -130,8 +130,8 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     try {
       setIsLoading(true)
 
-      // Load request data
-      const requestResponse = await fetch(`/api/requests/${requestId}`)
+      // Load request data — pass viewerGarageId for the GDPR audit log
+      const requestResponse = await fetch(`/api/requests/${requestId}?viewerGarageId=${garageId}`)
       if (requestResponse.ok) {
         const requestResult = await requestResponse.json()
         // Some endpoints return { success, request }, others may return just { request }

@@ -10,10 +10,15 @@ export async function GET(
 ) {
   try {
     const { requestId } = await params
+    const { searchParams } = new URL(request.url)
+    // Optional query param: when a garage is the viewer, the UI passes
+    // ?viewerGarageId=... so we can audit the access. The route still
+    // works without it for client-side viewers.
+    const viewerGarageId = searchParams.get('viewerGarageId') || undefined
 
     if (!requestId) {
-      return NextResponse.json({ 
-        error: 'Request ID is required' 
+      return NextResponse.json({
+        error: 'Request ID is required'
       }, { status: 400 })
     }
 
@@ -59,6 +64,31 @@ export async function GET(
 
     const vehicleResult = await dynamoDB.send(vehicleScanCommand)
     const vehicle = vehicleResult.Items?.[0]
+
+    // GDPR audit log: when a garage views a request that contains client
+    // PII (name, phone) and vehicle PII (plate, VIN), record the access.
+    // This lets us answer "who saw my data?" and detect scraping behavior.
+    if (viewerGarageId) {
+      logEvent({
+        eventName: EventName.GarageViewedRequestDetails,
+        actorType: 'garage',
+        actorId: viewerGarageId,
+        garageId: viewerGarageId,
+        clientId: serviceRequest.clientId,
+        requestId,
+        source: 'api/requests/[requestId]',
+        metadata: {
+          fieldsExposed: [
+            'client.firstName',
+            'client.lastName',
+            'client.phoneNumber',
+            'vehicle.licensePlate',
+            'vehicle.vinNumber',
+            'vehicle.engineNumber'
+          ]
+        }
+      })
+    }
 
     return NextResponse.json({
       success: true,

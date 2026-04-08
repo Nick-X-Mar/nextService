@@ -122,8 +122,8 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
     try {
       setIsLoading(true)
 
-      // Load service request
-      const requestResponse = await fetch(`/api/requests/${requestId}`)
+      // Load service request — pass viewerGarageId for the GDPR audit log
+      const requestResponse = await fetch(`/api/requests/${requestId}?viewerGarageId=${garageId}`)
       if (requestResponse.ok) {
         const requestData = await requestResponse.json()
         if (requestData.success) {
@@ -523,6 +523,17 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
 
       {/* Main Content */}
       <div className="max-w-3xl mx-auto px-5 md:px-8 py-6 space-y-5">
+
+        {/* Confidentiality notice — GDPR obligation reminder for garages */}
+        <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex items-start gap-3">
+          <Icon name="shield_lock" className="text-amber-700 mt-0.5 flex-shrink-0" size="sm" />
+          <div className="flex-1">
+            <p className="text-xs font-bold text-amber-900 mb-1">Εμπιστευτικά στοιχεία πελάτη</p>
+            <p className="text-xs text-amber-800 leading-snug">
+              Τα στοιχεία επικοινωνίας και οχήματος του πελάτη είναι εμπιστευτικά και προστατεύονται από τον GDPR. Επιτρέπεται η χρήση τους <strong>μόνο</strong> για το συγκεκριμένο αίτημα service. Απαγορεύεται η αποθήκευση, η χρήση για marketing ή η μεταβίβαση σε τρίτους.
+            </p>
+          </div>
+        </div>
 
         {/* Client Details Section */}
         <div className={styles.card}>

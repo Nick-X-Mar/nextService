@@ -276,8 +276,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Email και κωδικός είναι υποχρεωτικά' }, { status: 400 })
       }
 
+      // Inline guest registration must record consent the same way the
+      // dedicated /register route does — otherwise the user has an account
+      // without proof of ToS acceptance.
+      if (body.acceptedTerms !== true) {
+        return NextResponse.json(
+          { error: 'Πρέπει να αποδεχτείς τους Όρους Χρήσης και την Πολιτική Απορρήτου' },
+          { status: 400 }
+        )
+      }
+
       const normalizedEmail = body.email.trim().toLowerCase()
       const passwordHash = await hashPassword(body.password)
+      const nowIso = new Date().toISOString()
 
       const clientData: Record<string, unknown> = {
         id: clientId,
@@ -285,8 +296,10 @@ export async function POST(request: NextRequest) {
         email: normalizedEmail,
         passwordHash,
         isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        acceptedTermsAt: nowIso,
+        acceptedTermsVersion: '1.0',
+        createdAt: nowIso,
+        updatedAt: nowIso
       }
 
       if (body.lastName) clientData.lastName = body.lastName
