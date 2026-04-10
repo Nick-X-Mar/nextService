@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useMemo } from 'react'
 import Icon from '@/components/ui/Icon'
+import ServiceCategoryModal from '@/components/ServiceCategoryModal'
 import { styles } from '../../../../styles/styles'
-import { saveFormData, ServiceFormData } from '../../../../utils/formStorage'
 
 interface Vehicle {
   id: string
@@ -34,9 +33,9 @@ interface VehiclesSectionProps {
 }
 
 export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionProps) {
-  const router = useRouter()
   const [currentVehicleIndex, setCurrentVehicleIndex] = useState(0)
   const [isEditing, setIsEditing] = useState(false)
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState<Partial<Vehicle>>({})
 
@@ -117,11 +116,10 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
     }
   }
 
-  const handleNewRequest = () => {
-    if (!currentVehicle) return
-
-    // Map vehicle data to form data format
-    const vehicleFormData = {
+  // Build vehicle form data to pass to the category modal
+  const vehicleExtraFormData = useMemo(() => {
+    if (!currentVehicle) return undefined
+    return {
       brand: currentVehicle.brand || '',
       model: currentVehicle.model || '',
       isBrandOther: false,
@@ -136,11 +134,8 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
       is4x4: currentVehicle.is4x4 || false,
       isTurbo: currentVehicle.isTurbo || false,
       engineNumber: currentVehicle.engineNumber || '',
-      // Keep existing category and description if any
-      category: '',
       description: '',
       estimatedPrice: null,
-      // Save original vehicle data for comparison
       originalVehicleId: currentVehicle.id,
       originalVehicleData: {
         brand: currentVehicle.brand || '',
@@ -156,13 +151,7 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
         color: currentVehicle.color || ''
       }
     }
-
-    // Save vehicle data to localStorage
-    saveFormData(vehicleFormData as Partial<ServiceFormData>)
-
-    // Navigate to landing page
-    router.push('/')
-  }
+  }, [currentVehicle])
 
   if (vehicles.length === 0) {
     return (
@@ -288,7 +277,7 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
           </div>
           {!isEditing && (
             <button
-              onClick={handleNewRequest}
+              onClick={() => setCategoryModalOpen(true)}
               className={styles.btnPrimary}
             >
               <Icon name="add" size="sm" />
@@ -454,6 +443,12 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
           </button>
         </div>
       )}
+
+      <ServiceCategoryModal
+        isOpen={categoryModalOpen}
+        onClose={() => setCategoryModalOpen(false)}
+        extraFormData={vehicleExtraFormData}
+      />
     </div>
   )
 }

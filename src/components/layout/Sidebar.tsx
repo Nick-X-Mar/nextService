@@ -1,9 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import Icon from '@/components/ui/Icon'
+import ServiceCategoryModal from '@/components/ServiceCategoryModal'
 
 interface NavItem {
   label: string
@@ -17,9 +19,10 @@ export default function Sidebar() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const currentTab = searchParams.get('tab')
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false)
 
   const clientNavItems: NavItem[] = client ? [
-    { label: 'Νέο Αίτημα', icon: 'add_circle', href: '/' },
+    { label: 'Νέο Αίτημα', icon: 'add_circle', href: '#new-request' },
     { label: 'Αιτήματα', icon: 'build', href: `/requests/${client.id}` },
     { label: 'Ραντεβού', icon: 'calendar_today', href: `/requests/${client.id}?tab=appointment`, matchTab: 'appointment' },
     { label: 'Μηνύματα', icon: 'chat', href: `/requests/${client.id}/chats` },
@@ -65,20 +68,34 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold uppercase tracking-wider transition-all hover:translate-x-1 duration-200 ${
-              isActive(item)
-                ? 'bg-primary-container/10 text-primary'
-                : 'text-secondary hover:bg-surface-container hover:text-on-surface'
-            }`}
-          >
-            <Icon name={item.icon} filled={isActive(item)} className={isActive(item) ? 'text-primary' : ''} />
-            <span className="text-xs">{item.label}</span>
-          </Link>
-        ))}
+        {navItems.map((item) => {
+          if (item.href === '#new-request') {
+            return (
+              <button
+                key={item.href}
+                onClick={() => setCategoryModalOpen(true)}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold uppercase tracking-wider transition-all hover:translate-x-1 duration-200 text-secondary hover:bg-surface-container hover:text-on-surface"
+              >
+                <Icon name={item.icon} className="" />
+                <span className="text-xs">{item.label}</span>
+              </button>
+            )
+          }
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold uppercase tracking-wider transition-all hover:translate-x-1 duration-200 ${
+                isActive(item)
+                  ? 'bg-primary-container/10 text-primary'
+                  : 'text-secondary hover:bg-surface-container hover:text-on-surface'
+              }`}
+            >
+              <Icon name={item.icon} filled={isActive(item)} className={isActive(item) ? 'text-primary' : ''} />
+              <span className="text-xs">{item.label}</span>
+            </Link>
+          )
+        })}
       </nav>
 
       {/* Bottom actions */}
@@ -91,6 +108,7 @@ export default function Sidebar() {
           <span className="text-xs uppercase tracking-wider">Αποσύνδεση</span>
         </button>
       </div>
+      <ServiceCategoryModal isOpen={categoryModalOpen} onClose={() => setCategoryModalOpen(false)} />
     </aside>
   )
 }

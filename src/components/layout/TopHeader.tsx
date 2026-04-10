@@ -6,10 +6,12 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import Icon from '@/components/ui/Icon'
+import ServiceCategoryModal from '@/components/ServiceCategoryModal'
 
 export default function TopHeader() {
   const { userType, client, garage, logout } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false)
   const pathname = usePathname()
 
   const isLanding = pathname === '/'
@@ -56,13 +58,13 @@ export default function TopHeader() {
           {/* Logged-in clients see ONLY the "Νέο Αίτημα" CTA — every other
               navigation item lives in the sidebar / bottom nav. */}
           {userType === 'client' && client && (
-            <Link
-              href="/"
+            <button
+              onClick={() => setCategoryModalOpen(true)}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-br from-primary to-primary-container text-on-primary text-sm font-bold shadow-md active:scale-95 transition-all"
             >
               <Icon name="add_circle" size="sm" filled />
               Νέο Αίτημα
-            </Link>
+            </button>
           )}
           {userType === 'garage' && garage && (
             <Link href={`/garage-dashboard/${garage.id}`} className="text-secondary hover:text-on-surface transition-colors">
@@ -127,10 +129,10 @@ export default function TopHeader() {
             </>
           )}
           {userType === 'client' && client && (
-            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
+            <button onClick={() => { setMobileMenuOpen(false); setCategoryModalOpen(true) }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors w-full">
               <Icon name="add_circle" className="text-primary" filled />
               <span className="font-medium">Νέο Αίτημα</span>
-            </Link>
+            </button>
           )}
           {userType === 'garage' && garage && (
             <Link href={`/garage-dashboard/${garage.id}`} onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
@@ -146,6 +148,7 @@ export default function TopHeader() {
           )}
         </div>
       )}
+      <ServiceCategoryModal isOpen={categoryModalOpen} onClose={() => setCategoryModalOpen(false)} />
     </header>
   )
 }
