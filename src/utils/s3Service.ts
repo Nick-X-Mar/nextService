@@ -1,4 +1,5 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
 
@@ -213,17 +214,56 @@ export const validateFile = (
 }
 
 /**
- * Generate presigned URL for direct client upload (alternative approach)
- * This would require additional S3 configuration for CORS and presigned URLs
- * For now, we'll use server-side upload for simplicity
+ * Generate a presigned download URL for an S3 object.
+ * @param key - The S3 key (path) of the file
+ * @param expiresIn - URL validity in seconds (default: 15 minutes)
+ * @returns Presigned URL string
  */
-export const generatePresignedUrl = async (): Promise<{ success: boolean; url?: string; error?: string }> => {
-  // This would require @aws-sdk/s3-request-presigner
-  // Implementation can be added later if needed for direct client uploads
-  return {
-    success: false,
-    error: 'Presigned URLs not implemented yet'
-  }
+export const getPresignedDownloadUrl = async (
+  key: string,
+  expiresIn: number = 900
+): Promise<string> => {
+  const command = new GetObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+  })
+  return getSignedUrl(s3Client, command, { expiresIn })
+}
+
+/**
+ * Convert an array of S3 keys (or legacy public URLs) to presigned URLs.
+ * Handles both new keys and old full URLs gracefully.
+ */
+export const generatePresignedUrls = async (
+  keysOrUrls: string[],
+  expiresIn: number = 900
+): Promise<string[]> => {
+  return Promise.all(
+    keysOrUrls.map(async (keyOrUrl) => {
+      // If it's already a full URL, extract the key
+      const key = keyOrUrl.includes('amazonaws.com/')
+        ? extractS3KeyFromUrl(keyOrUrl)
+        : keyOrUrl
+      return getPresignedDownloadUrl(key, expiresIn)
+    })
+  )
+}
+
+/**
+ * Convert photo records (with s3Key or s3Url) to use presigned URLs.
+ */
+export const presignPhotoRecords = async (
+  photos: Array<{ s3Key?: string; s3Url?: string; [key: string]: unknown }>,
+  expiresIn: number = 900
+): Promise<Array<{ s3Key?: string; s3Url: string; [key: string]: unknown }>> => {
+  return Promise.all(
+    photos.map(async (photo) => {
+      const key = photo.s3Key || (photo.s3Url ? extractS3KeyFromUrl(photo.s3Url) : null)
+      if (!key) return photo as { s3Key?: string; s3Url: string; [key: string]: unknown }
+      const presignedUrl = await getPresignedDownloadUrl(key, expiresIn)
+      return { ...photo, s3Url: presignedUrl }
+    })
+  )
 }
 
 // Utility function to check if S3 service is properly configured

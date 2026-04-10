@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { requireGarage } from '@/utils/requireAuth'
 
 export async function GET(request: NextRequest) {
   try {
-    // Get garage ID from query parameters
-    const { searchParams } = new URL(request.url)
-    const garageId = searchParams.get('garageId')
-
-    if (!garageId) {
-      return NextResponse.json({ 
-        error: 'Garage ID is required' 
-      }, { status: 400 })
-    }
+    const garageId = requireGarage(request)
+    if (garageId instanceof NextResponse) return garageId
 
     // Get all offers made by this garage
     const scanCommand = new ScanCommand({
@@ -121,7 +115,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       { 
         error: 'Error fetching garage offers',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: 'Internal server error'
       },
       { status: 500 }
     )

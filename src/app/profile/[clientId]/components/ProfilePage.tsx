@@ -6,6 +6,7 @@ import { styles } from '../../../../styles/styles'
 // Navigation handled by AppShell
 import UserInfoSection from './UserInfoSection'
 import VehiclesSection from './VehiclesSection'
+import WalletSection from './WalletSection'
 import AccountDangerZone from '@/components/AccountDangerZone'
 import { useToast } from '../../../../hooks/useToast'
 import { useAuth } from '../../../../contexts/AuthContext'
@@ -240,6 +241,13 @@ export default function ProfilePage({ clientId }: ProfilePageProps) {
             onUpdate={handleVehicleUpdate}
           />
         </div>
+
+        {/* Wallet Section */}
+        {process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === 'true' && (
+          <div id="wallet-section" className="mb-6">
+            <WalletSection clientId={clientId} />
+          </div>
+        )}
 
         {/* Navigation Menu Items */}
         <div className="space-y-1 mb-6">

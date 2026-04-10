@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { requireAuth } from '@/utils/requireAuth'
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
+    const auth = requireAuth(request)
+    if (auth instanceof NextResponse) return auth
+
     const { requestId } = await params
     const body = await request.json()
     const { garageId } = body
@@ -47,7 +51,7 @@ export async function POST(
     return NextResponse.json(
       { 
         error: 'Error marking messages as read',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: 'Internal server error'
       },
       { status: 500 }
     )

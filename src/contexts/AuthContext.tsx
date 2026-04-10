@@ -47,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Clear all authentication data - memoized to prevent infinite loops
   const clearAuth = useCallback(() => {
+    // Keep localStorage for backward compatibility during transition
     localStorage.removeItem('clientId')
     localStorage.removeItem('garageId')
     setClient(null)
@@ -54,24 +55,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserType(null)
   }, [])
 
-  // Logout function
-  const logout = () => {
+  // Logout function - calls server to clear httpOnly cookie
+  const logout = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+    } catch {
+      // Ignore errors - we're logging out anyway
+    }
     clearAuth()
-    // Reload to clear all state
     window.location.href = '/'
-  }
+  }, [clearAuth])
 
   // Refresh client data - memoized to prevent infinite loops
   const refreshClient = useCallback(async (clientId: string) => {
     try {
-      console.log('AuthContext: Refreshing client with clientId:', clientId)
       const response = await fetch(`/api/clients/${clientId}`)
       if (response.ok) {
         const data = await response.json()
         const clientData = data.client
-        
-        console.log('AuthContext: Received client data:', clientData)
-        
+
         if (clientData) {
           const userData: ClientUser = {
             id: clientData.id,
@@ -81,18 +83,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             phoneNumber: clientData.phoneNumber,
             isRegistered: !!clientData.email
           }
-          console.log('AuthContext: Setting client data:', userData)
           setClient(userData)
           setUserType('client')
-          // Clear any existing garage session
+          // Keep localStorage in sync for UI purposes
+          localStorage.setItem('clientId', clientData.id)
           localStorage.removeItem('garageId')
           setGarage((prevGarage) => (prevGarage ? null : prevGarage))
         } else {
-          console.log('AuthContext: No client data, clearing auth')
           clearAuth()
         }
+      } else if (response.status === 401) {
+        clearAuth()
       } else {
-        console.log('AuthContext: Response not ok, clearing auth')
         clearAuth()
       }
     } catch (error) {
@@ -106,14 +108,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Refresh garage data - memoized to prevent infinite loops
   const refreshGarage = useCallback(async (garageId: string) => {
     try {
-      console.log('AuthContext: Refreshing garage with garageId:', garageId)
       const response = await fetch(`/api/garage/${garageId}`)
       if (response.ok) {
         const data = await response.json()
         const garageData = data.garage
-        
-        console.log('AuthContext: Received garage data:', garageData)
-        
+
         if (garageData && data.success) {
           const userData: GarageUser = {
             id: garageData.id,
@@ -126,18 +125,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             description: garageData.description,
             isActive: garageData.isActive
           }
-          console.log('AuthContext: Setting garage data:', userData)
           setGarage(userData)
           setUserType('garage')
-          // Clear any existing client session
+          // Keep localStorage in sync for UI purposes
+          localStorage.setItem('garageId', garageData.id)
           localStorage.removeItem('clientId')
           setClient((prevClient) => (prevClient ? null : prevClient))
         } else {
-          console.log('AuthContext: No garage data, clearing auth')
           clearAuth()
         }
+      } else if (response.status === 401) {
+        clearAuth()
       } else {
-        console.log('AuthContext: Response not ok, clearing auth')
         clearAuth()
       }
     } catch (error) {
@@ -148,39 +147,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [clearAuth])
 
-  // Check authentication on mount
+  // Check authentication on mount using /api/auth/me (JWT cookie-based)
   useEffect(() => {
     const checkAuth = async () => {
-      const clientId = localStorage.getItem('clientId')
-      const garageId = localStorage.getItem('garageId')
+      try {
+        const response = await fetch('/api/auth/me')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.authenticated && data.user) {
+            if (data.userType === 'client') {
+              const userData: ClientUser = {
+                id: data.user.id,
+                firstName: data.user.firstName,
+                lastName: data.user.lastName,
+                email: data.user.email,
+                phoneNumber: data.user.phoneNumber,
+                isRegistered: !!data.user.email
+              }
+              setClient(userData)
+              setUserType('client')
+              localStorage.setItem('clientId', data.user.id)
+              localStorage.removeItem('garageId')
+            } else if (data.userType === 'garage') {
+              const userData: GarageUser = {
+                id: data.user.id,
+                companyName: data.user.companyName,
+                email: data.user.email,
+                mobile: data.user.mobile,
+                address: data.user.address,
+                tin: data.user.tin,
+                taxAuthority: data.user.taxAuthority,
+                description: data.user.description,
+                isActive: data.user.isActive
+              }
+              setGarage(userData)
+              setUserType('garage')
+              localStorage.setItem('garageId', data.user.id)
+              localStorage.removeItem('clientId')
+            }
+          } else {
+            setUserType('guest')
+          }
+        } else {
+          // Not authenticated - check localStorage for backward compatibility
+          const clientId = localStorage.getItem('clientId')
+          const garageId = localStorage.getItem('garageId')
 
-      // If both exist, there's a conflict - clear both
-      if (clientId && garageId) {
-        console.warn('AuthContext: Both clientId and garageId found in localStorage. Clearing both.')
-        clearAuth()
+          if (clientId && !garageId) {
+            // Old session without JWT - clear it, user needs to log in again
+            clearAuth()
+          } else if (garageId && !clientId) {
+            clearAuth()
+          }
+          setUserType('guest')
+        }
+      } catch {
+        setUserType('guest')
+      } finally {
         setIsLoading(false)
-        return
       }
-
-      // Check for client authentication
-      if (clientId) {
-        await refreshClient(clientId)
-        return
-      }
-
-      // Check for garage authentication
-      if (garageId) {
-        await refreshGarage(garageId)
-        return
-      }
-
-      // No authentication found
-      setUserType('guest')
-      setIsLoading(false)
     }
 
     checkAuth()
-  }, [])
+  }, [clearAuth])
 
   // Update userType when client or garage changes
   useEffect(() => {
@@ -219,4 +248,3 @@ export function useAuth() {
   }
   return context
 }
-

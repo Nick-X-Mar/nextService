@@ -132,6 +132,53 @@ const renderers: Record<EmailTemplateName, TemplateRenderer> = {
     return { subject, html, text: htmlToPlainText(html) }
   },
 
+  [EmailTemplate.PaymentConfirmationClient]: (v) => {
+    const subject = 'Επιβεβαίωση πληρωμής'
+    const html = baseLayout({
+      title: subject,
+      bodyHtml: `
+        <h2 style="margin:0 0 16px 0;font-size:20px;">Η πληρωμή σου ολοκληρώθηκε</h2>
+        <p>Καταβλήθηκε προκαταβολή <strong>${v.depositAmount || ''}€</strong> για το ραντεβού σου με το συνεργείο <strong>${v.garageName || ''}</strong> στις <strong>${v.appointmentDate || ''}</strong>.</p>
+        <p><strong>Υπόλοιπο στο συνεργείο:</strong> ${v.remainingAmount || ''}€</p>
+        <p>Μπορείς να δεις τις λεπτομέρειες στην εφαρμογή.</p>
+      `,
+      ctaLabel: 'Δες το ραντεβού',
+      ctaUrl: link(`/requests/${v.clientId || ''}/details/${v.requestId || ''}`)
+    })
+    return { subject, html, text: htmlToPlainText(html) }
+  },
+
+  [EmailTemplate.CancellationConfirmationClient]: (v) => {
+    const subject = 'Ακύρωση ραντεβού'
+    const refundText = v.refundPoints
+      ? `<p><strong>${v.refundPoints} πόντοι</strong> πιστώθηκαν στο πορτοφόλι σου.</p>`
+      : '<p>Δεν δικαιούσαι επιστροφή πόντων για αυτή την ακύρωση.</p>'
+    const html = baseLayout({
+      title: subject,
+      bodyHtml: `
+        <h2 style="margin:0 0 16px 0;font-size:20px;">Το ραντεβού σου ακυρώθηκε</h2>
+        <p>Το ραντεβού σου με το συνεργείο <strong>${v.garageName || ''}</strong> στις <strong>${v.appointmentDate || ''}</strong> ακυρώθηκε.</p>
+        ${refundText}
+      `
+    })
+    return { subject, html, text: htmlToPlainText(html) }
+  },
+
+  [EmailTemplate.CancellationNotificationGarage]: (v) => {
+    const subject = 'Ακύρωση ραντεβού πελάτη'
+    const html = baseLayout({
+      title: subject,
+      bodyHtml: `
+        <h2 style="margin:0 0 16px 0;font-size:20px;">Ακυρώθηκε ραντεβού</h2>
+        <p>Ο πελάτης <strong>${v.clientName || ''}</strong> ακύρωσε το ραντεβού του στις <strong>${v.appointmentDate || ''}</strong>.</p>
+        <p>Η ημερομηνία είναι πλέον διαθέσιμη στο πρόγραμμά σου.</p>
+      `,
+      ctaLabel: 'Άνοιγμα dashboard',
+      ctaUrl: link(`/garage-dashboard/${v.garageId || ''}?tab=appointments`)
+    })
+    return { subject, html, text: htmlToPlainText(html) }
+  },
+
   [EmailTemplate.AdminNewGarageValidation]: (v) => {
     const subject = `[Admin] Νέο συνεργείο για επιβεβαίωση: ${v.companyName || ''}`
     const html = baseLayout({

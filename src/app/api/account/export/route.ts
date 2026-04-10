@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
 import { verifyPassword } from '@/utils/passwordService'
+import { requireAuth } from '@/utils/requireAuth'
 
 const EVENT_LOGS_TABLE = process.env.EVENT_LOGS_TABLE || 'EventLogs'
 const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
@@ -19,8 +20,14 @@ const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
  */
 export async function POST(request: NextRequest) {
   try {
+    const auth = requireAuth(request)
+    if (auth instanceof NextResponse) return auth
+
     const body = await request.json()
-    const { userId, userType, password } = body || {}
+    const { password } = body || {}
+    // Use authenticated identity instead of body values
+    const userId = auth.userId
+    const userType = auth.userType
 
     if (!userId || typeof userId !== 'string') {
       return NextResponse.json({ error: 'userId required' }, { status: 400 })

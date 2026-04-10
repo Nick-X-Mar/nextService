@@ -9,6 +9,7 @@ interface RequestCardProps {
   request: ServiceRequest
   onViewDetails: () => void
   onChatClick?: () => void
+  onCancelClick?: () => void
   hasGarageMessages?: boolean
   getStatusIcon: (status: ServiceRequestStatus) => React.ReactNode
   getStatusText: (status: ServiceRequestStatus) => string
@@ -21,6 +22,7 @@ export default function RequestCard({
   request,
   onViewDetails,
   onChatClick,
+  onCancelClick,
   hasGarageMessages = false,
   getStatusIcon,
   getStatusText,
@@ -164,6 +166,17 @@ export default function RequestCard({
               }`}
             >
               Συνομιλία
+            </button>
+          )}
+          {request.status === ServiceRequestStatus.APPOINTMENT && onCancelClick && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onCancelClick()
+              }}
+              className="px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-error bg-error-container/30 hover:bg-error-container/50 rounded-lg transition-colors"
+            >
+              Ακύρωση
             </button>
           )}
           <button

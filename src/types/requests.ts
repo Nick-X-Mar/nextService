@@ -49,5 +49,9 @@ export interface ServiceRequest {
   acceptedOfferId?: string
   appointmentDate?: string
   appointmentPrice?: number
+  paymentIntentId?: string
+  depositAmount?: number
+  remainingAmount?: number
+  cancelledAt?: string
 }
 

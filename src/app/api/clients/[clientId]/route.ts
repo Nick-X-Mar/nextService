@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { getAuth, requireOwner } from '@/utils/requireAuth'
 
 export async function GET(
   request: NextRequest,
@@ -8,7 +9,16 @@ export async function GET(
 ) {
   try {
     const { clientId } = await params
-    
+
+    // Auth check: allow client viewing own profile or any garage
+    const auth = getAuth(request)
+    if (!auth) {
+      return NextResponse.json({ error: 'Απαιτείται σύνδεση' }, { status: 401 })
+    }
+    if (auth.userId !== clientId && auth.userType !== 'garage') {
+      return NextResponse.json({ error: 'Δεν έχετε πρόσβαση σε αυτόν τον πόρο' }, { status: 403 })
+    }
+
     if (!clientId) {
       return NextResponse.json(
         { error: 'Client ID is required' },
@@ -64,7 +74,7 @@ export async function GET(
     return NextResponse.json(
       { 
         error: 'Σφάλμα κατά την ανάκτηση των πληροφοριών πελάτη',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: 'Internal server error'
       },
       { status: 500 }
     )
@@ -77,6 +87,11 @@ export async function PUT(
 ) {
   try {
     const { clientId } = await params
+
+    // Auth check: only the client can edit their own profile
+    const auth = requireOwner(request, clientId)
+    if (auth instanceof NextResponse) return auth
+
     const body = await request.json()
 
     if (!clientId) {
@@ -172,7 +187,7 @@ export async function PUT(
   } catch (error) {
     console.error('Error updating client:', error)
     return NextResponse.json(
-      { error: 'Error updating client details', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Error updating client details', details: 'Internal server error' },
       { status: 500 }
     )
   }

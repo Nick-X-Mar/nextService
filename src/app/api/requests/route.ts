@@ -1,26 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { requireClient } from '@/utils/requireAuth'
+import { generatePresignedUrls } from '@/utils/s3Service'
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const clientId = searchParams.get('clientId')
-    
-    if (!clientId) {
-      return NextResponse.json(
-        { error: 'Client ID is required' },
-        { status: 400 }
-      )
-    }
-
-    // Basic validation for clientId format (should start with 'client-')
-    if (!clientId.startsWith('client-')) {
-      return NextResponse.json(
-        { error: 'Invalid client ID format' },
-        { status: 400 }
-      )
-    }
+    const clientId = requireClient(request)
+    if (clientId instanceof NextResponse) return clientId
 
     // Query service requests by clientId using the ClientRequestsIndex
     const queryCommand = new QueryCommand({
@@ -76,8 +63,15 @@ export async function GET(request: NextRequest) {
               }
             : null
 
+          // Generate presigned URLs for photos
+          const rawUrls = request.photoUrls || []
+          const presignedPhotoUrls = rawUrls.length > 0
+            ? await generatePresignedUrls(rawUrls)
+            : []
+
           return {
             ...request,
+            photoUrls: presignedPhotoUrls,
             clientAvailabilityDates: request.clientAvailabilityDates || [],
             vehicle: vehicleData
           }
@@ -102,7 +96,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       { 
         error: 'Σφάλμα κατά την ανάκτηση των αιτημάτων',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: 'Internal server error'
       },
       { status: 500 }
     )

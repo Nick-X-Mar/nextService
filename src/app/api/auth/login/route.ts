@@ -4,22 +4,11 @@ import { ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { verifyPassword } from '@/utils/passwordService'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
+import { signToken, setAuthCookie } from '@/utils/auth'
+import { createRateLimiter } from '@/utils/rateLimit'
 
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
-
-function checkRateLimit(identifier: string, maxAttempts: number = 5, windowMs: number = 3600000): boolean {
-  const now = Date.now()
-  const key = `login:${identifier}`
-  const current = rateLimitMap.get(key)
-
-  if (!current || now > current.resetTime) {
-    rateLimitMap.set(key, { count: 1, resetTime: now + windowMs })
-    return true
-  }
-  if (current.count >= maxAttempts) return false
-  current.count++
-  return true
-}
+const checkIPRate = createRateLimiter('login-ip', 10, 3600000)
+const checkEmailRate = createRateLimiter('login-email', 5, 3600000)
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,13 +29,13 @@ export async function POST(request: NextRequest) {
 
     const clientIP = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
 
-    if (!checkRateLimit(clientIP, 10, 3600000)) {
+    if (!checkIPRate(clientIP)) {
       return NextResponse.json({
         error: 'Πολλές προσπάθειες σύνδεσης. Δοκιμάστε ξανά σε 1 ώρα.'
       }, { status: 429 })
     }
 
-    if (!checkRateLimit(`email:${email}`, 5, 3600000)) {
+    if (!checkEmailRate(email)) {
       return NextResponse.json({
         error: 'Πολλές προσπάθειες για αυτό το email. Δοκιμάστε ξανά σε 1 ώρα.'
       }, { status: 429 })
@@ -96,7 +85,8 @@ export async function POST(request: NextRequest) {
           garageId: user.id,
           source: 'api/auth/login'
         })
-        return NextResponse.json({
+        const pendingToken = await signToken({ userId: user.id, userType: 'garage' })
+        const pendingResponse = NextResponse.json({
           success: true,
           pendingValidation: true,
           user: {
@@ -106,6 +96,8 @@ export async function POST(request: NextRequest) {
             isActive: false
           }
         })
+        setAuthCookie(pendingResponse, pendingToken)
+        return pendingResponse
       }
 
       logEvent({
@@ -116,7 +108,8 @@ export async function POST(request: NextRequest) {
         source: 'api/auth/login'
       })
 
-      return NextResponse.json({
+      const token = await signToken({ userId: user.id, userType: 'garage' })
+      const response = NextResponse.json({
         success: true,
         user: {
           id: user.id,
@@ -128,6 +121,8 @@ export async function POST(request: NextRequest) {
           isActive: user.isActive
         }
       })
+      setAuthCookie(response, token)
+      return response
     } else {
       logEvent({
         eventName: EventName.ClientLogin,
@@ -136,7 +131,9 @@ export async function POST(request: NextRequest) {
         clientId: user.id,
         source: 'api/auth/login'
       })
-      return NextResponse.json({
+
+      const token = await signToken({ userId: user.id, userType: 'client' })
+      const response = NextResponse.json({
         success: true,
         user: {
           id: user.id,
@@ -146,6 +143,8 @@ export async function POST(request: NextRequest) {
           phoneNumber: user.phoneNumber
         }
       })
+      setAuthCookie(response, token)
+      return response
     }
   } catch (error) {
     console.error('Login error:', error)

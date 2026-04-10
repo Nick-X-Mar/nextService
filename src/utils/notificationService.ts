@@ -1,5 +1,6 @@
 // SMS notification service using AWS SNS
 // import { sendSMSNotificationToGarages, formatSMSMessage } from './smsService'
+import { isNotificationsEnabled } from '@/utils/emailService'
 
 interface SMSNotificationResult {
   successful: number
@@ -39,6 +40,17 @@ export const sendNotificationToGarages = async (
   }
 ): Promise<SMSNotificationResult> => {
   try {
+    if (!isNotificationsEnabled()) {
+      console.log('[notificationService] NOTIFICATIONS OFF — SMS skipped')
+      return {
+        successful: 0,
+        failed: 0,
+        errors: [],
+        messageIds: [],
+        summary: 'Ειδοποιήσεις απενεργοποιημένες (NOTIFICATIONS_ENABLED=false)'
+      }
+    }
+
     // SMS functionality commented out - AWS SNS not configured
     console.log('SMS notifications disabled - AWS SNS not configured')
     

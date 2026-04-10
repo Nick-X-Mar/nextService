@@ -1,29 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand, PutCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb'
+import { signToken, setAuthCookie } from '@/utils/auth'
+import { createRateLimiter } from '@/utils/rateLimit'
 
-// Simple in-memory rate limiting (in production, use Redis or database)
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
-
-function checkRateLimit(identifier: string, maxAttempts: number = 3, windowMs: number = 3600000): boolean {
-  const now = Date.now()
-  const key = `register-vehicle:${identifier}`
-  
-  const current = rateLimitMap.get(key)
-  
-  if (!current || now > current.resetTime) {
-    // Reset or create new entry
-    rateLimitMap.set(key, { count: 1, resetTime: now + windowMs })
-    return true
-  }
-  
-  if (current.count >= maxAttempts) {
-    return false
-  }
-  
-  current.count++
-  return true
-}
+const checkRateLimit = createRateLimiter('register-vehicle', 3, 3600000)
 
 // Function to check if two vehicles are the same based on unique identifiers
 function areVehiclesSame(vehicle1: any, vehicle2: any): boolean {
@@ -66,7 +47,7 @@ export async function POST(request: NextRequest) {
                      'unknown'
 
     // Check rate limit (3 registrations per IP per hour)
-    if (!checkRateLimit(clientIP, 3, 3600000)) {
+    if (!checkRateLimit(clientIP)) {
       return NextResponse.json({ 
         error: 'Πολλές εγγραφές από αυτή τη διεύθυνση. Παρακαλώ δοκιμάστε ξανά σε 1 ώρα.' 
       }, { status: 429 })
@@ -198,7 +179,8 @@ export async function POST(request: NextRequest) {
           await dynamoDB.send(deleteVehicleCommand)
         }
 
-        return NextResponse.json({
+        const token1 = await signToken({ userId: existingClient.id, userType: 'client' })
+        const response1 = NextResponse.json({
           success: true,
           message: 'Existing user found with matching vehicle (VIN/Engine) - logged in and merged data',
           client: {
@@ -213,9 +195,12 @@ export async function POST(request: NextRequest) {
           vehicleDeduplicated: true,
           vehicleMatchReason: existingVehicle.vinNumber && vehicleData.vinNumber ? 'VIN' : 'Engine Number'
         })
+        setAuthCookie(response1, token1)
+        return response1
       } else {
         // User exists but no duplicate vehicle found - just log them in
-        return NextResponse.json({
+        const token2 = await signToken({ userId: existingClient.id, userType: 'client' })
+        const response2 = NextResponse.json({
           success: true,
           message: 'Existing user found - logged in successfully',
           client: {
@@ -228,6 +213,8 @@ export async function POST(request: NextRequest) {
           isExistingUser: true,
           vehicleDeduplicated: false
         })
+        setAuthCookie(response2, token2)
+        return response2
       }
     }
 
@@ -251,7 +238,8 @@ export async function POST(request: NextRequest) {
 
     await dynamoDB.send(putCommand)
 
-    return NextResponse.json({
+    const token = await signToken({ userId: clientData.id, userType: 'client' })
+    const response = NextResponse.json({
       success: true,
       message: 'Client registered successfully',
       client: {
@@ -262,13 +250,15 @@ export async function POST(request: NextRequest) {
       isExistingUser: false,
       vehicleDeduplicated: false
     })
+    setAuthCookie(response, token)
+    return response
 
   } catch (error) {
     console.error('Registration with vehicle error:', error)
     return NextResponse.json(
       { 
         error: 'Error during registration',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: 'Internal server error'
       },
       { status: 500 }
     )

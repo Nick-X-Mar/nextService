@@ -5,6 +5,10 @@ import { OfferStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { sendEmail } from '@/utils/emailService'
 import { EventName, EmailTemplate } from '@/types/events'
+import { requireAuth, requireGarage } from '@/utils/requireAuth'
+import { createRateLimiter } from '@/utils/rateLimit'
+
+const checkOfferRate = createRateLimiter('offer-create', 10, 3600000)
 
 // Initialize DynamoDB client
 const client = new DynamoDBClient({
@@ -16,6 +20,16 @@ const docClient = DynamoDBDocumentClient.from(client)
 
 export async function POST(request: NextRequest) {
   try {
+    const garageId = requireGarage(request)
+    if (garageId instanceof NextResponse) return garageId
+
+    if (!checkOfferRate(garageId)) {
+      return NextResponse.json(
+        { error: 'Πολλές προσφορές. Δοκιμάστε ξανά σε 1 ώρα.' },
+        { status: 429 }
+      )
+    }
+
     const body = await request.json()
     const {
       offerNumber,
@@ -25,11 +39,10 @@ export async function POST(request: NextRequest) {
       benefits,
       availabilityDates,
       serviceRequestId,
-      garageId
     } = body
 
     // Validate required fields
-    if (!serviceRequestId || !garageId || !offerAmount || offerAmount <= 0) {
+    if (!serviceRequestId || !offerAmount || offerAmount <= 0) {
       return NextResponse.json({
         success: false,
         error: 'Missing required fields or invalid offer amount'
@@ -101,9 +114,17 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = requireAuth(request)
+    if (auth instanceof NextResponse) return auth
+
     const { searchParams } = new URL(request.url)
     const garageId = searchParams.get('garageId')
     const serviceRequestId = searchParams.get('serviceRequestId')
+
+    // If requesting by garageId and caller is a garage, they can only see their own offers
+    if (garageId && auth.userType === 'garage' && garageId !== auth.userId) {
+      return NextResponse.json({ success: false, error: 'Δεν έχετε πρόσβαση σε αυτόν τον πόρο' }, { status: 403 })
+    }
 
     if (!garageId && !serviceRequestId) {
       return NextResponse.json({
@@ -161,6 +182,9 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const garageId = requireGarage(request)
+    if (garageId instanceof NextResponse) return garageId
+
     const body = await request.json()
     const {
       offerId,
@@ -176,6 +200,15 @@ export async function PUT(request: NextRequest) {
         success: false,
         error: 'Missing required fields or invalid offer amount'
       }, { status: 400 })
+    }
+
+    // Verify the offer belongs to this garage
+    const existingOffer = await docClient.send(new GetCommand({ TableName: 'Offers', Key: { id: offerId } }))
+    if (!existingOffer.Item) {
+      return NextResponse.json({ success: false, error: 'Offer not found' }, { status: 404 })
+    }
+    if (existingOffer.Item.garageId !== garageId) {
+      return NextResponse.json({ success: false, error: 'Δεν έχετε πρόσβαση σε αυτόν τον πόρο' }, { status: 403 })
     }
 
     // Update offer in DynamoDB

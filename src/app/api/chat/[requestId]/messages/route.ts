@@ -6,12 +6,19 @@ import { ScanCommand as RequestsScanCommand } from '@aws-sdk/lib-dynamodb'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
+import { requireAuth } from '@/utils/requireAuth'
+import { createRateLimiter } from '@/utils/rateLimit'
+
+const checkMessageRate = createRateLimiter('chat-message', 60, 3600000)
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
+    const auth = requireAuth(request)
+    if (auth instanceof NextResponse) return auth
+
     const { requestId } = await params
     const { searchParams } = new URL(request.url)
     const garageId = searchParams.get('garageId')
@@ -66,7 +73,7 @@ export async function GET(
     return NextResponse.json(
       { 
         error: 'Error fetching chat messages',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: 'Internal server error'
       },
       { status: 500 }
     )
@@ -78,17 +85,30 @@ export async function POST(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
+    const auth = requireAuth(request)
+    if (auth instanceof NextResponse) return auth
+
+    if (!checkMessageRate(auth.userId)) {
+      return NextResponse.json(
+        { error: 'Πολλά μηνύματα. Δοκιμάστε ξανά αργότερα.' },
+        { status: 429 }
+      )
+    }
+
     const { requestId } = await params
     const body = await request.json()
 
     if (!requestId) {
-      return NextResponse.json({ 
-        error: 'Request ID is required' 
+      return NextResponse.json({
+        error: 'Request ID is required'
       }, { status: 400 })
     }
 
-    const { message, senderId, senderType, garageId } = body
-    
+    const { message, garageId } = body
+    // Use authenticated user as sender instead of trusting body
+    const senderId = auth.userId
+    const senderType = auth.userType
+
     // If garageId is not provided but senderType is garage, use senderId as garageId
     const effectiveGarageId = garageId || (senderType === 'garage' ? senderId : null)
 
@@ -220,7 +240,7 @@ export async function POST(
     return NextResponse.json(
       { 
         error: 'Error creating chat message',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: 'Internal server error'
       },
       { status: 500 }
     )

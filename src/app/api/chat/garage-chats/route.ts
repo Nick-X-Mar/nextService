@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { requireGarage } from '@/utils/requireAuth'
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const garageId = searchParams.get('garageId')
-
-    if (!garageId) {
-      return NextResponse.json({ error: 'garageId is required' }, { status: 400 })
-    }
+    const garageId = requireGarage(request)
+    if (garageId instanceof NextResponse) return garageId
 
     // Find all chat messages where this garage is involved
     const messagesResult = await dynamoDB.send(new ScanCommand({

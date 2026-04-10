@@ -4,18 +4,13 @@ import { ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
+import { requireGarage } from '@/utils/requireAuth'
+import { generatePresignedUrls } from '@/utils/s3Service'
 
 export async function GET(request: NextRequest) {
   try {
-    // Get garage ID from query parameters
-    const { searchParams } = new URL(request.url)
-    const garageId = searchParams.get('garageId')
-
-    if (!garageId) {
-      return NextResponse.json({
-        error: 'Garage ID is required'
-      }, { status: 400 })
-    }
+    const garageId = requireGarage(request)
+    if (garageId instanceof NextResponse) return garageId
 
     logEvent({
       eventName: EventName.GarageViewedAvailableRequests,
@@ -99,6 +94,12 @@ export async function GET(request: NextRequest) {
         const vehicleResult = await dynamoDB.send(vehicleScanCommand)
         const vehicle = vehicleResult.Items?.[0]
 
+        // Generate presigned URLs for photos
+        const rawUrls = request.photoUrls || []
+        const presignedUrls = rawUrls.length > 0
+          ? await generatePresignedUrls(rawUrls)
+          : []
+
         return {
           id: request.id,
           description: request.description,
@@ -106,7 +107,7 @@ export async function GET(request: NextRequest) {
           status: request.status,
           createdAt: request.createdAt,
           clientAvailabilityDates: request.clientAvailabilityDates || [],
-          photoUrls: request.photoUrls || [],
+          photoUrls: presignedUrls,
           client: client ? {
             firstName: client.firstName,
             lastName: client.lastName,
@@ -143,7 +144,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       { 
         error: 'Error fetching available requests',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: 'Internal server error'
       },
       { status: 500 }
     )

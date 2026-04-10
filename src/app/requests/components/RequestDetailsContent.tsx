@@ -8,9 +8,11 @@ import 'react-day-picker/dist/style.css'
 import { addDays, addMonths, format, isWeekend } from 'date-fns'
 import { el } from 'date-fns/locale'
 import { ServiceVehicleCard, Modal, Input, Button, Checkbox } from '@/components'
+import PaymentModal from './PaymentModal'
 import { styles } from '../../../styles/styles'
 import { ServiceRequestStatus, OfferStatus } from '../../../types/statuses'
 import type { ServiceRequest } from '../../../types/requests'
+import type { SavedCard } from '@/types/payments'
 
 interface Offer {
   id: string
@@ -152,6 +154,15 @@ export default function RequestDetailsContent({
   const [vehicleUpdateError, setVehicleUpdateError] = useState<string | null>(null)
   const [acceptingOfferId, setAcceptingOfferId] = useState<string | null>(null)
   const [acceptError, setAcceptError] = useState<string | null>(null)
+
+  // Payment state
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [paymentClientSecret, setPaymentClientSecret] = useState<string | null>(null)
+  const [paymentSavedCards, setPaymentSavedCards] = useState<SavedCard[]>([])
+  const [paymentLoading, setPaymentLoading] = useState(false)
+  const [paymentError, setPaymentError] = useState<string | null>(null)
+  const [pendingOffer, setPendingOffer] = useState<OfferWithGarage | null>(null)
+  const [paymentAmounts, setPaymentAmounts] = useState<{ deposit: number; remaining: number } | null>(null)
 
   const hasOffers =
     typeof offers !== 'undefined' && Array.isArray(offers) && offers.length > 0
@@ -392,22 +403,22 @@ export default function RequestDetailsContent({
     }
   }
 
-  const handleAcceptOffer = async (offer: OfferWithGarage) => {
-    const selectedDate = selectedOfferDates[offer.id]
+  const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === 'true'
 
-    if (!selectedDate) {
-      setAcceptError('Επιλέξτε ημερομηνία για το ραντεβού πριν αποδεχτείτε την προσφορά.')
-      return
-    }
+  const executeAcceptOffer = async (offer: OfferWithGarage, paymentIntentId?: string) => {
+    const selectedDate = selectedOfferDates[offer.id]
 
     try {
       setAcceptError(null)
       setAcceptingOfferId(offer.id)
 
-      const payload = {
+      const payload: Record<string, unknown> = {
         offerId: offer.id,
         appointmentDate: selectedDate,
         appointmentPrice: offer.offerAmount
+      }
+      if (paymentIntentId) {
+        payload.paymentIntentId = paymentIntentId
       }
 
       const response = await fetch(`/api/requests/${request.id}/accept-offer`, {
@@ -430,9 +441,9 @@ export default function RequestDetailsContent({
       const updatedRequest: ServiceRequest = {
         ...request,
         status: ServiceRequestStatus.APPOINTMENT,
-        acceptedOfferId: payload.offerId,
-        appointmentDate: payload.appointmentDate,
-        appointmentPrice: payload.appointmentPrice,
+        acceptedOfferId: offer.id,
+        appointmentDate: selectedDate ?? undefined,
+        appointmentPrice: offer.offerAmount,
         updatedAt: data.request?.updatedAt ?? new Date().toISOString()
       }
 
@@ -442,8 +453,8 @@ export default function RequestDetailsContent({
             ? {
                 ...item,
                 status: OfferStatus.ACCEPTED,
-                appointmentDate: payload.appointmentDate,
-                appointmentPrice: payload.appointmentPrice
+                appointmentDate: selectedDate ?? undefined,
+                appointmentPrice: offer.offerAmount
               }
             : {
                 ...item,
@@ -461,6 +472,65 @@ export default function RequestDetailsContent({
     } finally {
       setAcceptingOfferId(null)
     }
+  }
+
+  const handleAcceptOffer = async (offer: OfferWithGarage) => {
+    const selectedDate = selectedOfferDates[offer.id]
+
+    if (!selectedDate) {
+      setAcceptError('Επιλέξτε ημερομηνία για το ραντεβού πριν αποδεχτείτε την προσφορά.')
+      return
+    }
+
+    if (paymentsEnabled) {
+      // Open payment modal
+      setPendingOffer(offer)
+      setPaymentLoading(true)
+      setPaymentError(null)
+      setShowPaymentModal(true)
+
+      try {
+        const clientId = localStorage.getItem('clientId')
+        const res = await fetch('/api/payments/create-intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientId,
+            requestId: request.id,
+            offerId: offer.id,
+            offerAmount: offer.offerAmount,
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Payment setup failed')
+
+        setPaymentClientSecret(data.clientSecret)
+        setPaymentSavedCards(data.savedCards || [])
+        setPaymentAmounts({ deposit: data.depositAmount, remaining: data.remainingAmount })
+      } catch (err) {
+        setPaymentError(err instanceof Error ? err.message : 'Σφάλμα πληρωμής')
+      } finally {
+        setPaymentLoading(false)
+      }
+    } else {
+      // Direct accept (no payment)
+      await executeAcceptOffer(offer)
+    }
+  }
+
+  const handlePaymentSuccess = async (paymentIntentId: string) => {
+    setShowPaymentModal(false)
+    if (pendingOffer) {
+      await executeAcceptOffer(pendingOffer, paymentIntentId)
+      setPendingOffer(null)
+    }
+  }
+
+  const handlePaymentModalClose = () => {
+    setShowPaymentModal(false)
+    setPendingOffer(null)
+    setPaymentClientSecret(null)
+    setPaymentAmounts(null)
   }
 
   useEffect(() => {
@@ -1340,6 +1410,23 @@ export default function RequestDetailsContent({
           </div>
         </div>
       </Modal>
+
+      {/* Payment Modal */}
+      {showPaymentModal && pendingOffer && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={handlePaymentModalClose}
+          offerAmount={pendingOffer.offerAmount}
+          depositAmount={paymentAmounts?.deposit ?? 0}
+          remainingAmount={paymentAmounts?.remaining ?? 0}
+          clientSecret={paymentClientSecret}
+          savedCards={paymentSavedCards}
+          isLoading={paymentLoading}
+          error={paymentError}
+          onPaymentSuccess={handlePaymentSuccess}
+          onPaymentError={(err) => setPaymentError(err)}
+        />
+      )}
     </>
   )
 }

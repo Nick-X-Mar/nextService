@@ -135,14 +135,14 @@
 Στο production/staging setting, βάλε στο environment:
 
 ```
-EMAIL_DRY_RUN=false
+NOTIFICATIONS_ENABLED=true                  # master switch — false ή absent = τίποτα δεν φεύγει
 SES_FROM_ADDRESS=no-reply@nextservice.gr    # must be verified στο SES
 SES_REGION=eu-central-1                     # fallback στο REGION
 ADMIN_EMAIL=admin@nextservice.gr            # για τις admin notifications
 NEXT_PUBLIC_APP_URL=https://nextservice.gr  # για τα CTA links στα emails
 ```
 
-Στο local dev, άστα όλα default → `EMAIL_DRY_RUN=true`. Τα emails γράφονται μόνο στο `EmailLogs` table με status `dry_run`, δεν φεύγει τίποτα πουθενά.
+Στο local dev, άστα όλα default → `NOTIFICATIONS_ENABLED=false`. Τα emails γράφονται μόνο στο `EmailLogs` table με status `skipped`, δεν φεύγει τίποτα πουθενά. Αυτό το flag ελέγχει **όλα** τα notifications (email, SMS, push).
 
 ### Πώς βλέπεις τι στάλθηκε
 

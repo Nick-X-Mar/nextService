@@ -39,6 +39,7 @@ class AmplifyStack(Stack):
         table_names = [
             "Clients", "Garages", "Vehicles",
             "ServiceRequests", "Offers", "ChatMessages",
+            "EventLogs", "EmailLogs",
         ]
         dynamo_resources = []
         for t in table_names:
@@ -62,6 +63,21 @@ class AmplifyStack(Stack):
                 "dynamodb:BatchWriteItem",
             ],
             resources=dynamo_resources,
+        ))
+
+        # DynamoDB — create/describe for auto-provisioned tables (EventLogs, EmailLogs)
+        self.amplify_role.add_to_policy(iam.PolicyStatement(
+            sid="DynamoDBCreateTable",
+            actions=[
+                "dynamodb:CreateTable",
+                "dynamodb:DescribeTable",
+                "dynamodb:UpdateTimeToLive",
+                "dynamodb:DescribeTimeToLive",
+            ],
+            resources=[
+                f"arn:aws:dynamodb:{self.region}:{self.account}:table/EventLogs",
+                f"arn:aws:dynamodb:{self.region}:{self.account}:table/EmailLogs",
+            ],
         ))
 
         # S3 access
@@ -103,6 +119,18 @@ class AmplifyStack(Stack):
             ],
             resources=[
                 f"arn:aws:logs:{self.region}:{self.account}:log-group:/nextservice/*",
+            ],
+        ))
+
+        # SES — send emails
+        self.amplify_role.add_to_policy(iam.PolicyStatement(
+            sid="SESSendEmail",
+            actions=[
+                "ses:SendEmail",
+                "ses:SendRawEmail",
+            ],
+            resources=[
+                f"arn:aws:ses:{self.region}:{self.account}:identity/*",
             ],
         ))
 
@@ -168,6 +196,19 @@ frontend:
                 amplify.CfnApp.EnvironmentVariableProperty(
                     name="AMPLIFY_ROLE_ARN",
                     value=self.amplify_role.role_arn,
+                ),
+                # Notifications (email via SES)
+                amplify.CfnApp.EnvironmentVariableProperty(
+                    name="NOTIFICATIONS_ENABLED", value="true",
+                ),
+                amplify.CfnApp.EnvironmentVariableProperty(
+                    name="SES_FROM_ADDRESS", value="no-reply@nextservice.gr",
+                ),
+                amplify.CfnApp.EnvironmentVariableProperty(
+                    name="SES_REGION", value=self.region,
+                ),
+                amplify.CfnApp.EnvironmentVariableProperty(
+                    name="ADMIN_EMAIL", value="nmarianos93@gmail.com",
                 ),
             ],
         )

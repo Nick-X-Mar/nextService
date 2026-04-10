@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses'
+import { SESClient, SendRawEmailCommand } from '@aws-sdk/client-ses'
 import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
 import { PutCommand } from '@aws-sdk/lib-dynamodb'
@@ -15,6 +15,7 @@ import type {
 
 const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
 const FROM_ADDRESS = process.env.SES_FROM_ADDRESS || 'no-reply@nextservice.gr'
+const FROM_NAME = 'NextService'
 const SES_REGION = process.env.SES_REGION || process.env.REGION || 'eu-central-1'
 
 // Retention: 180 days for the EmailLogs records — long enough to debug
@@ -22,11 +23,12 @@ const SES_REGION = process.env.SES_REGION || process.env.REGION || 'eu-central-1
 const EMAIL_LOG_TTL_SECONDS = 180 * 24 * 60 * 60
 
 /**
- * Dry-run is the default for safety. Set EMAIL_DRY_RUN=false explicitly in
- * the environment to actually hit SES. This means local dev never sends
- * real emails by accident.
+ * Master switch for all outbound notifications (email, SMS, push, etc.).
+ * Default is OFF — set NOTIFICATIONS_ENABLED=true in .env to actually send.
+ * This means local dev never sends real emails/SMS by accident.
  */
-const isDryRun = (process.env.EMAIL_DRY_RUN ?? 'true').toLowerCase() !== 'false'
+const notificationsEnabled =
+  (process.env.NOTIFICATIONS_ENABLED ?? 'false').toLowerCase() === 'true'
 
 let sesClient: SESClient | null = null
 function getSesClient(): SESClient {
@@ -102,7 +104,7 @@ async function sendEmailInternal(input: SendEmailInput): Promise<void> {
     subject: rendered.subject,
     bodyPreview: '',
     triggerEvent,
-    status: isDryRun ? 'dry_run' : 'queued',
+    status: notificationsEnabled ? 'queued' : 'skipped',
     sentAt,
     ...(clientId ? { clientId } : {}),
     ...(garageId ? { garageId } : {}),
@@ -111,24 +113,41 @@ async function sendEmailInternal(input: SendEmailInput): Promise<void> {
 
   await writeEmailLog(baseRecord)
 
-  if (isDryRun) {
+  if (!notificationsEnabled) {
     console.log(
-      `[emailService] DRY RUN — would send "${rendered.subject}" to ${to} (template=${templateName}, trigger=${triggerEvent})`
+      `[emailService] NOTIFICATIONS OFF — would send "${rendered.subject}" to ${to} (template=${templateName}, trigger=${triggerEvent})`
     )
     return
   }
 
   try {
-    const command = new SendEmailCommand({
-      Source: FROM_ADDRESS,
-      Destination: { ToAddresses: [to] },
-      Message: {
-        Subject: { Data: rendered.subject, Charset: 'UTF-8' },
-        Body: {
-          Html: { Data: rendered.html, Charset: 'UTF-8' },
-          Text: { Data: rendered.text, Charset: 'UTF-8' }
-        }
-      }
+    const boundary = `----=_Part_${randomUUID().replace(/-/g, '')}`
+
+    const rawMessage = [
+      `From: ${FROM_NAME} <${FROM_ADDRESS}>`,
+      `To: ${to}`,
+      `Subject: =?UTF-8?B?${Buffer.from(rendered.subject).toString('base64')}?=`,
+      `MIME-Version: 1.0`,
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      `X-Mailer: NextService`,
+      ``,
+      `--${boundary}`,
+      `Content-Type: text/plain; charset=UTF-8`,
+      `Content-Transfer-Encoding: base64`,
+      ``,
+      Buffer.from(rendered.text).toString('base64'),
+      ``,
+      `--${boundary}`,
+      `Content-Type: text/html; charset=UTF-8`,
+      `Content-Transfer-Encoding: base64`,
+      ``,
+      Buffer.from(rendered.html).toString('base64'),
+      ``,
+      `--${boundary}--`
+    ].join('\r\n')
+
+    const command = new SendRawEmailCommand({
+      RawMessage: { Data: Buffer.from(rawMessage) }
     })
     const result = await getSesClient().send(command)
     await updateEmailLog(emailId, {
@@ -199,6 +218,6 @@ async function updateEmailLog(
   }
 }
 
-export function isEmailDryRun(): boolean {
-  return isDryRun
+export function isNotificationsEnabled(): boolean {
+  return notificationsEnabled
 }

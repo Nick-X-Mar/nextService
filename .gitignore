@@ -112,3 +112,6 @@ temp/
 # Local development files
 local-data/
 dev-data/
+
+# Playwright MCP snapshots
+.playwright-mcp/

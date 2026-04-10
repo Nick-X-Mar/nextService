@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { requireAuth } from '@/utils/requireAuth'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
+    const auth = requireAuth(request)
+    if (auth instanceof NextResponse) return auth
+
     const { requestId } = await params
 
     if (!requestId) {
@@ -107,7 +111,7 @@ export async function GET(
     return NextResponse.json(
       { 
         error: 'Error fetching garages',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: 'Internal server error'
       },
       { status: 500 }
     )

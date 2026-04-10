@@ -4,6 +4,7 @@ import { GetCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { logEvent } from '@/utils/eventLogger'
 import { sendEmail } from '@/utils/emailService'
 import { EventName, EmailTemplate } from '@/types/events'
+import { requireOwner } from '@/utils/requireAuth'
 
 export async function GET(
   request: NextRequest,
@@ -60,7 +61,7 @@ export async function GET(
     return NextResponse.json(
       { 
         error: 'Error fetching garage data',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: 'Internal server error'
       },
       { status: 500 }
     )
@@ -73,6 +74,10 @@ export async function PUT(
 ) {
   try {
     const { garageId } = await params
+
+    const ownerAuth = requireOwner(request, garageId)
+    if (ownerAuth instanceof NextResponse) return ownerAuth
+
     const body = await request.json()
 
     if (!garageId) {
@@ -183,7 +188,7 @@ export async function PUT(
     return NextResponse.json(
       { 
         error: 'Error updating garage data',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: 'Internal server error'
       },
       { status: 500 }
     )

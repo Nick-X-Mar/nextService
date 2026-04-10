@@ -7,6 +7,7 @@ import { styles } from '../../../styles/styles'
 import RequestCard from './RequestCard'
 import OfferSummaryCard from './OfferSummaryCard'
 import RequestDetailsModal from './RequestDetailsModal'
+import CancellationModal from './CancellationModal'
 import { useToast } from '../../../hooks/useToast'
 import { useUser } from '../../../contexts/UserContext'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -66,6 +67,10 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [garageMessagesMap, setGarageMessagesMap] = useState<Record<string, boolean>>({})
   const [offersMap, setOffersMap] = useState<Record<string, OfferSummary[]>>({})
+
+  // Cancellation state
+  const [cancelRequest, setCancelRequest] = useState<ServiceRequest | null>(null)
+  const [cancelLoading, setCancelLoading] = useState(false)
 
   // Check if clientId is valid (starts with 'client-')
   const isValidClientId = clientId && clientId.startsWith('client-')
@@ -353,6 +358,40 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
   const handleChatClick = (requestId: string) => {
     // Navigate to the client's individual chat page
     router.push(`/requests/${clientId}/chats/${requestId}`)
+  }
+
+  const handleCancelAppointment = async () => {
+    if (!cancelRequest) return
+    setCancelLoading(true)
+    try {
+      const res = await fetch(`/api/requests/${cancelRequest.id}/cancel`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+
+      // Update local state
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === cancelRequest.id
+            ? { ...r, status: ServiceRequestStatus.CANCELLED }
+            : r
+        )
+      )
+
+      if (data.refundPoints) {
+        success('Ακύρωση', `Το ραντεβού ακυρώθηκε. ${data.refundPoints} πόντοι πιστώθηκαν στο πορτοφόλι σας.`)
+      } else {
+        success('Ακύρωση', 'Το ραντεβού ακυρώθηκε.')
+      }
+      setCancelRequest(null)
+    } catch (err) {
+      error('Σφάλμα', 'Δεν ήταν δυνατή η ακύρωση.')
+    } finally {
+      setCancelLoading(false)
+    }
   }
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -669,6 +708,11 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                     request={request}
                     onViewDetails={() => handleViewDetails(request)}
                     onChatClick={() => handleChatClick(request.id)}
+                    onCancelClick={
+                      request.status === ServiceRequestStatus.APPOINTMENT
+                        ? () => setCancelRequest(request)
+                        : undefined
+                    }
                     hasGarageMessages={garageMessagesMap[request.id] || false}
                     getStatusIcon={getStatusIcon}
                     getStatusText={getStatusText}
@@ -884,6 +928,17 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
           getStatusIcon={getStatusIcon}
           getStatusText={getStatusText}
           getStatusColor={getStatusColor}
+        />
+      )}
+
+      {/* Cancellation Modal */}
+      {cancelRequest && (
+        <CancellationModal
+          isOpen={!!cancelRequest}
+          onClose={() => setCancelRequest(null)}
+          request={cancelRequest}
+          onConfirm={handleCancelAppointment}
+          isLoading={cancelLoading}
         />
       )}
     </section>

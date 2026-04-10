@@ -36,6 +36,14 @@ export const EventName = {
   AppointmentScheduled: 'appointment_scheduled',
   ServiceCompleted: 'service_completed',
   ServiceCancelled: 'service_cancelled',
+  AppointmentCancelled: 'appointment_cancelled',
+
+  // Phase E+ — Payments
+  PaymentInitiated: 'payment_initiated',
+  PaymentSucceeded: 'payment_succeeded',
+  PaymentFailed: 'payment_failed',
+  PaymentAbandoned: 'payment_abandoned',
+  WalletCredited: 'wallet_credited',
 
   // Phase F — Account recovery
   PasswordResetRequested: 'password_reset_requested',
@@ -88,7 +96,10 @@ export const EmailTemplate = {
   AppointmentConfirmationClient: 'appointment_confirmation_client',
   NewChatMessage: 'new_chat_message',
   AdminNewGarageValidation: 'admin_new_garage_validation',
-  PasswordReset: 'password_reset'
+  PasswordReset: 'password_reset',
+  PaymentConfirmationClient: 'payment_confirmation_client',
+  CancellationConfirmationClient: 'cancellation_confirmation_client',
+  CancellationNotificationGarage: 'cancellation_notification_garage'
 } as const
 
 export type EmailTemplateName = typeof EmailTemplate[keyof typeof EmailTemplate]
@@ -102,7 +113,7 @@ export type EmailStatus =
   | 'opened'
   | 'clicked'
   | 'failed'
-  | 'dry_run'
+  | 'skipped'
 
 export interface EmailLogRecord {
   emailId: string

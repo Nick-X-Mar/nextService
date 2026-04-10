@@ -3,6 +3,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
+import { requireClient } from '@/utils/requireAuth'
 
 const client = new DynamoDBClient({
   region: process.env.AWS_REGION || 'us-east-1',
@@ -16,6 +17,9 @@ export async function PATCH(
   { params }: { params: Promise<{ offerId: string }> }
 ) {
   try {
+    const clientId = requireClient(request)
+    if (clientId instanceof NextResponse) return clientId
+
     const { offerId } = await params
 
     if (!offerId) {

@@ -4,21 +4,10 @@ import { PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { hashPassword } from '@/utils/passwordService'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
+import { signToken, setAuthCookie } from '@/utils/auth'
+import { createRateLimiter } from '@/utils/rateLimit'
 
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
-
-function checkRateLimit(identifier: string, maxAttempts: number = 3, windowMs: number = 3600000): boolean {
-  const now = Date.now()
-  const key = `register:${identifier}`
-  const current = rateLimitMap.get(key)
-  if (!current || now > current.resetTime) {
-    rateLimitMap.set(key, { count: 1, resetTime: now + windowMs })
-    return true
-  }
-  if (current.count >= maxAttempts) return false
-  current.count++
-  return true
-}
+const checkRegisterRate = createRateLimiter('register', 3, 3600000)
 
 // Bumped whenever the legal text changes — every signup record has the
 // version it agreed to so we can prove what they accepted at the time.
@@ -45,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     const clientIP = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
-    if (!checkRateLimit(clientIP, 3, 3600000)) {
+    if (!checkRegisterRate(clientIP)) {
       return NextResponse.json({ error: 'Πολλές εγγραφές. Δοκιμάστε ξανά σε 1 ώρα.' }, { status: 429 })
     }
 
@@ -96,7 +85,8 @@ export async function POST(request: NextRequest) {
       metadata: { email: normalizedEmail }
     })
 
-    return NextResponse.json({
+    const token = await signToken({ userId: clientData.id, userType: 'client' })
+    const response = NextResponse.json({
       success: true,
       message: 'Εγγραφή επιτυχής',
       client: {
@@ -105,6 +95,8 @@ export async function POST(request: NextRequest) {
         email: clientData.email
       }
     })
+    setAuthCookie(response, token)
+    return response
   } catch (error) {
     console.error('Registration error:', error)
     return NextResponse.json({ error: 'Σφάλμα κατά την εγγραφή' }, { status: 500 })

@@ -3,12 +3,17 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
+import { requireAuth, requireOwner } from '@/utils/requireAuth'
+import { generatePresignedUrls } from '@/utils/s3Service'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
+    const auth = requireAuth(request)
+    if (auth instanceof NextResponse) return auth
+
     const { requestId } = await params
     const { searchParams } = new URL(request.url)
     // Optional query param: when a garage is the viewer, the UI passes
@@ -34,12 +39,28 @@ export async function GET(
     const result = await dynamoDB.send(scanCommand)
 
     if (!result.Items || result.Items.length === 0) {
-      return NextResponse.json({ 
-        error: 'Service request not found' 
+      return NextResponse.json({
+        error: 'Service request not found'
       }, { status: 404 })
     }
 
     const serviceRequest = result.Items[0]
+
+    // Authorization: clients can only view their own requests
+    if (auth.userType === 'client' && auth.userId !== serviceRequest.clientId) {
+      return NextResponse.json(
+        { error: 'Δεν έχετε πρόσβαση σε αυτόν τον πόρο' },
+        { status: 403 }
+      )
+    }
+
+    // Authorization: if garage passes viewerGarageId, it must match authenticated user
+    if (viewerGarageId && auth.userType === 'garage' && viewerGarageId !== auth.userId) {
+      return NextResponse.json(
+        { error: 'Δεν έχετε πρόσβαση σε αυτόν τον πόρο' },
+        { status: 403 }
+      )
+    }
 
     // Get client details
     const clientScanCommand = new ScanCommand({
@@ -90,6 +111,12 @@ export async function GET(
       })
     }
 
+    // Generate presigned URLs for photos
+    const rawPhotoUrls = serviceRequest.photoUrls || []
+    const presignedPhotoUrls = rawPhotoUrls.length > 0
+      ? await generatePresignedUrls(rawPhotoUrls)
+      : []
+
     return NextResponse.json({
       success: true,
       request: {
@@ -99,7 +126,7 @@ export async function GET(
         status: serviceRequest.status,
         createdAt: serviceRequest.createdAt,
         clientAvailabilityDates: serviceRequest.clientAvailabilityDates || [],
-        photoUrls: serviceRequest.photoUrls || [],
+        photoUrls: presignedPhotoUrls,
         acceptedOfferId: serviceRequest.acceptedOfferId,
         appointmentDate: serviceRequest.appointmentDate,
         appointmentPrice: serviceRequest.appointmentPrice,
@@ -134,7 +161,7 @@ export async function GET(
     return NextResponse.json(
       { 
         error: 'Error fetching service request',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: 'Internal server error'
       },
       { status: 500 }
     )
@@ -171,6 +198,27 @@ export async function PATCH(
         { status: 400 }
       )
     }
+
+    // Fetch the request to verify ownership
+    const fetchCommand = new ScanCommand({
+      TableName: 'ServiceRequests',
+      FilterExpression: 'id = :requestId',
+      ExpressionAttributeValues: {
+        ':requestId': requestId
+      }
+    })
+    const fetchResult = await dynamoDB.send(fetchCommand)
+    const serviceRequest = fetchResult.Items?.[0]
+
+    if (!serviceRequest) {
+      return NextResponse.json(
+        { error: 'Service request not found' },
+        { status: 404 }
+      )
+    }
+
+    const ownerCheck = requireOwner(request, serviceRequest.clientId)
+    if (ownerCheck instanceof NextResponse) return ownerCheck
 
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/
     const normalizedDates = Array.from(
@@ -261,6 +309,12 @@ export async function PATCH(
     const vehicleResult = await dynamoDB.send(vehicleScanCommand)
     const vehicle = vehicleResult.Items?.[0]
 
+    // Generate presigned URLs for photos
+    const rawPatchPhotoUrls = updatedRequest.photoUrls || []
+    const presignedPatchPhotoUrls = rawPatchPhotoUrls.length > 0
+      ? await generatePresignedUrls(rawPatchPhotoUrls)
+      : []
+
     return NextResponse.json({
       success: true,
       request: {
@@ -271,7 +325,7 @@ export async function PATCH(
         createdAt: updatedRequest.createdAt,
         updatedAt: updatedRequest.updatedAt,
         clientAvailabilityDates: updatedRequest.clientAvailabilityDates || [],
-        photoUrls: updatedRequest.photoUrls || [],
+        photoUrls: presignedPatchPhotoUrls,
         client: client ? {
           firstName: client.firstName,
           lastName: client.lastName,
@@ -299,7 +353,7 @@ export async function PATCH(
     return NextResponse.json(
       {
         error: 'Δεν ήταν δυνατή η ενημέρωση των προτεινόμενων ημερομηνιών',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: 'Internal server error'
       },
       { status: 500 }
     )

@@ -5,6 +5,12 @@ import { ServiceRequestStatus, OfferStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { sendEmail } from '@/utils/emailService'
 import { EventName, EmailTemplate } from '@/types/events'
+import { getStripe, DEPOSIT_PERCENT } from '@/lib/stripe-server'
+import { requireClient } from '@/utils/requireAuth'
+import { generatePresignedUrls, presignPhotoRecords } from '@/utils/s3Service'
+import { createRateLimiter } from '@/utils/rateLimit'
+
+const checkAcceptRate = createRateLimiter('accept-offer', 5, 3600000)
 
 export async function PATCH(
   request: NextRequest,
@@ -21,7 +27,9 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { offerId, appointmentDate, appointmentPrice } = body || {}
+    const { offerId, appointmentDate, appointmentPrice, paymentIntentId } = body || {}
+
+    const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === 'true'
 
     if (!offerId) {
       return NextResponse.json(
@@ -53,27 +61,110 @@ export async function PATCH(
       )
     }
 
-    // First, update the service request with appointment details
+    // Authorization: only the owning client can accept an offer
+    const clientId = requireClient(request)
+    if (clientId instanceof NextResponse) return clientId
+
+    if (!checkAcceptRate(clientId)) {
+      return NextResponse.json(
+        { error: 'Πολλές προσπάθειες. Δοκιμάστε ξανά σε 1 ώρα.' },
+        { status: 429 }
+      )
+    }
+
+    const fetchRes = await dynamoDB.send(
+      new GetCommand({ TableName: 'ServiceRequests', Key: { id: requestId } })
+    )
+    const serviceRequest = fetchRes.Item
+
+    if (!serviceRequest) {
+      return NextResponse.json(
+        { success: false, error: 'Service request not found' },
+        { status: 404 }
+      )
+    }
+
+    if (clientId !== serviceRequest.clientId) {
+      return NextResponse.json(
+        { success: false, error: 'Δεν έχετε πρόσβαση σε αυτόν τον πόρο' },
+        { status: 403 }
+      )
+    }
+
+    // Verify payment if payments are enabled
+    let depositAmount: number | null = null
+    let remainingAmount: number | null = null
+
+    if (paymentsEnabled) {
+      if (!paymentIntentId) {
+        return NextResponse.json(
+          { success: false, error: 'Payment is required to accept this offer' },
+          { status: 400 }
+        )
+      }
+
+      const stripe = getStripe()
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
+
+      if (paymentIntent.status !== 'succeeded') {
+        return NextResponse.json(
+          { success: false, error: 'Payment has not been completed' },
+          { status: 400 }
+        )
+      }
+
+      if (paymentIntent.metadata?.requestId !== requestId || paymentIntent.metadata?.offerId !== offerId) {
+        return NextResponse.json(
+          { success: false, error: 'Payment does not match this request/offer' },
+          { status: 400 }
+        )
+      }
+
+      const price = typeof appointmentPrice === 'number' ? appointmentPrice : 0
+      depositAmount = Math.round(price * (DEPOSIT_PERCENT / 100) * 100) / 100
+      remainingAmount = Math.round((price - depositAmount) * 100) / 100
+    }
+
+    // Update the service request with appointment details
     const updatedAt = new Date().toISOString()
+
+    const updateExpressionParts = [
+      '#status = :status',
+      'acceptedOfferId = :acceptedOfferId',
+      'appointmentDate = :appointmentDate',
+      'appointmentPrice = :appointmentPrice',
+      'updatedAt = :updatedAt'
+    ]
+    const exprAttrValues: Record<string, unknown> = {
+      ':status': ServiceRequestStatus.APPOINTMENT,
+      ':acceptedOfferId': offerId,
+      ':appointmentDate': appointmentDate,
+      ':appointmentPrice':
+        typeof appointmentPrice === 'number' && !Number.isNaN(appointmentPrice)
+          ? appointmentPrice
+          : null,
+      ':updatedAt': updatedAt
+    }
+
+    if (paymentsEnabled && paymentIntentId) {
+      updateExpressionParts.push(
+        'paymentIntentId = :paymentIntentId',
+        'depositAmount = :depositAmount',
+        'remainingAmount = :remainingAmount'
+      )
+      exprAttrValues[':paymentIntentId'] = paymentIntentId
+      exprAttrValues[':depositAmount'] = depositAmount
+      exprAttrValues[':remainingAmount'] = remainingAmount
+    }
 
     const updateRequestCommand = new UpdateCommand({
       TableName: 'ServiceRequests',
       Key: { id: requestId },
-      UpdateExpression:
-        'SET #status = :status, acceptedOfferId = :acceptedOfferId, appointmentDate = :appointmentDate, appointmentPrice = :appointmentPrice, updatedAt = :updatedAt',
+      UpdateExpression: `SET ${updateExpressionParts.join(', ')}`,
       ExpressionAttributeNames: {
         '#status': 'status'
       },
-      ExpressionAttributeValues: {
-        ':status': ServiceRequestStatus.APPOINTMENT,
-        ':acceptedOfferId': offerId,
-        ':appointmentDate': appointmentDate,
-        ':appointmentPrice':
-          typeof appointmentPrice === 'number' && !Number.isNaN(appointmentPrice)
-            ? appointmentPrice
-            : null,
-        ':updatedAt': updatedAt
-      },
+      ExpressionAttributeValues: exprAttrValues,
       ReturnValues: 'ALL_NEW'
     })
 
@@ -191,7 +282,9 @@ export async function PATCH(
       requestId,
       offerId,
       appointmentDate,
-      appointmentPrice: typeof appointmentPrice === 'number' ? appointmentPrice : undefined
+      appointmentPrice: typeof appointmentPrice === 'number' ? appointmentPrice : undefined,
+      depositAmount: depositAmount ?? undefined,
+      remainingAmount: remainingAmount ?? undefined
     })
 
     return NextResponse.json({
@@ -204,8 +297,12 @@ export async function PATCH(
         description: updatedRequest.description,
         status: updatedRequest.status,
         estimatedCost: updatedRequest.estimatedCost,
-        photoUrls: updatedRequest.photoUrls || [],
-        photos: updatedRequest.photos || [],
+        photoUrls: (updatedRequest.photoUrls?.length > 0
+          ? await generatePresignedUrls(updatedRequest.photoUrls)
+          : []),
+        photos: (updatedRequest.photos?.length > 0
+          ? await presignPhotoRecords(updatedRequest.photos)
+          : []),
         createdAt: updatedRequest.createdAt,
         updatedAt: updatedRequest.updatedAt,
         clientAvailabilityDates: updatedRequest.clientAvailabilityDates || [],
@@ -220,7 +317,7 @@ export async function PATCH(
       {
         success: false,
         error: 'Failed to accept offer for this request',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: 'Internal server error'
       },
       { status: 500 }
     )
@@ -234,6 +331,8 @@ async function notifyAcceptanceParticipants(args: {
   offerId: string
   appointmentDate: string
   appointmentPrice?: number
+  depositAmount?: number
+  remainingAmount?: number
 }): Promise<void> {
   try {
     const [clientRes, garageRes] = await Promise.all([
@@ -259,6 +358,26 @@ async function notifyAcceptanceParticipants(args: {
           appointmentPrice: args.appointmentPrice !== undefined ? String(args.appointmentPrice) : ''
         },
         triggerEvent: EventName.OfferAccepted,
+        clientId: args.clientId,
+        garageId: args.garageId,
+        requestId: args.requestId
+      })
+    }
+
+    // Payment confirmation email (when deposit was paid)
+    if (clientEmail && args.depositAmount !== undefined) {
+      sendEmail({
+        to: clientEmail,
+        templateName: EmailTemplate.PaymentConfirmationClient,
+        variables: {
+          clientId: args.clientId,
+          requestId: args.requestId,
+          garageName,
+          appointmentDate: args.appointmentDate,
+          depositAmount: String(args.depositAmount),
+          remainingAmount: String(args.remainingAmount ?? '')
+        },
+        triggerEvent: EventName.PaymentSucceeded,
         clientId: args.clientId,
         garageId: args.garageId,
         requestId: args.requestId

@@ -4,9 +4,23 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
+import { requireAuth } from '@/utils/requireAuth'
+import { createRateLimiter } from '@/utils/rateLimit'
+
+const checkUploadRate = createRateLimiter('photo-upload', 20, 3600000)
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = requireAuth(request)
+    if (auth instanceof NextResponse) return auth
+
+    if (!checkUploadRate(auth.userId)) {
+      return NextResponse.json(
+        { error: 'Πολλά uploads. Δοκιμάστε ξανά σε 1 ώρα.' },
+        { status: 429 }
+      )
+    }
+
     // Check if S3 service is configured
     if (!isS3Configured()) {
       return NextResponse.json(
@@ -109,7 +123,7 @@ export async function POST(request: NextRequest) {
       UpdateExpression: 'SET photos = :photos, photoUrls = :photoUrls, updatedAt = :updatedAt',
       ExpressionAttributeValues: {
         ':photos': photoData,
-        ':photoUrls': photoData.map(p => p.s3Url),
+        ':photoUrls': photoData.map(p => p.s3Key),
         ':updatedAt': new Date().toISOString()
       }
     }))
@@ -152,7 +166,7 @@ export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     },

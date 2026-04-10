@@ -12,16 +12,18 @@ const nextConfig: NextConfig = {
       test: /\.yaml$/,
       use: 'yaml-loader',
     });
-    
+
     // Ensure proper path resolution for @/ aliases
     config.resolve.alias = {
       ...config.resolve.alias,
       '@': path.resolve(__dirname, 'src'),
     };
-    
+
     return config;
   },
   // Expose environment variables to the runtime
+  // NOTE: Only server-side vars here. STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET
+  // are intentionally excluded — they are available via process.env on server only.
   env: {
     REGION: process.env.REGION,
     DYNAMODB_ENDPOINT: process.env.DYNAMODB_ENDPOINT,
@@ -31,8 +33,24 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_APPSYNC_API_KEY: process.env.NEXT_PUBLIC_APPSYNC_API_KEY,
     NEXT_PUBLIC_APPSYNC_REGION: process.env.NEXT_PUBLIC_APPSYNC_REGION,
     NEXT_PUBLIC_APPSYNC_ENDPOINT: process.env.NEXT_PUBLIC_APPSYNC_ENDPOINT,
+    DEPOSIT_PERCENT: process.env.DEPOSIT_PERCENT,
+    CANCELLATION_DEADLINE_DAYS: process.env.CANCELLATION_DEADLINE_DAYS,
   },
-  /* config options here */
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'X-XSS-Protection', value: '1; mode=block' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+        ],
+      },
+    ]
+  },
 };
 
 export default nextConfig;

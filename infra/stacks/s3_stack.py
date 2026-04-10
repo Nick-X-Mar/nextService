@@ -18,14 +18,9 @@ class S3Stack(Stack):
             self, "UploadsBucket",
             bucket_name=f"nextservice-uploads-{self.account}",
             removal_policy=RemovalPolicy.RETAIN,
-            # Public read access for serving photos directly
-            block_public_access=s3.BlockPublicAccess(
-                block_public_acls=False,
-                block_public_policy=False,
-                ignore_public_acls=False,
-                restrict_public_buckets=False,
-            ),
-            object_ownership=s3.ObjectOwnership.BUCKET_OWNER_PREFERRED,
+            # Block all public access — photos served via presigned URLs
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            object_ownership=s3.ObjectOwnership.BUCKET_OWNER_ENFORCED,
             cors=[
                 s3.CorsRule(
                     allowed_headers=["*"],
@@ -33,10 +28,13 @@ class S3Stack(Stack):
                         s3.HttpMethods.GET,
                         s3.HttpMethods.PUT,
                         s3.HttpMethods.POST,
-                        s3.HttpMethods.DELETE,
                         s3.HttpMethods.HEAD,
                     ],
-                    allowed_origins=["*"],
+                    allowed_origins=[
+                        "https://nextservice.gr",
+                        "https://www.nextservice.gr",
+                        "http://localhost:3000",
+                    ],
                     exposed_headers=["ETag"],
                     max_age=3000,
                 )
@@ -57,8 +55,7 @@ class S3Stack(Stack):
             encryption=s3.BucketEncryption.S3_MANAGED,
         )
 
-        # Allow public read on all objects
-        self.uploads_bucket.grant_public_access("*", "s3:GetObject")
+        # No public access — photos are served via presigned URLs
 
         # ── Outputs ─────────────────────────────────────────────
         CfnOutput(self, "BucketName",

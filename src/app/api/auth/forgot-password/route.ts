@@ -5,21 +5,10 @@ import { ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { sendEmail } from '@/utils/emailService'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName, EmailTemplate } from '@/types/events'
+import { createRateLimiter } from '@/utils/rateLimit'
 
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
-
-function checkRateLimit(identifier: string, maxAttempts: number, windowMs: number): boolean {
-  const now = Date.now()
-  const key = `forgot-password:${identifier}`
-  const current = rateLimitMap.get(key)
-  if (!current || now > current.resetTime) {
-    rateLimitMap.set(key, { count: 1, resetTime: now + windowMs })
-    return true
-  }
-  if (current.count >= maxAttempts) return false
-  current.count++
-  return true
-}
+const checkIpRateLimit = createRateLimiter('forgot-ip', 10, 3600000)
+const checkEmailRateLimit = createRateLimiter('forgot-email', 3, 3600000)
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
@@ -58,13 +47,13 @@ export async function POST(request: NextRequest) {
       'unknown'
 
     // Rate limit per IP and per email to make brute force / spam expensive.
-    if (!checkRateLimit(clientIP, 10, 3600000)) {
+    if (!checkIpRateLimit(clientIP)) {
       return NextResponse.json(
         { error: 'Πάρα πολλές προσπάθειες. Δοκιμάστε ξανά σε 1 ώρα.' },
         { status: 429 }
       )
     }
-    if (!checkRateLimit(`email:${email}`, 3, 3600000)) {
+    if (!checkEmailRateLimit(email)) {
       return NextResponse.json(
         { error: 'Πάρα πολλές αιτήσεις για αυτό το email. Δοκιμάστε ξανά σε 1 ώρα.' },
         { status: 429 }

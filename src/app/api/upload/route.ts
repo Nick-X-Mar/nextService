@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { uploadMultipleFilesToS3, validateFile, isS3Configured } from '@/utils/s3Service'
 import { getEnvironmentInfo } from '@/utils/dynamoService'
+import { requireAuth } from '@/utils/requireAuth'
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = requireAuth(request)
+    if (auth instanceof NextResponse) return auth
+
     // Check if S3 service is configured
     if (!isS3Configured()) {
       return NextResponse.json(
@@ -95,7 +99,7 @@ export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     },

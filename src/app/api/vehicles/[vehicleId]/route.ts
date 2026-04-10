@@ -1,8 +1,9 @@
 'use server'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
+import { requireAuth } from '@/utils/requireAuth'
 
 const STRING_FIELDS = [
   'brand',
@@ -27,10 +28,33 @@ export async function PATCH(
   try {
     const { vehicleId } = await params
 
+    // Auth check: require authentication
+    const auth = requireAuth(request)
+    if (auth instanceof NextResponse) return auth
+
     if (!vehicleId) {
       return NextResponse.json(
         { error: 'Vehicle ID is required' },
         { status: 400 }
+      )
+    }
+
+    // Verify the vehicle belongs to the authenticated user
+    const getCommand = new GetCommand({
+      TableName: 'Vehicles',
+      Key: { id: vehicleId }
+    })
+    const vehicleResult = await dynamoDB.send(getCommand)
+    if (!vehicleResult.Item) {
+      return NextResponse.json(
+        { error: 'Vehicle not found' },
+        { status: 404 }
+      )
+    }
+    if (vehicleResult.Item.clientId !== auth.userId) {
+      return NextResponse.json(
+        { error: 'Δεν έχετε πρόσβαση σε αυτόν τον πόρο' },
+        { status: 403 }
       )
     }
 
@@ -140,7 +164,7 @@ export async function PATCH(
     return NextResponse.json(
       {
         error: 'Δεν ήταν δυνατή η ενημέρωση των στοιχείων του οχήματος',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: 'Internal server error'
       },
       { status: 500 }
     )

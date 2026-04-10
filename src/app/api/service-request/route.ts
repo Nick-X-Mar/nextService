@@ -384,7 +384,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { 
         error: 'Σφάλμα κατά την επεξεργασία του αιτήματος',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: 'Internal server error'
       },
       { status: 500 }
     )
