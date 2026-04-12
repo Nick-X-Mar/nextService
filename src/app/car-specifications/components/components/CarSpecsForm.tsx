@@ -361,7 +361,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                   <input
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => setEmail(e.target.value.replace(/[^a-zA-Z0-9@._+\-]/g, ''))}
                     placeholder="π.χ. example@email.com"
                     className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 pr-12 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
                   />
@@ -511,7 +511,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                     : 'flex-1 py-2.5 rounded-full font-bold text-xs text-on-surface-variant hover:bg-surface-variant text-center transition-all'
                 }
               >
-                Αριθμος
+                Αριθμος Κινητηρα
               </button>
               <button
                 type="button"
@@ -531,7 +531,10 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                 <input
                   type="text"
                   value={engineNumber}
-                  onChange={(e) => setEngineNumber(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g, '')
+                    setEngineNumber(val)
+                  }}
                   placeholder="π.χ. ABC123456"
                   className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
                 />
@@ -612,7 +615,10 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
               <input
                 type="text"
                 value={vinNumber}
-                onChange={(e) => setVinNumber(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')
+                  setVinNumber(val)
+                }}
                 placeholder="π.χ. WVWZZZ1JZ3W386752"
                 className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 pr-12 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
                 maxLength={17}

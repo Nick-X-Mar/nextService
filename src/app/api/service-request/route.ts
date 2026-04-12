@@ -80,7 +80,6 @@ export async function POST(request: NextRequest) {
     
     const missingFields: string[] = []
     if (!category) missingFields.push('Κατηγορία')
-    if (!description) missingFields.push('Περιγραφή')
     if (!brand) missingFields.push('Μάρκα')
     if (!model) missingFields.push('Μοντέλο')
 

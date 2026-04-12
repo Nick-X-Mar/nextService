@@ -108,7 +108,7 @@ export default function ForgotPasswordPage() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value.replace(/[^a-zA-Z0-9@._+\-]/g, ''))}
                 placeholder="π.χ. example@email.com"
                 required
                 disabled={isLoading}
