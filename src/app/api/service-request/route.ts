@@ -7,6 +7,7 @@ import { hashPassword } from '@/utils/passwordService'
 import { logEvent } from '@/utils/eventLogger'
 import { sendEmail } from '@/utils/emailService'
 import { EventName, EmailTemplate } from '@/types/events'
+import { getAuth } from '@/utils/requireAuth'
 
 // Helper function to normalize string values for comparison
 const normalizeString = (value: string | undefined | null): string => {
@@ -69,8 +70,13 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     
+    // Use authenticated clientId from JWT when available (set by middleware),
+    // falling back to body.clientId for guest users only
+    const auth = getAuth(request)
+    const existingClientId = auth?.userType === 'client' ? auth.userId : (body.clientId || null)
+
     // Validate required fields
-    const { category, description, brand, model, clientId: existingClientId } = body
+    const { category, description, brand, model } = body
     
     const missingFields: string[] = []
     if (!category) missingFields.push('Κατηγορία')

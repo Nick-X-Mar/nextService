@@ -51,6 +51,12 @@ export default function HeroSection() {
     if (tlRef.current) tlRef.current.reverse()
     setIsOpen(false)
     saveFormData({ category: value })
+    const clientId = localStorage.getItem('clientId')
+    fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventName: 'category_selected', clientId, metadata: { category: value } }),
+    }).catch(() => {})
     setTimeout(() => {
       router.push('/car-details')
     }, 500)

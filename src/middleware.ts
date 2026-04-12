@@ -13,6 +13,7 @@ const PUBLIC_API_ROUTES = [
   '/api/price-estimation',
   '/api/service-request',
   '/api/hot-deals',
+  '/api/track',
 ]
 
 function isPublicRoute(pathname: string): boolean {
@@ -64,8 +65,24 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Allow public routes
+  // Public routes: don't require auth but still extract identity if token exists
   if (isPublicRoute(pathname)) {
+    const token = request.cookies.get(TOKEN_COOKIE_NAME)?.value
+    if (token) {
+      try {
+        const { payload } = await jwtVerify(token, secret)
+        const userId = payload.userId as string
+        const userType = payload.userType as string
+        if (userId && userType) {
+          const requestHeaders = new Headers(request.headers)
+          requestHeaders.set('x-user-id', userId)
+          requestHeaders.set('x-user-type', userType)
+          return NextResponse.next({ request: { headers: requestHeaders } })
+        }
+      } catch {
+        // Token invalid/expired — proceed as unauthenticated
+      }
+    }
     return NextResponse.next()
   }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
 import GearSubmitButton from '@/components/GearSubmitButton'
@@ -25,6 +25,16 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
   const { success, error } = useToast()
   const [photos, setPhotos] = useState<File[]>([])
   const [dragActive, setDragActive] = useState(false)
+
+  // Track form funnel
+  useEffect(() => {
+    const clientId = localStorage.getItem('clientId')
+    fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventName: 'car_specs_started', clientId }),
+    }).catch(() => {})
+  }, [])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])

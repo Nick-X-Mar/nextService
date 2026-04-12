@@ -1,22 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand } from '@aws-sdk/lib-dynamodb'
-import { requireAuth } from '@/utils/requireAuth'
+import { ScanCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
+import { requireClient } from '@/utils/requireAuth'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
-    const auth = requireAuth(request)
-    if (auth instanceof NextResponse) return auth
+    const clientId = requireClient(request)
+    if (clientId instanceof NextResponse) return clientId
 
     const { requestId } = await params
 
     if (!requestId) {
-      return NextResponse.json({ 
-        error: 'Request ID is required' 
+      return NextResponse.json({
+        error: 'Request ID is required'
       }, { status: 400 })
+    }
+
+    // Verify the client owns this request
+    const requestResult = await dynamoDB.send(new GetCommand({
+      TableName: 'ServiceRequests',
+      Key: { id: requestId }
+    }))
+    if (!requestResult.Item || requestResult.Item.clientId !== clientId) {
+      return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
     }
 
     // Get all messages for this request to find unique garages

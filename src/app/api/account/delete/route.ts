@@ -8,6 +8,8 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { verifyPassword } from '@/utils/passwordService'
 import { deleteFileFromS3, extractS3KeyFromUrl } from '@/utils/s3Service'
 import { requireAuth } from '@/utils/requireAuth'
+import { logEvent } from '@/utils/eventLogger'
+import { EventName } from '@/types/events'
 
 const EVENT_LOGS_TABLE = process.env.EVENT_LOGS_TABLE || 'EventLogs'
 const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
@@ -106,6 +108,14 @@ export async function POST(request: NextRequest) {
     await dynamoDB.send(
       new DeleteCommand({ TableName: tableName, Key: { id: userId } })
     )
+
+    logEvent({
+      eventName: EventName.AccountDeleted,
+      actorType: userType === 'client' ? 'client' : 'garage',
+      actorId: userId,
+      ...(userType === 'client' ? { clientId: userId } : { garageId: userId }),
+      metadata: { deletedRecords: summary },
+    })
 
     return NextResponse.json({
       success: true,

@@ -49,17 +49,19 @@ function greekToLatinVariants(text: string): string[] {
       // Ambiguous single chars
       if (ch === 'υ' || ch === 'ύ' || ch === 'ϋ' || ch === 'ΰ') { options = ['y', 'u', 'i'] }
       else if (ch === 'η' || ch === 'ή') { options = ['i', 'e'] }
+      else if (ch === 'σ' || ch === 'ς') { options = ['s', 'c'] }
+      else if (ch === 'κ') { options = ['k', 'c'] }
       else { options = [greekToLatinMap[ch] || ch] }
       i++
     }
-    // Expand variants (cap at 16 to avoid explosion)
+    // Expand variants (cap at 32 to avoid explosion)
     const newVariants: string[] = []
     for (const v of variants) {
       for (const o of options) {
         newVariants.push(v + o)
-        if (newVariants.length >= 16) break
+        if (newVariants.length >= 32) break
       }
-      if (newVariants.length >= 16) break
+      if (newVariants.length >= 32) break
     }
     variants = newVariants
   }
@@ -188,6 +190,17 @@ export default function CarBrandModelSelector({
   }
 
 
+  // Track form funnel
+  useEffect(() => {
+    const clientId = typeof window !== 'undefined' ? localStorage.getItem('clientId') : null
+    fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventName: 'car_details_started', clientId, metadata: { category } }),
+    }).catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Load saved data on component mount
   useEffect(() => {
     setMounted(true)
@@ -266,6 +279,16 @@ export default function CarBrandModelSelector({
         is4x4,
         isTurbo
       })
+      const clientId = localStorage.getItem('clientId')
+      fetch('/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventName: 'car_details_completed',
+          clientId,
+          metadata: { brand: currentBrand, model: currentModel, isBrandOther, isModelOther, category },
+        }),
+      }).catch(() => {})
       router.push('/car-specifications')
     }
   }

@@ -16,6 +16,8 @@ interface CarSpecsFormProps {
     description: string
     brand: string
     model: string
+    isBrandOther: boolean
+    isModelOther: boolean
     modelYear: string
     vinNumber: string
     engineCC: string
@@ -49,6 +51,16 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   const [emailCheckName, setEmailCheckName] = useState('')
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [isCheckingEmail, setIsCheckingEmail] = useState(false)
+
+  // Track form funnel
+  useEffect(() => {
+    const clientId = localStorage.getItem('clientId')
+    fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventName: 'car_specs_started', clientId }),
+    }).catch(() => {})
+  }, [])
 
   // Load saved data on component mount
   useEffect(() => {

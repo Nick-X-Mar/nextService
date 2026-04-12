@@ -16,6 +16,12 @@ export const EventName = {
   GarageValidated: 'garage_validated',
   GuestRegisteredFromRequest: 'guest_registered_from_request',
 
+  // Phase A+ — Form funnel (client-side, tracked via /api/track)
+  CategorySelected: 'category_selected',
+  CarDetailsStarted: 'car_details_started',
+  CarDetailsCompleted: 'car_details_completed',
+  CarSpecsStarted: 'car_specs_started',
+
   // Phase B — Request creation (client side)
   ServiceRequestSubmitted: 'service_request_submitted',
   DamagePhotosUploaded: 'damage_photos_uploaded',

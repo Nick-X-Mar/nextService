@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand, PutCommand } from '@aws-sdk/lib-dynamodb'
+import { ScanCommand, PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
 import appSyncService from '@/lib/appsync-service'
 import { ScanCommand as RequestsScanCommand } from '@aws-sdk/lib-dynamodb'
 import { ServiceRequestStatus } from '@/types/statuses'
@@ -24,9 +24,22 @@ export async function GET(
     const garageId = searchParams.get('garageId')
 
     if (!requestId) {
-      return NextResponse.json({ 
-        error: 'Request ID is required' 
+      return NextResponse.json({
+        error: 'Request ID is required'
       }, { status: 400 })
+    }
+
+    // Verify the user has access to this request
+    const requestResult = await dynamoDB.send(new GetCommand({
+      TableName: 'ServiceRequests',
+      Key: { id: requestId }
+    }))
+    if (!requestResult.Item) {
+      return NextResponse.json({ error: 'Request not found' }, { status: 404 })
+    }
+    // Clients can only view their own requests' chats
+    if (auth.userType === 'client' && requestResult.Item.clientId !== auth.userId) {
+      return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
     }
 
     // Build filter expression
@@ -102,6 +115,18 @@ export async function POST(
       return NextResponse.json({
         error: 'Request ID is required'
       }, { status: 400 })
+    }
+
+    // Verify the user has access to this request
+    const requestResult = await dynamoDB.send(new GetCommand({
+      TableName: 'ServiceRequests',
+      Key: { id: requestId }
+    }))
+    if (!requestResult.Item) {
+      return NextResponse.json({ error: 'Request not found' }, { status: 404 })
+    }
+    if (auth.userType === 'client' && requestResult.Item.clientId !== auth.userId) {
+      return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
     }
 
     const { message, garageId } = body
