@@ -154,7 +154,9 @@ export default function OffersSection() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
 
                     {/* Text content over image */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-end gap-3 p-6 pb-8">
+                    <div className={`absolute inset-0 flex flex-col items-center justify-end gap-3 p-6 pb-8 transition-all duration-500 ease-out ${
+                      isRevealed ? '-translate-y-[45%]' : 'translate-y-0'
+                    }`}>
                       <h4 className="font-bold text-xl text-white text-center drop-shadow-lg">
                         {offer.title}
                       </h4>
