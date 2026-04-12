@@ -35,11 +35,12 @@ class AmplifyStack(Stack):
             assumed_by=iam.ServicePrincipal("amplify.amazonaws.com"),
         )
 
-        # DynamoDB access — all 6 tables + indexes
+        # DynamoDB access — all tables + indexes
         table_names = [
             "Clients", "Garages", "Vehicles",
             "ServiceRequests", "Offers", "ChatMessages",
-            "EventLogs", "EmailLogs",
+            "EventLogs", "EmailLogs", "AdminUsers",
+            "Payments", "WalletTransactions",
         ]
         dynamo_resources = []
         for t in table_names:
@@ -65,7 +66,7 @@ class AmplifyStack(Stack):
             resources=dynamo_resources,
         ))
 
-        # DynamoDB — create/describe for auto-provisioned tables (EventLogs, EmailLogs)
+        # DynamoDB — create/describe for auto-provisioned tables
         self.amplify_role.add_to_policy(iam.PolicyStatement(
             sid="DynamoDBCreateTable",
             actions=[
@@ -77,6 +78,9 @@ class AmplifyStack(Stack):
             resources=[
                 f"arn:aws:dynamodb:{self.region}:{self.account}:table/EventLogs",
                 f"arn:aws:dynamodb:{self.region}:{self.account}:table/EmailLogs",
+                f"arn:aws:dynamodb:{self.region}:{self.account}:table/AdminUsers",
+                f"arn:aws:dynamodb:{self.region}:{self.account}:table/Payments",
+                f"arn:aws:dynamodb:{self.region}:{self.account}:table/WalletTransactions",
             ],
         ))
 
@@ -116,10 +120,24 @@ class AmplifyStack(Stack):
                 "logs:PutLogEvents",
                 "logs:DescribeLogGroups",
                 "logs:DescribeLogStreams",
+                "logs:FilterLogEvents",
+                "logs:GetLogEvents",
             ],
             resources=[
                 f"arn:aws:logs:{self.region}:{self.account}:log-group:/nextservice/*",
+                f"arn:aws:logs:{self.region}:{self.account}:log-group:/nextservice/*:*",
             ],
+        ))
+
+        # CloudWatch Metrics — for admin error monitoring dashboard
+        self.amplify_role.add_to_policy(iam.PolicyStatement(
+            sid="CloudWatchMetrics",
+            actions=[
+                "cloudwatch:GetMetricData",
+                "cloudwatch:GetMetricStatistics",
+                "cloudwatch:ListMetrics",
+            ],
+            resources=["*"],
         ))
 
         # SES — send emails
@@ -209,6 +227,14 @@ frontend:
                 ),
                 amplify.CfnApp.EnvironmentVariableProperty(
                     name="ADMIN_EMAIL", value="nmarianos93@gmail.com",
+                ),
+                # Admin Dashboard
+                amplify.CfnApp.EnvironmentVariableProperty(
+                    name="ADMIN_JWT_SECRET",
+                    value="CHANGE_ME_IN_AMPLIFY_CONSOLE",
+                ),
+                amplify.CfnApp.EnvironmentVariableProperty(
+                    name="ADMIN_SESSION_EXPIRY", value="8h",
                 ),
             ],
         )

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
+import { verifyAdminToken, ADMIN_COOKIE } from '@/utils/adminAuth'
 
 const JWT_SECRET_KEY = process.env.JWT_SECRET || 'dev-secret-change-in-production'
 const secret = new TextEncoder().encode(JWT_SECRET_KEY)
@@ -19,6 +20,43 @@ function isPublicRoute(pathname: string): boolean {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // ── Admin section ────────────────────────────────────────
+  // Admin pages and admin API have their own auth system (separate JWT cookie).
+  // Handled completely independently from the client/garage auth below.
+  const isAdminPage = pathname.startsWith('/admin')
+  const isAdminApi = pathname.startsWith('/api/admin')
+
+  if (isAdminPage || isAdminApi) {
+    // Public admin routes — login page and login API
+    if (pathname === '/admin/login' || pathname === '/api/admin/auth/login') {
+      return NextResponse.next()
+    }
+
+    const adminToken = request.cookies.get(ADMIN_COOKIE)?.value
+
+    if (!adminToken) {
+      if (isAdminApi) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+      return NextResponse.redirect(new URL('/admin/login', request.url))
+    }
+
+    const admin = await verifyAdminToken(adminToken)
+    if (!admin) {
+      if (isAdminApi) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+      return NextResponse.redirect(new URL('/admin/login', request.url))
+    }
+
+    const adminHeaders = new Headers(request.headers)
+    adminHeaders.set('x-admin-id', admin.adminId)
+    adminHeaders.set('x-admin-email', admin.email)
+    adminHeaders.set('x-admin-role', admin.role)
+
+    return NextResponse.next({ request: { headers: adminHeaders } })
+  }
 
   // Only protect API routes
   if (!pathname.startsWith('/api/')) {
@@ -77,5 +115,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: '/api/:path*',
+  matcher: ['/api/:path*', '/admin/:path*'],
 }

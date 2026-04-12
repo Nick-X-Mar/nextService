@@ -12,6 +12,11 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const { userType, isLoading } = useAuth()
   const pathname = usePathname()
 
+  // Admin routes have their own layout — bypass the main app shell entirely
+  if (pathname.startsWith('/admin')) {
+    return <>{children}</>
+  }
+
   const isLanding = pathname === '/'
   const isFullPage = pathname.startsWith('/offer/') || pathname === '/login'
   // Clients see the landing page as their "new request" entry point — the

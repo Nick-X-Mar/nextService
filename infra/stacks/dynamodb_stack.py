@@ -222,6 +222,27 @@ class DynamoDBStack(Stack):
             projection_type=dynamodb.ProjectionType.ALL,
         )
 
+        # ── AdminUsers ──────────────────────────────────────────
+        self.admin_users_table = dynamodb.Table(
+            self, "AdminUsersTable",
+            table_name="AdminUsers",
+            partition_key=dynamodb.Attribute(
+                name="adminId", type=dynamodb.AttributeType.STRING
+            ),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.RETAIN,
+            point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
+                point_in_time_recovery_enabled=True,
+            ),
+        )
+        self.admin_users_table.add_global_secondary_index(
+            index_name="EmailIndex",
+            partition_key=dynamodb.Attribute(
+                name="email", type=dynamodb.AttributeType.STRING
+            ),
+            projection_type=dynamodb.ProjectionType.ALL,
+        )
+
         # ── Outputs ─────────────────────────────────────────────
         tables = {
             "Clients": self.clients_table,
@@ -230,6 +251,7 @@ class DynamoDBStack(Stack):
             "ServiceRequests": self.service_requests_table,
             "Offers": self.offers_table,
             "ChatMessages": self.chat_messages_table,
+            "AdminUsers": self.admin_users_table,
         }
         for name, table in tables.items():
             CfnOutput(self, f"{name}TableArn",

@@ -149,6 +149,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check authentication on mount using /api/auth/me (JWT cookie-based)
   useEffect(() => {
+    // Skip client/garage auth check on admin routes — admin has its own auth system
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+      setUserType('guest')
+      setIsLoading(false)
+      return
+    }
+
     const checkAuth = async () => {
       try {
         const response = await fetch('/api/auth/me')
