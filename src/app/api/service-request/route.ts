@@ -8,6 +8,7 @@ import { logEvent } from '@/utils/eventLogger'
 import { sendEmail } from '@/utils/emailService'
 import { EventName, EmailTemplate } from '@/types/events'
 import { getAuth } from '@/utils/requireAuth'
+import { signToken, setAuthCookie } from '@/utils/auth'
 
 // Helper function to normalize string values for comparison
 const normalizeString = (value: string | undefined | null): string => {
@@ -371,8 +372,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Always return success when SMS is disabled, but indicate it in the message
-    return NextResponse.json({ 
-      success: true, 
+    const response = NextResponse.json({
+      success: true,
       message: notificationResult.summary,
       notificationsSent: notificationResult.successful,
       notificationsFailed: notificationResult.failed,
@@ -382,6 +383,14 @@ export async function POST(request: NextRequest) {
       vehicleId,
       note: smsConfigured ? 'SMS notifications sent' : 'SMS notifications are currently disabled'
     })
+
+    // Auto-login: set auth cookie when a new client was created
+    if (!existingClientId) {
+      const token = await signToken({ userId: clientId, userType: 'client' })
+      setAuthCookie(response, token)
+    }
+
+    return response
 
   } catch (error) {
     console.error('Error processing service request:', error)

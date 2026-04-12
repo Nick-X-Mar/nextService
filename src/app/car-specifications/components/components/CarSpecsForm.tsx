@@ -222,27 +222,11 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
           const transmissionText = savedData.isAutomatic ? 'Αυτοματο' : 'Χειροκινητο'
           const driveText = savedData.is4x4 ? '4x4' : '2WD'
 
-          // Store service request and vehicle data in localStorage for potential deduplication (only for guest users)
-          if (!loggedInClientId) {
-            const pendingRegistrationData = {
-              serviceRequestId: result.serviceRequestId,
-              vehicleData: {
-                id: result.vehicleId,
-                brand: savedData.brand,
-                model: savedData.model,
-                modelYear: savedData.modelYear,
-                vinNumber: vinNumber,
-                engineCC: savedData.engineCC,
-                fuelType: savedData.fuelType,
-                isAutomatic: savedData.isAutomatic,
-                is4x4: savedData.is4x4,
-                engineNumber: engineNumber
-              },
-              clientId: result.clientId,
-              timestamp: Date.now()
-            }
-
-            localStorage.setItem('pendingRegistrationData', JSON.stringify(pendingRegistrationData))
+          // Auto-login: server set the auth cookie, now set localStorage
+          if (!loggedInClientId && result.clientId) {
+            localStorage.setItem('clientId', result.clientId)
+            localStorage.setItem('userType', 'client')
+            refreshClient()
           }
 
           success(

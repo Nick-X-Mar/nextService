@@ -1,13 +1,14 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Icon from '@/components/ui/Icon'
 import { Badge } from '@/components/ui/badge'
 import { saveFormData } from '@/utils/formStorage'
 
 interface Offer {
-  id: string
+  id?: string
+  dealId?: string
   slug: string
   image: string
   title: string
@@ -22,11 +23,35 @@ interface Offer {
   icon: string
 }
 
-export default function OfferDetailPage({ offer }: { offer: Offer }) {
+export default function OfferDetailPage({ slug }: { slug: string }) {
   const router = useRouter()
+  const [offer, setOffer] = useState<Offer | null>(null)
+  const [loading, setLoading] = useState(true)
   const [shared, setShared] = useState(false)
 
+  useEffect(() => {
+    async function fetchDeal() {
+      try {
+        const res = await fetch('/api/hot-deals')
+        if (res.ok) {
+          const data = await res.json()
+          const deals = Array.isArray(data) ? data : data.deals || []
+          const found = deals.find((d: Offer) => d.slug === slug)
+          if (found) {
+            setOffer(found)
+          }
+        }
+      } catch {
+        // Failed to fetch
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchDeal()
+  }, [slug])
+
   const handleGetOffer = useCallback(() => {
+    if (!offer) return
     saveFormData({
       category: offer.category,
       description: offer.workType,
@@ -35,6 +60,7 @@ export default function OfferDetailPage({ offer }: { offer: Offer }) {
   }, [offer, router])
 
   const handleShare = useCallback(async () => {
+    if (!offer) return
     const url = `${window.location.origin}/offer/${offer.slug}`
     const shareData = {
       title: `${offer.title} - ${offer.price} | NextService`,
@@ -54,6 +80,29 @@ export default function OfferDetailPage({ offer }: { offer: Offer }) {
       setTimeout(() => setShared(false), 2000)
     }
   }, [offer])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    )
+  }
+
+  if (!offer) {
+    return (
+      <div className="min-h-screen bg-surface flex flex-col items-center justify-center gap-4">
+        <Icon name="search_off" size="lg" className="text-on-surface-variant/30" />
+        <p className="text-on-surface-variant">Η προσφορά δεν βρέθηκε</p>
+        <button
+          onClick={() => router.push('/')}
+          className="text-primary font-bold text-sm"
+        >
+          Επιστροφή στην αρχική
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-surface">
