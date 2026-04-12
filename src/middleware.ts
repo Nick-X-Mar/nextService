@@ -12,6 +12,7 @@ const PUBLIC_API_ROUTES = [
   '/api/webhooks/',
   '/api/price-estimation',
   '/api/service-request',
+  '/api/hot-deals',
 ]
 
 function isPublicRoute(pathname: string): boolean {
