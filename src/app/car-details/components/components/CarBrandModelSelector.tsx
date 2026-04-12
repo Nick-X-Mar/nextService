@@ -11,6 +11,76 @@ interface CarBrandModelSelectorProps {
   onModelChange: (model: string) => void
 }
 
+// Greek to Latin phonetic transliteration for search matching
+const greekToLatinMap: Record<string, string> = {
+  // Digraphs first (order matters)
+  'μπ': 'b', 'ντ': 'nt', 'γκ': 'g', 'γγ': 'ng', 'τσ': 'ts', 'τζ': 'tz',
+  'ου': 'ou', 'αι': 'ai', 'ει': 'ei', 'οι': 'oi', 'αυ': 'au', 'ευ': 'eu',
+  // Single characters
+  'α': 'a', 'β': 'v', 'γ': 'g', 'δ': 'd', 'ε': 'e', 'ζ': 'z',
+  'η': 'i', 'θ': 'th', 'ι': 'i', 'κ': 'k', 'λ': 'l', 'μ': 'm',
+  'ν': 'n', 'ξ': 'x', 'ο': 'o', 'π': 'p', 'ρ': 'r', 'σ': 's',
+  'ς': 's', 'τ': 't', 'υ': 'y', 'φ': 'f', 'χ': 'ch', 'ψ': 'ps', 'ω': 'o',
+  // Accented vowels
+  'ά': 'a', 'έ': 'e', 'ή': 'i', 'ί': 'i', 'ό': 'o', 'ύ': 'y', 'ώ': 'o',
+  'ϊ': 'i', 'ϋ': 'y', 'ΐ': 'i', 'ΰ': 'y',
+}
+
+// Generate multiple transliteration variants for ambiguous Greek sounds
+function greekToLatinVariants(text: string): string[] {
+  const lower = text.toLowerCase()
+  let variants: string[] = ['']
+  let i = 0
+  while (i < lower.length) {
+    let options: string[] = []
+    // Try digraph first
+    if (i + 1 < lower.length) {
+      const pair = lower[i] + lower[i + 1]
+      if (pair === 'ου') { options = ['ou', 'oo', 'u']; i += 2 }
+      else if (pair === 'αι') { options = ['ai', 'e']; i += 2 }
+      else if (pair === 'ει') { options = ['ei', 'i']; i += 2 }
+      else if (pair === 'οι') { options = ['oi', 'i']; i += 2 }
+      else if (pair === 'αυ') { options = ['au', 'av', 'af']; i += 2 }
+      else if (pair === 'ευ') { options = ['eu', 'ev', 'ef']; i += 2 }
+      else if (greekToLatinMap[pair]) { options = [greekToLatinMap[pair]]; i += 2 }
+    }
+    if (options.length === 0) {
+      const ch = lower[i]
+      // Ambiguous single chars
+      if (ch === 'υ' || ch === 'ύ' || ch === 'ϋ' || ch === 'ΰ') { options = ['y', 'u', 'i'] }
+      else if (ch === 'η' || ch === 'ή') { options = ['i', 'e'] }
+      else { options = [greekToLatinMap[ch] || ch] }
+      i++
+    }
+    // Expand variants (cap at 16 to avoid explosion)
+    const newVariants: string[] = []
+    for (const v of variants) {
+      for (const o of options) {
+        newVariants.push(v + o)
+        if (newVariants.length >= 16) break
+      }
+      if (newVariants.length >= 16) break
+    }
+    variants = newVariants
+  }
+  return variants
+}
+
+function fuzzyMatch(item: string, query: string): boolean {
+  const q = query.toLowerCase()
+  const target = item.toLowerCase()
+  // Direct match
+  if (target.includes(q)) return true
+  // Check if query has any Greek characters
+  if (/[α-ωάέήίόύώϊϋΐΰ]/.test(q)) {
+    const variants = greekToLatinVariants(q)
+    for (const v of variants) {
+      if (target.includes(v)) return true
+    }
+  }
+  return false
+}
+
 // Car brands and their models
 const carBrands = {
   'toyota': ['Yaris', 'Corolla', 'Camry', 'Prius', 'RAV4', 'C-HR', 'Highlander', 'Land Cruiser', 'Hilux', 'Auris', 'Avensis', 'Verso', 'Aygo', 'GT86', 'Supra'],
@@ -65,18 +135,28 @@ export default function CarBrandModelSelector({
 
   const [brandOpen, setBrandOpen] = useState(false)
   const [modelOpen, setModelOpen] = useState(false)
+  const [brandSearch, setBrandSearch] = useState('')
+  const [modelSearch, setModelSearch] = useState('')
   const brandRef = useRef<HTMLDivElement>(null)
   const modelRef = useRef<HTMLDivElement>(null)
+  const brandSearchRef = useRef<HTMLInputElement>(null)
+  const modelSearchRef = useRef<HTMLInputElement>(null)
 
   const availableModels = !isBrandOther && brand ? carBrands[brand as keyof typeof carBrands] || [] : []
+  const filteredBrands = Object.keys(carBrands).filter(b =>
+    fuzzyMatch(b, brandSearch)
+  )
+  const filteredModels = availableModels.filter(m =>
+    fuzzyMatch(m, modelSearch)
+  )
   const currentBrand = isBrandOther ? customBrand : brand
   const currentModel = isModelOther ? customModel : model
 
   // Close dropdowns on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (brandRef.current && !brandRef.current.contains(e.target as Node)) setBrandOpen(false)
-      if (modelRef.current && !modelRef.current.contains(e.target as Node)) setModelOpen(false)
+      if (brandRef.current && !brandRef.current.contains(e.target as Node)) { setBrandOpen(false); setBrandSearch('') }
+      if (modelRef.current && !modelRef.current.contains(e.target as Node)) { setModelOpen(false); setModelSearch('') }
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
@@ -277,7 +357,7 @@ export default function CarBrandModelSelector({
             </label>
             <div className="relative" ref={brandRef}>
               <div
-                onClick={() => { setBrandOpen(!brandOpen); setModelOpen(false) }}
+                onClick={() => { setBrandOpen(!brandOpen); setModelOpen(false); setBrandSearch(''); setTimeout(() => brandSearchRef.current?.focus(), 50) }}
                 className="w-full h-14 bg-surface-container-highest rounded-xl px-4 flex items-center justify-between cursor-pointer"
               >
                 <span className={`font-bold text-base ${currentBrand ? 'text-on-surface' : 'text-on-surface-variant/50'}`}>
@@ -287,7 +367,21 @@ export default function CarBrandModelSelector({
               </div>
               {brandOpen && (
                 <div className="absolute z-50 left-0 right-0 top-[60px] bg-surface-container-lowest rounded-2xl shadow-2xl border border-outline-variant/10 max-h-[320px] overflow-y-auto p-2 space-y-1">
-                  {Object.keys(carBrands).map((b) => (
+                  <div className="sticky top-0 bg-surface-container-lowest pb-1">
+                    <div className="relative">
+                      <Icon name="search" size="sm" className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50" />
+                      <input
+                        ref={brandSearchRef}
+                        type="text"
+                        value={brandSearch}
+                        onChange={(e) => setBrandSearch(e.target.value)}
+                        placeholder="Αναζήτηση μάρκας..."
+                        className="w-full h-10 bg-surface-container-highest rounded-xl pl-9 pr-4 border-none focus:ring-2 focus:ring-primary text-sm font-medium"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  </div>
+                  {filteredBrands.map((b) => (
                     <div
                       key={b}
                       onClick={() => {
@@ -305,21 +399,41 @@ export default function CarBrandModelSelector({
                       {brand === b && !isBrandOther && <Icon name="check" size="sm" className="text-primary" />}
                     </div>
                   ))}
-                  <div
-                    onClick={() => {
-                      setIsBrandOther(true); setBrand('')
-                      setIsModelOther(false); setCustomModel(''); setModel('')
-                      setBrandOpen(false)
-                    }}
-                    className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
-                      isBrandOther ? 'bg-primary/10' : 'bg-surface-container hover:bg-surface-container-high'
-                    }`}
-                  >
-                    <span className={`text-base font-bold ${isBrandOther ? 'text-primary' : 'text-on-surface'}`}>
-                      Άλλο
-                    </span>
-                    {isBrandOther && <Icon name="check" size="sm" className="text-primary" />}
-                  </div>
+                  {!brandSearch && (
+                    <div
+                      onClick={() => {
+                        setIsBrandOther(true); setBrand('')
+                        setIsModelOther(false); setCustomModel(''); setModel('')
+                        setBrandOpen(false)
+                      }}
+                      className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
+                        isBrandOther ? 'bg-primary/10' : 'bg-surface-container hover:bg-surface-container-high'
+                      }`}
+                    >
+                      <span className={`text-base font-bold ${isBrandOther ? 'text-primary' : 'text-on-surface'}`}>
+                        Άλλο
+                      </span>
+                      {isBrandOther && <Icon name="check" size="sm" className="text-primary" />}
+                    </div>
+                  )}
+                  {filteredBrands.length === 0 && brandSearch && (
+                    <div className="p-2 space-y-2">
+                      <p className="text-center text-xs text-on-surface-variant/50">Δεν βρέθηκε μάρκα</p>
+                      <div
+                        onClick={() => {
+                          setIsBrandOther(true); setBrand(''); setCustomBrand(brandSearch)
+                          setIsModelOther(false); setCustomModel(''); setModel('')
+                          setBrandOpen(false); setBrandSearch('')
+                        }}
+                        className="flex items-center gap-3 p-3 rounded-xl cursor-pointer bg-tertiary/10 hover:bg-tertiary/20 transition-colors"
+                      >
+                        <Icon name="add_circle" size="sm" className="text-tertiary" />
+                        <span className="text-sm font-bold text-on-surface">
+                          Συνέχεια με &ldquo;<span className="text-tertiary">{brandSearch}</span>&rdquo;
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -350,7 +464,7 @@ export default function CarBrandModelSelector({
               {!isBrandOther ? (
                 <div className="relative" ref={modelRef}>
                   <div
-                    onClick={() => { setModelOpen(!modelOpen); setBrandOpen(false) }}
+                    onClick={() => { setModelOpen(!modelOpen); setBrandOpen(false); setModelSearch(''); setTimeout(() => modelSearchRef.current?.focus(), 50) }}
                     className="w-full h-14 bg-surface-container-highest rounded-xl px-4 flex items-center justify-between cursor-pointer"
                   >
                     <span className={`font-bold text-base ${model ? 'text-on-surface' : 'text-on-surface-variant/50'}`}>
@@ -360,7 +474,21 @@ export default function CarBrandModelSelector({
                   </div>
                   {modelOpen && (
                     <div className="absolute z-50 left-0 right-0 top-[60px] bg-surface-container-lowest rounded-2xl shadow-2xl border border-outline-variant/10 max-h-[320px] overflow-y-auto p-2 space-y-1">
-                      {availableModels.map((m) => (
+                      <div className="sticky top-0 bg-surface-container-lowest pb-1">
+                        <div className="relative">
+                          <Icon name="search" size="sm" className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50" />
+                          <input
+                            ref={modelSearchRef}
+                            type="text"
+                            value={modelSearch}
+                            onChange={(e) => setModelSearch(e.target.value)}
+                            placeholder="Αναζήτηση μοντέλου..."
+                            className="w-full h-10 bg-surface-container-highest rounded-xl pl-9 pr-4 border-none focus:ring-2 focus:ring-primary text-sm font-medium"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                      </div>
+                      {filteredModels.map((m) => (
                         <div
                           key={m}
                           onClick={() => {
@@ -377,20 +505,39 @@ export default function CarBrandModelSelector({
                           {model === m && !isModelOther && <Icon name="check" size="sm" className="text-primary" />}
                         </div>
                       ))}
-                      <div
-                        onClick={() => {
-                          setIsModelOther(true); setModel('')
-                          setModelOpen(false)
-                        }}
-                        className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
-                          isModelOther ? 'bg-primary/10' : 'bg-surface-container hover:bg-surface-container-high'
-                        }`}
-                      >
-                        <span className={`text-base font-bold ${isModelOther ? 'text-primary' : 'text-on-surface'}`}>
-                          Άλλο
-                        </span>
-                        {isModelOther && <Icon name="check" size="sm" className="text-primary" />}
-                      </div>
+                      {!modelSearch && (
+                        <div
+                          onClick={() => {
+                            setIsModelOther(true); setModel('')
+                            setModelOpen(false)
+                          }}
+                          className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
+                            isModelOther ? 'bg-primary/10' : 'bg-surface-container hover:bg-surface-container-high'
+                          }`}
+                        >
+                          <span className={`text-base font-bold ${isModelOther ? 'text-primary' : 'text-on-surface'}`}>
+                            Άλλο
+                          </span>
+                          {isModelOther && <Icon name="check" size="sm" className="text-primary" />}
+                        </div>
+                      )}
+                      {filteredModels.length === 0 && modelSearch && (
+                        <div className="p-2 space-y-2">
+                          <p className="text-center text-xs text-on-surface-variant/50">Δεν βρέθηκε μοντέλο</p>
+                          <div
+                            onClick={() => {
+                              setIsModelOther(true); setModel(''); setCustomModel(modelSearch)
+                              setModelOpen(false); setModelSearch('')
+                            }}
+                            className="flex items-center gap-3 p-3 rounded-xl cursor-pointer bg-tertiary/10 hover:bg-tertiary/20 transition-colors"
+                          >
+                            <Icon name="add_circle" size="sm" className="text-tertiary" />
+                            <span className="text-sm font-bold text-on-surface">
+                              Συνέχεια με &ldquo;<span className="text-tertiary">{modelSearch}</span>&rdquo;
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

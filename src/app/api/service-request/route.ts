@@ -229,6 +229,8 @@ export async function POST(request: NextRequest) {
         fuelType: string
         isAutomatic: boolean
         is4x4: boolean
+        isBrandOther: boolean
+        isModelOther: boolean
         isActive: boolean
         createdAt: string
         updatedAt: string
@@ -248,6 +250,8 @@ export async function POST(request: NextRequest) {
         fuelType: body.fuelType || 'petrol', // Default to petrol if not provided
         isAutomatic: body.isAutomatic !== undefined ? body.isAutomatic : false, // Default to false if not provided
         is4x4: body.is4x4 !== undefined ? body.is4x4 : false, // Default to false if not provided
+        isBrandOther: body.isBrandOther || false,
+        isModelOther: body.isModelOther || false,
         isActive: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()

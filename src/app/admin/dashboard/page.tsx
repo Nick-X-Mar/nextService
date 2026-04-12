@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import StatCard from '../components/StatCard'
 
 interface DashboardStats {
@@ -12,6 +13,7 @@ interface DashboardStats {
   emailsSent24h: number
   emailsFailed24h: number
   totalRequests: number
+  customVehicles: number
 }
 
 export default function DashboardPage() {
@@ -45,6 +47,24 @@ export default function DashboardPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold font-headline text-on-surface mb-6">Dashboard</h1>
+
+      {/* Custom vehicles alert */}
+      {(stats?.customVehicles ?? 0) > 0 && (
+        <Link href="/admin/custom-vehicles" className="block mb-6">
+          <div className="bg-tertiary/10 border border-tertiary/30 rounded-2xl p-4 flex items-center gap-4 hover:bg-tertiary/15 transition-colors">
+            <span className="material-symbols-outlined text-tertiary text-3xl">new_releases</span>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-on-surface">
+                {stats!.customVehicles} {stats!.customVehicles === 1 ? 'vehicle' : 'vehicles'} with custom brand/model
+              </p>
+              <p className="text-xs text-on-surface-variant mt-0.5">
+                Review and consider adding to the official list
+              </p>
+            </div>
+            <span className="material-symbols-outlined text-tertiary">arrow_forward</span>
+          </div>
+        </Link>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

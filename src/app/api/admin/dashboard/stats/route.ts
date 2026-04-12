@@ -17,6 +17,7 @@ export async function GET() {
       garagesResult,
       emailsSentResult,
       emailsFailedResult,
+      customVehiclesResult,
       ...statusResults
     ] = await Promise.all([
       // Total clients
@@ -39,6 +40,13 @@ export async function GET() {
         KeyConditionExpression: '#status = :status AND sentAt >= :since',
         ExpressionAttributeNames: { '#status': 'status' },
         ExpressionAttributeValues: { ':status': 'failed', ':since': oneDayAgo },
+        Select: 'COUNT'
+      })),
+      // Custom vehicles (brand or model "other")
+      dynamoDB.send(new ScanCommand({
+        TableName: 'Vehicles',
+        FilterExpression: 'isBrandOther = :true OR isModelOther = :true',
+        ExpressionAttributeValues: { ':true': true },
         Select: 'COUNT'
       })),
       // Service requests by status
@@ -74,7 +82,8 @@ export async function GET() {
       emailsSent24h: emailsSentResult.Count || 0,
       emailsFailed24h: emailsFailedResult.Count || 0,
       requestsByStatus,
-      totalRequests
+      totalRequests,
+      customVehicles: customVehiclesResult.Count || 0
     })
   } catch (error) {
     console.error('Dashboard stats error:', error)

@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -10,12 +11,21 @@ const navItems = [
   { icon: 'error', label: 'Errors', href: '/admin/errors' },
   { icon: 'people', label: 'Users', href: '/admin/users' },
   { icon: 'build', label: 'Requests', href: '/admin/requests' },
+  { icon: 'new_releases', label: 'Custom Vehicles', href: '/admin/custom-vehicles', badgeKey: 'customVehicles' as const },
   { icon: 'payments', label: 'Payments', href: '/admin/payments' },
   { icon: 'settings', label: 'Settings', href: '/admin/settings' },
 ]
 
 export default function AdminSidebar() {
   const pathname = usePathname()
+  const [customVehicleCount, setCustomVehicleCount] = useState(0)
+
+  useEffect(() => {
+    fetch('/api/admin/custom-vehicles')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data?.total) setCustomVehicleCount(data.total) })
+      .catch(() => {})
+  }, [])
 
   return (
     <aside className="fixed top-0 left-0 h-full w-60 bg-inverse-surface text-inverse-on-surface flex flex-col z-40">
@@ -45,6 +55,11 @@ export default function AdminSidebar() {
             >
               <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
               {item.label}
+              {'badgeKey' in item && item.badgeKey === 'customVehicles' && customVehicleCount > 0 && (
+                <span className="ml-auto bg-tertiary text-on-tertiary text-[10px] font-bold min-w-[20px] h-5 flex items-center justify-center rounded-full px-1.5">
+                  {customVehicleCount}
+                </span>
+              )}
             </Link>
           )
         })}
