@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function GET(
+async function _GET(
   _request: NextRequest,
   { params }: { params: Promise<{ garageId: string }> }
 ) {
@@ -46,3 +47,5 @@ export async function GET(
     return NextResponse.json({ error: 'Failed to fetch garage' }, { status: 500 })
   }
 }
+
+export const GET = withMetrics(_GET)

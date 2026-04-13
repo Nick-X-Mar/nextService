@@ -4,8 +4,9 @@ import { UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
 import { sendEmail } from '@/utils/emailService'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName, EmailTemplate } from '@/types/events'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function POST(
+async function _POST(
   _request: NextRequest,
   { params }: { params: Promise<{ garageId: string }> }
 ) {
@@ -60,3 +61,5 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to activate garage' }, { status: 500 })
   }
 }
+
+export const POST = withMetrics(_POST)

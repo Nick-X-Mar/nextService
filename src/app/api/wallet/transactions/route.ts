@@ -3,8 +3,9 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { ensureWalletTransactionsTable } from '@/utils/ensurePaymentTables'
 import { requireClient } from '@/utils/requireAuth'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function GET(request: NextRequest) {
+async function _GET(request: NextRequest) {
   try {
     const clientId = requireClient(request)
     if (clientId instanceof NextResponse) return clientId
@@ -34,3 +35,5 @@ export async function GET(request: NextRequest) {
     )
   }
 }
+
+export const GET = withMetrics(_GET)

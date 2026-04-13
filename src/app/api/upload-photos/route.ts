@@ -6,10 +6,11 @@ import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { requireAuth } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
+import { withMetrics } from '@/utils/withMetrics'
 
 const checkUploadRate = createRateLimiter('photo-upload', 20, 3600000)
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     const auth = requireAuth(request)
     if (auth instanceof NextResponse) return auth
@@ -172,3 +173,5 @@ export async function OPTIONS() {
     },
   })
 }
+
+export const POST = withMetrics(_POST)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 
 interface TestResult {
   title: string
@@ -105,6 +105,68 @@ export default function TestsPage() {
           </div>
         )}
       </div>
+
+      {/* Performance KPIs */}
+      {results && results.suites?.length > 0 && (() => {
+        const allTests = results.suites.flatMap(s => s.tests)
+        const durations = allTests.map(t => t.duration).filter(d => d > 0)
+        const avgDuration = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0
+        const maxDuration = Math.max(...durations, 0)
+        const slowTests = [...allTests].sort((a, b) => b.duration - a.duration).slice(0, 10)
+
+        return (
+          <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/10 overflow-hidden">
+            <div className="px-6 py-4 border-b border-outline-variant/10 bg-surface-container flex items-center gap-2">
+              <span className="material-symbols-outlined text-[20px] text-secondary">speed</span>
+              <h3 className="font-bold text-on-surface">Performance KPIs</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* Stats row */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-surface-container rounded-lg p-4">
+                  <p className="text-xs text-secondary uppercase tracking-wider">Συνολ. Διάρκεια</p>
+                  <p className="text-xl font-bold text-on-surface mt-1">{(results.summary.duration / 1000).toFixed(1)}s</p>
+                </div>
+                <div className="bg-surface-container rounded-lg p-4">
+                  <p className="text-xs text-secondary uppercase tracking-wider">Μέσος χρόνος/test</p>
+                  <p className="text-xl font-bold text-on-surface mt-1">{(avgDuration / 1000).toFixed(2)}s</p>
+                </div>
+                <div className="bg-surface-container rounded-lg p-4">
+                  <p className="text-xs text-secondary uppercase tracking-wider">Πιο αργό test</p>
+                  <p className="text-xl font-bold text-on-surface mt-1">{(maxDuration / 1000).toFixed(1)}s</p>
+                </div>
+              </div>
+
+              {/* Slowest tests bar chart */}
+              <div>
+                <p className="text-sm font-medium text-on-surface mb-3">Top 10 πιο αργά tests</p>
+                <div className="space-y-2">
+                  {slowTests.map((t, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <span className={`material-symbols-outlined text-[14px] ${
+                        t.status === 'passed' ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {t.status === 'passed' ? 'check_circle' : 'cancel'}
+                      </span>
+                      <span className="text-xs text-on-surface truncate w-60 shrink-0" title={t.title}>{t.title}</span>
+                      <div className="flex-1 h-5 bg-surface-container rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            t.duration > avgDuration * 2 ? 'bg-tertiary' :
+                            t.duration > avgDuration ? 'bg-secondary' : 'bg-primary'
+                          }`}
+                          style={{ width: `${maxDuration > 0 ? (t.duration / maxDuration) * 100 : 0}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-mono text-secondary w-14 text-right">{(t.duration / 1000).toFixed(2)}s</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Results */}
       {results && (

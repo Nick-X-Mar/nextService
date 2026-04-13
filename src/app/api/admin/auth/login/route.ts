@@ -5,11 +5,12 @@ import { verifyPassword } from '@/utils/passwordService'
 import { signAdminToken, setAdminCookie } from '@/utils/adminAuth'
 import { ensureAdminUsersTable, ADMIN_USERS_TABLE_NAME } from '@/utils/ensureAdminTables'
 import { createRateLimiter } from '@/utils/rateLimit'
+import { withMetrics } from '@/utils/withMetrics'
 
 const checkIPRate = createRateLimiter('admin-login-ip', 5, 3600000)
 const checkEmailRate = createRateLimiter('admin-login-email', 3, 3600000)
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     await ensureAdminUsersTable()
 
@@ -85,3 +86,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Login failed' }, { status: 500 })
   }
 }
+
+export const POST = withMetrics(_POST)

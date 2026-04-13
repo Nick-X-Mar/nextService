@@ -7,6 +7,7 @@ import { sendEmail } from '@/utils/emailService'
 import { EventName, EmailTemplate } from '@/types/events'
 import { signToken, setAuthCookie } from '@/utils/auth'
 import { createRateLimiter } from '@/utils/rateLimit'
+import { withMetrics } from '@/utils/withMetrics'
 
 const checkRateLimit = createRateLimiter('register-pro', 3, 3600000)
 
@@ -14,7 +15,7 @@ const checkRateLimit = createRateLimiter('register-pro', 3, 3600000)
 // version it agreed to so we can prove what they accepted at the time.
 const CURRENT_TERMS_VERSION = '1.0'
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { companyName, contactFirstName, contactLastName, tin, email, password, taxAuthority, address, mobile, benefits, services, acceptedTerms } = body
@@ -221,3 +222,5 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const POST = withMetrics(_POST)

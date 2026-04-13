@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
 import { requireAuth } from '@/utils/requireAuth'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function POST(
+async function _POST(
   request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
@@ -69,3 +70,5 @@ export async function POST(
     )
   }
 }
+
+export const POST = withMetrics(_POST)

@@ -4,8 +4,9 @@ import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { getAdminFromRequest } from '@/utils/adminAuth'
 import { verifyPassword, hashPassword } from '@/utils/passwordService'
 import { ensureAdminUsersTable, ADMIN_USERS_TABLE_NAME } from '@/utils/ensureAdminTables'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     await ensureAdminUsersTable()
 
@@ -56,3 +57,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to change password' }, { status: 500 })
   }
 }
+
+export const POST = withMetrics(_POST)

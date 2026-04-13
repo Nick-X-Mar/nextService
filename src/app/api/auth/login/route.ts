@@ -6,11 +6,12 @@ import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { signToken, setAuthCookie } from '@/utils/auth'
 import { createRateLimiter } from '@/utils/rateLimit'
+import { withMetrics } from '@/utils/withMetrics'
 
 const checkIPRate = createRateLimiter('login-ip', 10, 3600000)
 const checkEmailRate = createRateLimiter('login-email', 5, 3600000)
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { email, password, userType = 'client' } = body
@@ -151,3 +152,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Σφάλμα κατά τη σύνδεση' }, { status: 500 })
   }
 }
+
+export const POST = withMetrics(_POST)

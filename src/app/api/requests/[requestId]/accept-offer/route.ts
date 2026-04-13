@@ -9,10 +9,11 @@ import { getStripe, DEPOSIT_PERCENT } from '@/lib/stripe-server'
 import { requireClient } from '@/utils/requireAuth'
 import { generatePresignedUrls, presignPhotoRecords } from '@/utils/s3Service'
 import { createRateLimiter } from '@/utils/rateLimit'
+import { withMetrics } from '@/utils/withMetrics'
 
 const checkAcceptRate = createRateLimiter('accept-offer', 5, 3600000)
 
-export async function PATCH(
+async function _PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
@@ -404,6 +405,4 @@ async function notifyAcceptanceParticipants(args: {
   }
 }
 
-
-
-
+export const PATCH = withMetrics(_PATCH)

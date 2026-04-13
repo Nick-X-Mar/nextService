@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function POST(
+async function _POST(
   _request: NextRequest,
   { params }: { params: Promise<{ garageId: string }> }
 ) {
@@ -25,3 +26,5 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to deactivate garage' }, { status: 500 })
   }
 }
+
+export const POST = withMetrics(_POST)

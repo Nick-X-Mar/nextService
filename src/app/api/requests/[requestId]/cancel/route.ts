@@ -11,10 +11,11 @@ import { randomUUID } from 'crypto'
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { requireClient } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
+import { withMetrics } from '@/utils/withMetrics'
 
 const checkCancelRate = createRateLimiter('request-cancel', 3, 3600000)
 
-export async function PATCH(
+async function _PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
@@ -267,3 +268,5 @@ async function notifyCancellationParticipants(args: {
     console.error('[cancel] notifyCancellationParticipants failed:', err)
   }
 }
+
+export const PATCH = withMetrics(_PATCH)

@@ -6,6 +6,7 @@ import { sendEmail } from '@/utils/emailService'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName, EmailTemplate } from '@/types/events'
 import { createRateLimiter } from '@/utils/rateLimit'
+import { withMetrics } from '@/utils/withMetrics'
 
 const checkIpRateLimit = createRateLimiter('forgot-ip', 10, 3600000)
 const checkEmailRateLimit = createRateLimiter('forgot-email', 3, 3600000)
@@ -29,7 +30,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
  * and a 1-hour expiry on the user record, then emails the raw token back
  * to the user as part of a reset link.
  */
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { email, userType = 'client' } = body || {}
@@ -134,3 +135,5 @@ export async function POST(request: NextRequest) {
     })
   }
 }
+
+export const POST = withMetrics(_POST)

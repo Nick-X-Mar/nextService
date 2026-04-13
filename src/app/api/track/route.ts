@@ -4,6 +4,7 @@ import { EventName } from '@/types/events'
 import type { EventNameValue } from '@/types/events'
 import { getAuth } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
+import { withMetrics } from '@/utils/withMetrics'
 
 // Events allowed from client-side (whitelist to prevent abuse)
 const ALLOWED_EVENTS = new Set<EventNameValue>([
@@ -17,7 +18,7 @@ const ALLOWED_EVENTS = new Set<EventNameValue>([
 // 30 events per minute per IP
 const checkTrackRate = createRateLimiter('track', 30, 60000)
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     const ip = request.headers.get('x-forwarded-for') || 'unknown'
     if (!checkTrackRate(ip)) {
@@ -49,3 +50,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
 }
+
+export const POST = withMetrics(_POST)

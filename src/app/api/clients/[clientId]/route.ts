@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { getAuth, requireOwner } from '@/utils/requireAuth'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function GET(
+async function _GET(
   request: NextRequest,
   { params }: { params: Promise<{ clientId: string }> }
 ) {
@@ -81,7 +82,7 @@ export async function GET(
   }
 }
 
-export async function PUT(
+async function _PUT(
   request: NextRequest,
   { params }: { params: Promise<{ clientId: string }> }
 ) {
@@ -192,3 +193,6 @@ export async function PUT(
     )
   }
 }
+
+export const GET = withMetrics(_GET)
+export const PUT = withMetrics(_PUT)

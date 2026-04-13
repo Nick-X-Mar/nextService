@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { ensureHotDealsTable, HOT_DEALS_TABLE_NAME } from '@/utils/ensureHotDealsTable'
+import { withMetrics } from '@/utils/withMetrics'
 
 // POST — reorder deals: body = { order: ["dealId1", "dealId2", ...] }
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     await ensureHotDealsTable()
 
@@ -31,3 +32,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to reorder' }, { status: 500 })
   }
 }
+
+export const POST = withMetrics(_POST)

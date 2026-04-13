@@ -5,8 +5,9 @@ import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { requireAuth, requireOwner } from '@/utils/requireAuth'
 import { generatePresignedUrls } from '@/utils/s3Service'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function GET(
+async function _GET(
   request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
@@ -168,7 +169,7 @@ export async function GET(
   }
 }
 
-export async function PATCH(
+async function _PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
@@ -360,4 +361,5 @@ export async function PATCH(
   }
 }
 
-
+export const GET = withMetrics(_GET)
+export const PATCH = withMetrics(_PATCH)

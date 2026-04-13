@@ -9,6 +9,7 @@ import { sendEmail } from '@/utils/emailService'
 import { EventName, EmailTemplate } from '@/types/events'
 import { getAuth } from '@/utils/requireAuth'
 import { signToken, setAuthCookie } from '@/utils/auth'
+import { withMetrics } from '@/utils/withMetrics'
 
 // Helper function to normalize string values for comparison
 const normalizeString = (value: string | undefined | null): string => {
@@ -67,7 +68,7 @@ const areVehiclesSame = (
   return true
 }
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     const body = await request.json()
     
@@ -409,3 +410,4 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export const POST = withMetrics(_POST)

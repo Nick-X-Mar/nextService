@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { ensureHotDealsTable, HOT_DEALS_TABLE_NAME } from '@/utils/ensureHotDealsTable'
+import { withMetrics } from '@/utils/withMetrics'
 
 // Public endpoint — returns active deals sorted by sortOrder
-export async function GET() {
+async function _GET() {
   try {
     await ensureHotDealsTable()
 
@@ -24,3 +25,5 @@ export async function GET() {
     return NextResponse.json([])
   }
 }
+
+export const GET = withMetrics(_GET)

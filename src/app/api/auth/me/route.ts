@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthFromRequest } from '@/utils/auth'
 import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand } from '@aws-sdk/lib-dynamodb'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function GET(request: NextRequest) {
+async function _GET(request: NextRequest) {
   try {
     const auth = await getAuthFromRequest(request)
     if (!auth) {
@@ -36,3 +37,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ authenticated: false }, { status: 500 })
   }
 }
+
+export const GET = withMetrics(_GET)

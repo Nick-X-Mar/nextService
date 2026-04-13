@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
 import { requireAuth } from '@/utils/requireAuth'
+import { withMetrics } from '@/utils/withMetrics'
 
 const STRING_FIELDS = [
   'brand',
@@ -21,7 +22,7 @@ const BOOLEAN_FIELDS = ['isAutomatic', 'is4x4', 'isTurbo'] as const
 type StringField = (typeof STRING_FIELDS)[number]
 type BooleanField = (typeof BOOLEAN_FIELDS)[number]
 
-export async function PATCH(
+async function _PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ vehicleId: string }> }
 ) {
@@ -171,3 +172,4 @@ export async function PATCH(
   }
 }
 
+export const PATCH = withMetrics(_PATCH)

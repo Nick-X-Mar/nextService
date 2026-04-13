@@ -3,6 +3,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand, PutCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb'
 import { signToken, setAuthCookie } from '@/utils/auth'
 import { createRateLimiter } from '@/utils/rateLimit'
+import { withMetrics } from '@/utils/withMetrics'
 
 const checkRateLimit = createRateLimiter('register-vehicle', 3, 3600000)
 
@@ -24,7 +25,7 @@ function areVehiclesSame(vehicle1: any, vehicle2: any): boolean {
   return false
 }
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { email, firstName, vehicleData, serviceRequestId } = body
@@ -264,3 +265,5 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const POST = withMetrics(_POST)

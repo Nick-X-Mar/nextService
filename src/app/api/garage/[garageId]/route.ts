@@ -5,8 +5,9 @@ import { logEvent } from '@/utils/eventLogger'
 import { sendEmail } from '@/utils/emailService'
 import { EventName, EmailTemplate } from '@/types/events'
 import { requireOwner } from '@/utils/requireAuth'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function GET(
+async function _GET(
   request: NextRequest,
   { params }: { params: Promise<{ garageId: string }> }
 ) {
@@ -68,7 +69,7 @@ export async function GET(
   }
 }
 
-export async function PUT(
+async function _PUT(
   request: NextRequest,
   { params }: { params: Promise<{ garageId: string }> }
 ) {
@@ -194,3 +195,6 @@ export async function PUT(
     )
   }
 }
+
+export const GET = withMetrics(_GET)
+export const PUT = withMetrics(_PUT)

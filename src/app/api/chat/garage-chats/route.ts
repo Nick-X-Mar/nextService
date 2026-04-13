@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { requireGarage } from '@/utils/requireAuth'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function GET(request: NextRequest) {
+async function _GET(request: NextRequest) {
   try {
     const garageId = requireGarage(request)
     if (garageId instanceof NextResponse) return garageId
@@ -33,3 +34,5 @@ export async function GET(request: NextRequest) {
     )
   }
 }
+
+export const GET = withMetrics(_GET)

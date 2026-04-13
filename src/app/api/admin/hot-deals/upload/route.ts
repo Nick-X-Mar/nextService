@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { uploadFileToS3, validateFile } from '@/utils/s3Service'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File | null
@@ -31,3 +32,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
   }
 }
+
+export const POST = withMetrics(_POST)

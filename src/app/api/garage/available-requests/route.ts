@@ -6,8 +6,9 @@ import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { requireGarage } from '@/utils/requireAuth'
 import { generatePresignedUrls } from '@/utils/s3Service'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function GET(request: NextRequest) {
+async function _GET(request: NextRequest) {
   try {
     const garageId = requireGarage(request)
     if (garageId instanceof NextResponse) return garageId
@@ -150,3 +151,5 @@ export async function GET(request: NextRequest) {
     )
   }
 }
+
+export const GET = withMetrics(_GET)

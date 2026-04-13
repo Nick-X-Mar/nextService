@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function GET(request: NextRequest) {
+async function _GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
@@ -51,3 +52,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch garages' }, { status: 500 })
   }
 }
+
+export const GET = withMetrics(_GET)

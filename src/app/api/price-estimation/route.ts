@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withMetrics } from '@/utils/withMetrics'
 
 interface PriceEstimationRequest {
   category: string
@@ -82,7 +83,7 @@ function estimatePrice(data: PriceEstimationRequest): PriceEstimationResponse {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     const body: PriceEstimationRequest = await request.json()
     
@@ -123,3 +124,5 @@ async function getPriceFromDatabase(data: PriceEstimationRequest): Promise<Price
   // Include confidence score based on number of matching records
 }
 */
+
+export const POST = withMetrics(_POST)

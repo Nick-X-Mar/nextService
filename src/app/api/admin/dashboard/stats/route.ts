@@ -3,8 +3,9 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { ensureEmailLogsTable } from '@/utils/ensureEventTables'
 import { ServiceRequestStatus } from '@/types/statuses'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function GET() {
+async function _GET() {
   try {
     await ensureEmailLogsTable()
 
@@ -90,3 +91,5 @@ export async function GET() {
     return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 })
   }
 }
+
+export const GET = withMetrics(_GET)

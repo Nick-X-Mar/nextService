@@ -4,6 +4,7 @@ import { DynamoDBDocumentClient, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { requireClient } from '@/utils/requireAuth'
+import { withMetrics } from '@/utils/withMetrics'
 
 const client = new DynamoDBClient({
   region: process.env.AWS_REGION || 'us-east-1',
@@ -12,7 +13,7 @@ const client = new DynamoDBClient({
 
 const docClient = DynamoDBDocumentClient.from(client)
 
-export async function PATCH(
+async function _PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ offerId: string }> }
 ) {
@@ -100,3 +101,4 @@ export async function PATCH(
   }
 }
 
+export const PATCH = withMetrics(_PATCH)

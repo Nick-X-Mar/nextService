@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { ensurePaymentsTable } from '@/utils/ensurePaymentTables'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function GET(request: NextRequest) {
+async function _GET(request: NextRequest) {
   try {
     await ensurePaymentsTable()
 
@@ -52,3 +53,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch payment stats' }, { status: 500 })
   }
 }
+
+export const GET = withMetrics(_GET)

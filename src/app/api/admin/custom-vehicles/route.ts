@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function GET() {
+async function _GET() {
   try {
     // Scan Vehicles table for entries with custom brand or model
     const result = await dynamoDB.send(new ScanCommand({
@@ -36,3 +37,5 @@ export async function GET() {
     return NextResponse.json({ error: 'Failed to fetch custom vehicles' }, { status: 500 })
   }
 }
+
+export const GET = withMetrics(_GET)

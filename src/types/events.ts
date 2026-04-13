@@ -70,7 +70,7 @@ export const EventName = {
 
 export type EventNameValue = typeof EventName[keyof typeof EventName]
 
-export type ActorType = 'client' | 'garage' | 'system'
+export type ActorType = 'client' | 'garage' | 'system' | 'admin'
 
 export interface LogEventInput {
   eventName: EventNameValue

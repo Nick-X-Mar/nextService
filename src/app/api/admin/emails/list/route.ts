@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { QueryCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { ensureEmailLogsTable } from '@/utils/ensureEventTables'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function GET(request: NextRequest) {
+async function _GET(request: NextRequest) {
   try {
     await ensureEmailLogsTable()
 
@@ -78,3 +79,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch email list' }, { status: 500 })
   }
 }
+
+export const GET = withMetrics(_GET)

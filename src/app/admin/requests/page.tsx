@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
 import DateRangePicker from '../components/DateRangePicker'
@@ -58,6 +59,7 @@ const columns: Column<RequestRecord>[] = [
 ]
 
 export default function RequestsPage() {
+  const router = useRouter()
   const [from, setFrom] = useState(daysAgo(30))
   const [to, setTo] = useState(today())
   const [stats, setStats] = useState<RequestStats | null>(null)
@@ -155,6 +157,7 @@ export default function RequestsPage() {
         keyField="id"
         loading={listLoading}
         emptyMessage="No requests found for this period"
+        onRowClick={(item) => router.push(`/admin/requests/${item.id}`)}
       />
     </div>
   )

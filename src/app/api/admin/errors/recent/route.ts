@@ -5,13 +5,15 @@ import {
 } from '@aws-sdk/client-cloudwatch-logs'
 import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
+import { withMetrics } from '@/utils/withMetrics'
 
 const REGION = process.env.REGION || 'eu-central-1'
 const LOG_GROUPS = ['/nextservice/app', '/nextservice/api']
 
 function getCloudWatchClient(): CloudWatchLogsClient {
   const config: ConstructorParameters<typeof CloudWatchLogsClient>[0] = {
-    region: REGION
+    region: REGION,
+    requestHandler: { requestTimeout: 5_000 }
   }
 
   if (process.env.ACCESS_KEY_ID && process.env.SECRET_ACCESS_KEY) {
@@ -41,7 +43,7 @@ const rangeMs: Record<string, number> = {
   '7d': 7 * 24 * 60 * 60 * 1000
 }
 
-export async function GET(request: NextRequest) {
+async function _GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const range = searchParams.get('range') || '24h'
@@ -52,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     const client = getCloudWatchClient()
 
-    // Query all log groups in parallel
+    // Query all log groups in parallel with 5s timeout
     const results = await Promise.allSettled(
       LOG_GROUPS.map((logGroup) =>
         client.send(new FilterLogEventsCommand({
@@ -61,7 +63,7 @@ export async function GET(request: NextRequest) {
           endTime: now,
           filterPattern: '?"ERROR" ?"error" ?"status: 500" ?"status: 502" ?"status: 503" ?"5xx"',
           limit: 50
-        })).then((res) => ({
+        }), { abortSignal: AbortSignal.timeout(5_000) }).then((res) => ({
           logGroup,
           events: res.events || []
         }))
@@ -102,3 +104,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ entries: [], total5xx: 0, total4xx: 0 })
   }
 }
+
+export const GET = withMetrics(_GET)

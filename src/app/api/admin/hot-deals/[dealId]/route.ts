@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb'
 import { ensureHotDealsTable, HOT_DEALS_TABLE_NAME } from '@/utils/ensureHotDealsTable'
+import { withMetrics } from '@/utils/withMetrics'
 
 // GET — single deal
-export async function GET(
+async function _GET(
   _request: NextRequest,
   { params }: { params: Promise<{ dealId: string }> }
 ) {
@@ -29,7 +30,7 @@ export async function GET(
 }
 
 // PUT — update deal
-export async function PUT(
+async function _PUT(
   request: NextRequest,
   { params }: { params: Promise<{ dealId: string }> }
 ) {
@@ -74,7 +75,7 @@ export async function PUT(
 }
 
 // DELETE — remove deal
-export async function DELETE(
+async function _DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ dealId: string }> }
 ) {
@@ -93,3 +94,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to delete deal' }, { status: 500 })
   }
 }
+
+export const GET = withMetrics(_GET)
+export const PUT = withMetrics(_PUT)
+export const DELETE = withMetrics(_DELETE)

@@ -3,6 +3,7 @@ import { ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
 import { verifyPassword } from '@/utils/passwordService'
 import { requireAuth } from '@/utils/requireAuth'
+import { withMetrics } from '@/utils/withMetrics'
 
 const EVENT_LOGS_TABLE = process.env.EVENT_LOGS_TABLE || 'EventLogs'
 const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
@@ -18,7 +19,7 @@ const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
  *
  * Sensitive fields like passwordHash are stripped from the output.
  */
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     const auth = requireAuth(request)
     if (auth instanceof NextResponse) return auth
@@ -185,3 +186,5 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const POST = withMetrics(_POST)

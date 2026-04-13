@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { uploadMultipleFilesToS3, validateFile, isS3Configured } from '@/utils/s3Service'
 import { getEnvironmentInfo } from '@/utils/dynamoService'
 import { requireAuth } from '@/utils/requireAuth'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     const auth = requireAuth(request)
     if (auth instanceof NextResponse) return auth
@@ -105,3 +106,5 @@ export async function OPTIONS() {
     },
   })
 }
+
+export const POST = withMetrics(_POST)

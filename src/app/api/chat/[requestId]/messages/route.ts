@@ -8,10 +8,11 @@ import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { requireAuth } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
+import { withMetrics } from '@/utils/withMetrics'
 
 const checkMessageRate = createRateLimiter('chat-message', 60, 3600000)
 
-export async function GET(
+async function _GET(
   request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
@@ -93,7 +94,7 @@ export async function GET(
   }
 }
 
-export async function POST(
+async function _POST(
   request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
 ) {
@@ -272,4 +273,5 @@ export async function POST(
   }
 }
 
-
+export const GET = withMetrics(_GET)
+export const POST = withMetrics(_POST)

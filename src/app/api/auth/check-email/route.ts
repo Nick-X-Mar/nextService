@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { withMetrics } from '@/utils/withMetrics'
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     const { email, userType } = await request.json()
 
@@ -37,3 +38,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
+
+export const POST = withMetrics(_POST)

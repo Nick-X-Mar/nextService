@@ -10,6 +10,7 @@ import { deleteFileFromS3, extractS3KeyFromUrl } from '@/utils/s3Service'
 import { requireAuth } from '@/utils/requireAuth'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
+import { withMetrics } from '@/utils/withMetrics'
 
 const EVENT_LOGS_TABLE = process.env.EVENT_LOGS_TABLE || 'EventLogs'
 const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
@@ -36,7 +37,7 @@ interface DeleteSummary {
  *
  * This is the GDPR "right to erasure" implementation.
  */
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     const auth = requireAuth(request)
     if (auth instanceof NextResponse) return auth
@@ -302,3 +303,5 @@ async function batchDelete(
     )
   }
 }
+
+export const POST = withMetrics(_POST)

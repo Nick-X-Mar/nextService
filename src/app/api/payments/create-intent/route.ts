@@ -8,10 +8,11 @@ import { EventName } from '@/types/events'
 import type { PaymentRecord, SavedCard } from '@/types/payments'
 import { requireClient } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
+import { withMetrics } from '@/utils/withMetrics'
 
 const checkPaymentRate = createRateLimiter('payment-create', 5, 3600000)
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     const clientId = requireClient(request)
     if (clientId instanceof NextResponse) return clientId
@@ -186,3 +187,5 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const POST = withMetrics(_POST)

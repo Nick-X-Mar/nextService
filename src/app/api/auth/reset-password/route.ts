@@ -5,6 +5,7 @@ import { ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { hashPassword } from '@/utils/passwordService'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
+import { withMetrics } from '@/utils/withMetrics'
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
@@ -19,7 +20,7 @@ function hashToken(token: string): string {
  * sets the new password, and clears the reset fields so the token can't
  * be reused.
  */
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { token, userType = 'client', newPassword } = body || {}
@@ -101,3 +102,5 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const POST = withMetrics(_POST)

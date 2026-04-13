@@ -7,6 +7,7 @@ import { sendEmail } from '@/utils/emailService'
 import { EventName, EmailTemplate } from '@/types/events'
 import { requireAuth, requireGarage } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
+import { withMetrics } from '@/utils/withMetrics'
 
 const checkOfferRate = createRateLimiter('offer-create', 10, 3600000)
 
@@ -18,7 +19,7 @@ const client = new DynamoDBClient({
 
 const docClient = DynamoDBDocumentClient.from(client)
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     const garageId = requireGarage(request)
     if (garageId instanceof NextResponse) return garageId
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest) {
+async function _GET(request: NextRequest) {
   try {
     const auth = requireAuth(request)
     if (auth instanceof NextResponse) return auth
@@ -180,7 +181,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function PUT(request: NextRequest) {
+async function _PUT(request: NextRequest) {
   try {
     const garageId = requireGarage(request)
     if (garageId instanceof NextResponse) return garageId
@@ -304,3 +305,7 @@ async function notifyClientAboutNewOffer(args: {
     console.error('[offers] notifyClientAboutNewOffer failed:', err)
   }
 }
+
+export const GET = withMetrics(_GET)
+export const POST = withMetrics(_POST)
+export const PUT = withMetrics(_PUT)

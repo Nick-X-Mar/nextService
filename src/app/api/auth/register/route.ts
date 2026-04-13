@@ -6,6 +6,7 @@ import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { signToken, setAuthCookie } from '@/utils/auth'
 import { createRateLimiter } from '@/utils/rateLimit'
+import { withMetrics } from '@/utils/withMetrics'
 
 const checkRegisterRate = createRateLimiter('register', 3, 3600000)
 
@@ -13,7 +14,7 @@ const checkRegisterRate = createRateLimiter('register', 3, 3600000)
 // version it agreed to so we can prove what they accepted at the time.
 const CURRENT_TERMS_VERSION = '1.0'
 
-export async function POST(request: NextRequest) {
+async function _POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { email, password, firstName, acceptedTerms } = body
@@ -102,3 +103,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Σφάλμα κατά την εγγραφή' }, { status: 500 })
   }
 }
+
+export const POST = withMetrics(_POST)
