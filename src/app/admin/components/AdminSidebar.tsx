@@ -14,6 +14,7 @@ const navItems = [
   { icon: 'new_releases', label: 'Custom Vehicles', href: '/admin/custom-vehicles', badgeKey: 'customVehicles' as const },
   { icon: 'payments', label: 'Payments', href: '/admin/payments' },
   { icon: 'settings', label: 'Settings', href: '/admin/settings' },
+  { icon: 'science', label: 'E2E Tests', href: '/admin/tests' },
 ]
 
 export default function AdminSidebar() {

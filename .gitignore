@@ -115,3 +115,6 @@ dev-data/
 
 # Playwright MCP snapshots
 .playwright-mcp/
+
+# Playwright test results
+test-results/

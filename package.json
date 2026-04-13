@@ -11,7 +11,9 @@
     "mock-appsync": "node local-appsync-server.js",
     "services": "./start-all-services.sh",
     "dev:full": "concurrently \"npm run dynamodb\" \"npm run mock-appsync\" \"npm run dev\"",
-    "dev:all": "concurrently \"npm run services\" \"npm run dev\""
+    "dev:all": "concurrently \"npm run services\" \"npm run dev\"",
+    "test:e2e": "npx playwright test",
+    "test:e2e:ui": "npx playwright test --ui"
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch-logs": "^3.1029.0",
