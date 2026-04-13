@@ -25,9 +25,7 @@ export default function Header() {
           {/* Logo */}
           <div className="flex-shrink-0">
             <Link href="/" className="flex items-center">
-              <div className={`bg-orange-400 text-white font-bold text-xl px-3 py-2 rounded-lg`}>
-                NextService
-              </div>
+              <img src="/images/next_logo.svg" alt="NextService" className="h-8 w-auto" />
             </Link>
           </div>
 

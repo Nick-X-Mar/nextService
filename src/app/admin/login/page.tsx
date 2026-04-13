@@ -42,9 +42,7 @@ export default function AdminLoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold font-headline text-on-surface">
-            NextService
-          </h1>
+          <img src="/images/next_logo.svg" alt="NextService" className="h-10 w-auto mx-auto mb-2" />
           <p className="text-sm text-on-surface/60 mt-1">Admin Panel</p>
         </div>
 

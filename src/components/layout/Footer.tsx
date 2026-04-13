@@ -39,7 +39,7 @@ export default function Footer() {
         <div className="flex flex-col md:flex-row items-center md:items-start gap-6 mb-8">
           <Link href="/" className="shrink-0">
             <Image
-              src="/logo.png"
+              src="/images/next_logo.svg"
               alt="NextService"
               width={120}
               height={40}

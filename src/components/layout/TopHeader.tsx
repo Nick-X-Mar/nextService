@@ -33,11 +33,11 @@ export default function TopHeader() {
           </button>
           <Link href={userType === 'garage' && garage ? `/garage-dashboard/${garage.id}` : '/'} className="flex items-center">
             <Image
-              src="/logo.png"
+              src="/images/next_logo.svg"
               alt="NextService"
-              width={120}
-              height={40}
-              className="h-8 w-auto"
+              width={170}
+              height={48}
+              className="h-12 w-auto"
             />
           </Link>
         </div>

@@ -31,9 +31,7 @@ export default function AdminSidebar() {
     <aside className="fixed top-0 left-0 h-full w-60 bg-inverse-surface text-inverse-on-surface flex flex-col z-40">
       {/* Logo */}
       <div className="h-14 flex items-center px-5 border-b border-white/10">
-        <span className="text-inverse-primary font-headline font-bold text-lg">
-          NextService
-        </span>
+        <img src="/images/next_logo.svg" alt="NextService" className="h-7 w-auto brightness-0 invert" />
         <span className="ml-2 text-xs font-medium bg-inverse-primary/20 text-inverse-primary px-2 py-0.5 rounded-full">
           Admin
         </span>
