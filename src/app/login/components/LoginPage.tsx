@@ -103,7 +103,6 @@ export default function LoginPage() {
     if (userType === 'garage') {
       sessionStorage.setItem('garageRegEmail', email.trim().toLowerCase())
       sessionStorage.setItem('garageRegPassword', password)
-      sessionStorage.setItem('garageRegAcceptedTerms', 'true')
       router.push('/register-professional')
       return
     }

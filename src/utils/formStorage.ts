@@ -22,6 +22,7 @@ export interface ServiceFormData {
   estimatedPrice: number | null
   // Original vehicle tracking (for detecting changes)
   originalVehicleId?: string
+  originalVehicleLicensePhotoUrl?: string
   originalVehicleData?: {
     brand: string
     model: string
@@ -80,6 +81,7 @@ export const loadFormData = (): ServiceFormData => {
     engineNumber: '',
     estimatedPrice: null,
     originalVehicleId: undefined,
+    originalVehicleLicensePhotoUrl: undefined,
     originalVehicleData: undefined
   }
 }

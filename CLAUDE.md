@@ -80,6 +80,7 @@ Path alias: `@/` maps to `src/`.
 
 ## Rules
 
+- **NEVER commit automatically.** Only commit when the user explicitly asks for it.
 - Do not start the dev server — it is always running on localhost:3000.
 - Clean up any temporary/test/debug files before completing work.
 - Use existing shared components from `src/components/` rather than creating duplicates.

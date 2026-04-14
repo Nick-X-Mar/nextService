@@ -135,6 +135,24 @@ export default function CarBrandModelSelector({
   const [isTurbo, setIsTurbo] = useState(false)
   const [mounted, setMounted] = useState(false)
 
+  // Vehicle selector for logged-in users
+  interface Vehicle {
+    id: string
+    brand: string
+    model: string
+    modelYear?: string
+    engineCC?: string
+    fuelType?: string
+    isAutomatic?: boolean
+    is4x4?: boolean
+    isTurbo?: boolean
+    vinNumber?: string
+    engineNumber?: string
+    licensePhotoUrl?: string
+  }
+  const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string>('')
+
   const [brandOpen, setBrandOpen] = useState(false)
   const [modelOpen, setModelOpen] = useState(false)
   const [brandSearch, setBrandSearch] = useState('')
@@ -201,28 +219,31 @@ export default function CarBrandModelSelector({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Load saved data on component mount
+  // Load only category/description on mount; vehicle fields start fresh
   useEffect(() => {
     setMounted(true)
     const data = loadFormData()
-
-    if (data.brand) {
-      if (data.isBrandOther) { setIsBrandOther(true); setCustomBrand(data.brand) }
-      else setBrand(data.brand)
-    }
-    if (data.model) {
-      if (data.isModelOther) { setIsModelOther(true); setCustomModel(data.model) }
-      else setModel(data.model)
-    }
     if (data.category) setCategory(data.category)
     if (data.description) setDescription(data.description)
-    if (data.engineCC) setEngineCC(data.engineCC)
-    if (data.modelYear) setModelYear(data.modelYear)
-    if (data.fuelType) setFuelType(data.fuelType)
-    else setFuelType('petrol')
-    if (data.isAutomatic !== undefined) setIsAutomatic(data.isAutomatic)
-    if (data.is4x4 !== undefined) setIs4x4(data.is4x4)
-    if (data.isTurbo !== undefined) setIsTurbo(data.isTurbo)
+
+    // Clear stale vehicle fields from previous requests
+    clearFormData()
+    if (data.category || data.description) {
+      saveFormData({ category: data.category, description: data.description })
+    }
+
+    // Fetch user's vehicles if logged in
+    const clientId = localStorage.getItem('clientId')
+    if (clientId) {
+      fetch(`/api/clients/${clientId}/vehicles`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.vehicles?.length > 0) {
+            setVehicles(data.vehicles.filter((v: Vehicle) => v.brand && v.model))
+          }
+        })
+        .catch(() => {})
+    }
   }, [])
 
   // Save data whenever it changes
@@ -251,6 +272,57 @@ export default function CarBrandModelSelector({
     if (year.length !== 4 || !/^\d{4}$/.test(year)) return false
     const currentYear = new Date().getFullYear()
     return parseInt(year) <= currentYear
+  }
+
+  // Fill form from a saved vehicle
+  const selectVehicle = (vehicleId: string) => {
+    setSelectedVehicleId(vehicleId)
+    if (!vehicleId) {
+      // "Νέο Όχημα" — reset all fields
+      setBrand(''); setModel(''); setIsBrandOther(false); setIsModelOther(false)
+      setCustomBrand(''); setCustomModel(''); setEngineCC(''); setModelYear('')
+      setFuelType('petrol'); setIsAutomatic(false); setIs4x4(false); setIsTurbo(false)
+      return
+    }
+    const v = vehicles.find(v => v.id === vehicleId)
+    if (!v) return
+
+    // Set brand
+    const brandKey = Object.keys(carBrands).find(b => b === v.brand.toLowerCase())
+    if (brandKey) {
+      setIsBrandOther(false); setCustomBrand(''); setBrand(brandKey)
+      // Set model
+      const models = carBrands[brandKey as keyof typeof carBrands] || []
+      if (v.model && models.includes(v.model)) {
+        setIsModelOther(false); setCustomModel(''); setModel(v.model)
+      } else {
+        setIsModelOther(true); setCustomModel(v.model || '')
+      }
+    } else {
+      setIsBrandOther(true); setCustomBrand(v.brand || ''); setBrand('')
+      setIsModelOther(true); setCustomModel(v.model || '')
+    }
+
+    if (v.modelYear) setModelYear(v.modelYear)
+    if (v.engineCC) setEngineCC(v.engineCC)
+    if (v.fuelType) setFuelType(v.fuelType as 'petrol' | 'diesel')
+    if (v.isAutomatic !== undefined) setIsAutomatic(v.isAutomatic)
+    if (v.is4x4 !== undefined) setIs4x4(v.is4x4)
+    if (v.isTurbo !== undefined) setIsTurbo(v.isTurbo)
+
+    // Save vehicle data for the next step (car-specifications)
+    saveFormData({
+      vinNumber: v.vinNumber || '',
+      engineNumber: v.engineNumber || '',
+      originalVehicleId: v.id,
+      originalVehicleLicensePhotoUrl: v.licensePhotoUrl || '',
+      originalVehicleData: {
+        brand: v.brand, model: v.model, modelYear: v.modelYear,
+        engineCC: v.engineCC, fuelType: v.fuelType,
+        isAutomatic: v.isAutomatic, is4x4: v.is4x4,
+        vinNumber: v.vinNumber, engineNumber: v.engineNumber
+      }
+    })
   }
 
   // Form validation
@@ -373,6 +445,29 @@ export default function CarBrandModelSelector({
               </>
             )}
           </div>
+
+          {/* Vehicle selector for logged-in users */}
+          {vehicles.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
+                <Icon name="directions_car" size="sm" className="text-primary inline-block mr-1 align-text-bottom" />
+                Τα Οχήματά μου
+              </label>
+              <select
+                value={selectedVehicleId}
+                onChange={(e) => selectVehicle(e.target.value)}
+                className="w-full h-14 bg-surface-container-highest rounded-xl px-4 border-none focus:ring-2 focus:ring-primary font-bold text-sm text-on-surface cursor-pointer appearance-none"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='%23666' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
+              >
+                <option value="">Νέο Όχημα</option>
+                {vehicles.map(v => (
+                  <option key={v.id} value={v.id}>
+                    {v.brand.charAt(0).toUpperCase() + v.brand.slice(1)} {v.model} {v.modelYear ? `(${v.modelYear})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Brand */}
           <div className="space-y-2">

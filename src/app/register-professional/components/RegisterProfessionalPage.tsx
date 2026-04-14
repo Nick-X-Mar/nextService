@@ -39,6 +39,8 @@ export default function RegisterProfessionalPage() {
     mobile: ''
   })
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPasswordFields, setShowPasswordFields] = useState(true)
   const [emailLocked, setEmailLocked] = useState(false)
   const [selectedServices, setSelectedServices] = useState<string[]>([])
   const [customServices, setCustomServices] = useState<string[]>([])
@@ -53,19 +55,16 @@ export default function RegisterProfessionalPage() {
   useEffect(() => {
     const savedEmail = sessionStorage.getItem('garageRegEmail')
     const savedPassword = sessionStorage.getItem('garageRegPassword')
-    const savedAccepted = sessionStorage.getItem('garageRegAcceptedTerms') === 'true'
     if (savedEmail) {
       setFormData(prev => ({ ...prev, email: savedEmail }))
       setEmailLocked(true)
     }
     if (savedPassword) {
       setPassword(savedPassword)
+      setShowPasswordFields(false)
     }
-    if (savedAccepted) {
-      // Forwarded from LoginPage register flow — they already ticked the box
-      // but they still need to confirm here, so we just pre-check it.
-      setAcceptedTerms(true)
-    }
+    // Never pre-check the terms checkbox — GDPR requires explicit consent
+    // on each form, regardless of what the user accepted elsewhere.
   }, [])
 
 
@@ -140,6 +139,17 @@ export default function RegisterProfessionalPage() {
       return false
     }
 
+    if (showPasswordFields) {
+      if (!password || password.length < 6) {
+        error('Σφάλμα', 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες')
+        return false
+      }
+      if (password !== confirmPassword) {
+        error('Σφάλμα', 'Οι κωδικοί δεν ταιριάζουν')
+        return false
+      }
+    }
+
     if (!acceptedTerms) {
       error('Σφάλμα', 'Πρέπει να αποδεχτείτε τους Όρους Χρήσης και την Πολιτική Απορρήτου')
       return false
@@ -176,7 +186,6 @@ export default function RegisterProfessionalPage() {
       if (response.ok && data.success) {
         sessionStorage.removeItem('garageRegEmail')
         sessionStorage.removeItem('garageRegPassword')
-        sessionStorage.removeItem('garageRegAcceptedTerms')
         setIsSubmitted(true)
         success('Επιτυχής Εγγραφή', 'Το συνεργείο σας εγγράφηκε επιτυχώς! Θα επικοινωνήσουμε μαζί σας σύντομα.')
       } else {
@@ -347,6 +356,44 @@ export default function RegisterProfessionalPage() {
                   </div>
                 )
               })}
+
+              {showPasswordFields && (
+                <>
+                  <div className="space-y-2">
+                    <label className={`${styles.labelUpper} flex items-center gap-2`}>
+                      <Icon name="lock" size="sm" className="text-on-surface-variant" />
+                      Κωδικός Πρόσβασης *
+                    </label>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Τουλάχιστον 6 χαρακτήρες"
+                      required
+                      disabled={isLoading}
+                      className={`${styles.input} ${isLoading ? 'opacity-50' : ''}`}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className={`${styles.labelUpper} flex items-center gap-2`}>
+                      <Icon name="lock" size="sm" className="text-on-surface-variant" />
+                      Επιβεβαίωση Κωδικού *
+                    </label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Επαναλάβετε τον κωδικό"
+                      required
+                      disabled={isLoading}
+                      className={`${styles.input} ${isLoading ? 'opacity-50' : ''}`}
+                    />
+                    {confirmPassword && password !== confirmPassword && (
+                      <p className="text-xs text-error">Οι κωδικοί δεν ταιριάζουν</p>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Extra Services Section */}

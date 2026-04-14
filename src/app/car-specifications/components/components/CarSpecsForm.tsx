@@ -38,6 +38,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [hasLicensePhoto, setHasLicensePhoto] = useState(false)
   const [licensePhoto, setLicensePhoto] = useState<File | null>(null)
+  const [existingLicensePhotoUrl, setExistingLicensePhotoUrl] = useState<string>('')
   const [mounted, setMounted] = useState(false)
   const [showVinInfo, setShowVinInfo] = useState(false)
   const [showEngineInfo, setShowEngineInfo] = useState(false)
@@ -69,6 +70,10 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
     const data = loadFormData()
     if (data.vinNumber) setVinNumber(data.vinNumber)
     if (data.engineNumber) setEngineNumber(data.engineNumber)
+    if (data.originalVehicleLicensePhotoUrl) {
+      setExistingLicensePhotoUrl(data.originalVehicleLicensePhotoUrl)
+      setHasLicensePhoto(true)
+    }
 
     // Estimate price when component mounts if not already estimated
     if (!data.estimatedPrice && data.brand && data.model && data.modelYear && data.engineCC && data.fuelType) {
@@ -168,7 +173,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
 
   const isFormValid =
     vinNumber.trim() !== '' &&
-    (engineNumber.trim() !== '' || licensePhoto !== null) &&
+    (engineNumber.trim() !== '' || licensePhoto !== null || !!existingLicensePhotoUrl) &&
     (isLoggedIn || (isEmailValid(email) && !emailExists && isPasswordValid && acceptedTerms))
 
   const handleSubmit = async () => {
@@ -531,30 +536,53 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                     Ανεβάστε μια <span className="font-bold text-on-surface">καθαρή και ευανάγνωστη</span> φωτογραφία της άδειας κυκλοφορίας. Θα αντλήσουμε αυτόματα τα στοιχεία του οχήματος (αρ. κινητήρα, πλαισίου).
                   </p>
                 </div>
-                <div className="border-2 border-dashed border-outline-variant/30 rounded-2xl p-8 text-center hover:border-primary transition-colors">
-                  <input
-                    type="file"
-                    id="license-photo"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                  <label htmlFor="license-photo" className="cursor-pointer">
-                    {licensePhoto ? (
-                      <div className="text-green-600">
-                        <Icon name="photo" size="lg" className="mx-auto mb-2" />
-                        <p className="text-sm font-bold">{licensePhoto.name}</p>
-                        <p className="text-xs text-on-surface-variant">Κανε κλικ για αλλαγη</p>
-                      </div>
-                    ) : (
-                      <div className="text-on-surface-variant">
-                        <Icon name="cloud_upload" size="lg" className="mx-auto mb-2" />
-                        <p className="text-sm font-bold">Κανε κλικ για ανεβασμα</p>
-                        <p className="text-xs text-on-surface-variant">JPG, PNG μεχρι 10MB</p>
-                      </div>
-                    )}
-                  </label>
-                </div>
+                {/* Show existing license photo from vehicle */}
+                {existingLicensePhotoUrl && !licensePhoto && (
+                  <div className="rounded-2xl overflow-hidden border-2 border-green-200 bg-green-50/50">
+                    <div className="relative">
+                      <img
+                        src={existingLicensePhotoUrl}
+                        alt="Άδεια κυκλοφορίας"
+                        className="w-full max-h-48 object-contain"
+                      />
+                    </div>
+                    <div className="p-3 flex items-center justify-between">
+                      <p className="text-xs font-bold text-green-700 flex items-center gap-1">
+                        <Icon name="check_circle" size="sm" className="text-green-600" />
+                        Φωτογραφία από το όχημά σας
+                      </p>
+                      <label htmlFor="license-photo" className="text-xs font-bold text-primary cursor-pointer hover:underline">
+                        Αλλαγή
+                      </label>
+                    </div>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  id="license-photo"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                {(!existingLicensePhotoUrl || licensePhoto) && (
+                  <div className="border-2 border-dashed border-outline-variant/30 rounded-2xl p-8 text-center hover:border-primary transition-colors">
+                    <label htmlFor="license-photo" className="cursor-pointer">
+                      {licensePhoto ? (
+                        <div className="text-green-600">
+                          <Icon name="photo" size="lg" className="mx-auto mb-2" />
+                          <p className="text-sm font-bold">{licensePhoto.name}</p>
+                          <p className="text-xs text-on-surface-variant">Κανε κλικ για αλλαγη</p>
+                        </div>
+                      ) : (
+                        <div className="text-on-surface-variant">
+                          <Icon name="cloud_upload" size="lg" className="mx-auto mb-2" />
+                          <p className="text-sm font-bold">Κανε κλικ για ανεβασμα</p>
+                          <p className="text-xs text-on-surface-variant">JPG, PNG μεχρι 10MB</p>
+                        </div>
+                      )}
+                    </label>
+                  </div>
+                )}
               </>
             )}
           </div>
