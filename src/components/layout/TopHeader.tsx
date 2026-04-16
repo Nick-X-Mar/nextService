@@ -3,15 +3,15 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import Icon from '@/components/ui/Icon'
-import ServiceCategoryModal from '@/components/ServiceCategoryModal'
+import { clearFormData } from '@/utils/formStorage'
 
 export default function TopHeader() {
   const { userType, client, garage, logout } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [categoryModalOpen, setCategoryModalOpen] = useState(false)
+  const router = useRouter()
   const pathname = usePathname()
 
   const isLanding = pathname === '/'
@@ -59,7 +59,7 @@ export default function TopHeader() {
               navigation item lives in the sidebar / bottom nav. */}
           {userType === 'client' && client && (
             <button
-              onClick={() => setCategoryModalOpen(true)}
+              onClick={() => { clearFormData(); router.push('/?open=1') }}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-br from-primary to-primary-container text-on-primary text-sm font-bold shadow-md active:scale-95 transition-all"
             >
               <Icon name="add_circle" size="sm" filled />
@@ -129,7 +129,7 @@ export default function TopHeader() {
             </>
           )}
           {userType === 'client' && client && (
-            <button onClick={() => { setMobileMenuOpen(false); setCategoryModalOpen(true) }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors w-full">
+            <button onClick={() => { setMobileMenuOpen(false); clearFormData(); router.push('/?open=1') }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors w-full">
               <Icon name="add_circle" className="text-primary" filled />
               <span className="font-medium">Νέο Αίτημα</span>
             </button>
@@ -148,7 +148,6 @@ export default function TopHeader() {
           )}
         </div>
       )}
-      <ServiceCategoryModal isOpen={categoryModalOpen} onClose={() => setCategoryModalOpen(false)} />
     </header>
   )
 }

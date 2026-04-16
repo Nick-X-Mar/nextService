@@ -20,6 +20,8 @@ export default function CarDetailsSection() {
     kteo: 'ΚΤΕΟ',
     elastika: 'Ελαστικά',
     fanopeia: 'Φανοποιεία',
+    'oliki-vafi': 'Ολική Βαφή',
+    'meriki-vafi': 'Μερική Βαφή',
     oils: 'Λάδια',
     disk: 'Δίσκος',
   }

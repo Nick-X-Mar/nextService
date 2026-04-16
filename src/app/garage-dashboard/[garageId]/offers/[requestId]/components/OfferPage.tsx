@@ -593,6 +593,27 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
           showEstimatedCost={false}
         />
 
+        {/* Photos */}
+        {serviceRequest.photoUrls && serviceRequest.photoUrls.length > 0 && (
+          <div className={styles.card}>
+            <div className="flex items-center gap-2 mb-4">
+              <Icon name="photo_library" size="md" className="text-primary" filled />
+              <p className={styles.labelUpper}>Φωτογραφίες ({serviceRequest.photoUrls.length})</p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {serviceRequest.photoUrls.map((url: string, index: number) => (
+                <a key={index} href={url} target="_blank" rel="noopener noreferrer" className="relative aspect-square bg-surface-container rounded-xl overflow-hidden hover:opacity-90 transition-opacity">
+                  <img
+                    src={url}
+                    alt={`Φωτογραφία ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Offer Section */}
         <div className={styles.card}>
           <div className="flex items-center gap-2 mb-5">

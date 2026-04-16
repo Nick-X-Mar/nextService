@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useLayoutEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useState, useLayoutEffect, useRef, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { gsap } from 'gsap'
 import Icon from '@/components/ui/Icon'
 import { saveFormData } from '@/utils/formStorage'
@@ -17,6 +17,7 @@ const categories = [
 
 export default function HeroSection() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [selectedCategory, setSelectedCategory] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -35,6 +36,17 @@ export default function HeroSection() {
     }, containerRef)
     return () => ctx.revert()
   }, [])
+
+  // Auto-open when navigated with ?open=1
+  useEffect(() => {
+    if (searchParams.get('open') === '1' && tlRef.current && !isOpen) {
+      setTimeout(() => {
+        tlRef.current?.play()
+        setIsOpen(true)
+      }, 300)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   const toggleMenu = () => {
     if (!tlRef.current) return

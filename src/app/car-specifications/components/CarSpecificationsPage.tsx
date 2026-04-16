@@ -55,7 +55,9 @@ export default function CarSpecificationsPage() {
     )
   }
 
-  const formContent = savedData.category === 'fanopeia'
+  const isBodywork = savedData.category === 'fanopeia' || savedData.category === 'oliki-vafi' || savedData.category === 'meriki-vafi'
+
+  const formContent = isBodywork
     ? <BodyWorkPhotosForm savedData={savedData} />
     : <CarSpecsForm savedData={savedData} />
 

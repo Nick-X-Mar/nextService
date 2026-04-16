@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import Icon from '@/components/ui/Icon'
 import GearSubmitButton from '@/components/GearSubmitButton'
 import { saveFormData, loadFormData, clearFormData } from '../../../../utils/formStorage'
+import { useToast } from '../../../../hooks/useToast'
 
 interface CarBrandModelSelectorProps {
   selectedBrand: string
@@ -118,6 +120,9 @@ export default function CarBrandModelSelector({
   onModelChange
 }: CarBrandModelSelectorProps) {
   const router = useRouter()
+  const { success, error: showError } = useToast()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [dragActive, setDragActive] = useState(false)
   const [brand, setBrand] = useState('')
   const [model, setModel] = useState('')
   const [isBrandOther, setIsBrandOther] = useState(false)
@@ -325,43 +330,107 @@ export default function CarBrandModelSelector({
     })
   }
 
+  // Bodywork categories don't need engine/fuel/transmission details
+  const isBodywork = category === 'oliki-vafi' || category === 'meriki-vafi' || category === 'fanopeia'
+
   // Form validation
   const isFormValid =
     currentBrand.trim() !== '' &&
     currentModel.trim() !== '' &&
-    isCCValid(engineCC) &&
     isYearValid(modelYear) &&
-    fuelType !== ''
+    (isBodywork ? descriptionPhotos.length >= 1 : (isCCValid(engineCC) && fuelType !== ''))
 
-  const handleSubmit = () => {
-    if (isFormValid) {
-      saveFormData({
-        brand: currentBrand,
-        model: currentModel,
-        description,
-        isBrandOther,
-        isModelOther,
-        customBrand,
-        customModel,
-        engineCC,
-        modelYear,
-        fuelType,
-        isAutomatic,
-        is4x4,
-        isTurbo
-      })
-      const clientId = localStorage.getItem('clientId')
-      fetch('/api/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          eventName: 'car_details_completed',
-          clientId,
-          metadata: { brand: currentBrand, model: currentModel, isBrandOther, isModelOther, category },
-        }),
-      }).catch(() => {})
-      router.push('/car-specifications')
+  const handleSubmit = async () => {
+    if (!isFormValid) return
+
+    saveFormData({
+      brand: currentBrand,
+      model: currentModel,
+      description,
+      isBrandOther,
+      isModelOther,
+      customBrand,
+      customModel,
+      engineCC,
+      modelYear,
+      fuelType,
+      isAutomatic,
+      is4x4,
+      isTurbo
+    })
+    const clientId = localStorage.getItem('clientId')
+    fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventName: 'car_details_completed',
+        clientId,
+        metadata: { brand: currentBrand, model: currentModel, isBrandOther, isModelOther, category },
+      }),
+    }).catch(() => {})
+
+    // Bodywork: submit directly with photos, skip second page
+    if (isBodywork) {
+      if (descriptionPhotos.length < 1) {
+        showError('Σφάλμα', 'Ανεβάστε τουλάχιστον 1 φωτογραφία')
+        return
+      }
+      setIsSubmitting(true)
+      try {
+        const latestFormData = loadFormData()
+        // For bodywork, include the original vehicle's engine data so
+        // the backend comparison doesn't see a diff and create a clone.
+        const origData = latestFormData.originalVehicleData
+        const serviceRequestData = {
+          category, description, brand: currentBrand, model: currentModel,
+          modelYear, isBrandOther, isModelOther,
+          engineCC: origData?.engineCC || engineCC,
+          fuelType: origData?.fuelType || fuelType,
+          isAutomatic: origData?.isAutomatic ?? isAutomatic,
+          is4x4: origData?.is4x4 ?? is4x4,
+          vinNumber: origData?.vinNumber || '',
+          engineNumber: origData?.engineNumber || '',
+          photos: descriptionPhotos.map(p => ({ name: p.name, size: p.size, type: p.type })),
+          ...(latestFormData.originalVehicleId && { originalVehicleId: latestFormData.originalVehicleId }),
+          ...(origData && { originalVehicleData: origData }),
+          ...(clientId && { clientId })
+        }
+        const serviceResponse = await fetch('/api/service-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(serviceRequestData),
+        })
+        const serviceResult = await serviceResponse.json()
+        if (!serviceResponse.ok || !serviceResult.success) {
+          showError('Σφάλμα', serviceResult.error || 'Σφάλμα κατά την αποστολή')
+          return
+        }
+        // Upload photos to S3
+        const formData = new FormData()
+        descriptionPhotos.forEach(file => formData.append('files', file))
+        formData.append('serviceRequestId', serviceResult.serviceRequestId)
+        formData.append('vehicleId', serviceResult.vehicleId)
+        const uploadRes = await fetch('/api/upload-photos', { method: 'POST', body: formData })
+        const uploadData = await uploadRes.json().catch(() => ({}))
+        const photosUploaded = uploadData.success === true
+
+        if (photosUploaded) {
+          success('Επιτυχία!', `Στάλθηκαν ${descriptionPhotos.length} φωτογραφίες\n\nΕιδοποίηση σε ${serviceResult.notificationsSent} συνεργεία μέσω SMS!`)
+        } else {
+          success('Αίτημα Υποβλήθηκε', `Ειδοποίηση σε ${serviceResult.notificationsSent} συνεργεία μέσω SMS!\n\nΟι φωτογραφίες δεν ανέβηκαν — δοκιμάστε ξανά αργότερα.`)
+        }
+        if (serviceResult.clientId) router.push(`/requests/${serviceResult.clientId}`)
+        else if (clientId) router.push(`/requests/${clientId}`)
+        else router.push('/requests')
+      } catch {
+        showError('Σφάλμα', 'Σφάλμα κατά την αποστολή. Δοκιμάστε ξανά.')
+      } finally {
+        setIsSubmitting(false)
+      }
+      return
     }
+
+    router.push('/car-specifications')
   }
 
   return (
@@ -383,64 +452,96 @@ export default function CarBrandModelSelector({
               onChange={(e) => setDescription(e.target.value)}
             />
 
-            {/* Photo upload area - only for painting categories */}
-            {(category === 'oliki-vafi' || category === 'meriki-vafi') && (
+            {/* Photo upload area - bodywork categories */}
+            {isBodywork && (
               <>
-                {descriptionPhotos.length === 0 && (
-                  <div className="bg-tertiary/10 border border-tertiary/20 rounded-xl p-3 flex items-start gap-2">
-                    <Icon name="photo_camera" size="sm" className="text-tertiary mt-0.5 shrink-0" />
-                    <p className="text-xs text-on-surface-variant">
-                      <span className="font-bold text-on-surface">Προτείνουμε</span> να ανεβάσετε φωτογραφίες για πιο ακριβείς προσφορές από τα συνεργεία.
-                    </p>
-                  </div>
-                )}
+                <div className="space-y-4">
+                  <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
+                    Φωτογραφίες Ζημιάς ({descriptionPhotos.length}/3)
+                  </label>
 
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
-                      Φωτογραφίες (προαιρετικά)
-                    </label>
-                    <span className="text-[10px] text-on-surface-variant/50">{descriptionPhotos.length}/5</span>
-                  </div>
+                  {descriptionPhotos.length < 3 && (
+                    <div
+                      className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-200 ${
+                        dragActive
+                          ? 'border-primary bg-primary/5'
+                          : 'border-outline-variant/30 hover:border-primary'
+                      }`}
+                      onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(true) }}
+                      onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false) }}
+                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(true) }}
+                      onDrop={(e) => {
+                        e.preventDefault(); e.stopPropagation(); setDragActive(false)
+                        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
+                        setDescriptionPhotos(prev => [...prev, ...files].slice(0, 3))
+                      }}
+                    >
+                      <input
+                        type="file"
+                        id="bodywork-photos"
+                        accept="image/*"
+                        multiple
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files || []).filter(f => f.type.startsWith('image/'))
+                          setDescriptionPhotos(prev => [...prev, ...files].slice(0, 3))
+                          e.target.value = ''
+                        }}
+                        className="hidden"
+                      />
+                      <label htmlFor="bodywork-photos" className="cursor-pointer">
+                        <Icon name="cloud_upload" size="xl" className="mx-auto mb-3 text-on-surface-variant/40" />
+                        <p className="text-sm font-bold text-on-surface">
+                          Κάνε κλικ ή σύρε φωτογραφίες εδώ
+                        </p>
+                        <p className="text-xs text-on-surface-variant mt-1">
+                          JPG, PNG μέχρι 10MB ανά φωτογραφία
+                        </p>
+                        <p className="text-[10px] text-on-surface-variant/50 mt-1">
+                          Μέχρι {3 - descriptionPhotos.length} ακόμα φωτογραφί{3 - descriptionPhotos.length === 1 ? 'α' : 'ες'}
+                        </p>
+                      </label>
+                    </div>
+                  )}
 
                   {descriptionPhotos.length > 0 && (
-                    <div className="flex gap-2 flex-wrap">
+                    <div className="grid grid-cols-3 gap-3">
                       {descriptionPhotos.map((photo, index) => (
-                        <div key={index} className="relative w-20 h-20 rounded-xl overflow-hidden group">
-                          <img
-                            src={URL.createObjectURL(photo)}
-                            alt={`Φωτο ${index + 1}`}
-                            className="w-full h-full object-cover"
-                          />
+                        <div key={index} className="relative group">
+                          <div className="relative aspect-square bg-surface-container rounded-xl overflow-hidden">
+                            <Image
+                              src={URL.createObjectURL(photo)}
+                              alt={`Φωτογραφία ${index + 1}`}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
                           <button
                             type="button"
                             onClick={() => setDescriptionPhotos(prev => prev.filter((_, i) => i !== index))}
-                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute -top-2 -right-2 bg-tertiary text-on-tertiary rounded-full h-6 w-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-md"
                           >
-                            <Icon name="close" size="sm" className="text-white" />
+                            <Icon name="close" size="sm" />
                           </button>
+                          <p className="text-[10px] text-on-surface-variant mt-1 truncate">{photo.name}</p>
                         </div>
                       ))}
                     </div>
                   )}
+                </div>
 
-                  {descriptionPhotos.length < 5 && (
-                    <label className="flex items-center gap-2 cursor-pointer text-primary hover:text-primary/80 transition-colors w-fit">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => {
-                          const files = Array.from(e.target.files || [])
-                          setDescriptionPhotos(prev => [...prev, ...files].slice(0, 5))
-                          e.target.value = ''
-                        }}
-                      />
-                      <Icon name="add_photo_alternate" size="sm" />
-                      <span className="text-xs font-bold">Προσθήκη φωτογραφίας</span>
-                    </label>
-                  )}
+                {/* Tips card */}
+                <div className="p-4 bg-surface-container-lowest rounded-2xl">
+                  <div className="flex items-start gap-3">
+                    <Icon name="lightbulb" size="md" className="text-primary flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-xs font-bold text-on-surface mb-1">Συμβουλές για καλές φωτογραφίες:</h4>
+                      <ul className="text-[11px] text-on-surface-variant space-y-0.5">
+                        <li>Φωτογραφίστε τη ζημιά από κοντά και από μακριά</li>
+                        <li>Χρησιμοποιήστε καλό φωτισμό (φυσικό φως)</li>
+                        <li>Συμπεριλάβετε το περιβάλλον της ζημιάς</li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               </>
             )}
@@ -721,7 +822,8 @@ export default function CarBrandModelSelector({
             )}
           </div>
 
-          {/* Engine CC */}
+          {/* Engine CC — hidden for bodywork */}
+          {!isBodywork && (
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
               Κυβισμος (CC)
@@ -748,8 +850,11 @@ export default function CarBrandModelSelector({
               </p>
             )}
           </div>
+          )}
 
-          {/* Fuel Type - 2 button grid */}
+          {/* Fuel Type - 2 button grid — hidden for bodywork */}
+          {!isBodywork && (
+          <>
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
               Καυσιμο
@@ -879,11 +984,13 @@ export default function CarBrandModelSelector({
               </div>
             </div>
           </div>
+          </>
+          )}
         </div>
       </div>
 
       {/* CTA Button */}
-      <GearSubmitButton onClick={handleSubmit} disabled={!isFormValid} className="mt-6" />
+      <GearSubmitButton onClick={handleSubmit} disabled={!isFormValid || isSubmitting} isLoading={isSubmitting} className="mt-6" />
 
       {/* Back button */}
       <div className="mt-4 text-center space-y-2">

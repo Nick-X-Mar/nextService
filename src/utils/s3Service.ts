@@ -269,8 +269,8 @@ export const presignPhotoRecords = async (
 // Utility function to check if S3 service is properly configured
 export const isS3Configured = (): boolean => {
   return !!(
-    process.env.AWS_ACCESS_KEY_ID && 
-    process.env.AWS_SECRET_ACCESS_KEY && 
+    process.env.ACCESS_KEY_ID &&
+    process.env.SECRET_ACCESS_KEY &&
     BUCKET_NAME
   )
 }

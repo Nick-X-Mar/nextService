@@ -223,11 +223,25 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
                 </p>
               )}
 
-              {/* Photo indicator */}
+              {/* Photos */}
               {request.photoUrls && request.photoUrls.length > 0 && (
-                <div className="flex items-center gap-1.5 text-primary mb-4">
-                  <Icon name="image" filled size="sm" />
-                  <span className="text-xs font-bold">{request.photoUrls.length} Φωτογραφιες</span>
+                <div className="mb-4">
+                  <div className="flex items-center gap-1.5 text-primary mb-2">
+                    <Icon name="photo_library" filled size="sm" />
+                    <span className="text-xs font-bold">{request.photoUrls.length} Φωτογραφίες</span>
+                  </div>
+                  <div className="flex gap-2">
+                    {request.photoUrls.slice(0, 3).map((url: string, i: number) => (
+                      <div key={i} className="w-16 h-16 rounded-lg overflow-hidden bg-surface-container flex-shrink-0">
+                        <img src={url} alt={`Φωτο ${i + 1}`} className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                    {request.photoUrls.length > 3 && (
+                      <div className="w-16 h-16 rounded-lg bg-surface-container flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-bold text-secondary">+{request.photoUrls.length - 3}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
