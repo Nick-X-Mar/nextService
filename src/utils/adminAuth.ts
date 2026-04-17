@@ -1,11 +1,16 @@
 import { SignJWT, jwtVerify } from 'jose'
 import { NextRequest, NextResponse } from 'next/server'
 
-const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'admin-dev-secret-change-in-production'
-const secret = new TextEncoder().encode(ADMIN_JWT_SECRET)
-
 const ADMIN_COOKIE_NAME = 'ns-admin-session'
 const ADMIN_SESSION_EXPIRY = process.env.ADMIN_SESSION_EXPIRY || '8h'
+
+function getSecret(): Uint8Array {
+  const key = process.env.ADMIN_JWT_SECRET
+  if (!key) {
+    throw new Error('ADMIN_JWT_SECRET env var is not set — refusing to sign/verify admin tokens')
+  }
+  return new TextEncoder().encode(key)
+}
 
 export interface AdminPayload {
   adminId: string
@@ -18,12 +23,12 @@ export async function signAdminToken(payload: AdminPayload): Promise<string> {
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(ADMIN_SESSION_EXPIRY)
-    .sign(secret)
+    .sign(getSecret())
 }
 
 export async function verifyAdminToken(token: string): Promise<AdminPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, secret)
+    const { payload } = await jwtVerify(token, getSecret())
     return {
       adminId: payload.adminId as string,
       email: payload.email as string,

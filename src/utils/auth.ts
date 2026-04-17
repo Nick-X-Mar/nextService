@@ -1,11 +1,26 @@
 import { SignJWT, jwtVerify } from 'jose'
 import { NextRequest, NextResponse } from 'next/server'
 
-const JWT_SECRET_KEY = process.env.JWT_SECRET || 'dev-secret-change-in-production'
-const secret = new TextEncoder().encode(JWT_SECRET_KEY)
+export const TOKEN_COOKIE_NAME = 'auth-token'
 
-const TOKEN_COOKIE_NAME = 'auth-token'
-const TOKEN_EXPIRY = '7d'
+// Session window: user stays logged in as long as they are active within this window.
+// Every authenticated request refreshes the cookie (sliding session) — see middleware.
+const SESSION_EXPIRY = process.env.SESSION_EXPIRY || '2d'
+const SESSION_MAX_AGE_SEC = (() => {
+  const m = SESSION_EXPIRY.match(/^(\d+)([smhd])$/)
+  if (!m) return 2 * 24 * 60 * 60
+  const n = parseInt(m[1], 10)
+  const mult = { s: 1, m: 60, h: 3600, d: 86400 }[m[2] as 's' | 'm' | 'h' | 'd']
+  return n * mult
+})()
+
+function getSecret(): Uint8Array {
+  const key = process.env.JWT_SECRET
+  if (!key) {
+    throw new Error('JWT_SECRET env var is not set — refusing to sign/verify tokens')
+  }
+  return new TextEncoder().encode(key)
+}
 
 export interface AuthPayload {
   userId: string
@@ -16,13 +31,13 @@ export async function signToken(payload: AuthPayload): Promise<string> {
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime(TOKEN_EXPIRY)
-    .sign(secret)
+    .setExpirationTime(SESSION_EXPIRY)
+    .sign(getSecret())
 }
 
 export async function verifyToken(token: string): Promise<AuthPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, secret)
+    const { payload } = await jwtVerify(token, getSecret())
     return {
       userId: payload.userId as string,
       userType: payload.userType as 'client' | 'garage',
@@ -38,7 +53,7 @@ export function setAuthCookie(response: NextResponse, token: string): void {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 7 * 24 * 60 * 60, // 7 days
+    maxAge: SESSION_MAX_AGE_SEC,
   })
 }
 
