@@ -231,7 +231,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
           if (!loggedInClientId && result.clientId) {
             localStorage.setItem('clientId', result.clientId)
             localStorage.setItem('userType', 'client')
-            refreshClient()
+            refreshClient(result.clientId)
           }
 
           success(
