@@ -104,10 +104,23 @@ class AmplifyStack(Stack):
         )
 
         # ── IAM Role for Amplify ────────────────────────────────
+        # Trusted by both amplify.amazonaws.com (build-time / service role)
+        # and lambda.amazonaws.com (SSR compute function under the hood).
+        # Attach AWSLambdaBasicExecutionRole so the SSR runtime auto-creates
+        # `/aws/amplify/<appId>` log group and writes stdout/stderr there —
+        # matches the pattern Amplify's default managed compute role uses.
         self.amplify_role = iam.Role(
             self, "AmplifyRole",
             role_name="nextservice-amplify-role",
-            assumed_by=iam.ServicePrincipal("amplify.amazonaws.com"),
+            assumed_by=iam.CompositePrincipal(
+                iam.ServicePrincipal("amplify.amazonaws.com"),
+                iam.ServicePrincipal("lambda.amazonaws.com"),
+            ),
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name(
+                    "service-role/AWSLambdaBasicExecutionRole"
+                ),
+            ],
         )
 
         # DynamoDB access — all tables + indexes
@@ -116,6 +129,7 @@ class AmplifyStack(Stack):
             "ServiceRequests", "Offers", "ChatMessages",
             "EventLogs", "EmailLogs", "AdminUsers",
             "Payments", "WalletTransactions", "HotDeals",
+            "PerformanceMetrics",
         ]
         dynamo_resources = []
         for t in table_names:
@@ -157,6 +171,7 @@ class AmplifyStack(Stack):
                 f"arn:aws:dynamodb:{self.region}:{self.account}:table/Payments",
                 f"arn:aws:dynamodb:{self.region}:{self.account}:table/WalletTransactions",
                 f"arn:aws:dynamodb:{self.region}:{self.account}:table/HotDeals",
+                f"arn:aws:dynamodb:{self.region}:{self.account}:table/PerformanceMetrics",
             ],
         ))
 
@@ -188,6 +203,11 @@ class AmplifyStack(Stack):
         ))
 
         # CloudWatch Logs
+        # Two groups of log groups:
+        #  - /nextservice/*  — app-emitted structured logs (eventLogger, etc.)
+        #  - /aws/amplify/*  — SSR compute function logs written by the Amplify
+        #    runtime. Without this resource, the SSR Lambda silently fails to
+        #    push logs to CloudWatch and errors become invisible.
         self.amplify_role.add_to_policy(iam.PolicyStatement(
             sid="CloudWatchLogs",
             actions=[
@@ -202,6 +222,8 @@ class AmplifyStack(Stack):
             resources=[
                 f"arn:aws:logs:{self.region}:{self.account}:log-group:/nextservice/*",
                 f"arn:aws:logs:{self.region}:{self.account}:log-group:/nextservice/*:*",
+                f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/amplify/*",
+                f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/amplify/*:*",
             ],
         ))
 
@@ -327,12 +349,17 @@ frontend:
         self.amplify_app.node.add_dependency(auth_secrets_cr)
 
         # ── Branch ──────────────────────────────────────────────
+        # compute_role_arn wires our role into the SSR compute Lambda at
+        # runtime. Without it, Amplify uses an internal default role and our
+        # CloudWatch Logs / DynamoDB permissions don't apply to the SSR
+        # function — which is why logs were invisible before.
         self.main_branch = amplify.CfnBranch(
             self, "MainBranch",
             app_id=self.amplify_app.attr_app_id,
             branch_name=branch,
             stage="PRODUCTION",
             enable_auto_build=True,
+            compute_role_arn=self.amplify_role.role_arn,
         )
 
         # ── Outputs ─────────────────────────────────────────────

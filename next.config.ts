@@ -47,6 +47,17 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_APPSYNC_ENDPOINT: process.env.NEXT_PUBLIC_APPSYNC_ENDPOINT,
     DEPOSIT_PERCENT: process.env.DEPOSIT_PERCENT,
     CANCELLATION_DEADLINE_DAYS: process.env.CANCELLATION_DEADLINE_DAYS,
+    // Amplify Hosting quirk: app-level env vars are only available at build
+    // time. Listing them here inlines them into the SSR bundle so they work
+    // at runtime too. Never reference these from client code.
+    JWT_SECRET: process.env.JWT_SECRET,
+    ADMIN_JWT_SECRET: process.env.ADMIN_JWT_SECRET,
+    SESSION_EXPIRY: process.env.SESSION_EXPIRY,
+    ADMIN_SESSION_EXPIRY: process.env.ADMIN_SESSION_EXPIRY,
+    ADMIN_EMAIL: process.env.ADMIN_EMAIL,
+    NOTIFICATIONS_ENABLED: process.env.NOTIFICATIONS_ENABLED,
+    SES_FROM_ADDRESS: process.env.SES_FROM_ADDRESS,
+    SES_REGION: process.env.SES_REGION,
   },
   async headers() {
     return [

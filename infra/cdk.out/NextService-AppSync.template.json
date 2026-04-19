@@ -41,7 +41,7 @@
      ]
     },
     "Description": "NextService chat events API key",
-    "Expires": 1808164496
+    "Expires": 1808167804
    },
    "Metadata": {
     "aws:cdk:path": "NextService-AppSync/ChatApiKey"

@@ -246,10 +246,31 @@
        "Principal": {
         "Service": "amplify.amazonaws.com"
        }
+      },
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
       }
      ],
      "Version": "2012-10-17"
     },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ],
     "RoleName": "nextservice-amplify-role"
    },
    "Metadata": {
@@ -355,7 +376,9 @@
        "Effect": "Allow",
        "Resource": [
         "arn:aws:logs:eu-central-1:766671488262:log-group:/nextservice/*",
-        "arn:aws:logs:eu-central-1:766671488262:log-group:/nextservice/*:*"
+        "arn:aws:logs:eu-central-1:766671488262:log-group:/nextservice/*:*",
+        "arn:aws:logs:eu-central-1:766671488262:log-group:/aws/amplify/*",
+        "arn:aws:logs:eu-central-1:766671488262:log-group:/aws/amplify/*:*"
        ],
        "Sid": "CloudWatchLogs"
       },
@@ -519,6 +542,12 @@
      ]
     },
     "BranchName": "dev",
+    "ComputeRoleArn": {
+     "Fn::GetAtt": [
+      "AmplifyRole7A8FD9BC",
+      "Arn"
+     ]
+    },
     "EnableAutoBuild": true,
     "Stage": "PRODUCTION"
    },
