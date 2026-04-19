@@ -11,12 +11,12 @@ from constructs import Construct
 class S3Stack(Stack):
     """S3 bucket for photo uploads."""
 
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, *, bucket_name: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         self.uploads_bucket = s3.Bucket(
             self, "UploadsBucket",
-            bucket_name=f"nextservice-uploads-{self.account}",
+            bucket_name=bucket_name,
             removal_policy=RemovalPolicy.RETAIN,
             # Block all public access — photos served via presigned URLs
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,

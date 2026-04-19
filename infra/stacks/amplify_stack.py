@@ -1,9 +1,16 @@
+import textwrap
+
 from aws_cdk import (
+    CustomResource,
+    Duration,
     Stack,
     CfnOutput,
+    RemovalPolicy,
     SecretValue,
     aws_amplify as amplify,
     aws_iam as iam,
+    aws_lambda as lambda_,
+    custom_resources as cr,
 )
 from constructs import Construct
 
@@ -19,6 +26,7 @@ class AmplifyStack(Stack):
         github_owner: str,
         github_repo: str,
         github_token_secret_name: str,
+        auth_secrets_name: str,
         branch: str = "main",
         s3_bucket_name: str,
         appsync_http_endpoint: str,
@@ -27,6 +35,73 @@ class AmplifyStack(Stack):
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        # ── Auth secrets ────────────────────────────────────────
+        # One Secrets Manager secret, JSON body: { JWT_SECRET, ADMIN_JWT_SECRET }.
+        # A Lambda-backed custom resource creates it on first deploy with two
+        # cryptographically random hex strings. Subsequent deploys are no-ops, so
+        # rotations performed out-of-band (aws secretsmanager put-secret-value)
+        # aren't clobbered. Deleting the stack deletes the secret.
+        auth_secrets_fn = lambda_.Function(
+            self, "AuthSecretsFn",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="index.handler",
+            timeout=Duration.seconds(30),
+            code=lambda_.Code.from_inline(textwrap.dedent('''
+                import json, secrets, boto3
+                sm = boto3.client("secretsmanager")
+                def handler(event, context):
+                    req = event["RequestType"]
+                    name = event["ResourceProperties"]["SecretName"]
+                    if req == "Create":
+                        body = json.dumps({
+                            "JWT_SECRET": secrets.token_hex(32),
+                            "ADMIN_JWT_SECRET": secrets.token_hex(32),
+                        })
+                        try:
+                            sm.create_secret(Name=name, SecretString=body,
+                                             Description="NextService auth secrets (JWT + admin JWT)")
+                        except sm.exceptions.ResourceExistsException:
+                            # Already exists (prior deploy or out-of-band create). Leave as-is.
+                            pass
+                    elif req == "Delete":
+                        try:
+                            sm.delete_secret(SecretId=name,
+                                             ForceDeleteWithoutRecovery=True)
+                        except sm.exceptions.ResourceNotFoundException:
+                            pass
+                    # Update is a no-op — preserves out-of-band rotations.
+                    return {"PhysicalResourceId": name}
+            ''')),
+        )
+        auth_secrets_fn.add_to_role_policy(iam.PolicyStatement(
+            actions=[
+                "secretsmanager:CreateSecret",
+                "secretsmanager:DeleteSecret",
+                "secretsmanager:DescribeSecret",
+            ],
+            resources=["*"],
+        ))
+
+        auth_secrets_provider = cr.Provider(
+            self, "AuthSecretsProvider",
+            on_event_handler=auth_secrets_fn,
+        )
+
+        auth_secrets_cr = CustomResource(
+            self, "AuthSecretsResource",
+            service_token=auth_secrets_provider.service_token,
+            resource_type="Custom::AuthSecretsGenerator",
+            properties={"SecretName": auth_secrets_name},
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+
+        jwt_secret_value = SecretValue.secrets_manager(
+            auth_secrets_name, json_field="JWT_SECRET",
+        )
+        admin_jwt_secret_value = SecretValue.secrets_manager(
+            auth_secrets_name, json_field="ADMIN_JWT_SECRET",
+        )
 
         # ── IAM Role for Amplify ────────────────────────────────
         self.amplify_role = iam.Role(
@@ -85,7 +160,7 @@ class AmplifyStack(Stack):
             ],
         ))
 
-        # S3 access
+        # S3 access — wildcard so one role works across envs (staging/production/...)
         self.amplify_role.add_to_policy(iam.PolicyStatement(
             sid="S3Access",
             actions=[
@@ -95,8 +170,8 @@ class AmplifyStack(Stack):
                 "s3:ListBucket",
             ],
             resources=[
-                f"arn:aws:s3:::{s3_bucket_name}",
-                f"arn:aws:s3:::{s3_bucket_name}/*",
+                "arn:aws:s3:::nextservice-uploads-*",
+                "arn:aws:s3:::nextservice-uploads-*/*",
             ],
         ))
 
@@ -229,16 +304,27 @@ frontend:
                 amplify.CfnApp.EnvironmentVariableProperty(
                     name="ADMIN_EMAIL", value="nmarianos93@gmail.com",
                 ),
+                # Auth — resolved from Secrets Manager at deploy time
+                amplify.CfnApp.EnvironmentVariableProperty(
+                    name="JWT_SECRET",
+                    value=jwt_secret_value.unsafe_unwrap(),
+                ),
+                amplify.CfnApp.EnvironmentVariableProperty(
+                    name="SESSION_EXPIRY", value="2d",
+                ),
                 # Admin Dashboard
                 amplify.CfnApp.EnvironmentVariableProperty(
                     name="ADMIN_JWT_SECRET",
-                    value="CHANGE_ME_IN_AMPLIFY_CONSOLE",
+                    value=admin_jwt_secret_value.unsafe_unwrap(),
                 ),
                 amplify.CfnApp.EnvironmentVariableProperty(
                     name="ADMIN_SESSION_EXPIRY", value="8h",
                 ),
             ],
         )
+        # Amplify env vars resolve `{{resolve:secretsmanager:...}}` at deploy
+        # time, so the secret must exist before the app is created/updated.
+        self.amplify_app.node.add_dependency(auth_secrets_cr)
 
         # ── Branch ──────────────────────────────────────────────
         self.main_branch = amplify.CfnBranch(

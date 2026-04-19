@@ -1,16 +1,16 @@
 {
   "version": "53.0.0",
   "files": {
-    "06b892b9b46e953d4ff568cd6614100a63bd6df4d88e3e957c8faaf554a3ddc6": {
+    "047be35a262787c717cded47d634c246066f2a05dbc1aa69d9508eb28b00b009": {
       "displayName": "NextService-AppSync Template",
       "source": {
         "path": "NextService-AppSync.template.json",
         "packaging": "file"
       },
       "destinations": {
-        "766671488262-eu-central-1-40a7c21c": {
+        "766671488262-eu-central-1-6761b637": {
           "bucketName": "cdk-hnb659fds-assets-766671488262-eu-central-1",
-          "objectKey": "06b892b9b46e953d4ff568cd6614100a63bd6df4d88e3e957c8faaf554a3ddc6.json",
+          "objectKey": "047be35a262787c717cded47d634c246066f2a05dbc1aa69d9508eb28b00b009.json",
           "region": "eu-central-1",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-file-publishing-role-766671488262-eu-central-1"
         }

@@ -41,6 +41,18 @@
       "data": "CheckBootstrapVersion"
     }
   ],
+  "/NextService-Amplify/AuthSecretsFn/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuthSecretsFn8DAB7E42"
+    }
+  ],
+  "/NextService-Amplify/AuthSecretsResource/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuthSecretsResource"
+    }
+  ],
   "/NextService-Amplify/AmplifyRole/Resource": [
     {
       "type": "aws:cdk:logicalId",
@@ -53,10 +65,40 @@
       "data": "CDKMetadata"
     }
   ],
+  "/NextService-Amplify/AuthSecretsFn/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuthSecretsFnServiceRole1E13F711"
+    }
+  ],
+  "/NextService-Amplify/AuthSecretsProvider/framework-onEvent/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuthSecretsProviderframeworkonEvent1EF28EB0"
+    }
+  ],
   "/NextService-Amplify/AmplifyRole/DefaultPolicy/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "AmplifyRoleDefaultPolicyBCD6AD91"
+    }
+  ],
+  "/NextService-Amplify/AuthSecretsFn/ServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuthSecretsFnServiceRoleDefaultPolicy2652A7D8"
+    }
+  ],
+  "/NextService-Amplify/AuthSecretsProvider/framework-onEvent/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuthSecretsProviderframeworkonEventServiceRole46CC2671"
+    }
+  ],
+  "/NextService-Amplify/AuthSecretsProvider/framework-onEvent/ServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuthSecretsProviderframeworkonEventServiceRoleDefaultPolicy0F5C5B60"
     }
   ]
 }

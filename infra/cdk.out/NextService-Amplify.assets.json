@@ -1,16 +1,31 @@
 {
   "version": "53.0.0",
   "files": {
-    "d244b7f54942b8a56cabfe532fde0431355483ea45bf23b79322b5619b614266": {
+    "07a90cc3efdfc34da22208dcd9d211f06f5b0e01b21e778edc7c3966b1f61d57": {
+      "displayName": "AuthSecretsProvider/framework-onEvent/Code",
+      "source": {
+        "path": "asset.07a90cc3efdfc34da22208dcd9d211f06f5b0e01b21e778edc7c3966b1f61d57",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "766671488262-eu-central-1-e2143efe": {
+          "bucketName": "cdk-hnb659fds-assets-766671488262-eu-central-1",
+          "objectKey": "07a90cc3efdfc34da22208dcd9d211f06f5b0e01b21e778edc7c3966b1f61d57.zip",
+          "region": "eu-central-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-file-publishing-role-766671488262-eu-central-1"
+        }
+      }
+    },
+    "9e4f31936574f1e7506d64d7865feba69de12a5cbe97aba2ef7a70dac526292e": {
       "displayName": "NextService-Amplify Template",
       "source": {
         "path": "NextService-Amplify.template.json",
         "packaging": "file"
       },
       "destinations": {
-        "766671488262-eu-central-1-c7a37a77": {
+        "766671488262-eu-central-1-cbd02d5e": {
           "bucketName": "cdk-hnb659fds-assets-766671488262-eu-central-1",
-          "objectKey": "d244b7f54942b8a56cabfe532fde0431355483ea45bf23b79322b5619b614266.json",
+          "objectKey": "9e4f31936574f1e7506d64d7865feba69de12a5cbe97aba2ef7a70dac526292e.json",
           "region": "eu-central-1",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-file-publishing-role-766671488262-eu-central-1"
         }

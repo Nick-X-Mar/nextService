@@ -47,6 +47,14 @@
       }
     }
   ],
+  "/NextService-DynamoDB/AdminUsersTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "AdminUsersTable35B520A8"
+      }
+    }
+  ],
   "/NextService-DynamoDB/ClientsTableArn": [
     {
       "type": "aws:cdk:logicalId",
@@ -81,6 +89,12 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "ChatMessagesTableArn"
+    }
+  ],
+  "/NextService-DynamoDB/AdminUsersTableArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AdminUsersTableArn"
     }
   ],
   "/NextService-DynamoDB/BootstrapVersion": [
@@ -129,6 +143,12 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "ChatMessagesTableB5D45C8B"
+    }
+  ],
+  "/NextService-DynamoDB/AdminUsersTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AdminUsersTable35B520A8"
     }
   ],
   "/NextService-DynamoDB/CDKMetadata/Default": [

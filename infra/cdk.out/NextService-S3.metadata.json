@@ -40,17 +40,5 @@
       "type": "aws:cdk:logicalId",
       "data": "CDKMetadata"
     }
-  ],
-  "/NextService-S3/Exports/Output{\"Ref\":\"UploadsBucket5E5E9B64\"}": [
-    {
-      "type": "aws:cdk:logicalId",
-      "data": "ExportsOutputRefUploadsBucket5E5E9B64F2F56CC2"
-    }
-  ],
-  "/NextService-S3/UploadsBucket/Policy/Resource": [
-    {
-      "type": "aws:cdk:logicalId",
-      "data": "UploadsBucketPolicy34A32B0B"
-    }
   ]
 }

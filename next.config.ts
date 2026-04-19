@@ -7,6 +7,18 @@ const nextConfig: NextConfig = {
     buildActivity: false,
     buildActivityPosition: 'bottom-right',
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.s3.eu-central-1.amazonaws.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.s3.amazonaws.com',
+      },
+    ],
+  },
   webpack: (config) => {
     config.module.rules.push({
       test: /\.yaml$/,

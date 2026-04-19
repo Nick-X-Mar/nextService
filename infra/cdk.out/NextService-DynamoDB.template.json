@@ -450,6 +450,51 @@
     "aws:cdk:path": "NextService-DynamoDB/ChatMessagesTable/Resource"
    }
   },
+  "AdminUsersTable35B520A8": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "adminId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "email",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "EmailIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "email",
+        "KeyType": "HASH"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "adminId",
+      "KeyType": "HASH"
+     }
+    ],
+    "PointInTimeRecoverySpecification": {
+     "PointInTimeRecoveryEnabled": true
+    },
+    "TableName": "AdminUsers"
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "NextService-DynamoDB/AdminUsersTable/Resource"
+   }
+  },
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
@@ -525,6 +570,17 @@
    },
    "Export": {
     "Name": "NextService-ChatMessagesTableArn"
+   }
+  },
+  "AdminUsersTableArn": {
+   "Value": {
+    "Fn::GetAtt": [
+     "AdminUsersTable35B520A8",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "NextService-AdminUsersTableArn"
    }
   }
  },

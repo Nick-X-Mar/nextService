@@ -13,8 +13,7 @@
     "dev:full": "concurrently \"npm run dynamodb\" \"npm run mock-appsync\" \"npm run dev\"",
     "dev:all": "concurrently \"npm run services\" \"npm run dev\"",
     "test:e2e": "npx playwright test",
-    "test:e2e:ui": "npx playwright test --ui",
-    "setup:iam": "tsx scripts/setup-iam.ts"
+    "test:e2e:ui": "npx playwright test --ui"
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch-logs": "^3.1029.0",
@@ -54,7 +53,6 @@
     "ws": "^8.14.2"
   },
   "devDependencies": {
-    "@aws-sdk/client-iam": "^3.1031.0",
     "@eslint/eslintrc": "^3.3.1",
     "@playwright/test": "^1.58.2",
     "@types/bcryptjs": "^3.0.0",

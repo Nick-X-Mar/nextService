@@ -44,6 +44,10 @@ from stacks.amplify_stack import AmplifyStack
 AWS_ACCOUNT = "766671488262"
 AWS_REGION = "eu-central-1"
 
+# Deployment stage — used as suffix for environment-scoped resources
+# (e.g. S3 bucket `nextservice-uploads-{STAGE}`). Override via `cdk deploy -c stage=production`.
+STAGE = "staging"
+
 # Email to receive alarm notifications (will get a confirmation email)
 ALERT_EMAIL = "nmarianos93@gmail.com"
 
@@ -55,17 +59,30 @@ GITHUB_BRANCH = "dev"
 # GitHub personal access token stored in AWS Secrets Manager
 GITHUB_TOKEN_SECRET_NAME = "nextservice/github-token"
 
+# Auth secrets stored in AWS Secrets Manager.
+# JSON body with fields: JWT_SECRET, ADMIN_JWT_SECRET.
+# Create once (see `aws secretsmanager create-secret` example in the infra README).
+AUTH_SECRETS_NAME = "nextservice/auth-secrets"
+
 # ─────────────────────────────────────────────────────────────────
 
 env = cdk.Environment(account=AWS_ACCOUNT, region=AWS_REGION)
 
 app = cdk.App()
 
+# Allow `cdk deploy -c stage=production` to override the default
+stage = app.node.try_get_context("stage") or STAGE
+
+# Bucket name is computed once here and passed to both stacks as a plain string
+# (no CFN Fn::ImportValue), so changing it later doesn't block updates across
+# stacks — see https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-stack-exports.html
+s3_bucket_name = f"nextservice-uploads-{AWS_ACCOUNT}-{stage}"
+
 # 1. DynamoDB — 6 tables with GSIs
 dynamo = DynamoDBStack(app, "NextService-DynamoDB", env=env)
 
 # 2. S3 — photo uploads bucket
-s3 = S3Stack(app, "NextService-S3", env=env)
+s3 = S3Stack(app, "NextService-S3", bucket_name=s3_bucket_name, env=env)
 
 # 3. AppSync Events — real-time chat
 appsync = AppSyncStack(app, "NextService-AppSync", env=env)
@@ -84,14 +101,17 @@ amplify = AmplifyStack(
     github_owner=GITHUB_OWNER,
     github_repo=GITHUB_REPO,
     github_token_secret_name=GITHUB_TOKEN_SECRET_NAME,
+    auth_secrets_name=AUTH_SECRETS_NAME,
     branch=GITHUB_BRANCH,
-    s3_bucket_name=s3.uploads_bucket.bucket_name,
+    s3_bucket_name=s3_bucket_name,
     appsync_http_endpoint=appsync.http_endpoint,
     appsync_realtime_endpoint=appsync.realtime_endpoint,
     appsync_api_key=appsync.api_key.attr_api_key,
     env=env,
 )
-amplify.add_dependency(s3)
+# Amplify no longer imports anything from the S3 stack (bucket name is passed
+# as a plain string), so the hard dependency is removed — this lets us deploy
+# them independently and avoid cross-stack export/import ordering headaches.
 amplify.add_dependency(appsync)
 amplify.add_dependency(dynamo)
 

@@ -12,7 +12,7 @@
       }
      ]
     },
-    "BucketName": "nextservice-uploads-766671488262",
+    "BucketName": "nextservice-uploads-766671488262-staging",
     "CorsConfiguration": {
      "CorsRules": [
       {
@@ -23,11 +23,12 @@
         "GET",
         "PUT",
         "POST",
-        "DELETE",
         "HEAD"
        ],
        "AllowedOrigins": [
-        "*"
+        "https://nextservice.gr",
+        "https://www.nextservice.gr",
+        "http://localhost:3000"
        ],
        "ExposedHeaders": [
         "ETag"
@@ -53,15 +54,15 @@
     "OwnershipControls": {
      "Rules": [
       {
-       "ObjectOwnership": "BucketOwnerPreferred"
+       "ObjectOwnership": "BucketOwnerEnforced"
       }
      ]
     },
     "PublicAccessBlockConfiguration": {
-     "BlockPublicAcls": false,
-     "BlockPublicPolicy": false,
-     "IgnorePublicAcls": false,
-     "RestrictPublicBuckets": false
+     "BlockPublicAcls": true,
+     "BlockPublicPolicy": true,
+     "IgnorePublicAcls": true,
+     "RestrictPublicBuckets": true
     }
    },
    "UpdateReplacePolicy": "Retain",
@@ -70,47 +71,10 @@
     "aws:cdk:path": "NextService-S3/UploadsBucket/Resource"
    }
   },
-  "UploadsBucketPolicy34A32B0B": {
-   "Type": "AWS::S3::BucketPolicy",
-   "Properties": {
-    "Bucket": {
-     "Ref": "UploadsBucket5E5E9B64"
-    },
-    "PolicyDocument": {
-     "Statement": [
-      {
-       "Action": "s3:GetObject",
-       "Effect": "Allow",
-       "Principal": {
-        "AWS": "*"
-       },
-       "Resource": {
-        "Fn::Join": [
-         "",
-         [
-          {
-           "Fn::GetAtt": [
-            "UploadsBucket5E5E9B64",
-            "Arn"
-           ]
-          },
-          "/*"
-         ]
-        ]
-       }
-      }
-     ],
-     "Version": "2012-10-17"
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "NextService-S3/UploadsBucket/Policy/Resource"
-   }
-  },
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/zPSMzKx0DNQTCwv1k1OydbNyUzSqw4uSUzO1kksL44vNtardipNzk4t0XFOy4OyIFRAfk5mciVCGMKvBQn4l5YUlJbU6gRUlmTk5+kb6xka65krZhVnZuoWleaVZOam6gVBaAA5/fW5fwAAAA=="
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/zPSMzKx0DNQTCwv1k1OydbNyUzSqw4uSUzO1kksL44vNtardipNzk4t0XFOy4OwakFM/9KSgtKSWp2AypKM/Dx9Yz1DYz1zxazizEzdotK8kszcVL0gCA0AxffAPmIAAAA="
    },
    "Metadata": {
     "aws:cdk:path": "NextService-S3/CDKMetadata/Default"
@@ -146,14 +110,6 @@
    },
    "Export": {
     "Name": "NextService-S3BucketDomain"
-   }
-  },
-  "ExportsOutputRefUploadsBucket5E5E9B64F2F56CC2": {
-   "Value": {
-    "Ref": "UploadsBucket5E5E9B64"
-   },
-   "Export": {
-    "Name": "NextService-S3:ExportsOutputRefUploadsBucket5E5E9B64F2F56CC2"
    }
   }
  },

@@ -266,11 +266,11 @@ export const presignPhotoRecords = async (
   )
 }
 
-// Utility function to check if S3 service is properly configured
+// Utility function to check if S3 service is properly configured.
+// Credentials are resolved at runtime by the SDK from one of: explicit env vars,
+// the local .aws/credentials file (dev), or the attached IAM role (prod).
+// We only verify the bucket name here; any missing credentials surface as
+// errors from the actual upload/delete call.
 export const isS3Configured = (): boolean => {
-  return !!(
-    process.env.ACCESS_KEY_ID &&
-    process.env.SECRET_ACCESS_KEY &&
-    BUCKET_NAME
-  )
+  return !!BUCKET_NAME
 }

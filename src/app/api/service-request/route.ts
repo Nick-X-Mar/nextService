@@ -231,7 +231,6 @@ async function _POST(request: NextRequest) {
         brand: string
         model: string
         modelYear: string
-        vinNumber: string
         engineCC: string
         fuelType: string
         isAutomatic: boolean
@@ -241,6 +240,7 @@ async function _POST(request: NextRequest) {
         isActive: boolean
         createdAt: string
         updatedAt: string
+        vinNumber?: string
         engineNumber?: string
         licensePlate?: string
         color?: string
@@ -252,7 +252,6 @@ async function _POST(request: NextRequest) {
         brand: body.brand,
         model: body.model,
         modelYear: body.modelYear,
-        vinNumber: body.vinNumber,
         engineCC: body.engineCC,
         fuelType: body.fuelType || 'petrol', // Default to petrol if not provided
         isAutomatic: body.isAutomatic !== undefined ? body.isAutomatic : false, // Default to false if not provided
@@ -264,7 +263,8 @@ async function _POST(request: NextRequest) {
         updatedAt: new Date().toISOString()
       }
       
-      // Only add optional fields if they have values
+      // Only add optional fields if they have values — empty strings break GSI keys
+      if (body.vinNumber) vehicleData.vinNumber = body.vinNumber
       if (body.engineNumber) vehicleData.engineNumber = body.engineNumber
       if (body.licensePlate) vehicleData.licensePlate = body.licensePlate
       if (body.color) vehicleData.color = body.color
