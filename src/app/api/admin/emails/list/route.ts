@@ -61,7 +61,18 @@ async function _GET(request: NextRequest) {
       templateName: item.templateName,
       status: item.status,
       sentAt: item.sentAt,
-      error: item.error
+      // Lifecycle timestamps + counters written by the SES event processor.
+      // All optional — only present after SES reports the corresponding
+      // event (delivery/open/click/bounce/complaint).
+      deliveredAt: item.deliveredAt,
+      openedAt: item.openedAt,
+      clickedAt: item.clickedAt,
+      bouncedAt: item.bouncedAt,
+      complainedAt: item.complainedAt,
+      openCount: item.openCount,
+      clickCount: item.clickCount,
+      bounceType: item.bounceType,
+      error: item.error || item.errorMessage
     }))
 
     // Sort by sentAt descending if not already from Query

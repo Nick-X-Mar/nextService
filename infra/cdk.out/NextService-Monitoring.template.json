@@ -202,6 +202,14 @@
    "Export": {
     "Name": "NextService-DashboardName"
    }
+  },
+  "ExportsOutputRefAlertTopic2720D5359ADB6D3E": {
+   "Value": {
+    "Ref": "AlertTopic2720D535"
+   },
+   "Export": {
+    "Name": "NextService-Monitoring:ExportsOutputRefAlertTopic2720D5359ADB6D3E"
+   }
   }
  },
  "Parameters": {

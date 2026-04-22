@@ -101,6 +101,9 @@ class DynamoDBStack(Stack):
         )
 
         # ── ServiceRequests ─────────────────────────────────────
+        # Stream is consumed by the NotificationsStack Lambda to broadcast
+        # new requests to active garages. NEW_IMAGE is enough — we only need
+        # the newly inserted row.
         self.service_requests_table = dynamodb.Table(
             self, "ServiceRequestsTable",
             table_name="ServiceRequests",
@@ -112,6 +115,7 @@ class DynamoDBStack(Stack):
             point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
                 point_in_time_recovery_enabled=True,
             ),
+            stream=dynamodb.StreamViewType.NEW_IMAGE,
         )
         self.service_requests_table.add_global_secondary_index(
             index_name="ClientRequestsIndex",
@@ -257,3 +261,7 @@ class DynamoDBStack(Stack):
             CfnOutput(self, f"{name}TableArn",
                        value=table.table_arn,
                        export_name=f"NextService-{name}TableArn")
+
+        CfnOutput(self, "ServiceRequestsStreamArn",
+                  value=self.service_requests_table.table_stream_arn or "",
+                  export_name="NextService-ServiceRequestsStreamArn")

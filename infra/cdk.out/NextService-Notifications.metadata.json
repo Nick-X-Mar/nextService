@@ -1,0 +1,152 @@
+{
+  "/NextService-Notifications/MainConfigSet": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MainConfigSet"
+    }
+  ],
+  "/NextService-Notifications/MainEventDestination": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MainEventDestination"
+    }
+  ],
+  "/NextService-Notifications/ServiceRequestsStreamMapping": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ServiceRequestsStreamMapping"
+    }
+  ],
+  "/NextService-Notifications/BroadcastFunctionName": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BroadcastFunctionName"
+    }
+  ],
+  "/NextService-Notifications/BroadcastDLQArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BroadcastDLQArn"
+    }
+  ],
+  "/NextService-Notifications/SESConfigSetName": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SESConfigSetName"
+    }
+  ],
+  "/NextService-Notifications/SESEventsTopicArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SESEventsTopicArn"
+    }
+  ],
+  "/NextService-Notifications/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/NextService-Notifications/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/NextService-Notifications/SESEventsTopic/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SESEventsTopicA5735C9D"
+    }
+  ],
+  "/NextService-Notifications/SesEventProcessorFn/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SesEventProcessorFnE8A772B8"
+    }
+  ],
+  "/NextService-Notifications/SesEventProcessorFn/AllowInvoke:NextServiceNotificationsSESEventsTopicD50C0EE6": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SesEventProcessorFnAllowInvokeNextServiceNotificationsSESEventsTopicD50C0EE620086923"
+    }
+  ],
+  "/NextService-Notifications/NewRequestBroadcastDLQ/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "NewRequestBroadcastDLQ0D1A41DE"
+    }
+  ],
+  "/NextService-Notifications/NewRequestBroadcastFn/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "NewRequestBroadcastFnC5596EDA"
+    }
+  ],
+  "/NextService-Notifications/BroadcastDLQAlarm/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BroadcastDLQAlarm7F657A13"
+    }
+  ],
+  "/NextService-Notifications/BroadcastErrorsAlarm/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BroadcastErrorsAlarm5FEEB3C3"
+    }
+  ],
+  "/NextService-Notifications/SESBounceRateAlarm/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SESBounceRateAlarm5540DF45"
+    }
+  ],
+  "/NextService-Notifications/SESComplaintRateAlarm/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SESComplaintRateAlarm3611F2D4"
+    }
+  ],
+  "/NextService-Notifications/CDKMetadata/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CDKMetadata"
+    }
+  ],
+  "/NextService-Notifications/SESEventsTopic/Policy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SESEventsTopicPolicyD01EB26C"
+    }
+  ],
+  "/NextService-Notifications/SesEventProcessorFn/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SesEventProcessorFnServiceRole09063D12"
+    }
+  ],
+  "/NextService-Notifications/SesEventProcessorFn/SESEventsTopic/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SesEventProcessorFnSESEventsTopicC5FCEA83"
+    }
+  ],
+  "/NextService-Notifications/NewRequestBroadcastFn/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "NewRequestBroadcastFnServiceRoleAC0DE572"
+    }
+  ],
+  "/NextService-Notifications/SesEventProcessorFn/ServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SesEventProcessorFnServiceRoleDefaultPolicy9DC7513A"
+    }
+  ],
+  "/NextService-Notifications/NewRequestBroadcastFn/ServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "NewRequestBroadcastFnServiceRoleDefaultPolicy68916853"
+    }
+  ]
+}

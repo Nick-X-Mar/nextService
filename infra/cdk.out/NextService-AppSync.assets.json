@@ -1,16 +1,31 @@
 {
   "version": "53.0.0",
   "files": {
-    "0e378598a89c2ebcb357e2cd80539b1ba87c9cb35af7c86bff1e6b465994d185": {
+    "0c481c51b3274e8d79197c0e4842a12eb5bd129df1d39e0fd39de3747befcd49": {
+      "displayName": "ApiKeyRotatorFn/Code",
+      "source": {
+        "path": "asset.0c481c51b3274e8d79197c0e4842a12eb5bd129df1d39e0fd39de3747befcd49",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "766671488262-eu-central-1-abb8c7f0": {
+          "bucketName": "cdk-hnb659fds-assets-766671488262-eu-central-1",
+          "objectKey": "0c481c51b3274e8d79197c0e4842a12eb5bd129df1d39e0fd39de3747befcd49.zip",
+          "region": "eu-central-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-file-publishing-role-766671488262-eu-central-1"
+        }
+      }
+    },
+    "18c965070433a89e57550c0c17a519829737ff40c2fa291625589e68a11f520b": {
       "displayName": "NextService-AppSync Template",
       "source": {
         "path": "NextService-AppSync.template.json",
         "packaging": "file"
       },
       "destinations": {
-        "766671488262-eu-central-1-c0f173c2": {
+        "766671488262-eu-central-1-6016ed8d": {
           "bucketName": "cdk-hnb659fds-assets-766671488262-eu-central-1",
-          "objectKey": "0e378598a89c2ebcb357e2cd80539b1ba87c9cb35af7c86bff1e6b465994d185.json",
+          "objectKey": "18c965070433a89e57550c0c17a519829737ff40c2fa291625589e68a11f520b.json",
           "region": "eu-central-1",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-file-publishing-role-766671488262-eu-central-1"
         }

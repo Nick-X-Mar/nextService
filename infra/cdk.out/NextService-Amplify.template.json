@@ -360,7 +360,8 @@
       {
        "Action": [
         "appsync:GraphQL",
-        "appsync:Connect"
+        "appsync:Connect",
+        "appsync:ListApiKeys"
        ],
        "Effect": "Allow",
        "Resource": "arn:aws:appsync:eu-central-1:766671488262:apis/*",
@@ -496,6 +497,10 @@
      {
       "Name": "SES_REGION",
       "Value": "eu-central-1"
+     },
+     {
+      "Name": "SES_CONFIG_SET",
+      "Value": "nextservice-main"
      },
      {
       "Name": "ADMIN_EMAIL",

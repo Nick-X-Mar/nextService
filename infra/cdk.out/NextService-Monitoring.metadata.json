@@ -83,6 +83,12 @@
       "data": "CDKMetadata"
     }
   ],
+  "/NextService-Monitoring/Exports/Output{\"Ref\":\"AlertTopic2720D535\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefAlertTopic2720D5359ADB6D3E"
+    }
+  ],
   "/NextService-Monitoring/AlertTopic/nmarianos93@gmail.com/Resource": [
     {
       "type": "aws:cdk:logicalId",

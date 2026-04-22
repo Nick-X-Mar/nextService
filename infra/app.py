@@ -37,6 +37,7 @@ from stacks.s3_stack import S3Stack
 from stacks.appsync_stack import AppSyncStack
 from stacks.monitoring_stack import MonitoringStack
 from stacks.amplify_stack import AmplifyStack
+from stacks.notifications_stack import NotificationsStack
 
 # ─────────────────────────────────────────────────────────────────
 # CONFIGURATION — edit these values for your deployment
@@ -64,6 +65,10 @@ GITHUB_TOKEN_SECRET_NAME = "nextservice/github-token"
 # Create once (see `aws secretsmanager create-secret` example in the infra README).
 AUTH_SECRETS_NAME = "nextservice/auth-secrets"
 
+# Public URL used in email CTA buttons. Override per-stage via CDK context:
+# `cdk deploy -c app_url=https://staging.nextservice.gr`
+APP_URL = "https://nextservice.gr"
+
 # ─────────────────────────────────────────────────────────────────
 
 env = cdk.Environment(account=AWS_ACCOUNT, region=AWS_REGION)
@@ -72,6 +77,7 @@ app = cdk.App()
 
 # Allow `cdk deploy -c stage=production` to override the default
 stage = app.node.try_get_context("stage") or STAGE
+app_url = app.node.try_get_context("app_url") or APP_URL
 
 # Bucket name is computed once here and passed to both stacks as a plain string
 # (no CFN Fn::ImportValue), so changing it later doesn't block updates across
@@ -84,15 +90,22 @@ dynamo = DynamoDBStack(app, "NextService-DynamoDB", env=env)
 # 2. S3 — photo uploads bucket
 s3 = S3Stack(app, "NextService-S3", bucket_name=s3_bucket_name, env=env)
 
-# 3. AppSync Events — real-time chat
-appsync = AppSyncStack(app, "NextService-AppSync", env=env)
-
-# 4. Monitoring — CloudWatch logs, alarms, SNS email alerts
+# 3. Monitoring — CloudWatch logs, alarms, SNS email alerts.
+# Created before AppSync so the key-rotator Lambda can wire its error alarm
+# into the shared alert topic.
 monitoring = MonitoringStack(
     app, "NextService-Monitoring",
     alert_email=ALERT_EMAIL,
     env=env,
 )
+
+# 4. AppSync Events — real-time chat + self-rotating API key
+appsync = AppSyncStack(
+    app, "NextService-AppSync",
+    alert_topic=monitoring.alert_topic,
+    env=env,
+)
+appsync.add_dependency(monitoring)
 
 # 5. Amplify Hosting — Next.js SSR with env vars from other stacks
 # AppSync attr_dns is a list: [http_endpoint, realtime_endpoint]
@@ -114,5 +127,20 @@ amplify = AmplifyStack(
 # them independently and avoid cross-stack export/import ordering headaches.
 amplify.add_dependency(appsync)
 amplify.add_dependency(dynamo)
+
+# 6. Notifications — DynamoDB Streams → Lambda → SES broadcast
+# The Next.js API route just writes the request to DynamoDB; this stack
+# handles fan-out to every active garage, completely out-of-band.
+notifications = NotificationsStack(
+    app, "NextService-Notifications",
+    service_requests_stream_arn=dynamo.service_requests_table.table_stream_arn,
+    garages_table_arn=dynamo.garages_table.table_arn,
+    alert_topic=monitoring.alert_topic,
+    app_url=app_url,
+    notifications_enabled=True,
+    env=env,
+)
+notifications.add_dependency(dynamo)
+notifications.add_dependency(monitoring)
 
 app.synth()

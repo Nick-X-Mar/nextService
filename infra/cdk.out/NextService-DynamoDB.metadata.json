@@ -97,6 +97,12 @@
       "data": "AdminUsersTableArn"
     }
   ],
+  "/NextService-DynamoDB/ServiceRequestsStreamArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ServiceRequestsStreamArn"
+    }
+  ],
   "/NextService-DynamoDB/BootstrapVersion": [
     {
       "type": "aws:cdk:logicalId",
@@ -155,6 +161,18 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "CDKMetadata"
+    }
+  ],
+  "/NextService-DynamoDB/Exports/Output{\"Fn::GetAtt\":[\"GaragesTable80195EE3\",\"Arn\"]}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputFnGetAttGaragesTable80195EE3ArnAA09DDCB"
+    }
+  ],
+  "/NextService-DynamoDB/Exports/Output{\"Fn::GetAtt\":[\"ServiceRequestsTable5933C500\",\"StreamArn\"]}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputFnGetAttServiceRequestsTable5933C500StreamArn6C932827"
     }
   ]
 }

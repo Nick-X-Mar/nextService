@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Icon from '@/components/ui/Icon'
@@ -26,7 +26,19 @@ export default function LoginPage() {
   const router = useRouter()
   const { success, error } = useToast()
   const { refreshUser } = useUser()
-  const { refreshClient, refreshGarage } = useAuth()
+  const { refreshClient, refreshGarage, userType: authUserType, client, garage, isLoading: authLoading } = useAuth()
+
+  // If the user is already authenticated, bounce them to their home.
+  // Without this, landing on /login (e.g. via browser back) shows the login
+  // form alongside the logged-in chrome (sidebar/header).
+  useEffect(() => {
+    if (authLoading) return
+    if (authUserType === 'garage' && garage) {
+      router.replace(`/garage-dashboard/${garage.id}`)
+    } else if (authUserType === 'client' && client) {
+      router.replace(`/requests/${client.id}`)
+    }
+  }, [authLoading, authUserType, client, garage, router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -59,13 +71,13 @@ export default function LoginPage() {
           localStorage.removeItem('clientId')
           localStorage.setItem('garageId', user.id)
           success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.companyName}!`)
-          refreshGarage(user.id)
-          router.push('/garage-dashboard')
+          await refreshGarage(user.id)
+          router.push(`/garage-dashboard/${user.id}`)
         } else {
           localStorage.removeItem('garageId')
           localStorage.setItem('clientId', user.id)
           success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.firstName}!`)
-          refreshClient(user.id)
+          await refreshClient(user.id)
           router.push(`/requests/${user.id}`)
         }
       } else {

@@ -53,6 +53,30 @@
       "data": "CheckBootstrapVersion"
     }
   ],
+  "/NextService-AppSync/ApiKeyRotatorFn/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ApiKeyRotatorFnBDF6B9CF"
+    }
+  ],
+  "/NextService-AppSync/ApiKeyRotatorSchedule/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ApiKeyRotatorScheduleFED55C18"
+    }
+  ],
+  "/NextService-AppSync/ApiKeyRotatorSchedule/AllowEventRuleNextServiceAppSyncApiKeyRotatorFn969D5915": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ApiKeyRotatorScheduleAllowEventRuleNextServiceAppSyncApiKeyRotatorFn969D5915D2F8245C"
+    }
+  ],
+  "/NextService-AppSync/ApiKeyRotatorAlarm/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ApiKeyRotatorAlarm2DB07960"
+    }
+  ],
   "/NextService-AppSync/CDKMetadata/Default": [
     {
       "type": "aws:cdk:logicalId",
@@ -69,6 +93,18 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "ExportsOutputFnGetAttChatApiKeyApiKeyCBB19482"
+    }
+  ],
+  "/NextService-AppSync/ApiKeyRotatorFn/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ApiKeyRotatorFnServiceRole510DF920"
+    }
+  ],
+  "/NextService-AppSync/ApiKeyRotatorFn/ServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ApiKeyRotatorFnServiceRoleDefaultPolicy575FB301"
     }
   ]
 }

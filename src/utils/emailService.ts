@@ -17,6 +17,11 @@ const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
 const FROM_ADDRESS = process.env.SES_FROM_ADDRESS || 'no-reply@nextservice.gr'
 const FROM_NAME = 'NextService'
 const SES_REGION = process.env.SES_REGION || process.env.REGION || 'eu-central-1'
+// Name of the SES Configuration Set defined in notifications_stack.py. When
+// set, every send goes through it, which enables per-email event tracking
+// (delivery/bounce/complaint/open/click) via SNS → event processor Lambda.
+// Empty string disables tagging (local dev / ad-hoc sends).
+const SES_CONFIG_SET = process.env.SES_CONFIG_SET || ''
 
 // Retention: 180 days for the EmailLogs records — long enough to debug
 // recent delivery issues, short enough not to hoard personal data.
@@ -123,13 +128,25 @@ async function sendEmailInternal(input: SendEmailInput): Promise<void> {
   try {
     const boundary = `----=_Part_${randomUUID().replace(/-/g, '')}`
 
-    const rawMessage = [
+    const headers: string[] = [
       `From: ${FROM_NAME} <${FROM_ADDRESS}>`,
       `To: ${to}`,
       `Subject: =?UTF-8?B?${Buffer.from(rendered.subject).toString('base64')}?=`,
       `MIME-Version: 1.0`,
       `Content-Type: multipart/alternative; boundary="${boundary}"`,
       `X-Mailer: NextService`,
+      // Read by the SES event processor Lambda to correlate lifecycle
+      // events back to this EmailLogs row.
+      `X-Nextservice-EmailId: ${emailId}`
+    ]
+    if (SES_CONFIG_SET) {
+      // Routes the send through the Configuration Set → unlocks event
+      // publishing + open/click tracking.
+      headers.push(`X-SES-CONFIGURATION-SET: ${SES_CONFIG_SET}`)
+    }
+
+    const rawMessage = [
+      ...headers,
       ``,
       `--${boundary}`,
       `Content-Type: text/plain; charset=UTF-8`,

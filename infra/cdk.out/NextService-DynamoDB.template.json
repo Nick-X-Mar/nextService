@@ -276,6 +276,9 @@
     "PointInTimeRecoverySpecification": {
      "PointInTimeRecoveryEnabled": true
     },
+    "StreamSpecification": {
+     "StreamViewType": "NEW_IMAGE"
+    },
     "TableName": "ServiceRequests"
    },
    "UpdateReplacePolicy": "Retain",
@@ -581,6 +584,39 @@
    },
    "Export": {
     "Name": "NextService-AdminUsersTableArn"
+   }
+  },
+  "ServiceRequestsStreamArn": {
+   "Value": {
+    "Fn::GetAtt": [
+     "ServiceRequestsTable5933C500",
+     "StreamArn"
+    ]
+   },
+   "Export": {
+    "Name": "NextService-ServiceRequestsStreamArn"
+   }
+  },
+  "ExportsOutputFnGetAttGaragesTable80195EE3ArnAA09DDCB": {
+   "Value": {
+    "Fn::GetAtt": [
+     "GaragesTable80195EE3",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "NextService-DynamoDB:ExportsOutputFnGetAttGaragesTable80195EE3ArnAA09DDCB"
+   }
+  },
+  "ExportsOutputFnGetAttServiceRequestsTable5933C500StreamArn6C932827": {
+   "Value": {
+    "Fn::GetAtt": [
+     "ServiceRequestsTable5933C500",
+     "StreamArn"
+    ]
+   },
+   "Export": {
+    "Name": "NextService-DynamoDB:ExportsOutputFnGetAttServiceRequestsTable5933C500StreamArn6C932827"
    }
   }
  },

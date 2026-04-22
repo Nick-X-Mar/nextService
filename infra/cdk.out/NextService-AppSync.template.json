@@ -41,7 +41,7 @@
      ]
     },
     "Description": "NextService chat events API key",
-    "Expires": 1808168481
+    "Expires": 1808426165
    },
    "Metadata": {
     "aws:cdk:path": "NextService-AppSync/ChatApiKey"
@@ -62,10 +62,189 @@
     "aws:cdk:path": "NextService-AppSync/DefaultNamespace"
    }
   },
+  "ApiKeyRotatorFnServiceRole510DF920": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/ApiKeyRotatorFn/ServiceRole/Resource"
+   }
+  },
+  "ApiKeyRotatorFnServiceRoleDefaultPolicy575FB301": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "appsync:ListApiKeys",
+        "appsync:UpdateApiKey"
+       ],
+       "Effect": "Allow",
+       "Resource": "arn:aws:appsync:eu-central-1:766671488262:apis/*",
+       "Sid": "RotateAppSyncApiKeys"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "ApiKeyRotatorFnServiceRoleDefaultPolicy575FB301",
+    "Roles": [
+     {
+      "Ref": "ApiKeyRotatorFnServiceRole510DF920"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/ApiKeyRotatorFn/ServiceRole/DefaultPolicy/Resource"
+   }
+  },
+  "ApiKeyRotatorFnBDF6B9CF": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-766671488262-eu-central-1",
+     "S3Key": "0c481c51b3274e8d79197c0e4842a12eb5bd129df1d39e0fd39de3747befcd49.zip"
+    },
+    "Description": "Extend AppSync API key expiration back to 365 days",
+    "Environment": {
+     "Variables": {
+      "APPSYNC_API_ID": {
+       "Fn::GetAtt": [
+        "ChatEventsApi",
+        "ApiId"
+       ]
+      }
+     }
+    },
+    "FunctionName": "nextservice-appsync-key-rotator",
+    "Handler": "index.handler",
+    "MemorySize": 128,
+    "Role": {
+     "Fn::GetAtt": [
+      "ApiKeyRotatorFnServiceRole510DF920",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs20.x",
+    "Timeout": 30
+   },
+   "DependsOn": [
+    "ApiKeyRotatorFnServiceRoleDefaultPolicy575FB301",
+    "ApiKeyRotatorFnServiceRole510DF920"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/ApiKeyRotatorFn/Resource",
+    "aws:asset:path": "asset.0c481c51b3274e8d79197c0e4842a12eb5bd129df1d39e0fd39de3747befcd49",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "ApiKeyRotatorScheduleFED55C18": {
+   "Type": "AWS::Events::Rule",
+   "Properties": {
+    "Description": "AppSync API key expiration extension (every 300d)",
+    "Name": "nextservice-appsync-key-rotator",
+    "ScheduleExpression": "rate(300 days)",
+    "State": "ENABLED",
+    "Targets": [
+     {
+      "Arn": {
+       "Fn::GetAtt": [
+        "ApiKeyRotatorFnBDF6B9CF",
+        "Arn"
+       ]
+      },
+      "Id": "Target0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/ApiKeyRotatorSchedule/Resource"
+   }
+  },
+  "ApiKeyRotatorScheduleAllowEventRuleNextServiceAppSyncApiKeyRotatorFn969D5915D2F8245C": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "ApiKeyRotatorFnBDF6B9CF",
+      "Arn"
+     ]
+    },
+    "Principal": "events.amazonaws.com",
+    "SourceArn": {
+     "Fn::GetAtt": [
+      "ApiKeyRotatorScheduleFED55C18",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/ApiKeyRotatorSchedule/AllowEventRuleNextServiceAppSyncApiKeyRotatorFn969D5915"
+   }
+  },
+  "ApiKeyRotatorAlarm2DB07960": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Fn::ImportValue": "NextService-Monitoring:ExportsOutputRefAlertTopic2720D5359ADB6D3E"
+     }
+    ],
+    "AlarmDescription": "AppSync key rotator Lambda failed — investigate before the API key naturally expires (max 365 days).",
+    "AlarmName": "NextService-AppSync-KeyRotator-Errors",
+    "ComparisonOperator": "GreaterThanThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "ApiKeyRotatorFnBDF6B9CF"
+      }
+     }
+    ],
+    "EvaluationPeriods": 1,
+    "MetricName": "Errors",
+    "Namespace": "AWS/Lambda",
+    "Period": 3600,
+    "Statistic": "Sum",
+    "Threshold": 0,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/ApiKeyRotatorAlarm/Resource"
+   }
+  },
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/yXIwQqCQBCA4WfxvjuVBnUNj4FFPUBM24aTOg3NLLKI7x7i6fv5Syj3R9gWOKoPr8739ITpbhg6h6M+UEQzB5jqN5+E3Mo55qXqFplj3+AQVTDEeZmXZJJsdtds7Zc3FewqOBQfJfK/xEZDhNvqH4QYIeB7AAAA"
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/02OTWvDMAxAf0vvjrY1g+2aFnYZbCH9AUV1tEaLP0JkLwTj/z6c7LDTe0jioSMcn1/h8YCLVLofK8M3SJeAelS4yDXhNMnqNKTzl2smVjveaS12HtA5Mh9oSSbUlJVBe+sR0lt0OrB35eq/tzRbFmHvsmK0kDpvqCw2tt6w3sq7ZSX1FUUoCDQFSmo4RT1SOKGQoh9yQSB18S8SDWWljY/9gkEPkBqDs92eLpKz2jKXgHd29zL/jGGKIat2DYN3DzU81fBy+Bbmao4usCXodv4CGFvf8ioBAAA="
    },
    "Metadata": {
     "aws:cdk:path": "NextService-AppSync/CDKMetadata/Default"

@@ -18,7 +18,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-deploy-role-766671488262-eu-central-1",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-cfn-exec-role-766671488262-eu-central-1",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-766671488262-eu-central-1/9d2e22c9e3c4e8ddd96208cea5ce48b6233b1f8ab41082754cd13d23f0c84161.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-766671488262-eu-central-1/0a30553f88e95ae518446e814819972800a033dac96c0f025c7386bfd51a3b64.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -71,41 +71,6 @@
       "additionalMetadataFile": "NextService-S3.metadata.json",
       "displayName": "NextService-S3"
     },
-    "NextService-AppSync.assets": {
-      "type": "cdk:asset-manifest",
-      "properties": {
-        "file": "NextService-AppSync.assets.json",
-        "requiresBootstrapStackVersion": 6,
-        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
-      }
-    },
-    "NextService-AppSync": {
-      "type": "aws:cloudformation:stack",
-      "environment": "aws://766671488262/eu-central-1",
-      "properties": {
-        "templateFile": "NextService-AppSync.template.json",
-        "terminationProtection": false,
-        "validateOnSynth": false,
-        "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-deploy-role-766671488262-eu-central-1",
-        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-cfn-exec-role-766671488262-eu-central-1",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-766671488262-eu-central-1/0e378598a89c2ebcb357e2cd80539b1ba87c9cb35af7c86bff1e6b465994d185.json",
-        "requiresBootstrapStackVersion": 6,
-        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
-        "additionalDependencies": [
-          "NextService-AppSync.assets"
-        ],
-        "lookupRole": {
-          "arn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-lookup-role-766671488262-eu-central-1",
-          "requiresBootstrapStackVersion": 8,
-          "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
-        }
-      },
-      "dependencies": [
-        "NextService-AppSync.assets"
-      ],
-      "additionalMetadataFile": "NextService-AppSync.metadata.json",
-      "displayName": "NextService-AppSync"
-    },
     "NextService-Monitoring.assets": {
       "type": "cdk:asset-manifest",
       "properties": {
@@ -123,7 +88,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-deploy-role-766671488262-eu-central-1",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-cfn-exec-role-766671488262-eu-central-1",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-766671488262-eu-central-1/7d308071effa7463d0b328e5bd10ac0d1d4f3feb01911ae47866e76fe27b6e2b.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-766671488262-eu-central-1/0e3338e0e273178fe71593424380103787a7dcfe3b44f55ee1f669ee8d553702.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -140,6 +105,42 @@
       ],
       "additionalMetadataFile": "NextService-Monitoring.metadata.json",
       "displayName": "NextService-Monitoring"
+    },
+    "NextService-AppSync.assets": {
+      "type": "cdk:asset-manifest",
+      "properties": {
+        "file": "NextService-AppSync.assets.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+      }
+    },
+    "NextService-AppSync": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://766671488262/eu-central-1",
+      "properties": {
+        "templateFile": "NextService-AppSync.template.json",
+        "terminationProtection": false,
+        "validateOnSynth": false,
+        "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-deploy-role-766671488262-eu-central-1",
+        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-cfn-exec-role-766671488262-eu-central-1",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-766671488262-eu-central-1/18c965070433a89e57550c0c17a519829737ff40c2fa291625589e68a11f520b.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
+        "additionalDependencies": [
+          "NextService-AppSync.assets"
+        ],
+        "lookupRole": {
+          "arn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-lookup-role-766671488262-eu-central-1",
+          "requiresBootstrapStackVersion": 8,
+          "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+        }
+      },
+      "dependencies": [
+        "NextService-Monitoring",
+        "NextService-AppSync.assets"
+      ],
+      "additionalMetadataFile": "NextService-AppSync.metadata.json",
+      "displayName": "NextService-AppSync"
     },
     "NextService-Amplify.assets": {
       "type": "cdk:asset-manifest",
@@ -158,7 +159,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-deploy-role-766671488262-eu-central-1",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-cfn-exec-role-766671488262-eu-central-1",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-766671488262-eu-central-1/8aa371d5472afae0d60c10ca22fc3e5302808e56e69630ec746c48758e2749cc.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-766671488262-eu-central-1/b77b9038a6d5624156ca878635e78b8570265c7bcd9fa55dfb834764b0588340.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -177,6 +178,43 @@
       ],
       "additionalMetadataFile": "NextService-Amplify.metadata.json",
       "displayName": "NextService-Amplify"
+    },
+    "NextService-Notifications.assets": {
+      "type": "cdk:asset-manifest",
+      "properties": {
+        "file": "NextService-Notifications.assets.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+      }
+    },
+    "NextService-Notifications": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://766671488262/eu-central-1",
+      "properties": {
+        "templateFile": "NextService-Notifications.template.json",
+        "terminationProtection": false,
+        "validateOnSynth": false,
+        "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-deploy-role-766671488262-eu-central-1",
+        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-cfn-exec-role-766671488262-eu-central-1",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-766671488262-eu-central-1/e81872f68bac07884aeb33a707a109c5d857b49621908c0c6920c144e5e9c2ef.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
+        "additionalDependencies": [
+          "NextService-Notifications.assets"
+        ],
+        "lookupRole": {
+          "arn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-lookup-role-766671488262-eu-central-1",
+          "requiresBootstrapStackVersion": 8,
+          "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+        }
+      },
+      "dependencies": [
+        "NextService-DynamoDB",
+        "NextService-Monitoring",
+        "NextService-Notifications.assets"
+      ],
+      "additionalMetadataFile": "NextService-Notifications.metadata.json",
+      "displayName": "NextService-Notifications"
     },
     "Tree": {
       "type": "cdk:tree",

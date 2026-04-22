@@ -372,6 +372,11 @@ async function _POST(request: NextRequest) {
       })
     }
 
+    // Broadcast to active garages is handled out-of-band by the
+    // `new-request-broadcast` Lambda, triggered by the DynamoDB Stream on
+    // the ServiceRequests table. The route returns as soon as the row is
+    // persisted — no SES calls in the request path.
+
     // Always return success when SMS is disabled, but indicate it in the message
     const response = NextResponse.json({
       success: true,

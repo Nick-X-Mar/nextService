@@ -191,11 +191,14 @@ class AmplifyStack(Stack):
         ))
 
         # AppSync access
+        # `ListApiKeys` is used by the admin "system health" API route to
+        # surface a banner when the chat API key is close to expiring.
         self.amplify_role.add_to_policy(iam.PolicyStatement(
             sid="AppSyncAccess",
             actions=[
                 "appsync:GraphQL",
                 "appsync:Connect",
+                "appsync:ListApiKeys",
             ],
             resources=[
                 f"arn:aws:appsync:{self.region}:{self.account}:apis/*",
@@ -322,6 +325,11 @@ frontend:
                 ),
                 amplify.CfnApp.EnvironmentVariableProperty(
                     name="SES_REGION", value=self.region,
+                ),
+                # Matches SES_CONFIG_SET_NAME in notifications_stack.py — if
+                # you rename the config set there, keep these in sync.
+                amplify.CfnApp.EnvironmentVariableProperty(
+                    name="SES_CONFIG_SET", value="nextservice-main",
                 ),
                 amplify.CfnApp.EnvironmentVariableProperty(
                     name="ADMIN_EMAIL", value="nmarianos93@gmail.com",
