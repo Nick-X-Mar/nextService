@@ -318,7 +318,9 @@
         "arn:aws:dynamodb:eu-central-1:766671488262:table/WalletTransactions",
         "arn:aws:dynamodb:eu-central-1:766671488262:table/WalletTransactions/index/*",
         "arn:aws:dynamodb:eu-central-1:766671488262:table/HotDeals",
-        "arn:aws:dynamodb:eu-central-1:766671488262:table/HotDeals/index/*"
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/HotDeals/index/*",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/PerformanceMetrics",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/PerformanceMetrics/index/*"
        ],
        "Sid": "DynamoDBAccess"
       },
@@ -336,7 +338,8 @@
         "arn:aws:dynamodb:eu-central-1:766671488262:table/AdminUsers",
         "arn:aws:dynamodb:eu-central-1:766671488262:table/Payments",
         "arn:aws:dynamodb:eu-central-1:766671488262:table/WalletTransactions",
-        "arn:aws:dynamodb:eu-central-1:766671488262:table/HotDeals"
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/HotDeals",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/PerformanceMetrics"
        ],
        "Sid": "DynamoDBCreateTable"
       },

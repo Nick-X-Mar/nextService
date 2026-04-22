@@ -10,6 +10,7 @@ const navItems = [
   { icon: 'mail', label: 'Emails', href: '/admin/emails' },
   { icon: 'error', label: 'Errors', href: '/admin/errors' },
   { icon: 'people', label: 'Users', href: '/admin/users' },
+  { icon: 'garage', label: 'Garages', href: '/admin/garages', badgeKey: 'pendingGarages' as const },
   { icon: 'build', label: 'Requests', href: '/admin/requests' },
   { icon: 'new_releases', label: 'Custom Vehicles', href: '/admin/custom-vehicles', badgeKey: 'customVehicles' as const },
   { icon: 'payments', label: 'Payments', href: '/admin/payments' },
@@ -21,11 +22,17 @@ const navItems = [
 export default function AdminSidebar() {
   const pathname = usePathname()
   const [customVehicleCount, setCustomVehicleCount] = useState(0)
+  const [pendingGarageCount, setPendingGarageCount] = useState(0)
 
   useEffect(() => {
     fetch('/api/admin/custom-vehicles')
       .then(res => res.ok ? res.json() : null)
       .then(data => { if (data?.total) setCustomVehicleCount(data.total) })
+      .catch(() => {})
+
+    fetch('/api/admin/users/garages?limit=1&status=pending')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (typeof data?.total === 'number') setPendingGarageCount(data.total) })
       .catch(() => {})
   }, [])
 
@@ -58,6 +65,11 @@ export default function AdminSidebar() {
               {'badgeKey' in item && item.badgeKey === 'customVehicles' && customVehicleCount > 0 && (
                 <span className="ml-auto bg-tertiary text-on-tertiary text-[10px] font-bold min-w-[20px] h-5 flex items-center justify-center rounded-full px-1.5">
                   {customVehicleCount}
+                </span>
+              )}
+              {'badgeKey' in item && item.badgeKey === 'pendingGarages' && pendingGarageCount > 0 && (
+                <span className="ml-auto bg-tertiary text-on-tertiary text-[10px] font-bold min-w-[20px] h-5 flex items-center justify-center rounded-full px-1.5">
+                  {pendingGarageCount}
                 </span>
               )}
             </Link>

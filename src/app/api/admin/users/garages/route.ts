@@ -46,7 +46,7 @@ async function _GET(request: NextRequest) {
       ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
       : null
 
-    return NextResponse.json({ items: items.slice(0, limit), cursor: nextCursor })
+    return NextResponse.json({ items: items.slice(0, limit), cursor: nextCursor, total: items.length })
   } catch (error) {
     console.error('Admin garages list error:', error)
     return NextResponse.json({ error: 'Failed to fetch garages' }, { status: 500 })

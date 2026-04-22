@@ -12,6 +12,7 @@ export default function ForgotPasswordPage() {
   const [userType, setUserType] = useState('client')
   const [isLoading, setIsLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [showEmailHint, setShowEmailHint] = useState(false)
 
   const { error } = useToast()
 
@@ -108,12 +109,22 @@ export default function ForgotPasswordPage() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value.replace(/[^a-zA-Z0-9@._+\-]/g, ''))}
+                onChange={(e) => {
+                  const raw = e.target.value
+                  const clean = raw.replace(/[^a-zA-Z0-9@._+\-]/g, '')
+                  setEmail(clean)
+                  setShowEmailHint(raw.length !== clean.length)
+                }}
                 placeholder="π.χ. example@email.com"
                 required
                 disabled={isLoading}
                 className={styles.input}
               />
+              {showEmailHint && (
+                <p className="text-xs text-error mt-1 flex items-center gap-1">
+                  <Icon name="keyboard" size="sm" /> Χρησιμοποίησε λατινικούς χαρακτήρες — γύρισε το πληκτρολόγιο σε Αγγλικά.
+                </p>
+              )}
             </div>
 
             <button

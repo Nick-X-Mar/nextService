@@ -48,6 +48,24 @@ export default function DashboardPage() {
     <div>
       <h1 className="text-2xl font-bold font-headline text-on-surface mb-6">Dashboard</h1>
 
+      {/* Pending garage approvals alert */}
+      {(stats?.pendingGarages ?? 0) > 0 && (
+        <Link href="/admin/garages?tab=pending" className="block mb-3">
+          <div className="bg-tertiary/10 border border-tertiary/30 rounded-2xl p-4 flex items-center gap-4 hover:bg-tertiary/15 transition-colors">
+            <span className="material-symbols-outlined text-tertiary text-3xl">how_to_reg</span>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-on-surface">
+                {stats!.pendingGarages} {stats!.pendingGarages === 1 ? 'garage awaiting' : 'garages awaiting'} approval
+              </p>
+              <p className="text-xs text-on-surface-variant mt-0.5">
+                Review and approve to activate their account
+              </p>
+            </div>
+            <span className="material-symbols-outlined text-tertiary">arrow_forward</span>
+          </div>
+        </Link>
+      )}
+
       {/* Custom vehicles alert */}
       {(stats?.customVehicles ?? 0) > 0 && (
         <Link href="/admin/custom-vehicles" className="block mb-6">

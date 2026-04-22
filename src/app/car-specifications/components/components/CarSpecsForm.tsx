@@ -52,6 +52,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   const [emailCheckName, setEmailCheckName] = useState('')
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [isCheckingEmail, setIsCheckingEmail] = useState(false)
+  const [showEmailHint, setShowEmailHint] = useState(false)
 
   // Track form funnel
   useEffect(() => {
@@ -350,12 +351,22 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                   <input
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value.replace(/[^a-zA-Z0-9@._+\-]/g, ''))}
+                    onChange={(e) => {
+                      const raw = e.target.value
+                      const clean = raw.replace(/[^a-zA-Z0-9@._+\-]/g, '')
+                      setEmail(clean)
+                      setShowEmailHint(raw.length !== clean.length)
+                    }}
                     placeholder="π.χ. example@email.com"
                     className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 pr-12 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
                   />
                   <Icon name={isCheckingEmail ? 'progress_activity' : 'mail'} className={`absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/50 ${isCheckingEmail ? 'animate-spin' : ''}`} size="md" />
                 </div>
+                {showEmailHint && (
+                  <p className="text-xs text-error flex items-center gap-1">
+                    <Icon name="keyboard" size="sm" /> Χρησιμοποίησε λατινικούς χαρακτήρες — γύρισε το πληκτρολόγιο σε Αγγλικά.
+                  </p>
+                )}
                 {email && !isEmailValid(email) && (
                   <p className="text-xs text-error flex items-center gap-1">
                     <Icon name="error" size="sm" className="text-error" /> Μη έγκυρη διεύθυνση email

@@ -9,6 +9,7 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showEmailHint, setShowEmailHint] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -58,12 +59,22 @@ export default function AdminLoginPage() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value.replace(/[^a-zA-Z0-9@._+\-]/g, ''))}
+                onChange={(e) => {
+                  const raw = e.target.value
+                  const clean = raw.replace(/[^a-zA-Z0-9@._+\-]/g, '')
+                  setEmail(clean)
+                  setShowEmailHint(raw.length !== clean.length)
+                }}
                 required
                 autoFocus
                 className="w-full px-3.5 py-2.5 rounded-lg border border-outline-variant/40 bg-surface text-on-surface text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                 placeholder="admin@nextservice.gr"
               />
+              {showEmailHint && (
+                <p className="text-xs text-error mt-1.5">
+                  Please use Latin characters — switch your keyboard layout to English.
+                </p>
+              )}
             </div>
 
             <div>

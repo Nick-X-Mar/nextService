@@ -21,6 +21,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [userType, setUserType] = useState('client')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [showEmailHint, setShowEmailHint] = useState(false)
 
   const router = useRouter()
   const { success, error } = useToast()
@@ -211,12 +212,22 @@ export default function LoginPage() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value.replace(/[^a-zA-Z0-9@._+\-]/g, ''))}
+                onChange={(e) => {
+                  const raw = e.target.value
+                  const clean = raw.replace(/[^a-zA-Z0-9@._+\-]/g, '')
+                  setEmail(clean)
+                  setShowEmailHint(raw.length !== clean.length)
+                }}
                 placeholder="π.χ. example@email.com"
                 required
                 disabled={isLoading}
                 className={styles.input}
               />
+              {showEmailHint && (
+                <p className="text-xs text-error mt-1 flex items-center gap-1">
+                  <Icon name="keyboard" size="sm" /> Χρησιμοποίησε λατινικούς χαρακτήρες — γύρισε το πληκτρολόγιο σε Αγγλικά.
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">
