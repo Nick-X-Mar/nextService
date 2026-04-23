@@ -521,6 +521,10 @@
      {
       "Name": "ADMIN_SESSION_EXPIRY",
       "Value": "8h"
+     },
+     {
+      "Name": "SITE_URL",
+      "Value": "https://dev.d3ku6yajf4j6y8.amplifyapp.com"
      }
     ],
     "IAMServiceRole": {
