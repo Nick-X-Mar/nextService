@@ -4,10 +4,11 @@ import AppShell from "@/components/layout/AppShell";
 import ToastContainer from "@/components/ToastContainer";
 import { UserProvider } from "@/contexts/UserContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SITE_URL } from "@/lib/site-url";
 import "@/lib/amplify-config"; // Initialize Amplify
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.nextservice.gr"),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "NextService — Βρες συνεργείο αυτοκινήτου με την καλύτερη τιμή",
     template: "%s | NextService",
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "NextService",
     locale: "el_GR",
-    url: "https://www.nextservice.gr",
+    url: SITE_URL,
     title: "NextService — Βρες συνεργείο αυτοκινήτου με την καλύτερη τιμή",
     description:
       "Στείλε αίτημα σε συνεργεία σε όλη την Ελλάδα και πάρε προσφορές. Hot deals σε service, συμπλέκτη, ιμάντα χρονισμού και φανοποιεία.",

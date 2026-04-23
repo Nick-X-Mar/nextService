@@ -1,6 +1,5 @@
 import type { MetadataRoute } from 'next'
-
-const SITE_URL = 'https://www.nextservice.gr'
+import { SITE_URL } from '@/lib/site-url'
 
 export default function robots(): MetadataRoute.Robots {
   return {

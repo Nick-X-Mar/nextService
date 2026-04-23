@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import RegisterProfessionalPage from './components/RegisterProfessionalPage'
-
-const SITE_URL = 'https://www.nextservice.gr'
+import { SITE_URL } from '@/lib/site-url'
 
 export const metadata: Metadata = {
   title: 'Εγγραφή Συνεργείου',

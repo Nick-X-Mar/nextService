@@ -1,7 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { getAllOffers } from '@/lib/offers'
-
-const SITE_URL = 'https://www.nextservice.gr'
+import { SITE_URL } from '@/lib/site-url'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date()

@@ -59,6 +59,7 @@ const nextConfig: NextConfig = {
     NOTIFICATIONS_ENABLED: process.env.NOTIFICATIONS_ENABLED,
     SES_FROM_ADDRESS: process.env.SES_FROM_ADDRESS,
     SES_REGION: process.env.SES_REGION,
+    SITE_URL: process.env.SITE_URL,
   },
   async headers() {
     return [

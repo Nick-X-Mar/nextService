@@ -69,6 +69,12 @@ AUTH_SECRETS_NAME = "nextservice/auth-secrets"
 # `cdk deploy -c app_url=https://staging.nextservice.gr`
 APP_URL = "https://nextservice.gr"
 
+# Public-facing origin used for SEO: canonical URLs, OG/Twitter tags, sitemap,
+# robots, JSON-LD. Must match the URL users and Google actually hit.
+# When cutting over to the real domain, change this + GITHUB_BRANCH together.
+# Override per-deploy via: `cdk deploy -c site_url=https://...`
+SITE_URL = "https://dev.d3ku6yajf4j6y8.amplifyapp.com"
+
 # ─────────────────────────────────────────────────────────────────
 
 env = cdk.Environment(account=AWS_ACCOUNT, region=AWS_REGION)
@@ -78,6 +84,7 @@ app = cdk.App()
 # Allow `cdk deploy -c stage=production` to override the default
 stage = app.node.try_get_context("stage") or STAGE
 app_url = app.node.try_get_context("app_url") or APP_URL
+site_url = app.node.try_get_context("site_url") or SITE_URL
 
 # Bucket name is computed once here and passed to both stacks as a plain string
 # (no CFN Fn::ImportValue), so changing it later doesn't block updates across
@@ -117,6 +124,7 @@ amplify = AmplifyStack(
     auth_secrets_name=AUTH_SECRETS_NAME,
     branch=GITHUB_BRANCH,
     s3_bucket_name=s3_bucket_name,
+    site_url=site_url,
     appsync_http_endpoint=appsync.http_endpoint,
     appsync_realtime_endpoint=appsync.realtime_endpoint,
     appsync_api_key=appsync.api_key.attr_api_key,

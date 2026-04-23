@@ -1,12 +1,11 @@
 import type { Metadata } from 'next'
 import OfferDetailPage from './components/OfferDetailPage'
 import { getOfferBySlug, type Offer } from '@/lib/offers'
+import { SITE_URL } from '@/lib/site-url'
 
 interface PageProps {
   params: Promise<{ slug: string }>
 }
-
-const SITE_URL = 'https://www.nextservice.gr'
 
 function absoluteImage(image: string | undefined): string {
   if (!image) return `${SITE_URL}/logo.png`
@@ -55,36 +54,45 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 function buildOfferJsonLd(offer: Offer) {
   const url = `${SITE_URL}/offer/${offer.slug}/`
   const image = absoluteImage(offer.image)
+  // Offer price is valid for one year from now — required for Product rich
+  // results eligibility in Google Search.
+  const priceValidUntil = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10)
+
   return {
     '@context': 'https://schema.org',
-    '@type': 'Offer',
+    '@type': 'Product',
     name: offer.title,
-    description: offer.description,
-    url,
+    description: `${offer.title} — ${offer.subtitle}. ${offer.description}`,
     image,
-    price: offer.priceNum,
-    priceCurrency: 'EUR',
-    priceSpecification: {
-      '@type': 'PriceSpecification',
+    brand: {
+      '@type': 'Brand',
+      name: 'NextService',
+    },
+    category: offer.category === 'fanopeia' ? 'Φανοποιεία' : 'Service αυτοκινήτου',
+    offers: {
+      '@type': 'Offer',
+      url,
       price: offer.priceNum,
       priceCurrency: 'EUR',
-    },
-    availability: 'https://schema.org/InStock',
-    category: offer.category === 'fanopeia' ? 'Φανοποιεία' : 'Service αυτοκινήτου',
-    seller: {
-      '@type': 'Organization',
-      name: 'NextService',
-      url: SITE_URL,
-    },
-    itemOffered: {
-      '@type': 'Service',
-      name: offer.workType,
-      description: offer.description,
-      areaServed: { '@type': 'Country', name: 'GR' },
-      provider: {
+      availability: 'https://schema.org/InStock',
+      priceValidUntil,
+      seller: {
         '@type': 'Organization',
         name: 'NextService',
         url: SITE_URL,
+      },
+      areaServed: { '@type': 'Country', name: 'GR' },
+      itemOffered: {
+        '@type': 'Service',
+        name: offer.workType,
+        description: offer.description,
+        provider: {
+          '@type': 'Organization',
+          name: 'NextService',
+          url: SITE_URL,
+        },
       },
     },
   }

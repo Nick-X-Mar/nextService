@@ -29,6 +29,7 @@ class AmplifyStack(Stack):
         auth_secrets_name: str,
         branch: str = "main",
         s3_bucket_name: str,
+        site_url: str,
         appsync_http_endpoint: str,
         appsync_realtime_endpoint: str,
         appsync_api_key: str,
@@ -349,6 +350,11 @@ frontend:
                 ),
                 amplify.CfnApp.EnvironmentVariableProperty(
                     name="ADMIN_SESSION_EXPIRY", value="8h",
+                ),
+                # SEO — public-facing origin for canonical URLs, OG tags,
+                # sitemap, robots, JSON-LD. Set per-deploy from app.py.
+                amplify.CfnApp.EnvironmentVariableProperty(
+                    name="SITE_URL", value=site_url,
                 ),
             ],
         )

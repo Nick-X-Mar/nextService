@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import LandingPage from './landing-page/LandingPage'
-
-const SITE_URL = 'https://www.nextservice.gr'
+import { SITE_URL } from '@/lib/site-url'
 
 export const metadata: Metadata = {
   alternates: { canonical: `${SITE_URL}/` },
