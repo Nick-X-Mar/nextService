@@ -7,4 +7,5 @@ export default function Page() {
 export const metadata = {
   title: 'Στοιχεία Αυτοκινήτου - NextService',
   description: 'Παρακαλώ συμπληρώστε τα τεχνικά στοιχεία του αυτοκινήτου σας',
-} 
+  robots: { index: false, follow: false },
+}

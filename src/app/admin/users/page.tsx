@@ -61,7 +61,7 @@ export default function UsersPage() {
         keyField="id"
         loading={loading}
         emptyMessage="No clients found"
-        onRowClick={(item) => router.push(`/admin/users/${item.id}`)}
+        onRowClick={(item) => router.push(`/admin/users/${item.id}/`)}
       />
     </div>
   )

@@ -488,11 +488,11 @@ export default function RegisterProfessionalPage() {
                 />
                 <span className="text-xs text-on-surface-variant leading-snug">
                   Έχω διαβάσει και αποδέχομαι τους{' '}
-                  <Link href="/terms" target="_blank" className="text-primary underline">
+                  <Link href="/terms/" target="_blank" className="text-primary underline">
                     Όρους Χρήσης
                   </Link>
                   {' '}και την{' '}
-                  <Link href="/privacy" target="_blank" className="text-primary underline">
+                  <Link href="/privacy/" target="_blank" className="text-primary underline">
                     Πολιτική Απορρήτου
                   </Link>
                   . Αναγνωρίζω ότι τα στοιχεία επικοινωνίας των πελατών είναι εμπιστευτικά και θα χρησιμοποιηθούν αποκλειστικά για το συγκεκριμένο αίτημα service.

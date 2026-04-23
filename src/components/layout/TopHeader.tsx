@@ -50,7 +50,7 @@ export default function TopHeader() {
               <Link href="/" className={`${isLanding ? 'text-white/80 hover:text-white' : 'text-secondary hover:text-on-surface'} transition-colors`}>
                 Αρχική
               </Link>
-              <Link href="/register-professional" className={`${isLanding ? 'text-white/80 hover:text-white' : 'text-secondary hover:text-on-surface'} transition-colors`}>
+              <Link href="/register-professional/" className={`${isLanding ? 'text-white/80 hover:text-white' : 'text-secondary hover:text-on-surface'} transition-colors`}>
                 Επαγγελματίες
               </Link>
             </>
@@ -67,7 +67,7 @@ export default function TopHeader() {
             </button>
           )}
           {userType === 'garage' && garage && (
-            <Link href={`/garage-dashboard/${garage.id}`} className="text-secondary hover:text-on-surface transition-colors">
+            <Link href={`/garage-dashboard/${garage.id}/`} className="text-secondary hover:text-on-surface transition-colors">
               Dashboard
             </Link>
           )}
@@ -78,7 +78,7 @@ export default function TopHeader() {
           {!userType || userType === 'guest' ? (
             <>
               <Link
-                href="/login"
+                href="/login/"
                 className={`px-5 py-2 rounded-lg text-sm font-bold active:scale-95 transition-all ${isLanding ? 'bg-white/20 backdrop-blur-sm text-white border border-white/30 hover:bg-white/30' : 'bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-md'}`}
               >
                 Σύνδεση
@@ -93,7 +93,7 @@ export default function TopHeader() {
               )}
               <div className="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center overflow-hidden border border-outline-variant/20">
                 {userType === 'client' && client ? (
-                  <Link href={`/profile/${client.id}`}>
+                  <Link href={`/profile/${client.id}/`}>
                     <span className="text-sm font-bold text-primary">
                       {client.firstName?.charAt(0).toUpperCase()}
                     </span>
@@ -122,7 +122,7 @@ export default function TopHeader() {
                 <Icon name="home" className="text-primary" />
                 <span className="font-medium">Αρχική</span>
               </Link>
-              <Link href="/register-professional" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
+              <Link href="/register-professional/" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
                 <Icon name="handyman" className="text-primary" />
                 <span className="font-medium">Εγγραφή Επαγγελματία</span>
               </Link>
@@ -135,7 +135,7 @@ export default function TopHeader() {
             </button>
           )}
           {userType === 'garage' && garage && (
-            <Link href={`/garage-dashboard/${garage.id}`} onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
+            <Link href={`/garage-dashboard/${garage.id}/`} onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
               <Icon name="dashboard" className="text-primary" />
               <span className="font-medium">Dashboard</span>
             </Link>

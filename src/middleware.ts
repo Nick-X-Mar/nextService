@@ -62,8 +62,10 @@ export async function middleware(request: NextRequest) {
   const isAdminApi = pathname.startsWith('/api/admin')
 
   if (isAdminPage || isAdminApi) {
-    // Public admin routes — login page and login API
-    if (pathname === '/admin/login' || pathname === '/api/admin/auth/login') {
+    // Public admin routes — login page and login API (match both with and
+    // without trailing slash since trailingSlash: true is enabled in next.config)
+    const normalized = pathname.replace(/\/$/, '')
+    if (normalized === '/admin/login' || normalized === '/api/admin/auth/login') {
       return NextResponse.next()
     }
 
@@ -73,7 +75,7 @@ export async function middleware(request: NextRequest) {
       if (isAdminApi) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
-      return NextResponse.redirect(new URL('/admin/login', request.url))
+      return NextResponse.redirect(new URL('/admin/login/', request.url))
     }
 
     const admin = await verifyAdminToken(adminToken)
@@ -81,7 +83,7 @@ export async function middleware(request: NextRequest) {
       if (isAdminApi) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
-      return NextResponse.redirect(new URL('/admin/login', request.url))
+      return NextResponse.redirect(new URL('/admin/login/', request.url))
     }
 
     const adminHeaders = new Headers(request.headers)

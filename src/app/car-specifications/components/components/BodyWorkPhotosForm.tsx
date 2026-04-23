@@ -141,9 +141,9 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
 
           // Redirect to requests page with clientId
           if (serviceResult.clientId) {
-            router.push(`/requests/${serviceResult.clientId}`)
+            router.push(`/requests/${serviceResult.clientId}/`)
           } else {
-            router.push('/requests')
+            router.push('/requests/')
           }
         } else {
           error('Σφαλμα', uploadResult.error || 'Αγνωστο σφαλμα')

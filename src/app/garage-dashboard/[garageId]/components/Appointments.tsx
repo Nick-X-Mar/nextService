@@ -133,11 +133,11 @@ export default function Appointments({ garageId }: AppointmentsProps) {
   }
 
   const handleChatClick = (requestId: string) => {
-    router.push(`/garage-dashboard/${garageId}/chat/${requestId}`)
+    router.push(`/garage-dashboard/${garageId}/chat/${requestId}/`)
   }
 
   const handleCardClick = (offer: Offer) => {
-    router.push(`/garage-dashboard/${garageId}/offers/${offer.serviceRequestId}`)
+    router.push(`/garage-dashboard/${garageId}/offers/${offer.serviceRequestId}/`)
   }
 
   // Filter to show only today and future appointments

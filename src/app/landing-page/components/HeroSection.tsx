@@ -70,13 +70,17 @@ export default function HeroSection() {
       body: JSON.stringify({ eventName: 'category_selected', clientId, metadata: { category: value } }),
     }).catch(() => {})
     setTimeout(() => {
-      router.push('/car-details')
+      router.push('/car-details/')
     }, 500)
   }
 
   return (
     <section className="relative min-h-screen flex flex-col justify-center">
       {/* Overlay removed — now applied globally in LandingPage */}
+
+      <h1 className="sr-only">
+        NextService — Βρες συνεργείο αυτοκινήτου στην Ελλάδα και πάρε προσφορές από επαγγελματίες για service, συμπλέκτη, ιμάντα χρονισμού και φανοποιεία
+      </h1>
 
       {/* Content */}
       <div className="relative z-10 px-5 flex flex-col items-center">

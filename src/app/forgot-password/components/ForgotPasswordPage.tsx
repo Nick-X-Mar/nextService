@@ -69,7 +69,7 @@ export default function ForgotPasswordPage() {
               Ο σύνδεσμος ισχύει για 1 ώρα. Έλεγξε και τον φάκελο spam.
             </p>
 
-            <Link href="/login" className={`${styles.btnOutline} w-full justify-center py-3.5`}>
+            <Link href="/login/" className={`${styles.btnOutline} w-full justify-center py-3.5`}>
               <Icon name="arrow_back" size="sm" />
               Επιστροφή στη σύνδεση
             </Link>
@@ -138,7 +138,7 @@ export default function ForgotPasswordPage() {
           </form>
 
           <div className="mt-4 text-center">
-            <Link href="/login" className={styles.linkText}>
+            <Link href="/login/" className={styles.linkText}>
               Επιστροφή στη σύνδεση
             </Link>
           </div>

@@ -18,12 +18,12 @@ export default function Page() {
     // Check if user is authenticated as a garage
     if (userType === 'garage' && garage) {
       if (!garage.isActive) {
-        router.replace('/login')
+        router.replace('/login/')
         return
       }
-      router.replace(`/garage-dashboard/${garage.id}`)
+      router.replace(`/garage-dashboard/${garage.id}/`)
     } else {
-      router.replace('/login')
+      router.replace('/login/')
     }
   }, [router, userType, garage, isLoading])
 

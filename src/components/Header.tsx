@@ -52,7 +52,7 @@ export default function Header() {
               // Client is logged in - show user info
               <div className="flex items-center gap-3">
                 <Link 
-                  href={`/profile/${client.id}`}
+                  href={`/profile/${client.id}/`}
                   className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200"
                 >
                   <HiUser className="h-4 w-4 text-gray-600" />
@@ -61,14 +61,14 @@ export default function Header() {
                   </span>
                 </Link>
                 <Link 
-                  href={`/profile/${client.id}`}
+                  href={`/profile/${client.id}/`}
                   className={styles.navLink}
                 >
                   <HiCog6Tooth className="h-4 w-4" />
                   Προφίλ
                 </Link>
                 <Link 
-                  href="/register-professional" 
+                  href="/register-professional/" 
                   className={styles.navLink}
                 >
                   <HiUserPlus className="h-4 w-4" />
@@ -86,14 +86,14 @@ export default function Header() {
               // No one is logged in - show login/register options
               <>
                 <Link 
-                  href="/register-professional" 
+                  href="/register-professional/" 
                   className={styles.navLink}
                 >
                   <HiUserPlus className="h-4 w-4" />
                   Εγγραφή Επαγγελματία
                 </Link>
                 <Link 
-                  href="/login" 
+                  href="/login/" 
                   className={styles.navButton}
                 >
                   <HiArrowRightOnRectangle className="h-4 w-4" />
@@ -140,7 +140,7 @@ export default function Header() {
               // Client is logged in - show user info
               <div className="px-3 py-2 mb-2">
                 <Link 
-                  href={`/profile/${client.id}`}
+                  href={`/profile/${client.id}/`}
                   className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200"
                 >
                   <HiUser className="h-4 w-4 text-gray-600" />
@@ -149,7 +149,7 @@ export default function Header() {
                   </span>
                 </Link>
                 <Link
-                  href={`/profile/${client.id}`}
+                  href={`/profile/${client.id}/`}
                   className="mt-2 w-full text-gray-700 hover:text-orange-500 hover:bg-gray-100 block px-3 py-2 rounded-md text-base font-medium flex items-center gap-2"
                 >
                   <HiCog6Tooth className="h-4 w-4" />
@@ -165,7 +165,7 @@ export default function Header() {
               </div>
             ) : null}
             <Link
-              href="/register-professional"
+              href="/register-professional/"
               className={styles.mobileNavLink}
             >
               <HiUserPlus className="h-4 w-4" />
@@ -173,7 +173,7 @@ export default function Header() {
             </Link>
             {!isLoading && userType !== 'garage' && userType !== 'client' && (
               <Link
-                href="/login"
+                href="/login/"
                 className={`${styles.btnPrimary} block text-base`}
               >
                 <HiArrowRightOnRectangle className="h-4 w-4" />

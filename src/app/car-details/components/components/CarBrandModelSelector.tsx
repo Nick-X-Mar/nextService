@@ -419,9 +419,9 @@ export default function CarBrandModelSelector({
         } else {
           success('Αίτημα Υποβλήθηκε', `Ειδοποίηση σε ${serviceResult.notificationsSent} συνεργεία μέσω SMS!\n\nΟι φωτογραφίες δεν ανέβηκαν — δοκιμάστε ξανά αργότερα.`)
         }
-        if (serviceResult.clientId) router.push(`/requests/${serviceResult.clientId}`)
-        else if (clientId) router.push(`/requests/${clientId}`)
-        else router.push('/requests')
+        if (serviceResult.clientId) router.push(`/requests/${serviceResult.clientId}/`)
+        else if (clientId) router.push(`/requests/${clientId}/`)
+        else router.push('/requests/')
       } catch {
         showError('Σφάλμα', 'Σφάλμα κατά την αποστολή. Δοκιμάστε ξανά.')
       } finally {
@@ -430,7 +430,7 @@ export default function CarBrandModelSelector({
       return
     }
 
-    router.push('/car-specifications')
+    router.push('/car-specifications/')
   }
 
   return (

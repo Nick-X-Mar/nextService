@@ -50,7 +50,7 @@ export default function DashboardPage() {
 
       {/* Pending garage approvals alert */}
       {(stats?.pendingGarages ?? 0) > 0 && (
-        <Link href="/admin/garages?tab=pending" className="block mb-3">
+        <Link href="/admin/garages/?tab=pending" className="block mb-3">
           <div className="bg-tertiary/10 border border-tertiary/30 rounded-2xl p-4 flex items-center gap-4 hover:bg-tertiary/15 transition-colors">
             <span className="material-symbols-outlined text-tertiary text-3xl">how_to_reg</span>
             <div className="flex-1">
@@ -68,7 +68,7 @@ export default function DashboardPage() {
 
       {/* Custom vehicles alert */}
       {(stats?.customVehicles ?? 0) > 0 && (
-        <Link href="/admin/custom-vehicles" className="block mb-6">
+        <Link href="/admin/custom-vehicles/" className="block mb-6">
           <div className="bg-tertiary/10 border border-tertiary/30 rounded-2xl p-4 flex items-center gap-4 hover:bg-tertiary/15 transition-colors">
             <span className="material-symbols-outlined text-tertiary text-3xl">new_releases</span>
             <div className="flex-1">

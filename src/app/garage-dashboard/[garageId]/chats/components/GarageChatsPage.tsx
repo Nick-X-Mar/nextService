@@ -197,7 +197,7 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
   }
 
   const handleChatClick = (requestId: string) => {
-    router.push(`/garage-dashboard/${garageId}/chat/${requestId}`)
+    router.push(`/garage-dashboard/${garageId}/chat/${requestId}/`)
   }
 
   if (isLoading) {
@@ -218,7 +218,7 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
         <div className="max-w-3xl mx-auto px-5 md:px-8">
           <div className="flex items-center gap-4 py-4">
             <button
-              onClick={() => router.push(`/garage-dashboard/${garageId}`)}
+              onClick={() => router.push(`/garage-dashboard/${garageId}/`)}
               className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-highest transition-colors"
             >
               <Icon name="arrow_back" size="sm" className="text-on-surface" />
@@ -315,7 +315,7 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
               Δεν έχετε ακόμα συνομιλίες με πελάτες για ανοιχτά αιτήματα.
             </p>
             <button
-              onClick={() => router.push(`/garage-dashboard/${garageId}?tab=requests`)}
+              onClick={() => router.push(`/garage-dashboard/${garageId}/?tab=requests`)}
               className={styles.btnPrimary + ' mx-auto'}
             >
               <Icon name="search" size="sm" />

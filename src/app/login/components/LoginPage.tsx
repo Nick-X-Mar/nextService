@@ -34,9 +34,9 @@ export default function LoginPage() {
   useEffect(() => {
     if (authLoading) return
     if (authUserType === 'garage' && garage) {
-      router.replace(`/garage-dashboard/${garage.id}`)
+      router.replace(`/garage-dashboard/${garage.id}/`)
     } else if (authUserType === 'client' && client) {
-      router.replace(`/requests/${client.id}`)
+      router.replace(`/requests/${client.id}/`)
     }
   }, [authLoading, authUserType, client, garage, router])
 
@@ -72,13 +72,13 @@ export default function LoginPage() {
           localStorage.setItem('garageId', user.id)
           success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.companyName}!`)
           await refreshGarage(user.id)
-          router.push(`/garage-dashboard/${user.id}`)
+          router.push(`/garage-dashboard/${user.id}/`)
         } else {
           localStorage.removeItem('garageId')
           localStorage.setItem('clientId', user.id)
           success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.firstName}!`)
           await refreshClient(user.id)
-          router.push(`/requests/${user.id}`)
+          router.push(`/requests/${user.id}/`)
         }
       } else {
         error('Σφάλμα Σύνδεσης', data.error || 'Λάθος email ή κωδικός')
@@ -116,7 +116,7 @@ export default function LoginPage() {
     if (userType === 'garage') {
       sessionStorage.setItem('garageRegEmail', email.trim().toLowerCase())
       sessionStorage.setItem('garageRegPassword', password)
-      router.push('/register-professional')
+      router.push('/register-professional/')
       return
     }
 
@@ -142,7 +142,7 @@ export default function LoginPage() {
         await refreshClient(data.client.id)
         await refreshUser(data.client.id)
         success('Επιτυχής Εγγραφή', 'Ο λογαριασμός σας δημιουργήθηκε!')
-        router.push(`/requests/${data.client.id}`)
+        router.push(`/requests/${data.client.id}/`)
       } else {
         error('Σφάλμα Εγγραφής', data.error || 'Δεν ήταν δυνατή η εγγραφή')
       }
@@ -264,7 +264,7 @@ export default function LoginPage() {
               </div>
               {mode === 'login' && (
                 <div className="text-right pt-1">
-                  <Link href="/forgot-password" className={`${styles.linkText} text-xs`}>
+                  <Link href="/forgot-password/" className={`${styles.linkText} text-xs`}>
                     Ξέχασα τον κωδικό μου
                   </Link>
                 </div>
@@ -309,11 +309,11 @@ export default function LoginPage() {
                 />
                 <span className="text-xs text-on-surface-variant leading-snug">
                   Έχω διαβάσει και αποδέχομαι τους{' '}
-                  <Link href="/terms" target="_blank" className="text-primary underline">
+                  <Link href="/terms/" target="_blank" className="text-primary underline">
                     Όρους Χρήσης
                   </Link>
                   {' '}και την{' '}
-                  <Link href="/privacy" target="_blank" className="text-primary underline">
+                  <Link href="/privacy/" target="_blank" className="text-primary underline">
                     Πολιτική Απορρήτου
                   </Link>
                   .

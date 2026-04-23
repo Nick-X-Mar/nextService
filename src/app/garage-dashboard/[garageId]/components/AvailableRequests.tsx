@@ -70,15 +70,15 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
   }
 
   const handleMakeOffer = (request: ServiceRequest) => {
-    router.push(`/garage-dashboard/${garageId}/offers/${request.id}`)
+    router.push(`/garage-dashboard/${garageId}/offers/${request.id}/`)
   }
 
   const handleOpenChat = (request: ServiceRequest) => {
-    router.push(`/garage-dashboard/${garageId}/chat/${request.id}`)
+    router.push(`/garage-dashboard/${garageId}/chat/${request.id}/`)
   }
 
   const handleCardClick = (request: ServiceRequest) => {
-    router.push(`/garage-dashboard/${garageId}/offers/${request.id}`)
+    router.push(`/garage-dashboard/${garageId}/offers/${request.id}/`)
   }
 
   const filteredRequests = requests.filter(request => {

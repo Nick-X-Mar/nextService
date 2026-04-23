@@ -114,7 +114,7 @@ export default function MyOffers({ garageId }: MyOffersProps) {
   }
 
   const handleOfferClick = (offer: Offer) => {
-    router.push(`/garage-dashboard/${garageId}/offers/${offer.serviceRequestId}`)
+    router.push(`/garage-dashboard/${garageId}/offers/${offer.serviceRequestId}/`)
   }
 
   const filteredOffers = offers.filter(offer => {

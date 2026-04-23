@@ -242,12 +242,12 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
 
           // Redirect to requests page with clientId
           if (result.clientId) {
-            router.push(`/requests/${result.clientId}`)
+            router.push(`/requests/${result.clientId}/`)
           } else if (loggedInClientId) {
             // Fallback to logged in client ID
-            router.push(`/requests/${loggedInClientId}`)
+            router.push(`/requests/${loggedInClientId}/`)
           } else {
-            router.push('/requests')
+            router.push('/requests/')
           }
         } else {
           error('Σφαλμα', result.error || 'Αγνωστο σφαλμα')
@@ -449,11 +449,11 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                     />
                     <span className="text-xs text-on-surface-variant leading-snug">
                       Έχω διαβάσει και αποδέχομαι τους{' '}
-                      <a href="/terms" target="_blank" rel="noreferrer" className="text-primary underline">
+                      <a href="/terms/" target="_blank" rel="noreferrer" className="text-primary underline">
                         Όρους Χρήσης
                       </a>
                       {' '}και την{' '}
-                      <a href="/privacy" target="_blank" rel="noreferrer" className="text-primary underline">
+                      <a href="/privacy/" target="_blank" rel="noreferrer" className="text-primary underline">
                         Πολιτική Απορρήτου
                       </a>
                       .

@@ -297,7 +297,7 @@ export default function RequestDetailPage() {
                 <span className="text-sm text-on-surface">{data.client.phoneNumber || '-'}</span>
               </div>
               <button
-                onClick={() => router.push(`/admin/users/${data.client!.id}`)}
+                onClick={() => router.push(`/admin/users/${data.client!.id}/`)}
                 className="text-xs text-primary hover:underline mt-1"
               >
                 Προβολή προφίλ →

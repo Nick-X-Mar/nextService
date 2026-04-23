@@ -368,7 +368,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
             })
             // Navigate after a short delay (keep spinner active)
             setTimeout(() => {
-              router.push(`/garage-dashboard/${garageId}#my-offers`)
+              router.push(`/garage-dashboard/${garageId}/#my-offers`)
               setIsSubmitting(false)
             }, 1500)
           } else {
@@ -421,7 +421,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
             })
             // Navigate after a short delay (keep spinner active)
             setTimeout(() => {
-              router.push(`/garage-dashboard/${garageId}#my-offers`)
+              router.push(`/garage-dashboard/${garageId}/#my-offers`)
               setIsSubmitting(false)
             }, 1500)
           } else {
@@ -478,7 +478,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
           <h2 className={`${styles.sectionTitle} mb-2`}>Σφάλμα</h2>
           <p className={`${styles.bodyText} mb-6`}>Δεν ήταν δυνατή η φόρτωση των δεδομένων.</p>
           <button
-            onClick={() => router.push(`/garage-dashboard/${garageId}#available`)}
+            onClick={() => router.push(`/garage-dashboard/${garageId}/#available`)}
             className={styles.btnOutline}
           >
             <Icon name="arrow_back" size="sm" />
@@ -496,7 +496,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
         <div className="max-w-3xl mx-auto px-5 md:px-8">
           <div className="flex items-center gap-4 py-4">
             <button
-              onClick={() => router.push(`/garage-dashboard/${garageId}#available`)}
+              onClick={() => router.push(`/garage-dashboard/${garageId}/#available`)}
               className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-highest transition-colors"
             >
               <Icon name="arrow_back" size="sm" className="text-on-surface" />
@@ -511,7 +511,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
             </div>
             {!isAccepted && (
               <button
-                onClick={() => router.push(`/garage-dashboard/${garageId}/chat/${requestId}`)}
+                onClick={() => router.push(`/garage-dashboard/${garageId}/chat/${requestId}/`)}
                 className="w-10 h-10 rounded-full machined-gradient flex items-center justify-center shadow-lg shadow-primary/20 active:scale-95 transition-transform"
               >
                 <Icon name="chat" size="sm" className="text-on-primary" filled />
@@ -850,7 +850,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
           ) : (
             <div className="flex gap-3 mt-5">
               <button
-                onClick={() => router.push(`/garage-dashboard/${garageId}#available`)}
+                onClick={() => router.push(`/garage-dashboard/${garageId}/#available`)}
                 className={`${styles.btnOutline} flex-1 justify-center`}
               >
                 Ακύρωση

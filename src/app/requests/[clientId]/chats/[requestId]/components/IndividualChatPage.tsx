@@ -345,7 +345,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
               <div className="p-4 border-b border-outline-variant/10">
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => router.push(`/requests/${clientId}/chats`)}
+                    onClick={() => router.push(`/requests/${clientId}/chats/`)}
                     className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container transition-colors"
                   >
                     <Icon name="arrow_back" size="md" className="text-on-surface" />
@@ -442,7 +442,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                     <div className="flex items-center gap-3">
                       {/* Mobile back button (hidden on desktop since sidebar is visible) */}
                       <button
-                        onClick={() => router.push(`/requests/${clientId}/chats`)}
+                        onClick={() => router.push(`/requests/${clientId}/chats/`)}
                         className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container transition-colors md:hidden"
                       >
                         <Icon name="arrow_back" size="md" className="text-on-surface" />

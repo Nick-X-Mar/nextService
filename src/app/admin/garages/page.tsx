@@ -112,7 +112,7 @@ export default function GaragesPage() {
         keyField="id"
         loading={loading}
         emptyMessage="No garages found"
-        onRowClick={(item) => router.push(`/admin/users/${item.id}`)}
+        onRowClick={(item) => router.push(`/admin/users/${item.id}/`)}
       />
     </div>
   )

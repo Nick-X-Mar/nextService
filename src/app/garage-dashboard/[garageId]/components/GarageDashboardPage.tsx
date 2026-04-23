@@ -35,7 +35,7 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
   useEffect(() => {
     // Validate garage ID
     if (!garageId) {
-      router.push('/login')
+      router.push('/login/')
       return
     }
 
@@ -46,7 +46,7 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
 
     // Check if garage is pending validation
     if (userType === 'garage' && authGarage && !authGarage.isActive) {
-      router.push('/login')
+      router.push('/login/')
       return
     }
 
@@ -54,7 +54,7 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
     if (userType !== 'garage' || !authGarage || authGarage.id !== garageId) {
       // User is not authenticated as this garage or is a client
       console.warn('Unauthorized access attempt to garage dashboard')
-      router.push('/login')
+      router.push('/login/')
       return
     }
 
@@ -142,11 +142,11 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
   }
 
   const handleTabChange = (tab: string) => {
-    router.push(`/garage-dashboard/${garageId}?tab=${tab}`)
+    router.push(`/garage-dashboard/${garageId}/?tab=${tab}`)
   }
 
   const handleLogout = () => {
-    router.push('/login')
+    router.push('/login/')
   }
 
   if (isLoading) {

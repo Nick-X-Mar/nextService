@@ -157,7 +157,7 @@ export default function RequestsPage() {
         keyField="id"
         loading={listLoading}
         emptyMessage="No requests found for this period"
-        onRowClick={(item) => router.push(`/admin/requests/${item.id}`)}
+        onRowClick={(item) => router.push(`/admin/requests/${item.id}/`)}
       />
     </div>
   )

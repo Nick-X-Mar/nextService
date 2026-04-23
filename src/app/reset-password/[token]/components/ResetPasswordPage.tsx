@@ -49,7 +49,7 @@ export default function ResetPasswordPage() {
         setCompleted(true)
         success('Επιτυχία', 'Ο κωδικός σου ενημερώθηκε')
         // Redirect to login after a short delay so the user sees feedback.
-        setTimeout(() => router.push('/login'), 1800)
+        setTimeout(() => router.push('/login/'), 1800)
       } else {
         error('Σφάλμα', data.error || 'Δεν ήταν δυνατή η επαναφορά')
       }
@@ -143,7 +143,7 @@ export default function ResetPasswordPage() {
           </form>
 
           <div className="mt-4 text-center">
-            <Link href="/login" className={styles.linkText}>
+            <Link href="/login/" className={styles.linkText}>
               Επιστροφή στη σύνδεση
             </Link>
           </div>

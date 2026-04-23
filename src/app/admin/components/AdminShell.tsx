@@ -31,13 +31,13 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       try {
         const res = await fetch('/api/admin/auth/me')
         if (!res.ok) {
-          router.push('/admin/login')
+          router.push('/admin/login/')
           return
         }
         const data = await res.json()
         setAdmin(data)
       } catch {
-        router.push('/admin/login')
+        router.push('/admin/login/')
       } finally {
         setLoading(false)
       }

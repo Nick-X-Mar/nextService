@@ -53,7 +53,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     if (userType !== 'garage' || !authGarage || authGarage.id !== garageId) {
       // User is not authenticated as this garage or is a client
       console.warn('Unauthorized access attempt to garage chat')
-      router.push('/login')
+      router.push('/login/')
       return
     }
 

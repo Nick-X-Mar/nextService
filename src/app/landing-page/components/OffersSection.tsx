@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import staticOffers from '../../../data/offers.json'
 import Link from 'next/link'
+import Image from 'next/image'
 import Icon from '@/components/ui/Icon'
 import { Badge } from '@/components/ui/badge'
 import { motion, useMotionValue, useSpring } from 'motion/react'
@@ -167,9 +168,9 @@ export default function OffersSection() {
     <section className="py-14 relative overflow-hidden">
       {/* Header */}
       <div className="px-8 text-center mb-8">
-        <h3 className="text-2xl md:text-3xl font-black italic tracking-tighter text-white drop-shadow-lg">
+        <h2 className="text-2xl md:text-3xl font-black italic tracking-tighter text-white drop-shadow-lg">
           Hot Deals
-        </h3>
+        </h2>
         <p className="text-white/70 text-sm mt-1 drop-shadow">
           Εργασία & επώνυμα ανταλλακτικά
         </p>
@@ -213,10 +214,12 @@ export default function OffersSection() {
                   <div className="size-full relative transition-transform duration-300">
                     {/* Background image */}
                     {offer.image ? (
-                      <img
+                      <Image
                         src={offer.image}
                         alt={offer.title}
-                        className="absolute inset-0 w-full h-full object-cover"
+                        fill
+                        sizes="(max-width: 768px) 80vw, (max-width: 1280px) 38vw, 28vw"
+                        className="object-cover"
                       />
                     ) : (
                       <div className="absolute inset-0 bg-gradient-to-br from-primary-container/40 via-primary-container/20 to-surface-container-lowest flex items-center justify-center">
@@ -292,7 +295,7 @@ export default function OffersSection() {
                     </span>
 
                     <Link
-                      href={`/offer/${offer.slug}`}
+                      href={`/offer/${offer.slug}/`}
                       className="flex items-center justify-center gap-2 w-full py-3 rounded-xl machined-gradient text-on-primary font-bold text-sm shadow-lg shadow-primary/20 active:scale-95 transition-transform"
                     >
                       <Icon name="build" size="sm" className="text-on-primary" />

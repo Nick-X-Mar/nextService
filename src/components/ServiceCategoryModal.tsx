@@ -33,7 +33,7 @@ export default function ServiceCategoryModal({ isOpen, onClose, extraFormData }:
   const selectCategory = (value: string) => {
     saveFormData({ ...extraFormData, category: value })
     onClose()
-    router.push('/car-details')
+    router.push('/car-details/')
   }
 
   return (

@@ -1,7 +1,8 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import Image from 'next/image'
 import Icon from '@/components/ui/Icon'
 import { Badge } from '@/components/ui/badge'
 import { saveFormData } from '@/utils/formStorage'
@@ -23,32 +24,15 @@ interface Offer {
   icon: string
 }
 
-export default function OfferDetailPage({ slug }: { slug: string }) {
-  const router = useRouter()
-  const [offer, setOffer] = useState<Offer | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [shared, setShared] = useState(false)
+interface OfferDetailPageProps {
+  slug: string
+  initialOffer: Offer | null
+}
 
-  useEffect(() => {
-    async function fetchDeal() {
-      try {
-        const res = await fetch('/api/hot-deals')
-        if (res.ok) {
-          const data = await res.json()
-          const deals = Array.isArray(data) ? data : data.deals || []
-          const found = deals.find((d: Offer) => d.slug === slug)
-          if (found) {
-            setOffer(found)
-          }
-        }
-      } catch {
-        // Failed to fetch
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchDeal()
-  }, [slug])
+export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) {
+  const router = useRouter()
+  const [offer] = useState<Offer | null>(initialOffer)
+  const [shared, setShared] = useState(false)
 
   const handleGetOffer = useCallback(() => {
     if (!offer) return
@@ -56,7 +40,7 @@ export default function OfferDetailPage({ slug }: { slug: string }) {
       category: offer.category,
       description: offer.workType,
     })
-    router.push('/car-details')
+    router.push('/car-details/')
   }, [offer, router])
 
   const handleShare = useCallback(async () => {
@@ -80,14 +64,6 @@ export default function OfferDetailPage({ slug }: { slug: string }) {
       setTimeout(() => setShared(false), 2000)
     }
   }, [offer])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-surface flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    )
-  }
 
   if (!offer) {
     return (
@@ -130,11 +106,14 @@ export default function OfferDetailPage({ slug }: { slug: string }) {
       <div className="max-w-2xl mx-auto px-4 pb-48">
         {/* Image Section */}
         {offer.image ? (
-          <div className="mt-4 aspect-[16/10] w-full overflow-hidden rounded-2xl bg-surface-container-high">
-            <img
+          <div className="relative mt-4 aspect-[16/10] w-full overflow-hidden rounded-2xl bg-surface-container-high">
+            <Image
               src={offer.image}
               alt={offer.title}
-              className="w-full h-full object-cover"
+              fill
+              sizes="(max-width: 768px) 100vw, 672px"
+              className="object-cover"
+              priority
             />
           </div>
         ) : (

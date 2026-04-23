@@ -347,9 +347,9 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
   const handleChatClick = (requestId: string, garageId?: string) => {
     // Navigate to the individual chat page for this request
     if (garageId) {
-      router.push(`/requests/${clientId}/chats/${requestId}?garageId=${garageId}`)
+      router.push(`/requests/${clientId}/chats/${requestId}/?garageId=${garageId}`)
     } else {
-      router.push(`/requests/${clientId}/chats/${requestId}`)
+      router.push(`/requests/${clientId}/chats/${requestId}/`)
     }
   }
 
@@ -483,7 +483,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
       <h3 className="text-lg font-bold text-on-surface mb-2">{message}</h3>
       <p className="text-sm text-on-surface-variant mb-8 max-w-sm mx-auto">{description}</p>
       <button
-        onClick={() => router.push(`/requests/${clientId}`)}
+        onClick={() => router.push(`/requests/${clientId}/`)}
         className="inline-flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded-full font-medium text-sm hover:opacity-90 transition-opacity mx-auto"
       >
         <Icon name="list_alt" size="sm" />

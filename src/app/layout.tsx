@@ -7,8 +7,50 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import "@/lib/amplify-config"; // Initialize Amplify
 
 export const metadata: Metadata = {
-  title: "NextService - Πλατφόρμα Επαγγελματιών",
-  description: "Η καλύτερη πλατφόρμα για να βρείτε επαγγελματίες και υπηρεσίες",
+  metadataBase: new URL("https://www.nextservice.gr"),
+  title: {
+    default: "NextService — Βρες συνεργείο αυτοκινήτου με την καλύτερη τιμή",
+    template: "%s | NextService",
+  },
+  description:
+    "Στείλε αίτημα σε συνεργεία σε όλη την Ελλάδα και πάρε προσφορές. Hot deals σε service, συμπλέκτη, ιμάντα χρονισμού και φανοποιεία — εργασία και επώνυμα ανταλλακτικά.",
+  applicationName: "NextService",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/logo.png",
+  },
+  openGraph: {
+    type: "website",
+    siteName: "NextService",
+    locale: "el_GR",
+    url: "https://www.nextservice.gr",
+    title: "NextService — Βρες συνεργείο αυτοκινήτου με την καλύτερη τιμή",
+    description:
+      "Στείλε αίτημα σε συνεργεία σε όλη την Ελλάδα και πάρε προσφορές. Hot deals σε service, συμπλέκτη, ιμάντα χρονισμού και φανοποιεία.",
+    images: [
+      {
+        url: "/logo.png",
+        alt: "NextService",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "NextService — Βρες συνεργείο αυτοκινήτου με την καλύτερη τιμή",
+    description:
+      "Στείλε αίτημα σε συνεργεία σε όλη την Ελλάδα και πάρε προσφορές σε service και φανοποιεία.",
+    images: ["/logo.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
 };
 
 export default function RootLayout({

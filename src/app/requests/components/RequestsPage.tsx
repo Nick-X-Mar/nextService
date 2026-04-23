@@ -338,7 +338,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
   ]
 
   const handleViewDetails = (request: ServiceRequest) => {
-    router.push(`/requests/${clientId}/details/${request.id}`)
+    router.push(`/requests/${clientId}/details/${request.id}/`)
   }
 
   const handleCloseModal = () => {
@@ -357,7 +357,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
 
   const handleChatClick = (requestId: string) => {
     // Navigate to the client's individual chat page
-    router.push(`/requests/${clientId}/chats/${requestId}`)
+    router.push(`/requests/${clientId}/chats/${requestId}/`)
   }
 
   const handleCancelAppointment = async () => {
@@ -474,7 +474,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
           // Use a timeout to allow the success message to show before redirect
           setTimeout(() => {
             try {
-              window.location.href = `/requests/${data.client.id}`
+              window.location.href = `/requests/${data.client.id}/`
             } catch (redirectError) {
               console.error('Redirect failed:', redirectError)
               // Fallback: reload the page with the new client ID
@@ -589,7 +589,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                         Συμπληρώστε Στοιχεία
                       </button>
                       <button
-                        onClick={() => router.push('/login')}
+                        onClick={() => router.push('/login/')}
                         className={`${styles.btnOutline}`}
                       >
                         Σύνδεση
@@ -793,7 +793,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                             Συμπληρώστε Στοιχεία
                           </button>
                           <button
-                            onClick={() => router.push('/login')}
+                            onClick={() => router.push('/login/')}
                             className={styles.btnOutline}
                           >
                             Σύνδεση
