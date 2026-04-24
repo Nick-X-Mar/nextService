@@ -27,7 +27,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const url = `${SITE_URL}/offer/${offer.slug}/`
   const title = `${offer.title} από ${offer.price} — ${offer.subtitle}`
   const description = `${offer.title} από ${offer.price}. ${offer.details.slice(0, 3).join(' · ')}. Εργασία και επώνυμα ανταλλακτικά. Διάρκεια: ${offer.duration}.`
-  const image = absoluteImage(offer.image)
 
   return {
     title,
@@ -40,13 +39,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       locale: 'el_GR',
       title: `${title} | NextService`,
       description,
-      images: [{ url: image, width: 1200, height: 630, alt: offer.title }],
     },
     twitter: {
       card: 'summary_large_image',
       title: `${title} | NextService`,
       description,
-      images: [image],
     },
   }
 }

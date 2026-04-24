@@ -28,19 +28,12 @@ export const metadata: Metadata = {
     title: "NextService — Βρες συνεργείο αυτοκινήτου με την καλύτερη τιμή",
     description:
       "Στείλε αίτημα σε συνεργεία σε όλη την Ελλάδα και πάρε προσφορές. Hot deals σε service, συμπλέκτη, ιμάντα χρονισμού και φανοποιεία.",
-    images: [
-      {
-        url: "/logo.png",
-        alt: "NextService",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "NextService — Βρες συνεργείο αυτοκινήτου με την καλύτερη τιμή",
     description:
       "Στείλε αίτημα σε συνεργεία σε όλη την Ελλάδα και πάρε προσφορές σε service και φανοποιεία.",
-    images: ["/logo.png"],
   },
   robots: {
     index: true,

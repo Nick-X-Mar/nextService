@@ -15,13 +15,20 @@ export const metadata: Metadata = {
     title: 'Εγγραφή Συνεργείου | NextService',
     description:
       'Κάνε εγγραφή στο NextService και δες αιτήματα πελατών στην περιοχή σου.',
-    images: [{ url: '/logo.png', alt: 'NextService' }],
+    images: [
+      {
+        url: `${SITE_URL}/opengraph-image`,
+        width: 1200,
+        height: 630,
+        alt: 'NextService',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Εγγραφή Συνεργείου | NextService',
     description: 'Κάνε εγγραφή στο NextService και δες αιτήματα πελατών στην περιοχή σου.',
-    images: ['/logo.png'],
+    images: [`${SITE_URL}/opengraph-image`],
   },
 }
 
