@@ -1,8 +1,10 @@
 import { ImageResponse } from 'next/og'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { getOfferBySlug } from '@/lib/offers'
+import { getOfferBySlug, type Offer } from '@/lib/offers'
+import { SITE_URL } from '@/lib/site-url'
 
+export const runtime = 'nodejs'
 export const alt = 'NextService προσφορά'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
@@ -25,11 +27,13 @@ async function loadFonts() {
   ]
 }
 
-async function loadOfferImage(imagePath: string): Promise<string | null> {
+async function loadOfferImage(imagePath: string | undefined): Promise<string | null> {
+  if (!imagePath) return null
   try {
-    if (!imagePath.startsWith('/')) return null
-    const abs = join(process.cwd(), 'public', imagePath)
-    const buf = await readFile(abs)
+    const url = imagePath.startsWith('http') ? imagePath : `${SITE_URL}${imagePath}`
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const buf = Buffer.from(await res.arrayBuffer())
     const ext = imagePath.toLowerCase().endsWith('.png') ? 'png' : 'jpeg'
     return `data:image/${ext};base64,${buf.toString('base64')}`
   } catch {
@@ -37,10 +41,17 @@ async function loadOfferImage(imagePath: string): Promise<string | null> {
   }
 }
 
+async function safeGetOffer(slug: string): Promise<Offer | null> {
+  try {
+    return await getOfferBySlug(decodeURIComponent(slug))
+  } catch {
+    return null
+  }
+}
+
 export default async function Image({ params }: Params) {
   const { slug } = await params
-  const offer = await getOfferBySlug(decodeURIComponent(slug))
-  const fonts = await loadFonts()
+  const [offer, fonts] = await Promise.all([safeGetOffer(slug), loadFonts()])
   const bg = offer ? await loadOfferImage(offer.image) : null
 
   const title = offer?.title ?? 'NextService'
