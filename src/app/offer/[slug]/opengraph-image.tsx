@@ -1,11 +1,12 @@
 import { ImageResponse } from 'next/og'
+import sharp from 'sharp'
 import staticOffers from '@/data/offers.json'
 import { SITE_URL } from '@/lib/site-url'
 
 export const runtime = 'nodejs'
 export const alt = 'NextService προσφορά'
 export const size = { width: 1200, height: 630 }
-export const contentType = 'image/png'
+export const contentType = 'image/jpeg'
 
 interface Params {
   params: Promise<{ slug: string }>
@@ -73,7 +74,7 @@ export default async function Image({ params }: Params) {
   const price = offer?.price ?? ''
   const category = offer?.category === 'fanopeia' ? 'Φανοποιεία' : 'Service'
 
-  return new ImageResponse(
+  const img = new ImageResponse(
     (
       <div
         style={{
@@ -218,4 +219,14 @@ export default async function Image({ params }: Params) {
     ),
     { ...size, fonts },
   )
+
+  // Re-encode PNG → JPEG for smaller file size (WhatsApp/Messenger require <600KB).
+  const png = Buffer.from(await img.arrayBuffer())
+  const jpeg = await sharp(png).jpeg({ quality: 82, mozjpeg: true }).toBuffer()
+  return new Response(new Uint8Array(jpeg), {
+    headers: {
+      'content-type': 'image/jpeg',
+      'cache-control': 'public, immutable, no-transform, max-age=31536000',
+    },
+  })
 }

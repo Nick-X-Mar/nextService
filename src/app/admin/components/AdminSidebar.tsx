@@ -14,6 +14,7 @@ const navItems = [
   { icon: 'build', label: 'Requests', href: '/admin/requests' },
   { icon: 'new_releases', label: 'Custom Vehicles', href: '/admin/custom-vehicles', badgeKey: 'customVehicles' as const },
   { icon: 'payments', label: 'Payments', href: '/admin/payments' },
+  { icon: 'account_balance_wallet', label: 'Commissions', href: '/admin/commissions' },
   { icon: 'settings', label: 'Settings', href: '/admin/settings' },
   { icon: 'monitoring', label: 'Performance', href: '/admin/performance' },
   { icon: 'science', label: 'E2E Tests', href: '/admin/tests' },

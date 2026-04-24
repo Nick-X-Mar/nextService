@@ -25,8 +25,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const url = `${SITE_URL}/offer/${offer.slug}/`
-  const title = `${offer.title} από ${offer.price} — ${offer.subtitle}`
-  const description = `${offer.title} από ${offer.price}. ${offer.details.slice(0, 3).join(' · ')}. Εργασία και επώνυμα ανταλλακτικά. Διάρκεια: ${offer.duration}.`
+  // Title ≤ 60 chars for Google SERP. The car model is shown in the OG image visual.
+  const title = `${offer.title} από ${offer.price}`
+  const ogTitle = `${title} | NextService`
+  // Description 110-160 chars.
+  const description = `${offer.title} ${offer.subtitle} από ${offer.price}. ${offer.details.slice(0, 2).join(' · ')}. Διάρκεια: ${offer.duration}.`
 
   return {
     title,
@@ -37,12 +40,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       url,
       siteName: 'NextService',
       locale: 'el_GR',
-      title: `${title} | NextService`,
+      title: ogTitle,
       description,
     },
     twitter: {
       card: 'summary_large_image',
-      title: `${title} | NextService`,
+      title: ogTitle,
       description,
     },
   }
