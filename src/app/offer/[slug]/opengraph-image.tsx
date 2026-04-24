@@ -1,6 +1,4 @@
 import { ImageResponse } from 'next/og'
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import staticOffers from '@/data/offers.json'
 import { SITE_URL } from '@/lib/site-url'
 
@@ -23,11 +21,15 @@ interface StaticOffer {
 }
 
 async function loadFonts() {
-  const dir = join(process.cwd(), 'public', 'fonts')
+  const fetchFont = async (name: string) => {
+    const res = await fetch(`${SITE_URL}/fonts/${name}`, { cache: 'force-cache' })
+    if (!res.ok) throw new Error(`font ${name} ${res.status}`)
+    return res.arrayBuffer()
+  }
   const [regular, bold, black] = await Promise.all([
-    readFile(join(dir, 'inter-greek-400.woff')),
-    readFile(join(dir, 'inter-greek-700.woff')),
-    readFile(join(dir, 'inter-greek-900.woff')),
+    fetchFont('inter-greek-400.woff'),
+    fetchFont('inter-greek-700.woff'),
+    fetchFont('inter-greek-900.woff'),
   ])
   return [
     { name: 'Inter', data: regular, weight: 400 as const, style: 'normal' as const },
