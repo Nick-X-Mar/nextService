@@ -1,5 +1,6 @@
 import HeroSection from './components/HeroSection'
 import OffersSection from './components/OffersSection'
+import FAQSection from './components/FAQSection'
 
 export default function LandingPage() {
   return (
@@ -21,6 +22,7 @@ export default function LandingPage() {
       </div>
       <HeroSection />
       <OffersSection />
+      <FAQSection />
     </div>
   )
 }

@@ -1,0 +1,32 @@
+# NextService
+
+> Marketplace συνεργείων αυτοκινήτου στην Ελλάδα. NextService is a Greek car service marketplace connecting vehicle owners with vetted garages: customers submit service requests with vehicle details and photos, receive offers from local garages, chat in real-time, and book online with a small Stripe deposit. Both labour and branded parts are included.
+
+## Τι προσφέρουμε / What we offer
+
+- **Δωρεάν αιτήματα service** — Στέλνετε στοιχεία οχήματος και εργασία, λαμβάνετε προσφορές από συνεργεία της περιοχής σας μέσα σε ώρες.
+- **Hot Deals** — Σταθερές τιμές πακέτο για συνήθεις εργασίες: service, αλλαγή λαδιών, ιμάντας χρονισμού, συμπλέκτης, φανοποιεία. Εργασία και επώνυμα ανταλλακτικά.
+- **Real-time chat** με τα συνεργεία για διευκρινίσεις πριν την κράτηση.
+- **Δωρεάν κράτηση online** — καμία χρέωση για πελάτες ή συνεργεία στην παρούσα φάση.
+- **Κάλυψη σε όλη την Ελλάδα** (Αθήνα, Θεσσαλονίκη, Πάτρα, Ηράκλειο και υπόλοιπη επικράτεια).
+
+## Για ποιους / For whom
+
+- **Ιδιοκτήτες αυτοκινήτων** που θέλουν να συγκρίνουν τιμές από πολλά συνεργεία πριν δώσουν εργασία.
+- **Επαγγελματικά συνεργεία** που θέλουν νέους πελάτες χωρίς διαφημιστικό κόστος ανά click.
+
+## Κύριες σελίδες / Key pages
+
+- [Αρχική / Home](https://www.nextservice.gr/) — Hot Deals και αποστολή αιτήματος service.
+- [Εγγραφή συνεργείου / Register as garage](https://www.nextservice.gr/register-professional/) — Onboarding για επαγγελματίες.
+- [Σύνδεση / Login](https://www.nextservice.gr/login/)
+- [Πολιτική απορρήτου / Privacy](https://www.nextservice.gr/privacy/)
+- [Όροι χρήσης / Terms](https://www.nextservice.gr/terms/)
+
+## Γλώσσες / Languages
+
+Ελληνικά (el-GR). UI και επικοινωνία στα Ελληνικά.
+
+## Επικοινωνία / Contact
+
+info@nextservice.gr

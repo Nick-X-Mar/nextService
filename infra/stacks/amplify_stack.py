@@ -356,6 +356,15 @@ frontend:
                 amplify.CfnApp.EnvironmentVariableProperty(
                     name="SITE_URL", value=site_url,
                 ),
+                # Payments feature flags — disabled for the launch phase
+                # (free booking, no deposit, no refunds flow). Flip to "true"
+                # once the Stripe integration is ready to go live.
+                amplify.CfnApp.EnvironmentVariableProperty(
+                    name="NEXT_PUBLIC_PAYMENTS_ENABLED", value="false",
+                ),
+                amplify.CfnApp.EnvironmentVariableProperty(
+                    name="NEXT_PUBLIC_PAYMENTS_REFUNDS_ENABLED", value="false",
+                ),
             ],
         )
         # Amplify env vars resolve `{{resolve:secretsmanager:...}}` at deploy

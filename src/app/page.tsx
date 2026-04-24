@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import LandingPage from './landing-page/LandingPage'
+import { faqs } from './landing-page/components/FAQSection'
 import { SITE_URL } from '@/lib/site-url'
 
 export const metadata: Metadata = {
@@ -29,6 +30,19 @@ const websiteJsonLd = {
   inLanguage: 'el-GR',
 }
 
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: faqs.map((f) => ({
+    '@type': 'Question',
+    name: f.question,
+    acceptedAnswer: {
+      '@type': 'Answer',
+      text: f.answer,
+    },
+  })),
+}
+
 export default function Home() {
   return (
     <>
@@ -39,6 +53,10 @@ export default function Home() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
       <LandingPage />
     </>

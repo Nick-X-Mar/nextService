@@ -525,6 +525,14 @@
      {
       "Name": "SITE_URL",
       "Value": "https://dev.d3ku6yajf4j6y8.amplifyapp.com"
+     },
+     {
+      "Name": "NEXT_PUBLIC_PAYMENTS_ENABLED",
+      "Value": "false"
+     },
+     {
+      "Name": "NEXT_PUBLIC_PAYMENTS_REFUNDS_ENABLED",
+      "Value": "false"
      }
     ],
     "IAMServiceRole": {

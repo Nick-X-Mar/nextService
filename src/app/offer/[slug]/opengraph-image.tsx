@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { getOfferBySlug, type Offer } from '@/lib/offers'
+import staticOffers from '@/data/offers.json'
 import { SITE_URL } from '@/lib/site-url'
 
 export const runtime = 'nodejs'
@@ -11,6 +11,15 @@ export const contentType = 'image/png'
 
 interface Params {
   params: Promise<{ slug: string }>
+}
+
+interface StaticOffer {
+  slug: string
+  image?: string
+  title?: string
+  subtitle?: string
+  price?: string
+  category?: string
 }
 
 async function loadFonts() {
@@ -41,9 +50,11 @@ async function loadOfferImage(imagePath: string | undefined): Promise<string | n
   }
 }
 
-async function safeGetOffer(slug: string): Promise<Offer | null> {
+function findOffer(slug: string): StaticOffer | null {
   try {
-    return await getOfferBySlug(decodeURIComponent(slug))
+    const decoded = decodeURIComponent(slug)
+    const offers = staticOffers as StaticOffer[]
+    return offers.find((o) => o.slug === decoded) ?? null
   } catch {
     return null
   }
@@ -51,7 +62,8 @@ async function safeGetOffer(slug: string): Promise<Offer | null> {
 
 export default async function Image({ params }: Params) {
   const { slug } = await params
-  const [offer, fonts] = await Promise.all([safeGetOffer(slug), loadFonts()])
+  const [fonts] = await Promise.all([loadFonts()])
+  const offer = findOffer(slug)
   const bg = offer ? await loadOfferImage(offer.image) : null
 
   const title = offer?.title ?? 'NextService'
