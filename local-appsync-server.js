@@ -126,12 +126,11 @@ function handleMessage(connectionId, data) {
 }
 
 function extractRoomId(data) {
-  // Extract room ID from AppSync subscription data
-  // This matches your room naming: request-${requestId}-garage-${garageId}
-  // Format: request-sr-1759063220039-rsjblvy1v-garage-1759169248452-40o4x992z
-  if (typeof data === 'string') {
-    const match = data.match(/^request-.+/);
-    return match ? match[0] : null;
+  // Accept any non-empty string as a room/channel id. Used by both chat
+  // (`request-<requestId>-garage-<garageId>`) and the new-request broadcast
+  // channels (`new-requests`, `request-updates`).
+  if (typeof data === 'string' && data.length > 0) {
+    return data;
   }
   return null;
 }
@@ -157,16 +156,18 @@ function unsubscribeFromRoom(connectionId, roomId) {
 
 function publishToRoom(roomId, message) {
   console.log(`📤 Publishing to ${roomId}:`, message);
-  
+
   if (subscriptions.has(roomId)) {
     const subs = subscriptions.get(roomId);
     subs.forEach(connectionId => {
       const ws = connections.get(connectionId);
       if (ws && ws.readyState === WebSocket.OPEN) {
-        // Send in AppSync format
+        // Include channelName so the client can route the event to the
+        // correct subscriber instead of broadcasting to every callback.
         ws.send(JSON.stringify({
           type: 'data',
           payload: {
+            channelName: roomId,
             data: {
               subscribe: message
             }

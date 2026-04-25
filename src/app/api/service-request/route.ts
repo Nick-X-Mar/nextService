@@ -10,6 +10,7 @@ import { EventName, EmailTemplate } from '@/types/events'
 import { getAuth } from '@/utils/requireAuth'
 import { signToken, setAuthCookie } from '@/utils/auth'
 import { withMetrics } from '@/utils/withMetrics'
+import { broadcastNewRequest } from '@/utils/requestBroadcast'
 
 // Helper function to normalize string values for comparison
 const normalizeString = (value: string | undefined | null): string => {
@@ -372,10 +373,10 @@ async function _POST(request: NextRequest) {
       })
     }
 
-    // Broadcast to active garages is handled out-of-band by the
-    // `new-request-broadcast` Lambda, triggered by the DynamoDB Stream on
-    // the ServiceRequests table. The route returns as soon as the row is
-    // persisted — no SES calls in the request path.
+    // Fan-out the new request to any garage dashboards listening on the
+    // shared AppSync channel. Don't await — broadcasting must never block
+    // the response, and failures are logged inside the helper.
+    void broadcastNewRequest(serviceRequestId)
 
     // Always return success when SMS is disabled, but indicate it in the message
     const response = NextResponse.json({

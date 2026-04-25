@@ -10,6 +10,7 @@ import { requireClient } from '@/utils/requireAuth'
 import { generatePresignedUrls, presignPhotoRecords } from '@/utils/s3Service'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { broadcastRequestUpdate } from '@/utils/requestBroadcast'
 
 const checkAcceptRate = createRateLimiter('accept-offer', 5, 3600000)
 
@@ -275,6 +276,11 @@ async function _PATCH(
         })
       }
     }
+
+    // Tell every garage dashboard listening on the realtime channel to drop
+    // this request from their list — once an offer is accepted it's no longer
+    // available to anyone else.
+    void broadcastRequestUpdate(requestId, ServiceRequestStatus.APPOINTMENT, 'offer_accepted')
 
     // Fire both confirmation emails (best-effort, never block).
     void notifyAcceptanceParticipants({

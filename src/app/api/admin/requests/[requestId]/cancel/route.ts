@@ -5,6 +5,7 @@ import { ServiceRequestStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { withMetrics } from '@/utils/withMetrics'
+import { broadcastRequestUpdate } from '@/utils/requestBroadcast'
 
 async function _PATCH(
   request: NextRequest,
@@ -50,6 +51,9 @@ async function _PATCH(
       source: 'api/admin/requests/[requestId]/cancel',
       metadata: { previousStatus: sr.status, cancelledByAdmin: true }
     })
+
+    // Drop the card from any garage dashboard that's currently displaying it.
+    void broadcastRequestUpdate(requestId, ServiceRequestStatus.CANCELLED, 'admin_cancelled')
 
     return NextResponse.json({ success: true })
   } catch (error) {

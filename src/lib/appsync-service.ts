@@ -1,22 +1,26 @@
-// AWS AppSync service for real-time chat
-interface ChatMessage {
-  id: string
-  requestId: string
-  senderId: string
-  senderType: 'client' | 'garage'
-  senderName: string
-  message: string
-  timestamp: string
-  garageId?: string
-}
+// AWS AppSync service for real-time pub/sub. Originally chat-only; now also
+// used to broadcast new service requests and request status updates to
+// subscribed garage dashboards.
+type AppSyncEvent = Record<string, unknown>
+// Subscribers may know more about the payload shape than AppSyncService does
+// (e.g. ChatMessage). Storing callbacks as `any` keeps strict mode happy at
+// the call sites without forcing every subscriber to widen its type.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AppSyncCallback = (message: any) => void
+type ReconnectListener = () => void
 
 class AppSyncService {
   private ws: WebSocket | null = null
-  private subscriptions: Map<string, (message: ChatMessage) => void> = new Map()
+  // Multiple components can listen on the same channel (e.g. the dashboard
+  // page tracks the badge while the AvailableRequests tab tracks the list).
+  // A Set per channel lets each subscriber be removed independently.
+  private subscriptions: Map<string, Set<AppSyncCallback>> = new Map()
+  private reconnectListeners: Set<ReconnectListener> = new Set()
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
   private reconnectDelay = 1000
   private isConnected = false
+  private hasEverConnected = false
 
   async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -70,8 +74,21 @@ class AppSyncService {
         
         this.ws.onopen = () => {
           console.log('✅ AppSync Events WebSocket connected')
+          const isReconnect = this.hasEverConnected
           this.reconnectAttempts = 0
           this.isConnected = true
+          this.hasEverConnected = true
+          // Resubscribe to any channels the app had registered before the
+          // disconnect, so subscribers don't have to manually re-bind.
+          if (isReconnect) {
+            const channels = Array.from(this.subscriptions.keys())
+            channels.forEach(channelName => {
+              this.sendSubscribeMessage(channelName)
+            })
+            this.reconnectListeners.forEach(listener => {
+              try { listener() } catch (e) { console.error('Reconnect listener error:', e) }
+            })
+          }
           resolve()
         }
         
@@ -108,46 +125,47 @@ class AppSyncService {
 
   private handleMessage(data: any) {
     console.log('📨 AppSync Events WebSocket message received:', data)
-    
+
     if (data.type === 'ack') {
       console.log('✅ AppSync Events message acknowledged')
       return
     }
-    
+
     if (data.type === 'error') {
       console.error('❌ AppSync Events error:', data)
       return
     }
-    
+
     if (data.type === 'data' && data.payload) {
       // Handle incoming events from local AppSync server
       try {
         const eventData = data.payload.data?.subscribe || data.payload.data
-        console.log('📨 Received local event:', eventData)
-        
+        const channelName: string | undefined = data.payload.channelName
+        console.log('📨 Received local event:', eventData, 'on channel:', channelName)
+
         if (eventData) {
-          // Route the event to all subscribers (simple approach)
-          this.subscriptions.forEach((callback, channelName) => {
-            console.log(`📨 Calling callback for channel: ${channelName}`)
-            callback(eventData)
-          })
+          this.dispatchEvent(eventData, channelName)
         }
       } catch (error) {
         console.error('Error parsing local event data:', error)
       }
     }
-    
+
     if (data.type === 'data' && data.event) {
       // Handle incoming events (AWS AppSync Events uses 'data' type with event field)
       try {
         const eventData = JSON.parse(data.event)
-        console.log('📨 Received AWS event:', eventData)
-        
-        // Route the event to all subscribers (simple approach)
-        this.subscriptions.forEach((callback, channelName) => {
-          console.log(`📨 Calling callback for AWS channel: ${channelName}`)
-          callback(eventData)
-        })
+        // AWS AppSync Events delivers per-channel; the WS message includes
+        // the channel name at the top level on the AWS side.
+        const channelName: string | undefined = (() => {
+          if (typeof data.channel === 'string') {
+            return data.channel.replace(/^\/default\//, '')
+          }
+          return undefined
+        })()
+        console.log('📨 Received AWS event:', eventData, 'on channel:', channelName)
+
+        this.dispatchEvent(eventData, channelName)
       } catch (error) {
         console.error('Error parsing AWS event data:', error)
       }
@@ -156,10 +174,33 @@ class AppSyncService {
     if (data.type === 'subscribe_success') {
       console.log('✅ Subscription successful:', data)
     }
-    
+
     if (data.type === 'subscribe_error') {
       console.error('❌ Subscription error:', data)
     }
+  }
+
+  // Route an event to subscribers. If the server told us which channel the
+  // event belongs to, deliver only to that channel's subscribers. Otherwise
+  // fall back to broadcasting (legacy behaviour) so existing chat code keeps
+  // working when the server doesn't include channel info.
+  private dispatchEvent(eventData: AppSyncEvent, channelName?: string) {
+    const fire = (callbacks: Set<AppSyncCallback>, channel: string) => {
+      callbacks.forEach(callback => {
+        try {
+          callback(eventData)
+        } catch (error) {
+          console.error(`Error in subscription callback for ${channel}:`, error)
+        }
+      })
+    }
+
+    if (channelName && this.subscriptions.has(channelName)) {
+      fire(this.subscriptions.get(channelName)!, channelName)
+      return
+    }
+
+    this.subscriptions.forEach((callbacks, cn) => fire(callbacks, cn))
   }
 
   private send(message: any) {
@@ -185,20 +226,45 @@ class AppSyncService {
     }
   }
 
-  subscribe(channelName: string, callback: (message: ChatMessage) => void) {
+  subscribe(channelName: string, callback: AppSyncCallback): () => void {
     console.log(`📡 Subscribing to channel: ${channelName}`)
-    
-    // Store the callback with the original channel name for lookup
-    this.subscriptions.set(channelName, callback)
-    
-    // Use simple channel name for proper isolation
+
+    const isFirstSubscriber = !this.subscriptions.has(channelName)
+    if (isFirstSubscriber) {
+      this.subscriptions.set(channelName, new Set())
+    }
+    const callbacks = this.subscriptions.get(channelName)!
+    callbacks.add(callback)
+
+    // Only send the wire-level subscribe once per channel. Multiple local
+    // subscribers share a single server-side subscription.
+    if (isFirstSubscriber) {
+      this.sendSubscribeMessage(channelName)
+    }
+
+    return () => this.unsubscribeCallback(channelName, callback)
+  }
+
+  // Remove a single callback. The server-side subscription is only torn down
+  // when the last local subscriber goes away.
+  private unsubscribeCallback(channelName: string, callback: AppSyncCallback) {
+    const callbacks = this.subscriptions.get(channelName)
+    if (!callbacks) return
+    callbacks.delete(callback)
+    if (callbacks.size === 0) {
+      this.subscriptions.delete(channelName)
+      this.sendUnsubscribeMessage(channelName)
+    }
+  }
+
+  // Sends the wire-level subscribe frame for a channel. Extracted so that
+  // reconnection logic can replay subscriptions without touching the local
+  // callbacks map.
+  private sendSubscribeMessage(channelName: string) {
     const defaultChannelName = `/default/${channelName}`
-    console.log(`📡 Subscription registered for channel: ${defaultChannelName}`)
-    
-    // For local development, use 'start' type. For AWS AppSync, use 'subscribe' type
     const isLocal = process.env.NODE_ENV === 'development'
     const messageType = isLocal ? 'start' : 'subscribe'
-    
+
     if (this.isConnected && this.ws) {
       const subscribeMessage = {
         id: `sub-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -209,22 +275,39 @@ class AppSyncService {
           }
         } : {
           channel: defaultChannelName,
-          authorization: { 
+          authorization: {
             'x-api-key': process.env.NEXT_PUBLIC_APPSYNC_API_KEY,
             'host': process.env.NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT
           }
         })
       }
-      
+
       console.log('📡 Sending subscription message:', subscribeMessage)
       this.send(subscribeMessage)
     }
   }
 
+  // Register a callback that fires every time the WebSocket transitions from
+  // disconnected back to connected (excluding the very first connection).
+  // Useful for refetching server state to fill any gap that occurred during
+  // the outage.
+  onReconnect(listener: ReconnectListener): () => void {
+    this.reconnectListeners.add(listener)
+    return () => {
+      this.reconnectListeners.delete(listener)
+    }
+  }
+
+  // Tear down ALL local subscribers for a channel. Generally prefer the
+  // disposer returned by `subscribe()` so individual components don't accidentally
+  // unsubscribe each other; this method is kept for legacy chat callsites.
   unsubscribe(channelName: string) {
     console.log(`📡 Unsubscribing from channel: ${channelName}`)
-    
-    // For local development, send 'stop' message to server
+    this.subscriptions.delete(channelName)
+    this.sendUnsubscribeMessage(channelName)
+  }
+
+  private sendUnsubscribeMessage(channelName: string) {
     const isLocal = process.env.NODE_ENV === 'development'
     if (isLocal && this.isConnected && this.ws) {
       const unsubscribeMessage = {
@@ -234,17 +317,13 @@ class AppSyncService {
           data: channelName
         }
       }
-      
       console.log('📡 Sending unsubscribe message:', unsubscribeMessage)
       this.send(unsubscribeMessage)
     }
-    
-    // Remove the callback
-    this.subscriptions.delete(channelName)
   }
 
   // Publish an event to a channel using AppSync Events
-  async publishEvent(channelName: string, message: ChatMessage): Promise<void> {
+  async publishEvent(channelName: string, message: AppSyncEvent): Promise<void> {
     // Try to connect if not already connected
     if (!this.isConnected || !this.ws) {
       console.log('📡 WebSocket not connected, attempting to connect...')
@@ -279,14 +358,14 @@ class AppSyncService {
   }
 
   // Simulate receiving a message (for testing)
-  simulateMessage(channelName: string, message: ChatMessage) {
+  simulateMessage(channelName: string, message: AppSyncEvent) {
     console.log(`📨 Simulating message for channel: ${channelName}`)
-    const callback = this.subscriptions.get(channelName)
-    if (callback) {
-      console.log(`📨 Found callback for channel: ${channelName}`)
-      callback(message)
+    const callbacks = this.subscriptions.get(channelName)
+    if (callbacks && callbacks.size > 0) {
+      console.log(`📨 Firing ${callbacks.size} callback(s) for channel: ${channelName}`)
+      callbacks.forEach(cb => cb(message))
     } else {
-      console.log(`📨 No callback found for channel: ${channelName}`)
+      console.log(`📨 No callbacks found for channel: ${channelName}`)
       console.log(`📨 Available subscriptions:`, Array.from(this.subscriptions.keys()))
     }
   }

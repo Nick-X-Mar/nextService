@@ -1,16 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useRef, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SegmentedControl } from '@/components'
 import { styles } from '@/styles/styles'
-import { OfferStatus } from '@/types/statuses'
+import { OfferStatus, ServiceRequestStatus } from '@/types/statuses'
 import { useAuth } from '@/contexts/AuthContext'
 import Icon from '@/components/ui/Icon'
 import MyOffers from './MyOffers'
 import AvailableRequests from './AvailableRequests'
 import Appointments from './Appointments'
 import GarageSettings from './GarageSettings'
+import { useRealtimeRequests, type BroadcastRequest, type RequestUpdatePayload } from '@/hooks/useRealtimeRequests'
+import { useToast } from '@/hooks/useToast'
+import { useNewRequestNotifier } from '@/hooks/useNewRequestNotifier'
+import { getCategoryText } from '@/utils/categoryLabels'
 
 interface GarageDashboardPageProps {
   garageId: string
@@ -25,6 +29,12 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
   const [garageData, setGarageData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [counts, setCounts] = useState({ requests: 0, offers: 0, appointments: 0 })
+  const { info } = useToast()
+  const { notify } = useNewRequestNotifier()
+  // Track which request ids we've already seen via realtime so the badge
+  // counter and toast don't fire twice (e.g. an event arriving twice during
+  // a flaky reconnect).
+  const seenRequestIdsRef = useRef<Set<string>>(new Set())
 
   // Determine active tab from URL params, default to 'requests'
   const activeTab = tabParam === 'offers' ? 'offers'
@@ -103,7 +113,11 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
       if (requestsResponse.ok) {
         const requestsData = await requestsResponse.json()
         if (requestsData.success) {
-          setCounts(prev => ({ ...prev, requests: requestsData.requests?.length || 0 }))
+          const list: { id: string }[] = requestsData.requests || []
+          setCounts(prev => ({ ...prev, requests: list.length }))
+          // Seed the seen-set so subsequent request-update events about
+          // these existing requests can decrement the badge correctly.
+          seenRequestIdsRef.current = new Set(list.map(r => r.id))
         }
       }
 
@@ -144,6 +158,45 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
   const handleTabChange = (tab: string) => {
     router.push(`/garage-dashboard/${garageId}/?tab=${tab}`)
   }
+
+  // ─── Realtime: badge counter + ambient notifications ───
+  // Lives at the dashboard level so it stays mounted across tab switches.
+
+  const handleRealtimeNewRequest = useCallback((broadcast: BroadcastRequest) => {
+    if (seenRequestIdsRef.current.has(broadcast.id)) return
+    seenRequestIdsRef.current.add(broadcast.id)
+
+    setCounts(prev => ({ ...prev, requests: prev.requests + 1 }))
+
+    const vehicleLabel = [broadcast.vehicle?.brand, broadcast.vehicle?.model].filter(Boolean).join(' ')
+    const categoryLabel = getCategoryText(broadcast.category)
+    info('Νεο αιτημα', `${categoryLabel}${vehicleLabel ? ` — ${vehicleLabel}` : ''}`)
+    notify({ category: categoryLabel, vehicle: vehicleLabel })
+  }, [info, notify])
+
+  const handleRealtimeRequestUpdate = useCallback((update: RequestUpdatePayload) => {
+    if (!update.status || update.status === ServiceRequestStatus.PENDING) return
+    if (!seenRequestIdsRef.current.has(update.requestId)) {
+      // Wasn't in our tracked set — likely closed before we ever saw it; the
+      // counter is best-effort, so skip.
+      return
+    }
+    seenRequestIdsRef.current.delete(update.requestId)
+    setCounts(prev => ({ ...prev, requests: Math.max(0, prev.requests - 1) }))
+  }, [])
+
+  const refreshCountsAfterReconnect = useCallback(() => {
+    // Fill any gap of events lost during the disconnect window.
+    seenRequestIdsRef.current.clear()
+    if (garageData) loadCounts()
+  }, [garageData])
+
+  useRealtimeRequests({
+    enabled: !!garageData,
+    onNewRequest: handleRealtimeNewRequest,
+    onRequestUpdate: handleRealtimeRequestUpdate,
+    onReconnect: refreshCountsAfterReconnect,
+  })
 
   const handleLogout = () => {
     router.push('/login/')
@@ -208,7 +261,9 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
 
         {/* Content based on active tab */}
         <div className="space-y-6">
-          {activeTab === 'requests' && <AvailableRequests garageId={garageData.id} />}
+          {activeTab === 'requests' && (
+            <AvailableRequests garageId={garageData.id} />
+          )}
           {activeTab === 'offers' && <MyOffers garageId={garageData.id} />}
           {activeTab === 'appointments' && <Appointments garageId={garageData.id} />}
         </div>
