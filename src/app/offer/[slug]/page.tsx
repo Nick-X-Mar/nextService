@@ -31,6 +31,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   // Description 110-160 chars.
   const description = `${offer.title} ${offer.subtitle} από ${offer.price}. ${offer.details.slice(0, 2).join(' · ')}. Διάρκεια: ${offer.duration}.`
 
+  // Explicit OG image URL WITH trailing slash. Without this, Next.js generates
+  // /opengraph-image (no slash) which 308-redirects under trailingSlash:true,
+  // and Facebook/Messenger crawlers do not follow OG image redirects.
+  const ogImage = {
+    url: `${SITE_URL}/offer/${offer.slug}/opengraph-image/`,
+    width: 1200,
+    height: 630,
+    alt: offer.title,
+    type: 'image/jpeg',
+  }
+
   return {
     title,
     description,
@@ -42,11 +53,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       locale: 'el_GR',
       title: ogTitle,
       description,
+      images: [ogImage],
     },
     twitter: {
       card: 'summary_large_image',
       title: ogTitle,
       description,
+      images: [ogImage.url],
     },
   }
 }

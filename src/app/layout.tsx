@@ -28,12 +28,25 @@ export const metadata: Metadata = {
     title: "NextService — Βρες συνεργείο αυτοκινήτου με την καλύτερη τιμή",
     description:
       "Στείλε αίτημα σε συνεργεία σε όλη την Ελλάδα και πάρε προσφορές. Hot deals σε service, συμπλέκτη, ιμάντα χρονισμού και φανοποιεία.",
+    // Explicit URL WITH trailing slash — without it, Next.js generates a URL
+    // that 308-redirects under trailingSlash:true, which Facebook/Messenger
+    // crawlers don't follow for OG images.
+    images: [
+      {
+        url: `${SITE_URL}/opengraph-image/`,
+        width: 1200,
+        height: 630,
+        alt: 'NextService',
+        type: 'image/png',
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "NextService — Βρες συνεργείο αυτοκινήτου με την καλύτερη τιμή",
     description:
       "Στείλε αίτημα σε συνεργεία σε όλη την Ελλάδα και πάρε προσφορές σε service και φανοποιεία.",
+    images: [`${SITE_URL}/opengraph-image/`],
   },
   robots: {
     index: true,

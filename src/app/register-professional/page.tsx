@@ -17,7 +17,7 @@ export const metadata: Metadata = {
       'Κάνε εγγραφή στο NextService και δες αιτήματα πελατών στην περιοχή σου.',
     images: [
       {
-        url: `${SITE_URL}/opengraph-image`,
+        url: `${SITE_URL}/opengraph-image/`,
         width: 1200,
         height: 630,
         alt: 'NextService',
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Εγγραφή Συνεργείου | NextService',
     description: 'Κάνε εγγραφή στο NextService και δες αιτήματα πελατών στην περιοχή σου.',
-    images: [`${SITE_URL}/opengraph-image`],
+    images: [`${SITE_URL}/opengraph-image/`],
   },
 }
 
