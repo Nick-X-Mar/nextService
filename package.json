@@ -57,6 +57,7 @@
     "@eslint/eslintrc": "^3.3.1",
     "@playwright/test": "^1.58.2",
     "@types/bcryptjs": "^3.0.0",
+    "@types/ws": "^8.18.1",
     "dynamodb-admin": "^4.0.0",
     "eslint": "^8",
     "eslint-config-next": "15.1.0",
