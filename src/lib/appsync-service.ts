@@ -123,8 +123,17 @@ class AppSyncService {
     })
   }
 
-  private handleMessage(data: any) {
-    console.log('📨 AppSync Events WebSocket message received:', data)
+  private handleMessage(raw: unknown) {
+    console.log('📨 AppSync Events WebSocket message received:', raw)
+
+    // The wire format varies by `type`; narrow once and treat as a loose
+    // shape afterwards instead of sprinkling `any` casts.
+    if (typeof raw !== 'object' || raw === null) return
+    const data = raw as Record<string, unknown> & {
+      payload?: { data?: { subscribe?: unknown }; channelName?: string }
+      event?: string
+      channel?: string
+    }
 
     if (data.type === 'ack') {
       console.log('✅ AppSync Events message acknowledged')
@@ -139,7 +148,7 @@ class AppSyncService {
     if (data.type === 'data' && data.payload) {
       // Handle incoming events from local AppSync server
       try {
-        const eventData = data.payload.data?.subscribe || data.payload.data
+        const eventData = (data.payload.data?.subscribe || data.payload.data) as AppSyncEvent | undefined
         const channelName: string | undefined = data.payload.channelName
         console.log('📨 Received local event:', eventData, 'on channel:', channelName)
 
@@ -154,7 +163,7 @@ class AppSyncService {
     if (data.type === 'data' && data.event) {
       // Handle incoming events (AWS AppSync Events uses 'data' type with event field)
       try {
-        const eventData = JSON.parse(data.event)
+        const eventData = JSON.parse(data.event) as AppSyncEvent
         // AWS AppSync Events delivers per-channel; the WS message includes
         // the channel name at the top level on the AWS side.
         const channelName: string | undefined = (() => {
@@ -203,7 +212,7 @@ class AppSyncService {
     this.subscriptions.forEach((callbacks, cn) => fire(callbacks, cn))
   }
 
-  private send(message: any) {
+  private send(message: unknown) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message))
     } else {

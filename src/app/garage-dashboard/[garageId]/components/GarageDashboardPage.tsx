@@ -42,43 +42,6 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
     : tabParam === 'settings' ? 'settings'
     : 'requests'
 
-  useEffect(() => {
-    // Validate garage ID
-    if (!garageId) {
-      router.push('/login/')
-      return
-    }
-
-    // Wait for auth to load
-    if (authLoading) {
-      return
-    }
-
-    // Check if garage is pending validation
-    if (userType === 'garage' && authGarage && !authGarage.isActive) {
-      router.push('/login/')
-      return
-    }
-
-    // Check if user is authenticated as a garage
-    if (userType !== 'garage' || !authGarage || authGarage.id !== garageId) {
-      // User is not authenticated as this garage or is a client
-      console.warn('Unauthorized access attempt to garage dashboard')
-      router.push('/login/')
-      return
-    }
-
-    // Load garage data
-    loadGarageData(garageId)
-  }, [router, garageId, userType, authGarage, authLoading])
-
-  useEffect(() => {
-    // Load counts when garage data is available
-    if (garageData) {
-      loadCounts()
-    }
-  }, [garageData])
-
   const loadGarageData = async (garageId: string) => {
     try {
       const response = await fetch(`/api/garage/${garageId}`)
@@ -106,7 +69,7 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
     }
   }
 
-  const loadCounts = async () => {
+  const loadCounts = useCallback(async () => {
     try {
       // Load available requests count
       const requestsResponse = await fetch(`/api/garage/available-requests?garageId=${garageId}`)
@@ -153,7 +116,44 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
     } catch (error) {
       console.error('Error loading counts:', error)
     }
-  }
+  }, [garageId])
+
+  useEffect(() => {
+    // Validate garage ID
+    if (!garageId) {
+      router.push('/login/')
+      return
+    }
+
+    // Wait for auth to load
+    if (authLoading) {
+      return
+    }
+
+    // Check if garage is pending validation
+    if (userType === 'garage' && authGarage && !authGarage.isActive) {
+      router.push('/login/')
+      return
+    }
+
+    // Check if user is authenticated as a garage
+    if (userType !== 'garage' || !authGarage || authGarage.id !== garageId) {
+      // User is not authenticated as this garage or is a client
+      console.warn('Unauthorized access attempt to garage dashboard')
+      router.push('/login/')
+      return
+    }
+
+    // Load garage data
+    loadGarageData(garageId)
+  }, [router, garageId, userType, authGarage, authLoading])
+
+  useEffect(() => {
+    // Load counts when garage data is available
+    if (garageData) {
+      loadCounts()
+    }
+  }, [garageData, loadCounts])
 
   const handleTabChange = (tab: string) => {
     router.push(`/garage-dashboard/${garageId}/?tab=${tab}`)
@@ -189,7 +189,7 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
     // Fill any gap of events lost during the disconnect window.
     seenRequestIdsRef.current.clear()
     if (garageData) loadCounts()
-  }, [garageData])
+  }, [garageData, loadCounts])
 
   useRealtimeRequests({
     enabled: !!garageData,

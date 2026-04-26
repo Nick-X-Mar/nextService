@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "dynamodb": "./start-dynamodb.sh",
     "mock-appsync": "node local-appsync-server.js",
     "services": "./start-all-services.sh",
@@ -60,6 +60,7 @@
     "dynamodb-admin": "^4.0.0",
     "eslint": "^8",
     "eslint-config-next": "15.1.0",
-    "tsx": "^4.21.0"
+    "tsx": "^4.21.0",
+    "typescript-eslint": "^8.59.0"
   }
 }
