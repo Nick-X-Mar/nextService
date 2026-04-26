@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, QueryCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
 import { verifyPassword } from '@/utils/passwordService'
 import { requireAuth } from '@/utils/requireAuth'
@@ -46,13 +46,12 @@ async function _POST(request: NextRequest) {
     const tableName = userType === 'garage' ? 'Garages' : 'Clients'
 
     const lookup = await dynamoDB.send(
-      new ScanCommand({
+      new GetCommand({
         TableName: tableName,
-        FilterExpression: 'id = :id',
-        ExpressionAttributeValues: { ':id': userId }
+        Key: { id: userId }
       })
     )
-    const user = lookup.Items?.[0]
+    const user = lookup.Item
     if (!user) {
       return NextResponse.json({ error: 'Ο λογαριασμός δεν βρέθηκε' }, { status: 404 })
     }
@@ -79,16 +78,18 @@ async function _POST(request: NextRequest) {
     if (userType === 'client') {
       const [vehiclesRes, requestsRes] = await Promise.all([
         dynamoDB.send(
-          new ScanCommand({
+          new QueryCommand({
             TableName: 'Vehicles',
-            FilterExpression: 'clientId = :c',
+            IndexName: 'ClientVehiclesIndex',
+            KeyConditionExpression: 'clientId = :c',
             ExpressionAttributeValues: { ':c': userId }
           })
         ),
         dynamoDB.send(
-          new ScanCommand({
+          new QueryCommand({
             TableName: 'ServiceRequests',
-            FilterExpression: 'clientId = :c',
+            IndexName: 'ClientRequestsIndex',
+            KeyConditionExpression: 'clientId = :c',
             ExpressionAttributeValues: { ':c': userId }
           })
         )
@@ -102,16 +103,18 @@ async function _POST(request: NextRequest) {
       for (const requestId of requestIds) {
         const [offRes, chatRes] = await Promise.all([
           dynamoDB.send(
-            new ScanCommand({
+            new QueryCommand({
               TableName: 'Offers',
-              FilterExpression: 'serviceRequestId = :r',
+              IndexName: 'ServiceRequestOffersIndex',
+              KeyConditionExpression: 'serviceRequestId = :r',
               ExpressionAttributeValues: { ':r': requestId }
             })
           ),
           dynamoDB.send(
-            new ScanCommand({
+            new QueryCommand({
               TableName: 'ChatMessages',
-              FilterExpression: 'requestId = :r',
+              IndexName: 'RequestMessagesIndex',
+              KeyConditionExpression: 'requestId = :r',
               ExpressionAttributeValues: { ':r': requestId }
             })
           )
@@ -125,12 +128,15 @@ async function _POST(request: NextRequest) {
       exportData.offersReceived = offers
       exportData.chatMessages = chats
     } else {
-      // Garage export
+      // Garage export. Chat scan stays as Scan because the compound predicate
+      // (senderType+senderId OR garageId) doesn't fit a single GSI; this is an
+      // admin-only data export, not on the hot path.
       const [offRes, chatRes] = await Promise.all([
         dynamoDB.send(
-          new ScanCommand({
+          new QueryCommand({
             TableName: 'Offers',
-            FilterExpression: 'garageId = :g',
+            IndexName: 'GarageOffersIndex',
+            KeyConditionExpression: 'garageId = :g',
             ExpressionAttributeValues: { ':g': userId }
           })
         ),

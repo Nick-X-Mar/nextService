@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { generatePresignedUrls } from '@/utils/s3Service'
 import { withMetrics } from '@/utils/withMetrics'
 
@@ -12,13 +12,12 @@ async function _GET(
     const { requestId } = await params
 
     // Fetch service request
-    const reqResult = await dynamoDB.send(new ScanCommand({
+    const reqResult = await dynamoDB.send(new GetCommand({
       TableName: 'ServiceRequests',
-      FilterExpression: 'id = :id',
-      ExpressionAttributeValues: { ':id': requestId }
+      Key: { id: requestId }
     }))
 
-    const sr = reqResult.Items?.[0]
+    const sr = reqResult.Item
     if (!sr) {
       return NextResponse.json({ error: 'Request not found' }, { status: 404 })
     }
@@ -26,19 +25,17 @@ async function _GET(
     // Fetch client, vehicle, and offers in parallel
     const [clientResult, vehicleResult, offersResult] = await Promise.all([
       sr.clientId
-        ? dynamoDB.send(new ScanCommand({
+        ? dynamoDB.send(new GetCommand({
             TableName: 'Clients',
-            FilterExpression: 'id = :id',
-            ExpressionAttributeValues: { ':id': sr.clientId }
+            Key: { id: sr.clientId }
           }))
-        : Promise.resolve({ Items: [] }),
+        : Promise.resolve({ Item: undefined }),
       sr.vehicleId
-        ? dynamoDB.send(new ScanCommand({
+        ? dynamoDB.send(new GetCommand({
             TableName: 'Vehicles',
-            FilterExpression: 'id = :id',
-            ExpressionAttributeValues: { ':id': sr.vehicleId }
+            Key: { id: sr.vehicleId }
           }))
-        : Promise.resolve({ Items: [] }),
+        : Promise.resolve({ Item: undefined }),
       dynamoDB.send(new QueryCommand({
         TableName: 'Offers',
         IndexName: 'ServiceRequestOffersIndex',
@@ -47,23 +44,22 @@ async function _GET(
       }))
     ])
 
-    const client = clientResult.Items?.[0]
-    const vehicle = vehicleResult.Items?.[0]
+    const client = clientResult.Item
+    const vehicle = vehicleResult.Item
     const offers = offersResult.Items || []
 
     // If there are offers, batch-fetch garage names
     const garageIds = [...new Set(offers.map((o) => o.garageId).filter(Boolean))]
-    let garageMap: Record<string, string> = {}
+    const garageMap: Record<string, string> = {}
 
     if (garageIds.length > 0) {
       const garageResults = await Promise.all(
         garageIds.map((gId) =>
-          dynamoDB.send(new ScanCommand({
+          dynamoDB.send(new GetCommand({
             TableName: 'Garages',
-            FilterExpression: 'id = :id',
-            ExpressionAttributeValues: { ':id': gId },
+            Key: { id: gId },
             ProjectionExpression: 'id, companyName'
-          })).then((res) => res.Items?.[0])
+          })).then((res) => res.Item)
         )
       )
       for (const g of garageResults) {

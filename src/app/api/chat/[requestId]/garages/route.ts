@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { requireClient } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
 
@@ -29,16 +29,13 @@ async function _GET(
       return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
     }
 
-    // Get all messages for this request to find unique garages
-    const scanCommand = new ScanCommand({
+    // Get all messages for this request via the RequestMessagesIndex GSI
+    const result = await dynamoDB.send(new QueryCommand({
       TableName: 'ChatMessages',
-      FilterExpression: 'requestId = :requestId',
-      ExpressionAttributeValues: {
-        ':requestId': requestId
-      }
-    })
-
-    const result = await dynamoDB.send(scanCommand)
+      IndexName: 'RequestMessagesIndex',
+      KeyConditionExpression: 'requestId = :requestId',
+      ExpressionAttributeValues: { ':requestId': requestId }
+    }))
 
     if (!result.Items || result.Items.length === 0) {
       return NextResponse.json({
@@ -61,46 +58,53 @@ async function _GET(
       })
     }
 
-    // Get garage details
-    const garages = []
-    for (const garageId of garageIds) {
-      const garageScanCommand = new ScanCommand({
-        TableName: 'Garages',
-        FilterExpression: 'id = :garageId',
-        ExpressionAttributeValues: {
-          ':garageId': garageId
-        }
-      })
-      
-      const garageResult = await dynamoDB.send(garageScanCommand)
-      if (garageResult.Items && garageResult.Items.length > 0) {
-        const garage = garageResult.Items[0]
-        
-        // Get last message and unread count for this garage
-        const garageMessages = result.Items
-          .filter((item: any) => item.senderId === garageId)
-          .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-        
-        const lastMessage = garageMessages[0]
-        
-        // Get the last time client read messages from this garage
-        const lastReadByClient = garage.lastReadByClient || garage.createdAt
-        
-        // Check if there are any unread messages from garage
-        const hasUnreadMessages = garageMessages.some((msg: any) => 
-          msg.senderType === 'garage' && 
-          new Date(msg.timestamp).getTime() > new Date(lastReadByClient).getTime()
-        )
+    // Get garage details — fetch all garages in parallel
+    const garageResults = await Promise.all(
+      garageIds.map((garageId) =>
+        dynamoDB.send(new GetCommand({
+          TableName: 'Garages',
+          Key: { id: garageId }
+        }))
+      )
+    )
 
-        garages.push({
-          id: garage.id,
-          companyName: garage.companyName,
-          logoUrl: garage.logoUrl,
-          lastMessage: lastMessage?.message,
-          lastMessageTime: lastMessage?.timestamp,
-          hasUnreadMessages: hasUnreadMessages
-        })
-      }
+    const garages: Array<{
+      id: string
+      companyName: string
+      logoUrl?: string
+      lastMessage?: string
+      lastMessageTime?: string
+      hasUnreadMessages: boolean
+    }> = []
+
+    for (const garageResult of garageResults) {
+      const garage = garageResult.Item
+      if (!garage) continue
+
+      // Get last message and unread count for this garage
+      const garageMessages = result.Items
+        .filter((item: any) => item.senderId === garage.id)
+        .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+
+      const lastMessage = garageMessages[0]
+
+      // Get the last time client read messages from this garage
+      const lastReadByClient = garage.lastReadByClient || garage.createdAt
+
+      // Check if there are any unread messages from garage
+      const hasUnreadMessages = garageMessages.some((msg: any) =>
+        msg.senderType === 'garage' &&
+        new Date(msg.timestamp).getTime() > new Date(lastReadByClient).getTime()
+      )
+
+      garages.push({
+        id: garage.id,
+        companyName: garage.companyName,
+        logoUrl: garage.logoUrl,
+        lastMessage: lastMessage?.message,
+        lastMessageTime: lastMessage?.timestamp,
+        hasUnreadMessages: hasUnreadMessages
+      })
     }
 
     // Sort garages by last message time (most recent first)

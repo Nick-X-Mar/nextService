@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand, PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
+import { PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
 import { OfferStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { sendEmail } from '@/utils/emailService'
@@ -23,22 +23,23 @@ async function _POST(
       )
     }
 
-    // Verify request exists
-    const reqResult = await dynamoDB.send(new ScanCommand({
-      TableName: 'ServiceRequests',
-      FilterExpression: 'id = :id',
-      ExpressionAttributeValues: { ':id': requestId }
-    }))
-    const sr = reqResult.Items?.[0]
+    // Verify request + garage exist (parallel)
+    const [reqResult, garageResult] = await Promise.all([
+      dynamoDB.send(new GetCommand({
+        TableName: 'ServiceRequests',
+        Key: { id: requestId }
+      })),
+      dynamoDB.send(new GetCommand({
+        TableName: 'Garages',
+        Key: { id: garageId }
+      }))
+    ])
+
+    const sr = reqResult.Item
     if (!sr) {
       return NextResponse.json({ error: 'Request not found' }, { status: 404 })
     }
 
-    // Verify garage exists
-    const garageResult = await dynamoDB.send(new GetCommand({
-      TableName: 'Garages',
-      Key: { id: garageId }
-    }))
     const garage = garageResult.Item
     if (!garage) {
       return NextResponse.json({ error: 'Garage not found' }, { status: 404 })

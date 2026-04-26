@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { requireAuth, requireOwner } from '@/utils/requireAuth'
@@ -29,23 +29,18 @@ async function _GET(
     }
 
     // Get service request details
-    const scanCommand = new ScanCommand({
+    const result = await dynamoDB.send(new GetCommand({
       TableName: 'ServiceRequests',
-      FilterExpression: 'id = :requestId',
-      ExpressionAttributeValues: {
-        ':requestId': requestId
-      }
-    })
+      Key: { id: requestId }
+    }))
 
-    const result = await dynamoDB.send(scanCommand)
-
-    if (!result.Items || result.Items.length === 0) {
+    if (!result.Item) {
       return NextResponse.json({
         error: 'Service request not found'
       }, { status: 404 })
     }
 
-    const serviceRequest = result.Items[0]
+    const serviceRequest = result.Item
 
     // Authorization: clients can only view their own requests
     if (auth.userType === 'client' && auth.userId !== serviceRequest.clientId) {
@@ -63,29 +58,21 @@ async function _GET(
       )
     }
 
-    // Get client details
-    const clientScanCommand = new ScanCommand({
-      TableName: 'Clients',
-      FilterExpression: 'id = :clientId',
-      ExpressionAttributeValues: {
-        ':clientId': serviceRequest.clientId
-      }
-    })
-
-    const clientResult = await dynamoDB.send(clientScanCommand)
-    const client = clientResult.Items?.[0]
-
-    // Get vehicle details
-    const vehicleScanCommand = new ScanCommand({
-      TableName: 'Vehicles',
-      FilterExpression: 'id = :vehicleId',
-      ExpressionAttributeValues: {
-        ':vehicleId': serviceRequest.vehicleId
-      }
-    })
-
-    const vehicleResult = await dynamoDB.send(vehicleScanCommand)
-    const vehicle = vehicleResult.Items?.[0]
+    // Fetch client + vehicle + presigned photo URLs in parallel — they're independent.
+    const rawPhotoUrls = serviceRequest.photoUrls || []
+    const [clientResult, vehicleResult, presignedPhotoUrls] = await Promise.all([
+      dynamoDB.send(new GetCommand({
+        TableName: 'Clients',
+        Key: { id: serviceRequest.clientId }
+      })),
+      dynamoDB.send(new GetCommand({
+        TableName: 'Vehicles',
+        Key: { id: serviceRequest.vehicleId }
+      })),
+      rawPhotoUrls.length > 0 ? generatePresignedUrls(rawPhotoUrls) : Promise.resolve([])
+    ])
+    const client = clientResult.Item
+    const vehicle = vehicleResult.Item
 
     // GDPR audit log: when a garage views a request that contains client
     // PII (name, phone) and vehicle PII (plate, VIN), record the access.
@@ -111,12 +98,6 @@ async function _GET(
         }
       })
     }
-
-    // Generate presigned URLs for photos
-    const rawPhotoUrls = serviceRequest.photoUrls || []
-    const presignedPhotoUrls = rawPhotoUrls.length > 0
-      ? await generatePresignedUrls(rawPhotoUrls)
-      : []
 
     return NextResponse.json({
       success: true,
@@ -201,15 +182,11 @@ async function _PATCH(
     }
 
     // Fetch the request to verify ownership
-    const fetchCommand = new ScanCommand({
+    const fetchResult = await dynamoDB.send(new GetCommand({
       TableName: 'ServiceRequests',
-      FilterExpression: 'id = :requestId',
-      ExpressionAttributeValues: {
-        ':requestId': requestId
-      }
-    })
-    const fetchResult = await dynamoDB.send(fetchCommand)
-    const serviceRequest = fetchResult.Items?.[0]
+      Key: { id: requestId }
+    }))
+    const serviceRequest = fetchResult.Item
 
     if (!serviceRequest) {
       return NextResponse.json(
@@ -286,35 +263,21 @@ async function _PATCH(
       metadata: { dateCount: normalizedDates.length }
     })
 
-    // Fetch client details
-    const clientScanCommand = new ScanCommand({
-      TableName: 'Clients',
-      FilterExpression: 'id = :clientId',
-      ExpressionAttributeValues: {
-        ':clientId': updatedRequest.clientId
-      }
-    })
-
-    const clientResult = await dynamoDB.send(clientScanCommand)
-    const client = clientResult.Items?.[0]
-
-    // Fetch vehicle details
-    const vehicleScanCommand = new ScanCommand({
-      TableName: 'Vehicles',
-      FilterExpression: 'id = :vehicleId',
-      ExpressionAttributeValues: {
-        ':vehicleId': updatedRequest.vehicleId
-      }
-    })
-
-    const vehicleResult = await dynamoDB.send(vehicleScanCommand)
-    const vehicle = vehicleResult.Items?.[0]
-
-    // Generate presigned URLs for photos
+    // Fetch client + vehicle + presigned photo URLs in parallel.
     const rawPatchPhotoUrls = updatedRequest.photoUrls || []
-    const presignedPatchPhotoUrls = rawPatchPhotoUrls.length > 0
-      ? await generatePresignedUrls(rawPatchPhotoUrls)
-      : []
+    const [clientResult, vehicleResult, presignedPatchPhotoUrls] = await Promise.all([
+      dynamoDB.send(new GetCommand({
+        TableName: 'Clients',
+        Key: { id: updatedRequest.clientId }
+      })),
+      dynamoDB.send(new GetCommand({
+        TableName: 'Vehicles',
+        Key: { id: updatedRequest.vehicleId }
+      })),
+      rawPatchPhotoUrls.length > 0 ? generatePresignedUrls(rawPatchPhotoUrls) : Promise.resolve([])
+    ])
+    const client = clientResult.Item
+    const vehicle = vehicleResult.Item
 
     return NextResponse.json({
       success: true,

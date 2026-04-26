@@ -39,10 +39,51 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// Cached identity is written to localStorage on every successful auth resolution
+// so subsequent loads can skip the loading spinner — we re-render from cache and
+// validate in the background. Stale data is corrected if /api/auth/me disagrees.
+const AUTH_CACHE_KEY = 'authCache'
+
+interface AuthCache {
+  userType: 'client' | 'garage'
+  client?: ClientUser
+  garage?: GarageUser
+}
+
+function readAuthCache(): AuthCache | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(AUTH_CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as AuthCache
+    if (parsed.userType === 'client' && parsed.client) return parsed
+    if (parsed.userType === 'garage' && parsed.garage) return parsed
+    return null
+  } catch {
+    return null
+  }
+}
+
+function writeAuthCache(cache: AuthCache | null): void {
+  if (typeof window === 'undefined') return
+  try {
+    if (cache) {
+      localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(cache))
+    } else {
+      localStorage.removeItem(AUTH_CACHE_KEY)
+    }
+  } catch {
+    // ignore quota / privacy mode failures
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [userType, setUserType] = useState<UserType>(null)
   const [client, setClient] = useState<ClientUser | null>(null)
   const [garage, setGarage] = useState<GarageUser | null>(null)
+  // Start in loading state on the server (no localStorage). The mount effect
+  // immediately flips this to false if we have a cached identity, avoiding the
+  // app-wide auth spinner on every navigation.
   const [isLoading, setIsLoading] = useState(true)
 
   // Clear all authentication data - memoized to prevent infinite loops
@@ -50,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Keep localStorage for backward compatibility during transition
     localStorage.removeItem('clientId')
     localStorage.removeItem('garageId')
+    writeAuthCache(null)
     setClient(null)
     setGarage(null)
     setUserType(null)
@@ -88,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Keep localStorage in sync for UI purposes
           localStorage.setItem('clientId', clientData.id)
           localStorage.removeItem('garageId')
+          writeAuthCache({ userType: 'client', client: userData })
           setGarage((prevGarage) => (prevGarage ? null : prevGarage))
         } else {
           clearAuth()
@@ -130,6 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Keep localStorage in sync for UI purposes
           localStorage.setItem('garageId', garageData.id)
           localStorage.removeItem('clientId')
+          writeAuthCache({ userType: 'garage', garage: userData })
           setClient((prevClient) => (prevClient ? null : prevClient))
         } else {
           clearAuth()
@@ -147,13 +191,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [clearAuth])
 
-  // Check authentication on mount using /api/auth/me (JWT cookie-based)
+  // Check authentication on mount using /api/auth/me (JWT cookie-based).
+  // If we have a cached identity in localStorage, hydrate from it FIRST and
+  // run the network call in the background — keeps the UI responsive across
+  // page navigations after the first login.
   useEffect(() => {
     // Skip client/garage auth check on admin routes — admin has its own auth system
     if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
       setUserType('guest')
       setIsLoading(false)
       return
+    }
+
+    // Hydrate from cache first (synchronous) so the UI doesn't flash a spinner.
+    const cached = readAuthCache()
+    if (cached) {
+      if (cached.userType === 'client' && cached.client) {
+        setClient(cached.client)
+        setUserType('client')
+      } else if (cached.userType === 'garage' && cached.garage) {
+        setGarage(cached.garage)
+        setUserType('garage')
+      }
+      setIsLoading(false)
     }
 
     const checkAuth = async () => {
@@ -175,6 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setUserType('client')
               localStorage.setItem('clientId', data.user.id)
               localStorage.removeItem('garageId')
+              writeAuthCache({ userType: 'client', client: userData })
             } else if (data.userType === 'garage') {
               const userData: GarageUser = {
                 id: data.user.id,
@@ -191,8 +252,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setUserType('garage')
               localStorage.setItem('garageId', data.user.id)
               localStorage.removeItem('clientId')
+              writeAuthCache({ userType: 'garage', garage: userData })
             }
           } else {
+            // Server says we're a guest — drop any stale cache.
+            writeAuthCache(null)
+            setClient(null)
+            setGarage(null)
             setUserType('guest')
           }
         } else {
@@ -209,7 +275,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUserType('guest')
         }
       } catch {
-        setUserType('guest')
+        // Network error: keep cached identity if any, otherwise mark guest.
+        if (!cached) setUserType('guest')
       } finally {
         setIsLoading(false)
       }

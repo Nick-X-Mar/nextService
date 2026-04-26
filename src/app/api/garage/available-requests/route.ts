@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
@@ -21,37 +21,32 @@ async function _GET(request: NextRequest) {
       source: 'api/garage/available-requests'
     })
 
-    // Get all pending service requests
-    const scanCommand = new ScanCommand({
-      TableName: 'ServiceRequests',
-      FilterExpression: '#status = :status',
-      ExpressionAttributeNames: {
-        '#status': 'status'
-      },
-      ExpressionAttributeValues: {
-        ':status': ServiceRequestStatus.PENDING
-      }
-    })
-
-    const result = await dynamoDB.send(scanCommand)
+    // Get all pending service requests via StatusIndex GSI, plus this garage's
+    // existing offers (to filter them out) — both are independent so run in parallel.
+    const [result, offersResult] = await Promise.all([
+      dynamoDB.send(new QueryCommand({
+        TableName: 'ServiceRequests',
+        IndexName: 'StatusIndex',
+        KeyConditionExpression: '#status = :status',
+        ExpressionAttributeNames: { '#status': 'status' },
+        ExpressionAttributeValues: { ':status': ServiceRequestStatus.PENDING },
+        ScanIndexForward: false
+      })),
+      dynamoDB.send(new QueryCommand({
+        TableName: 'Offers',
+        IndexName: 'GarageOffersIndex',
+        KeyConditionExpression: 'garageId = :garageId',
+        ExpressionAttributeValues: { ':garageId': garageId }
+      }))
+    ])
 
     if (!result.Items || result.Items.length === 0) {
       return NextResponse.json({
-        success: true, 
+        success: true,
         requests: []
       })
     }
 
-    // Get all offers made by this garage to filter out requests they've already offered on
-    const offersScanCommand = new ScanCommand({
-      TableName: 'Offers',
-      FilterExpression: 'garageId = :garageId',
-      ExpressionAttributeValues: {
-        ':garageId': garageId
-      }
-    })
-
-    const offersResult = await dynamoDB.send(offersScanCommand)
     const garageOfferRequestIds = new Set(
       offersResult.Items?.map(offer => offer.serviceRequestId) || []
     )
@@ -68,38 +63,26 @@ async function _GET(request: NextRequest) {
       })
     }
 
-    // For each service request, get client and vehicle details
+    // For each service request, get client + vehicle details + presigned URLs
+    // — all three are independent so fetch them in parallel.
     const requestsWithDetails = await Promise.all(
       availableRequests.map(async (request) => {
-        // Get client details
-        const clientScanCommand = new ScanCommand({
-          TableName: 'Clients',
-          FilterExpression: 'id = :clientId',
-          ExpressionAttributeValues: {
-            ':clientId': request.clientId
-          }
-        })
+        const [clientResult, vehicleResult, presignedUrls] = await Promise.all([
+          dynamoDB.send(new GetCommand({
+            TableName: 'Clients',
+            Key: { id: request.clientId }
+          })),
+          dynamoDB.send(new GetCommand({
+            TableName: 'Vehicles',
+            Key: { id: request.vehicleId }
+          })),
+          (request.photoUrls && request.photoUrls.length > 0)
+            ? generatePresignedUrls(request.photoUrls)
+            : Promise.resolve([])
+        ])
 
-        const clientResult = await dynamoDB.send(clientScanCommand)
-        const client = clientResult.Items?.[0]
-
-        // Get vehicle details
-        const vehicleScanCommand = new ScanCommand({
-          TableName: 'Vehicles',
-          FilterExpression: 'id = :vehicleId',
-          ExpressionAttributeValues: {
-            ':vehicleId': request.vehicleId
-          }
-        })
-
-        const vehicleResult = await dynamoDB.send(vehicleScanCommand)
-        const vehicle = vehicleResult.Items?.[0]
-
-        // Generate presigned URLs for photos
-        const rawUrls = request.photoUrls || []
-        const presignedUrls = rawUrls.length > 0
-          ? await generatePresignedUrls(rawUrls)
-          : []
+        const client = clientResult.Item
+        const vehicle = vehicleResult.Item
 
         return {
           id: request.id,

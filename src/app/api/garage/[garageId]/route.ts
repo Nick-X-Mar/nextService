@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { GetCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { logEvent } from '@/utils/eventLogger'
 import { sendEmail } from '@/utils/emailService'
 import { EventName, EmailTemplate } from '@/types/events'
@@ -21,23 +21,18 @@ async function _GET(
     }
 
     // Get garage data from database
-    const scanCommand = new ScanCommand({
+    const result = await dynamoDB.send(new GetCommand({
       TableName: 'Garages',
-      FilterExpression: 'id = :garageId',
-      ExpressionAttributeValues: {
-        ':garageId': garageId
-      }
-    })
+      Key: { id: garageId }
+    }))
 
-    const result = await dynamoDB.send(scanCommand)
-
-    if (!result.Items || result.Items.length === 0) {
-      return NextResponse.json({ 
-        error: 'Garage not found' 
+    if (!result.Item) {
+      return NextResponse.json({
+        error: 'Garage not found'
       }, { status: 404 })
     }
 
-    const garage = result.Items[0]
+    const garage = result.Item
 
     return NextResponse.json({
       success: true,

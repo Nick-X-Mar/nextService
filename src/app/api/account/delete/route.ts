@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
   ScanCommand,
+  GetCommand,
+  QueryCommand,
   DeleteCommand,
   BatchWriteCommand
 } from '@aws-sdk/lib-dynamodb'
@@ -65,13 +67,12 @@ async function _POST(request: NextRequest) {
 
     // Look up the user and verify password
     const lookup = await dynamoDB.send(
-      new ScanCommand({
+      new GetCommand({
         TableName: tableName,
-        FilterExpression: 'id = :id',
-        ExpressionAttributeValues: { ':id': userId }
+        Key: { id: userId }
       })
     )
-    const user = lookup.Items?.[0]
+    const user = lookup.Item
 
     if (!user) {
       return NextResponse.json({ error: 'Ο λογαριασμός δεν βρέθηκε' }, { status: 404 })
@@ -135,9 +136,10 @@ async function _POST(request: NextRequest) {
 async function deleteClientCascade(clientId: string, summary: DeleteSummary): Promise<void> {
   // 1. Find all service requests by this client (need them for offer + chat cleanup + S3)
   const reqsRes = await dynamoDB.send(
-    new ScanCommand({
+    new QueryCommand({
       TableName: 'ServiceRequests',
-      FilterExpression: 'clientId = :c',
+      IndexName: 'ClientRequestsIndex',
+      KeyConditionExpression: 'clientId = :c',
       ExpressionAttributeValues: { ':c': clientId }
     })
   )
@@ -163,9 +165,10 @@ async function deleteClientCascade(clientId: string, summary: DeleteSummary): Pr
   // 3. Delete chat messages for these requests
   for (const requestId of requestIds) {
     const chatRes = await dynamoDB.send(
-      new ScanCommand({
+      new QueryCommand({
         TableName: 'ChatMessages',
-        FilterExpression: 'requestId = :r',
+        IndexName: 'RequestMessagesIndex',
+        KeyConditionExpression: 'requestId = :r',
         ExpressionAttributeValues: { ':r': requestId }
       })
     )
@@ -180,9 +183,10 @@ async function deleteClientCascade(clientId: string, summary: DeleteSummary): Pr
   // 4. Delete offers attached to these requests
   for (const requestId of requestIds) {
     const offerRes = await dynamoDB.send(
-      new ScanCommand({
+      new QueryCommand({
         TableName: 'Offers',
-        FilterExpression: 'serviceRequestId = :r',
+        IndexName: 'ServiceRequestOffersIndex',
+        KeyConditionExpression: 'serviceRequestId = :r',
         ExpressionAttributeValues: { ':r': requestId }
       })
     )
@@ -204,9 +208,10 @@ async function deleteClientCascade(clientId: string, summary: DeleteSummary): Pr
 
   // 6. Delete the client's vehicles
   const vehiclesRes = await dynamoDB.send(
-    new ScanCommand({
+    new QueryCommand({
       TableName: 'Vehicles',
-      FilterExpression: 'clientId = :c',
+      IndexName: 'ClientVehiclesIndex',
+      KeyConditionExpression: 'clientId = :c',
       ExpressionAttributeValues: { ':c': clientId }
     })
   )
@@ -224,9 +229,10 @@ async function deleteClientCascade(clientId: string, summary: DeleteSummary): Pr
 async function deleteGarageCascade(garageId: string, summary: DeleteSummary): Promise<void> {
   // 1. Delete all offers from this garage
   const offerRes = await dynamoDB.send(
-    new ScanCommand({
+    new QueryCommand({
       TableName: 'Offers',
-      FilterExpression: 'garageId = :g',
+      IndexName: 'GarageOffersIndex',
+      KeyConditionExpression: 'garageId = :g',
       ExpressionAttributeValues: { ':g': garageId }
     })
   )

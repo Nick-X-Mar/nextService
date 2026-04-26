@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand, PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
+import { PutCommand, GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import appSyncService from '@/lib/appsync-service'
-import { ScanCommand as RequestsScanCommand } from '@aws-sdk/lib-dynamodb'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
@@ -43,27 +42,25 @@ async function _GET(
       return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
     }
 
-    // Build filter expression
-    let filterExpression = 'requestId = :requestId'
-    const expressionAttributeValues: any = {
-      ':requestId': requestId
-    }
+    // Query messages by requestId via the RequestMessagesIndex GSI.
+    // FilterExpression still narrows to a specific garage thread when requested
+    // — Filter is applied AFTER the index read, so it stays cheap.
+    const expressionValues: Record<string, unknown> = { ':requestId': requestId }
+    let filterExpression: string | undefined
 
-    // If garageId is provided, filter messages between client and this specific garage
     if (garageId) {
-      filterExpression += ' AND (senderId = :garageId OR (senderType = :clientType AND (garageId = :garageId OR attribute_not_exists(garageId))))'
-      expressionAttributeValues[':garageId'] = garageId
-      expressionAttributeValues[':clientType'] = 'client'
+      filterExpression = '(senderId = :garageId OR (senderType = :clientType AND (garageId = :garageId OR attribute_not_exists(garageId))))'
+      expressionValues[':garageId'] = garageId
+      expressionValues[':clientType'] = 'client'
     }
 
-    // Get all messages for this request
-    const scanCommand = new ScanCommand({
+    const result = await dynamoDB.send(new QueryCommand({
       TableName: 'ChatMessages',
-      FilterExpression: filterExpression,
-      ExpressionAttributeValues: expressionAttributeValues
-    })
-
-    const result = await dynamoDB.send(scanCommand)
+      IndexName: 'RequestMessagesIndex',
+      KeyConditionExpression: 'requestId = :requestId',
+      ExpressionAttributeValues: expressionValues,
+      ...(filterExpression ? { FilterExpression: filterExpression } : {})
+    }))
 
     if (!result.Items || result.Items.length === 0) {
       return NextResponse.json({
@@ -72,10 +69,8 @@ async function _GET(
       })
     }
 
-    // Sort messages by timestamp
-    const sortedMessages = result.Items.sort((a, b) => 
-      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-    )
+    // RequestMessagesIndex sorts by timestamp ASC by default — keep that order.
+    const sortedMessages = result.Items
 
     return NextResponse.json({
       success: true,
@@ -150,28 +145,13 @@ async function _POST(
       }, { status: 400 })
     }
 
-    // Prevent sending messages when the related request is in appointment status
-    try {
-      const requestScan = new RequestsScanCommand({
-        TableName: 'Requests',
-        FilterExpression: 'id = :requestId',
-        ExpressionAttributeValues: {
-          ':requestId': requestId
-        }
-      })
-
-      const requestResult = await dynamoDB.send(requestScan)
-      const requestItem = requestResult.Items && requestResult.Items[0]
-
-      if (requestItem && requestItem.status === ServiceRequestStatus.APPOINTMENT) {
-        return NextResponse.json(
-          { error: 'Η συνομιλία είναι μόνο για ανάγνωση επειδή έχει προγραμματιστεί ραντεβού για αυτό το αίτημα.' },
-          { status: 403 }
-        )
-      }
-    } catch (statusError) {
-      console.error('Error checking request status before creating chat message:', statusError)
-      // In case of error checking status, fall back to allowing the message
+    // Prevent sending messages when the related request is in appointment status.
+    // We already loaded the request above, so just check its status.
+    if (requestResult.Item.status === ServiceRequestStatus.APPOINTMENT) {
+      return NextResponse.json(
+        { error: 'Η συνομιλία είναι μόνο για ανάγνωση επειδή έχει προγραμματιστεί ραντεβού για αυτό το αίτημα.' },
+        { status: 403 }
+      )
     }
 
     // Generate unique message ID
@@ -180,30 +160,20 @@ async function _POST(
     // Get sender name based on type
     let senderName = 'Unknown'
     if (senderType === 'garage') {
-      // Get garage name
-      const garageScanCommand = new ScanCommand({
+      const garageResult = await dynamoDB.send(new GetCommand({
         TableName: 'Garages',
-        FilterExpression: 'id = :garageId',
-        ExpressionAttributeValues: {
-          ':garageId': senderId
-        }
-      })
-      const garageResult = await dynamoDB.send(garageScanCommand)
-      if (garageResult.Items && garageResult.Items.length > 0) {
-        senderName = garageResult.Items[0].companyName
+        Key: { id: senderId }
+      }))
+      if (garageResult.Item) {
+        senderName = garageResult.Item.companyName
       }
     } else {
-      // Get client name
-      const clientScanCommand = new ScanCommand({
+      const clientResult = await dynamoDB.send(new GetCommand({
         TableName: 'Clients',
-        FilterExpression: 'id = :clientId',
-        ExpressionAttributeValues: {
-          ':clientId': senderId
-        }
-      })
-      const clientResult = await dynamoDB.send(clientScanCommand)
-      if (clientResult.Items && clientResult.Items.length > 0) {
-        const client = clientResult.Items[0]
+        Key: { id: senderId }
+      }))
+      if (clientResult.Item) {
+        const client = clientResult.Item
         senderName = `${client.firstName} ${client.lastName || ''}`.trim()
       }
     }

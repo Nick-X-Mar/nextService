@@ -10,7 +10,6 @@ import RequestDetailsModal from './RequestDetailsModal'
 import CancellationModal from './CancellationModal'
 import { useToast } from '../../../hooks/useToast'
 import { useUser } from '../../../contexts/UserContext'
-import { useAuth } from '../../../contexts/AuthContext'
 // Navigation is handled by AppShell
 import { ServiceRequestStatus, OfferStatus } from '../../../types/statuses'
 import type { ServiceRequest } from '../../../types/requests'
@@ -76,25 +75,23 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
   const isValidClientId = clientId && clientId.startsWith('client-')
 
   const checkGarageMessages = useCallback(async (requestIds: string[]) => {
-    const messagesMap: Record<string, boolean> = {}
-
-    // Check each request for garage messages
-    for (const requestId of requestIds) {
-      try {
-        const response = await fetch(`/api/chat/${requestId}/garages`)
-        if (response.ok) {
+    // Run all garage-message checks in parallel — sequential await on a list of
+    // independent requests was the main source of UI lag on this page.
+    const entries = await Promise.all(
+      requestIds.map(async (requestId): Promise<[string, boolean]> => {
+        try {
+          const response = await fetch(`/api/chat/${requestId}/garages`)
+          if (!response.ok) return [requestId, false]
           const data = await response.json()
-          messagesMap[requestId] = data.garages && data.garages.length > 0
-        } else {
-          messagesMap[requestId] = false
+          return [requestId, !!(data.garages && data.garages.length > 0)]
+        } catch (error) {
+          console.error(`Error checking garage messages for request ${requestId}:`, error)
+          return [requestId, false]
         }
-      } catch (error) {
-        console.error(`Error checking garage messages for request ${requestId}:`, error)
-        messagesMap[requestId] = false
-      }
-    }
+      })
+    )
 
-    setGarageMessagesMap(messagesMap)
+    setGarageMessagesMap(Object.fromEntries(entries))
   }, [])
 
   const loadOffersForRequests = useCallback(async (requestIds: string[]) => {
@@ -200,17 +197,13 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     }
   }, [clientId, isValidClientId, checkGarageMessages, loadOffersForRequests])
 
-  const { refreshClient } = useAuth()
-
-  // Load requests on component mount and update auth context
+  // Load requests on component mount. AuthContext already handles auth state
+  // — no need to re-fetch the client here. Just keep localStorage in sync.
   useEffect(() => {
-    // Clear garage authentication if exists
     localStorage.removeItem('garageId')
-    // Store clientId in localStorage and refresh auth context
     const storedClientId = localStorage.getItem('clientId')
     if (storedClientId !== clientId) {
       localStorage.setItem('clientId', clientId)
-      refreshClient(clientId)
     }
     loadRequests()
     // eslint-disable-next-line react-hooks/exhaustive-deps

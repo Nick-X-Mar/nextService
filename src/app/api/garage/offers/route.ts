@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { requireGarage } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
 
@@ -9,16 +9,14 @@ async function _GET(request: NextRequest) {
     const garageId = requireGarage(request)
     if (garageId instanceof NextResponse) return garageId
 
-    // Get all offers made by this garage
-    const scanCommand = new ScanCommand({
+    // Get all offers made by this garage via the GarageOffersIndex GSI
+    const result = await dynamoDB.send(new QueryCommand({
       TableName: 'Offers',
-      FilterExpression: 'garageId = :garageId',
-      ExpressionAttributeValues: {
-        ':garageId': garageId
-      }
-    })
-
-    const result = await dynamoDB.send(scanCommand)
+      IndexName: 'GarageOffersIndex',
+      KeyConditionExpression: 'garageId = :garageId',
+      ExpressionAttributeValues: { ':garageId': garageId },
+      ScanIndexForward: false
+    }))
 
     if (!result.Items || result.Items.length === 0) {
       return NextResponse.json({
@@ -27,48 +25,31 @@ async function _GET(request: NextRequest) {
       })
     }
 
-    // For each offer, get service request, client and vehicle details
+    // For each offer, get service request first, then client + vehicle in parallel.
     const offersWithDetails = await Promise.all(
       result.Items.map(async (offer) => {
-        // Get service request details
-        const serviceRequestScanCommand = new ScanCommand({
+        const serviceRequestResult = await dynamoDB.send(new GetCommand({
           TableName: 'ServiceRequests',
-          FilterExpression: 'id = :requestId',
-          ExpressionAttributeValues: {
-            ':requestId': offer.serviceRequestId
-          }
-        })
-
-        const serviceRequestResult = await dynamoDB.send(serviceRequestScanCommand)
-        const serviceRequest = serviceRequestResult.Items?.[0]
+          Key: { id: offer.serviceRequestId }
+        }))
+        const serviceRequest = serviceRequestResult.Item
 
         if (!serviceRequest) {
           return null
         }
 
-        // Get client details
-        const clientScanCommand = new ScanCommand({
-          TableName: 'Clients',
-          FilterExpression: 'id = :clientId',
-          ExpressionAttributeValues: {
-            ':clientId': serviceRequest.clientId
-          }
-        })
-
-        const clientResult = await dynamoDB.send(clientScanCommand)
-        const client = clientResult.Items?.[0]
-
-        // Get vehicle details
-        const vehicleScanCommand = new ScanCommand({
-          TableName: 'Vehicles',
-          FilterExpression: 'id = :vehicleId',
-          ExpressionAttributeValues: {
-            ':vehicleId': serviceRequest.vehicleId
-          }
-        })
-
-        const vehicleResult = await dynamoDB.send(vehicleScanCommand)
-        const vehicle = vehicleResult.Items?.[0]
+        const [clientResult, vehicleResult] = await Promise.all([
+          dynamoDB.send(new GetCommand({
+            TableName: 'Clients',
+            Key: { id: serviceRequest.clientId }
+          })),
+          dynamoDB.send(new GetCommand({
+            TableName: 'Vehicles',
+            Key: { id: serviceRequest.vehicleId }
+          }))
+        ])
+        const client = clientResult.Item
+        const vehicle = vehicleResult.Item
 
         return {
           id: offer.id,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
@@ -15,12 +15,11 @@ async function _PATCH(
     const { requestId } = await params
 
     // Verify request exists
-    const reqResult = await dynamoDB.send(new ScanCommand({
+    const reqResult = await dynamoDB.send(new GetCommand({
       TableName: 'ServiceRequests',
-      FilterExpression: 'id = :id',
-      ExpressionAttributeValues: { ':id': requestId }
+      Key: { id: requestId }
     }))
-    const sr = reqResult.Items?.[0]
+    const sr = reqResult.Item
     if (!sr) {
       return NextResponse.json({ error: 'Request not found' }, { status: 404 })
     }

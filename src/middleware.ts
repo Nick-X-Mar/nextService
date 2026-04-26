@@ -129,10 +129,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Allow GET on garage profile (public data) and photo routes
-  // Use garage- prefix to avoid matching sub-routes like /api/garage/available-requests
+  // Allow GET on garage profile (public data) and photo routes.
+  // Use garage- prefix to avoid matching sub-routes like /api/garage/available-requests.
+  // Trailing slash is optional because next.config has trailingSlash: true.
   if (
-    (pathname.match(/^\/api\/garage\/garage-[^/]+$/) && request.method === 'GET') ||
+    (pathname.match(/^\/api\/garage\/garage-[^/]+\/?$/) && request.method === 'GET') ||
     pathname.startsWith('/api/photos/')
   ) {
     return NextResponse.next()

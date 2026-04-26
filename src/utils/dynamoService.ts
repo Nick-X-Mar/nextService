@@ -41,15 +41,11 @@ const getDynamoDBConfig = () => {
         accessKeyId: process.env.ACCESS_KEY_ID,
         secretAccessKey: process.env.SECRET_ACCESS_KEY
       }
-      console.log('🔧 DynamoDB: Using explicit credentials')
     } else if (!isProdOrStaging) {
       // In development, use local AWS credentials
       config.credentials = loadLocalCredentials()
-      console.log('🔧 DynamoDB: Using local AWS credentials')
-    } else {
-      // In production/staging, rely on IAM role - no credentials specified
-      console.log('🔧 DynamoDB: Using IAM role (no explicit credentials)')
     }
+    // In production/staging without explicit creds, rely on IAM role.
 
     return config
   }
@@ -73,15 +69,3 @@ export const getEnvironmentInfo = () => {
     s3Bucket: process.env.S3_BUCKET_NAME || 'nextservice-uploads-staging'
   }
 }
-
-// Log environment info (useful for debugging)
-console.log('🔧 DynamoDB Environment:', getEnvironmentInfo())
-console.log('🔧 REGION:', process.env.REGION || 'NOT SET')
-console.log('🔧 ACCESS_KEY_ID:', process.env.ACCESS_KEY_ID ? 'SET' : 'NOT SET')
-console.log('🔧 SECRET_ACCESS_KEY:', process.env.SECRET_ACCESS_KEY ? 'SET' : 'NOT SET')
-console.log('🔧 NODE_ENV:', process.env.NODE_ENV)
-console.log('🔧 DYNAMODB_ENDPOINT:', process.env.DYNAMODB_ENDPOINT || 'NOT SET')
-console.log('🔧 AMPLIFY_ROLE_ARN:', process.env.AMPLIFY_ROLE_ARN || 'NOT SET')
-
-// AWS credentials will be handled by the AWS SDK default credential chain
-console.log('🔧 AWS Credentials: Using default credential chain')
