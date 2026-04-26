@@ -6,6 +6,7 @@ import { DayPicker } from 'react-day-picker'
 import { addDays, addMonths, isWeekend, format } from 'date-fns'
 import { el } from 'date-fns/locale'
 import 'react-day-picker/dist/style.css'
+import RequestTimeline from './components/RequestTimeline'
 
 interface RequestDetail {
   id: string
@@ -414,6 +415,9 @@ export default function RequestDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Timeline */}
+      <RequestTimeline requestId={requestId} />
 
       {/* Assign Modal */}
       {showAssign && (

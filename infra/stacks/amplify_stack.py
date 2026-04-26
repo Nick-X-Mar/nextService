@@ -243,6 +243,10 @@ class AmplifyStack(Stack):
         ))
 
         # SES — send emails
+        # When emails are tagged with X-SES-CONFIGURATION-SET (see
+        # src/utils/emailService.ts), SES requires ses:SendEmail/SendRawEmail
+        # permission on BOTH the identity and the configuration-set resource.
+        # Keep the config-set name in sync with notifications_stack.SES_CONFIG_SET_NAME.
         self.amplify_role.add_to_policy(iam.PolicyStatement(
             sid="SESSendEmail",
             actions=[
@@ -251,6 +255,7 @@ class AmplifyStack(Stack):
             ],
             resources=[
                 f"arn:aws:ses:{self.region}:{self.account}:identity/*",
+                f"arn:aws:ses:{self.region}:{self.account}:configuration-set/nextservice-main",
             ],
         ))
 

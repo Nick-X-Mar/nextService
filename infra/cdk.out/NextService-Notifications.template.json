@@ -294,7 +294,10 @@
         "ses:SendRawEmail"
        ],
        "Effect": "Allow",
-       "Resource": "arn:aws:ses:eu-central-1:766671488262:identity/*",
+       "Resource": [
+        "arn:aws:ses:eu-central-1:766671488262:identity/*",
+        "arn:aws:ses:eu-central-1:766671488262:configuration-set/nextservice-main"
+       ],
        "Sid": "SESSendEmail"
       },
       {

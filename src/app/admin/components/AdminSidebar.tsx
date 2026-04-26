@@ -17,6 +17,7 @@ const navItems = [
   { icon: 'account_balance_wallet', label: 'Commissions', href: '/admin/commissions' },
   { icon: 'settings', label: 'Settings', href: '/admin/settings' },
   { icon: 'monitoring', label: 'Performance', href: '/admin/performance' },
+  { icon: 'analytics', label: 'Funnel', href: '/admin/funnel' },
   { icon: 'science', label: 'E2E Tests', href: '/admin/tests' },
 ]
 

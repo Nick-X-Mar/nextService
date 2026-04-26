@@ -16,16 +16,16 @@
         }
       }
     },
-    "2dc0cd58b297b3bb4266b35ec1d0b489888caef7d5450cf6d8faa39e5f04d222": {
+    "a1b49c0c054f9e5ad26e71344eb2afebfe4972f7c0cb097e50b0cba775b03b16": {
       "displayName": "NextService-AppSync Template",
       "source": {
         "path": "NextService-AppSync.template.json",
         "packaging": "file"
       },
       "destinations": {
-        "766671488262-eu-central-1-4b85b046": {
+        "766671488262-eu-central-1-b8616f00": {
           "bucketName": "cdk-hnb659fds-assets-766671488262-eu-central-1",
-          "objectKey": "2dc0cd58b297b3bb4266b35ec1d0b489888caef7d5450cf6d8faa39e5f04d222.json",
+          "objectKey": "a1b49c0c054f9e5ad26e71344eb2afebfe4972f7c0cb097e50b0cba775b03b16.json",
           "region": "eu-central-1",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-file-publishing-role-766671488262-eu-central-1"
         }

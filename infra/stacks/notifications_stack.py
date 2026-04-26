@@ -227,6 +227,12 @@ class NotificationsStack(Stack):
             ],
         ))
         # SES send
+        # When the sender tags an email with X-SES-CONFIGURATION-SET (we do —
+        # see infra/lambdas/new-request-broadcast/index.mjs), SES enforces the
+        # ses:SendEmail / ses:SendRawEmail action against BOTH the identity
+        # *and* the configuration-set resource. Missing the latter throws:
+        #   "not authorized to perform `ses:SendRawEmail` on resource
+        #    `arn:aws:ses:.../configuration-set/nextservice-main`"
         self.broadcast_fn.add_to_role_policy(iam.PolicyStatement(
             sid="SESSendEmail",
             actions=[
@@ -235,6 +241,7 @@ class NotificationsStack(Stack):
             ],
             resources=[
                 f"arn:aws:ses:{self.region}:{self.account}:identity/*",
+                f"arn:aws:ses:{self.region}:{self.account}:configuration-set/{SES_CONFIG_SET_NAME}",
             ],
         ))
 
