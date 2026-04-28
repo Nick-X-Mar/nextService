@@ -6,13 +6,6 @@ import GearSubmitButton from '@/components/GearSubmitButton'
 import { saveFormData, loadFormData, clearFormData } from '../../../../utils/formStorage'
 import { useToast } from '../../../../hooks/useToast'
 
-interface CarBrandModelSelectorProps {
-  selectedBrand: string
-  selectedModel: string
-  onBrandChange: (brand: string) => void
-  onModelChange: (model: string) => void
-}
-
 // Greek to Latin phonetic transliteration for search matching
 const greekToLatinMap: Record<string, string> = {
   // Digraphs first (order matters)
@@ -113,12 +106,7 @@ const carBrands = {
   'chevrolet': ['Spark', 'Aveo', 'Cruze', 'Malibu', 'Impala', 'Camaro', 'Corvette', 'Trax', 'Equinox', 'Traverse', 'Tahoe', 'Suburban', 'Silverado'],
 }
 
-export default function CarBrandModelSelector({
-  selectedBrand,
-  selectedModel,
-  onBrandChange,
-  onModelChange
-}: CarBrandModelSelectorProps) {
+export default function CarBrandModelSelector() {
   const router = useRouter()
   const { success, error: showError } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)

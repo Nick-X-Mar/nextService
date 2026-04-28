@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { RequestDetailsPanel } from '@/components'
 import { styles } from '@/styles/styles'
@@ -31,7 +31,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
   const [newMessage, setNewMessage] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [requestData, setRequestData] = useState<ServiceRequest | null>(null)
-  const [garageData, setGarageData] = useState<any>(null)
+  const [garageData, setGarageData] = useState<Record<string, unknown> | null>(null)
   const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -43,40 +43,12 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
 
   const { userType, garage: authGarage, isLoading: authLoading } = useAuth()
 
-  useEffect(() => {
-    // Wait for auth to load
-    if (authLoading) {
-      return
-    }
-
-    // Check if user is authenticated as a garage
-    if (userType !== 'garage' || !authGarage || authGarage.id !== garageId) {
-      // User is not authenticated as this garage or is a client
-      console.warn('Unauthorized access attempt to garage chat')
-      router.push('/login/')
-      return
-    }
-
-    loadChatData()
-  }, [garageId, requestId, router, userType, authGarage, authLoading])
-
-  // Cleanup subscription on unmount
-  useEffect(() => {
-    return () => {
-      stopSubscription()
-    }
-  }, [])
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
   // Subscribe to real-time messages using AWS AppSync
-  const subscribeToMessages = async () => {
+  const subscribeToMessages = useCallback(async () => {
     // Clear existing subscription
     if (subscriptionRef.current) {
       appSyncService.unsubscribe(subscriptionRef.current)
@@ -115,7 +87,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     } catch (error) {
       console.error('[Garage] Error subscribing to AppSync:', error)
     }
-  }
+  }, [requestId, garageId])
 
   // Stop subscription
   const stopSubscription = () => {
@@ -126,7 +98,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     }
   }
 
-  const loadChatData = async () => {
+  const loadChatData = useCallback(async () => {
     try {
       setIsLoading(true)
 
@@ -168,7 +140,36 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [requestId, garageId, subscribeToMessages])
+
+  useEffect(() => {
+    // Wait for auth to load
+    if (authLoading) {
+      return
+    }
+
+    // Check if user is authenticated as a garage
+    if (userType !== 'garage' || !authGarage || authGarage.id !== garageId) {
+      // User is not authenticated as this garage or is a client
+      console.warn('Unauthorized access attempt to garage chat')
+      router.push('/login/')
+      return
+    }
+
+    loadChatData()
+  }, [garageId, requestId, router, userType, authGarage, authLoading, loadChatData])
+
+  // Cleanup subscription on unmount
+  useEffect(() => {
+    return () => {
+      stopSubscription()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || isSending || isReadOnly) return

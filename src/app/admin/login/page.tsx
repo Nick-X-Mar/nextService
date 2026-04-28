@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 
 export default function AdminLoginPage() {
@@ -43,7 +44,7 @@ export default function AdminLoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <img src="/images/next_logo.svg" alt="NextService" className="h-10 w-auto mx-auto mb-2" />
+          <Image src="/images/next_logo.svg" alt="NextService" width={100} height={80} className="h-10 w-auto mx-auto mb-2" priority />
           <p className="text-sm text-on-surface/60 mt-1">Admin Panel</p>
         </div>
 

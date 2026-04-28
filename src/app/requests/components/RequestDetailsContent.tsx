@@ -97,22 +97,23 @@ const createVehicleFormState = (vehicle: VehicleInfo): VehicleFormState => ({
   engineNumber: vehicle?.engineNumber ?? ''
 })
 
-const mapVehicleDetailsFromApi = (vehicle: any): VehicleInfo => {
+const mapVehicleDetailsFromApi = (vehicle: unknown): VehicleInfo => {
   if (!vehicle || typeof vehicle !== 'object') {
     return null
   }
 
+  const v = vehicle as Record<string, unknown>
   return {
-    brand: vehicle.brand ?? '',
-    model: vehicle.model ?? '',
-    engineCC: vehicle.engineCC ?? '',
-    modelYear: vehicle.modelYear ?? '',
-    fuelType: vehicle.fuelType ?? '',
-    isAutomatic: vehicle.isAutomatic ?? null,
-    is4x4: vehicle.is4x4 ?? null,
-    isTurbo: vehicle.isTurbo ?? null,
-    vinNumber: vehicle.vinNumber ?? '',
-    engineNumber: vehicle.engineNumber ?? ''
+    brand: (v.brand as string) ?? '',
+    model: (v.model as string) ?? '',
+    engineCC: (v.engineCC as string) ?? '',
+    modelYear: (v.modelYear as string) ?? '',
+    fuelType: (v.fuelType as string) ?? '',
+    isAutomatic: (v.isAutomatic as boolean | undefined) ?? undefined,
+    is4x4: (v.is4x4 as boolean | undefined) ?? undefined,
+    isTurbo: (v.isTurbo as boolean | undefined) ?? undefined,
+    vinNumber: (v.vinNumber as string) ?? '',
+    engineNumber: (v.engineNumber as string) ?? ''
   }
 }
 
@@ -585,7 +586,7 @@ export default function RequestDetailsContent({
 
               garageCache.set(offer.garageId, garageSummary)
               return { ...offer, garage: garageSummary }
-            } catch (error) {
+            } catch {
               garageCache.set(offer.garageId, null)
               return { ...offer, garage: null }
             }
@@ -634,7 +635,7 @@ export default function RequestDetailsContent({
           setCustomDateSuccesses({})
           setSavingCustomDates({})
         }
-      } catch (error) {
+      } catch {
         if (isMounted) {
           setOffers([])
           setOffersError('Δεν ήταν δυνατή η φόρτωση των προσφορών. Δοκιμάστε ξανά αργότερα.')
@@ -660,7 +661,7 @@ export default function RequestDetailsContent({
   useEffect(() => {
     const mapped = mapVehicleDetailsFromApi(request.vehicle)
     setVehicleDetails(mapped)
-  }, [request.id, request.updatedAt])
+  }, [request.id, request.updatedAt, request.vehicle])
 
   const handleOpenVehicleModal = () => {
     setVehicleFormError(null)

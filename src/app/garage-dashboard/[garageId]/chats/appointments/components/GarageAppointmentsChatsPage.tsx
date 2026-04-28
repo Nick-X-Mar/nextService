@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { styles } from '@/styles/styles'
 import { useToast } from '@/hooks/useToast'
@@ -33,14 +33,9 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
   const { error } = useToast()
   const [chatRequests, setChatRequests] = useState<ChatRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [garageData, setGarageData] = useState<any>(null)
+  const [, setGarageData] = useState<Record<string, unknown> | null>(null)
 
-  useEffect(() => {
-    loadGarageData()
-    loadAppointmentChats()
-  }, [garageId])
-
-  const loadGarageData = async () => {
+  const loadGarageData = useCallback(async () => {
     try {
       const response = await fetch(`/api/garage/${garageId}`)
       if (response.ok) {
@@ -52,9 +47,9 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
     } catch (error) {
       console.error('Error loading garage data:', error)
     }
-  }
+  }, [garageId])
 
-  const loadAppointmentChats = async () => {
+  const loadAppointmentChats = useCallback(async () => {
     try {
       setIsLoading(true)
 
@@ -72,8 +67,10 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
         return
       }
 
+      interface OfferLite { status?: string; appointmentDate?: string; serviceRequestId: string }
+
       // Filter for accepted offers with appointment dates
-      const acceptedOffers = offersData.offers.filter((offer: any) =>
+      const acceptedOffers: OfferLite[] = offersData.offers.filter((offer: OfferLite) =>
         offer.status === 'accepted' &&
         offer.appointmentDate
       )
@@ -89,7 +86,7 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
       today.setHours(0, 0, 0, 0)
 
       // Filter offers with appointment dates >= today
-      const upcomingOffers = acceptedOffers.filter((offer: any) => {
+      const upcomingOffers = acceptedOffers.filter((offer) => {
         const appointmentDate = new Date(`${offer.appointmentDate}T00:00:00`)
         appointmentDate.setHours(0, 0, 0, 0)
         return appointmentDate >= today
@@ -102,7 +99,7 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
       }
 
       // Get unique request IDs from upcoming offers
-      const requestIds: string[] = [...new Set<string>(upcomingOffers.map((offer: any) => offer.serviceRequestId as string))]
+      const requestIds: string[] = [...new Set<string>(upcomingOffers.map((offer) => offer.serviceRequestId))]
 
       // For each request, get the full request data
       const requestsWithDetails = await Promise.all(
@@ -113,7 +110,7 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
               const requestData = await requestResponse.json()
               if (requestData.success && requestData.request) {
                 // Find the corresponding offer to get appointmentDate
-                const offer = upcomingOffers.find((o: any) => o.serviceRequestId === requestId)
+                const offer = upcomingOffers.find((o) => o.serviceRequestId === requestId)
                 return {
                   ...requestData.request,
                   appointmentDate: offer?.appointmentDate
@@ -128,8 +125,8 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
       )
 
       // Filter requests where status is APPOINTMENT
-      const appointmentRequests = requestsWithDetails.filter((request: any) =>
-        request &&
+      const appointmentRequests = requestsWithDetails.filter((request: ChatRequest | null): request is ChatRequest =>
+        !!request &&
         request.status === ServiceRequestStatus.APPOINTMENT
       )
 
@@ -149,7 +146,7 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
                     timestamp: lastMessage.timestamp,
                     sender: (lastMessage.senderType === 'garage' ? 'garage' : 'client') as 'garage' | 'client'
                   },
-                  unreadCount: chatData.messages.filter((msg: any) =>
+                  unreadCount: chatData.messages.filter((msg: { senderType?: string; read?: boolean }) =>
                     msg.senderType === 'client' && !msg.read
                   ).length
                 }
@@ -178,7 +175,12 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [garageId, error])
+
+  useEffect(() => {
+    loadGarageData()
+    loadAppointmentChats()
+  }, [garageId, loadGarageData, loadAppointmentChats])
 
   const formatAppointmentDate = (dateString: string) => {
     const date = new Date(`${dateString}T00:00:00`)

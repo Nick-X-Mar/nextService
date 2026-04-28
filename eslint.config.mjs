@@ -19,6 +19,7 @@ const eslintConfig = [
       "node_modules/**",
       "e2e/**",
       "scripts/**",
+      "infra/**",
       "next.config.ts",
       "playwright.config.ts",
       "tsconfig.tsbuildinfo",
@@ -30,6 +31,22 @@ const eslintConfig = [
   // a per-file program lookup, which keeps lint fast.
   ...tseslint.configs.recommended,
   ...compat.extends("next/core-web-vitals"),
+  {
+    rules: {
+      // Honour the `_` prefix convention for intentionally-unused
+      // identifiers (e.g. `_request` in Next.js route handlers, destructured
+      // siblings we want to drop, caught errors we don't read).
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
 ];
 
 export default eslintConfig;

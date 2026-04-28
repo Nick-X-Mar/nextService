@@ -53,7 +53,7 @@ async function _GET(request: NextRequest) {
 
     // Get client names for display
     const clientIds = [...new Set(requests.map((r) => r.clientId).filter(Boolean))]
-    let clientMap: Record<string, string> = {}
+    const clientMap: Record<string, string> = {}
 
     if (clientIds.length > 0) {
       const batchResult = await dynamoDB.send(new BatchGetCommand({

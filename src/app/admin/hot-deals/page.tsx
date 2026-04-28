@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
+import Image from 'next/image'
 import type { HotDeal } from '@/types/hotDeals'
 
 const emptyDeal: Partial<HotDeal> = {
@@ -148,7 +149,7 @@ export default function HotDealsAdminPage() {
             <label className="block text-sm font-medium text-on-surface/70 mb-2">Image</label>
             {editing.image && (
               <div className="relative w-full h-48 rounded-lg overflow-hidden mb-2">
-                <img src={editing.image} alt="" className="w-full h-full object-cover" />
+                <Image src={editing.image} alt="" fill sizes="(max-width: 768px) 100vw, 600px" className="object-cover" />
               </div>
             )}
             <input ref={fileRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
@@ -396,9 +397,9 @@ export default function HotDealsAdminPage() {
               </div>
 
               {/* Image thumbnail */}
-              <div className="w-20 h-14 rounded-lg overflow-hidden bg-surface-container-high shrink-0">
+              <div className="relative w-20 h-14 rounded-lg overflow-hidden bg-surface-container-high shrink-0">
                 {deal.image ? (
-                  <img src={deal.image} alt={deal.title} className="w-full h-full object-cover" />
+                  <Image src={deal.image} alt={deal.title} fill sizes="80px" className="object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <span className="material-symbols-outlined text-on-surface/30">{deal.icon}</span>

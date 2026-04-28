@@ -1,5 +1,4 @@
 // WebSocket service for real-time chat using AWS AppSync
-import { Amplify } from 'aws-amplify';
 
 interface ChatMessage {
   id: string
@@ -55,7 +54,7 @@ class WebSocketService {
             const message = data.payload.data.subscribe;
             // Find the callback for this message based on the roomId pattern
             // We need to determine which room this message belongs to
-            this.subscriptions.forEach((callback, roomId) => {
+            this.subscriptions.forEach((callback) => {
               // For now, we'll call all callbacks - in a real implementation,
               // we'd need to match the roomId based on the message content
               callback(message);

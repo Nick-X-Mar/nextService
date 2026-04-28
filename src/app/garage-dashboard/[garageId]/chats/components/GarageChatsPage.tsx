@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { styles } from '@/styles/styles'
 import { useToast } from '@/hooks/useToast'
@@ -32,14 +32,9 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
   const { error } = useToast()
   const [chatRequests, setChatRequests] = useState<ChatRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [garageData, setGarageData] = useState<any>(null)
+  const [, setGarageData] = useState<Record<string, unknown> | null>(null)
 
-  useEffect(() => {
-    loadGarageData()
-    loadChatRequests()
-  }, [garageId])
-
-  const loadGarageData = async () => {
+  const loadGarageData = useCallback(async () => {
     try {
       const response = await fetch(`/api/garage/${garageId}`)
       if (response.ok) {
@@ -51,9 +46,9 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
     } catch (error) {
       console.error('Error loading garage data:', error)
     }
-  }
+  }, [garageId])
 
-  const loadChatRequests = async () => {
+  const loadChatRequests = useCallback(async () => {
     try {
       setIsLoading(true)
 
@@ -69,7 +64,7 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
       if (offersResponse.ok) {
         const offersData = await offersResponse.json()
         if (offersData.success && offersData.offers) {
-          offersData.offers.forEach((offer: any) => requestIdsSet.add(offer.serviceRequestId))
+          offersData.offers.forEach((offer: { serviceRequestId: string }) => requestIdsSet.add(offer.serviceRequestId))
         }
       }
 
@@ -107,14 +102,11 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
         })
       )
 
-      // Filter requests where status is PENDING or IN_PROGRESS (not APPOINTMENT, not CANCELLED, not COMPLETED)
-      const openRequests = requestsWithDetails.filter((request: any) =>
-        request &&
+      // Filter requests where status is PENDING or IN_PROGRESS
+      const openRequests = requestsWithDetails.filter((request: ChatRequest | null): request is ChatRequest =>
+        !!request &&
         (request.status === ServiceRequestStatus.PENDING ||
-         request.status === ServiceRequestStatus.IN_PROGRESS) &&
-        request.status !== ServiceRequestStatus.APPOINTMENT &&
-        request.status !== ServiceRequestStatus.CANCELLED &&
-        request.status !== ServiceRequestStatus.COMPLETED
+         request.status === ServiceRequestStatus.IN_PROGRESS)
       )
 
       // For each request, get the last message
@@ -133,7 +125,7 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
                     timestamp: lastMessage.timestamp,
                     sender: (lastMessage.senderType === 'garage' ? 'garage' : 'client') as 'garage' | 'client'
                   },
-                  unreadCount: chatData.messages.filter((msg: any) =>
+                  unreadCount: chatData.messages.filter((msg: { senderType?: string; read?: boolean }) =>
                     msg.senderType === 'client' && !msg.read
                   ).length
                 }
@@ -154,7 +146,12 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [garageId, error])
+
+  useEffect(() => {
+    loadGarageData()
+    loadChatRequests()
+  }, [garageId, loadGarageData, loadChatRequests])
 
   const formatLastMessageTime = (timestamp: string) => {
     const date = new Date(timestamp)

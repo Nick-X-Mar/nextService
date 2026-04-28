@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { styles } from '@/styles/styles'
 import Icon from '@/components/ui/Icon'
@@ -340,8 +341,8 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
                     </div>
                     <div className="flex gap-2">
                       {request.photoUrls.slice(0, 3).map((url: string, i: number) => (
-                        <div key={i} className="w-16 h-16 rounded-lg overflow-hidden bg-surface-container flex-shrink-0">
-                          <img src={url} alt={`Φωτο ${i + 1}`} className="w-full h-full object-cover" />
+                        <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden bg-surface-container flex-shrink-0">
+                          <Image src={url} alt={`Φωτο ${i + 1}`} fill sizes="64px" className="object-cover" />
                         </div>
                       ))}
                       {request.photoUrls.length > 3 && (

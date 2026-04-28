@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
-import { useToast } from '../../../../../hooks/useToast'
 import { ServiceRequestStatus } from '../../../../../types/statuses'
 import type { ServiceRequest } from '../../../../../types/requests'
 import { getCategoryText } from '@/utils/categoryLabels'
@@ -44,7 +44,6 @@ type TabType = 'pending' | 'appointments' | 'unsuccessful'
 
 export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
   const router = useRouter()
-  const { error } = useToast()
   const [activeTab, setActiveTab] = useState<TabType>('pending')
   const [pendingConversations, setPendingConversations] = useState<ChatRequest[]>([])
   const [appointments, setAppointments] = useState<ChatRequest[]>([])
@@ -52,7 +51,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
 
-  const loadPendingConversations = async () => {
+  const loadPendingConversations = useCallback(async () => {
     try {
       const response = await fetch(`/api/requests?clientId=${clientId}`)
 
@@ -84,7 +83,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
                       timestamp: lastMessage.timestamp,
                       sender: lastMessage.senderType || lastMessage.sender || 'garage'
                     },
-                    unreadCount: chatData.messages.filter((msg: any) =>
+                    unreadCount: chatData.messages.filter((msg: { senderType?: string; sender?: string; read?: boolean }) =>
                       (msg.senderType === 'garage' || msg.sender === 'garage') && !msg.read
                     ).length
                   }
@@ -106,9 +105,9 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
       console.error('Error loading pending conversations:', error)
       setPendingConversations([])
     }
-  }
+  }, [clientId])
 
-  const loadAppointments = async () => {
+  const loadAppointments = useCallback(async () => {
     try {
       const response = await fetch(`/api/requests?clientId=${clientId}`)
 
@@ -141,7 +140,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
                       timestamp: lastMessage.timestamp,
                       sender: lastMessage.senderType || lastMessage.sender || 'garage'
                     },
-                    unreadCount: chatData.messages.filter((msg: any) =>
+                    unreadCount: chatData.messages.filter((msg: { senderType?: string; sender?: string; read?: boolean }) =>
                       (msg.senderType === 'garage' || msg.sender === 'garage') && !msg.read
                     ).length
                   }
@@ -181,9 +180,9 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
       console.error('Error loading appointments:', error)
       setAppointments([])
     }
-  }
+  }, [clientId])
 
-  const loadUnsuccessfulConversations = async () => {
+  const loadUnsuccessfulConversations = useCallback(async () => {
     try {
       const response = await fetch(`/api/requests?clientId=${clientId}`)
 
@@ -213,7 +212,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
               if (!offersData.success || !offersData.offers) return
 
               // Find the accepted offer's garageId
-              const acceptedOffer = offersData.offers.find((offer: any) =>
+              const acceptedOffer = offersData.offers.find((offer: { id: string; garageId: string }) =>
                 offer.id === request.acceptedOfferId
               )
               if (!acceptedOffer) return
@@ -228,7 +227,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
               if (!garagesData.success || !garagesData.garages) return
 
               // Filter garages that have messages but their offer was not accepted
-              const unsuccessfulGarages = garagesData.garages.filter((garage: any) =>
+              const unsuccessfulGarages = garagesData.garages.filter((garage: { id: string; companyName?: string; logoUrl?: string }) =>
                 garage.id !== acceptedGarageId
               )
 
@@ -240,12 +239,13 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
                     const messagesData = await messagesResponse.json()
                     if (messagesData.messages) {
                       // Filter messages from this garage
-                      const garageMessages = messagesData.messages.filter((msg: any) =>
+                      interface MsgLite { senderType?: string; sender?: string; senderId?: string; timestamp: string; message?: string; content?: string; read?: boolean }
+                      const garageMessages = (messagesData.messages as MsgLite[]).filter((msg) =>
                         msg.senderType === 'garage' && msg.senderId === garage.id
                       )
 
                       if (garageMessages.length > 0) {
-                        const lastMessage = garageMessages.sort((a: any, b: any) =>
+                        const lastMessage = garageMessages.sort((a, b) =>
                           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
                         )[0]
 
@@ -261,9 +261,9 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
                           lastMessage: {
                             content: lastMessage.message || lastMessage.content || '',
                             timestamp: lastMessage.timestamp,
-                            sender: lastMessage.senderType || 'garage'
+                            sender: (lastMessage.senderType === 'client' ? 'client' : 'garage') as 'client' | 'garage'
                           },
-                          unreadCount: garageMessages.filter((msg: any) =>
+                          unreadCount: garageMessages.filter((msg) =>
                             (msg.senderType === 'garage' || msg.sender === 'garage') && !msg.read
                           ).length
                         })
@@ -289,9 +289,9 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
       console.error('Error loading unsuccessful conversations:', error)
       setUnsuccessfulConversations([])
     }
-  }
+  }, [clientId])
 
-  const loadAllData = async () => {
+  const loadAllData = useCallback(async () => {
     setIsLoading(true)
     await Promise.all([
       loadPendingConversations(),
@@ -299,22 +299,11 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
       loadUnsuccessfulConversations()
     ])
     setIsLoading(false)
-  }
+  }, [loadPendingConversations, loadAppointments, loadUnsuccessfulConversations])
 
   useEffect(() => {
     loadAllData()
-  }, [clientId])
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('el-GR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
+  }, [loadAllData])
 
   const formatAppointmentDate = (dateString: string) => {
     const date = new Date(`${dateString}T00:00:00`)
@@ -400,9 +389,11 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
           {/* Vehicle Thumbnail */}
           <div className="flex-shrink-0">
             {thumbnailUrl ? (
-              <img
+              <Image
                 src={thumbnailUrl}
                 alt={vehicleName}
+                width={64}
+                height={64}
                 className={`w-16 h-16 rounded-lg object-cover ${isCompleted ? 'grayscale' : ''}`}
               />
             ) : (

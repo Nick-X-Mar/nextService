@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { ServiceVehicleCard } from '@/components'
 import { styles } from '@/styles/styles'
 import { OfferStatus } from '@/types/statuses'
 import Icon from '@/components/ui/Icon'
 import { DayPicker } from 'react-day-picker'
-import { addDays, addMonths, isWeekend, startOfDay, isBefore, format } from 'date-fns'
+import { addDays, addMonths, isWeekend, format } from 'date-fns'
 import { el } from 'date-fns/locale'
 import 'react-day-picker/dist/style.css'
 
@@ -92,16 +93,16 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [toasts, setToasts] = useState<ToastData[]>([])
-  const [existingOffer, setExistingOffer] = useState<any>(null)
-  const [originalOffer, setOriginalOffer] = useState<any>(null)
+  const [existingOffer, setExistingOffer] = useState<{ id: string; status?: OfferStatus } | null>(null)
+  const [originalOffer, setOriginalOffer] = useState<{
+    offerAmount: number
+    benefits: string[]
+    availabilityDates: string[]
+  } | null>(null)
   const [selectedDates, setSelectedDates] = useState<Date[]>([])
   const [clientAvailabilityDates, setClientAvailabilityDates] = useState<string[]>([])
   const [addingClientDate, setAddingClientDate] = useState<string | null>(null)
   const router = useRouter()
-
-  useEffect(() => {
-    loadData()
-  }, [garageId, requestId])
 
   const showToast = (toast: Omit<ToastData, 'id'>) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
@@ -118,7 +119,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
     setToasts(prev => prev.filter(toast => toast.id !== id))
   }
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setIsLoading(true)
 
@@ -198,7 +199,11 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [garageId, requestId])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const generateOfferNumber = () => {
     const now = new Date()
@@ -267,14 +272,6 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
   const handleOfferAmountChange = (value: string) => {
     const amount = parseInt(value) || 0
     setOffer(prev => ({ ...prev, offerAmount: amount }))
-  }
-
-  const handleBenefitToggle = (benefit: string) => {
-    setSelectedBenefits(prev =>
-      prev.includes(benefit)
-        ? prev.filter(b => b !== benefit)
-        : [...prev, benefit]
-    )
   }
 
   // Check if offer has been modified
@@ -603,10 +600,12 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {serviceRequest.photoUrls.map((url: string, index: number) => (
                 <a key={index} href={url} target="_blank" rel="noopener noreferrer" className="relative aspect-square bg-surface-container rounded-xl overflow-hidden hover:opacity-90 transition-opacity">
-                  <img
+                  <Image
                     src={url}
                     alt={`Φωτογραφία ${index + 1}`}
-                    className="w-full h-full object-cover"
+                    fill
+                    sizes="(max-width: 640px) 50vw, 33vw"
+                    className="object-cover"
                   />
                 </a>
               ))}
@@ -857,9 +856,9 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
               </button>
               <button
                 onClick={handleSendOffer}
-                disabled={isSubmitting || (existingOffer && !hasChanges())}
+                disabled={isSubmitting || (!!existingOffer && !hasChanges())}
                 className={`${
-                  isSubmitting || (existingOffer && !hasChanges())
+                  isSubmitting || (!!existingOffer && !hasChanges())
                     ? styles.btnDisabled
                     : styles.btnPrimary
                 } flex-1 justify-center`}

@@ -8,6 +8,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { recordMetric } from '@/utils/performanceService'
 
+// Context shape varies per route (some use { params }, some take none) so
+// the contract here is intentionally permissive — the wrapped handler still
+// has its own concrete typed signature.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type RouteHandler = (request: NextRequest, context?: any) => Promise<NextResponse | Response> | NextResponse | Response
 
@@ -17,7 +20,7 @@ export function withMetrics<T extends RouteHandler>(handler: T): T {
     let statusCode = 200
 
     try {
-      const response = await handler(request, context as any)
+      const response = await handler(request, context)
       statusCode = response instanceof NextResponse ? response.status : (response as Response).status
       return response
     } catch (err) {

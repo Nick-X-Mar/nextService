@@ -23,7 +23,7 @@ async function _GET(request: NextRequest) {
     }
 
     // Get unique request IDs
-    const requestIds = [...new Set(messages.map((m: any) => m.requestId as string))]
+    const requestIds = [...new Set(messages.map((m) => m.requestId as string))]
 
     return NextResponse.json({ success: true, requestIds })
   } catch (error) {

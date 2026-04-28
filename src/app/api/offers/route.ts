@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import { DynamoDBDocumentClient, PutCommand, QueryCommand, ScanCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
+import { DynamoDBDocumentClient, PutCommand, ScanCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
 import { OfferStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { sendEmail } from '@/utils/emailService'
@@ -96,10 +96,10 @@ async function _POST(request: NextRequest) {
       offer: offer
     })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error creating offer:', error)
-    
-    if (error.name === 'ConditionalCheckFailedException') {
+
+    if (error instanceof Error && error.name === 'ConditionalCheckFailedException') {
       return NextResponse.json({
         success: false,
         error: 'Offer already exists'
@@ -250,7 +250,7 @@ async function _PUT(request: NextRequest) {
       offer: result.Attributes
     })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error updating offer:', error)
 
     return NextResponse.json({

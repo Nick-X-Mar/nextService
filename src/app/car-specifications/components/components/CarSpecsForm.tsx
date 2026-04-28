@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
 import GearSubmitButton from '@/components/GearSubmitButton'
@@ -8,7 +9,6 @@ import LoginModal from '@/components/LoginModal'
 import { saveFormData, loadFormData } from '../../../../utils/formStorage'
 import { useToast } from '../../../../hooks/useToast'
 import { useAuth } from '@/contexts/AuthContext'
-import Image from 'next/image'
 
 interface CarSpecsFormProps {
   savedData: {
@@ -64,28 +64,19 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
     }).catch(() => {})
   }, [])
 
-  // Load saved data on component mount
-  useEffect(() => {
-    setMounted(true)
-    setIsLoggedIn(!!localStorage.getItem('clientId'))
-    const data = loadFormData()
-    if (data.vinNumber) setVinNumber(data.vinNumber)
-    if (data.engineNumber) setEngineNumber(data.engineNumber)
-    if (data.originalVehicleLicensePhotoUrl) {
-      setExistingLicensePhotoUrl(data.originalVehicleLicensePhotoUrl)
-      setHasLicensePhoto(true)
-    }
-
-    // Estimate price when component mounts if not already estimated
-    if (!data.estimatedPrice && data.brand && data.model && data.modelYear && data.engineCC && data.fuelType) {
-      estimatePrice(data)
-    } else if (data.estimatedPrice) {
-      setEstimatedPrice(data.estimatedPrice)
-    }
-  }, [])
+  interface PriceEstimateInput {
+    category: string
+    brand: string
+    model: string
+    modelYear?: string | number
+    engineCC?: string | number
+    fuelType?: string
+    isAutomatic?: boolean
+    is4x4?: boolean
+  }
 
   // Function to estimate price
-  const estimatePrice = async (data: any) => {
+  const estimatePrice = useCallback(async (data: PriceEstimateInput) => {
     setIsEstimatingPrice(true)
     try {
       const response = await fetch('/api/price-estimation', {
@@ -119,7 +110,27 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
     } finally {
       setIsEstimatingPrice(false)
     }
-  }
+  }, [])
+
+  // Load saved data on component mount
+  useEffect(() => {
+    setMounted(true)
+    setIsLoggedIn(!!localStorage.getItem('clientId'))
+    const data = loadFormData()
+    if (data.vinNumber) setVinNumber(data.vinNumber)
+    if (data.engineNumber) setEngineNumber(data.engineNumber)
+    if (data.originalVehicleLicensePhotoUrl) {
+      setExistingLicensePhotoUrl(data.originalVehicleLicensePhotoUrl)
+      setHasLicensePhoto(true)
+    }
+
+    // Estimate price when component mounts if not already estimated
+    if (!data.estimatedPrice && data.brand && data.model && data.modelYear && data.engineCC && data.fuelType) {
+      estimatePrice(data)
+    } else if (data.estimatedPrice) {
+      setEstimatedPrice(data.estimatedPrice)
+    }
+  }, [estimatePrice])
 
   // Save data whenever it changes
   useEffect(() => {
@@ -550,11 +561,13 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                 {/* Show existing license photo from vehicle */}
                 {existingLicensePhotoUrl && !licensePhoto && (
                   <div className="rounded-2xl overflow-hidden border-2 border-green-200 bg-green-50/50">
-                    <div className="relative">
-                      <img
+                    <div className="relative w-full h-48">
+                      <Image
                         src={existingLicensePhotoUrl}
                         alt="Άδεια κυκλοφορίας"
-                        className="w-full max-h-48 object-contain"
+                        fill
+                        sizes="(max-width: 768px) 100vw, 600px"
+                        className="object-contain"
                       />
                     </div>
                     <div className="p-3 flex items-center justify-between">

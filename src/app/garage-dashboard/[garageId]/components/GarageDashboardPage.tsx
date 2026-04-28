@@ -20,13 +20,30 @@ interface GarageDashboardPageProps {
   garageId: string
 }
 
+interface GarageData {
+  id: string
+  companyName: string
+  email: string
+  mobile: string
+  address: string
+  tin: string
+  taxAuthority: string
+  description?: string
+  benefits?: string[]
+}
+
+interface OfferLite {
+  status?: OfferStatus | string
+  appointmentDate?: string
+}
+
 export default function GarageDashboardPage({ garageId }: GarageDashboardPageProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
   const { userType, garage: authGarage, isLoading: authLoading } = useAuth()
 
-  const [garageData, setGarageData] = useState<any>(null)
+  const [garageData, setGarageData] = useState<GarageData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [counts, setCounts] = useState({ requests: 0, offers: 0, appointments: 0 })
   const { info } = useToast()
@@ -90,8 +107,8 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
         const offersData = await offersResponse.json()
         if (offersData.success) {
           // Count only pending offers (exclude rejected and accepted ones)
-          const offersCount = offersData.offers?.filter((offer: any) => {
-            const status = offer.status?.toLowerCase()
+          const offersCount = offersData.offers?.filter((offer: OfferLite) => {
+            const status = (offer.status as string | undefined)?.toLowerCase()
             return status === OfferStatus.PENDING
           }).length || 0
 
@@ -101,7 +118,7 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
           const today = new Date()
           today.setHours(0, 0, 0, 0)
 
-          const appointmentsCount = offersData.offers?.filter((offer: any) => {
+          const appointmentsCount = offersData.offers?.filter((offer: OfferLite) => {
             const isAccepted = offer.status === 'accepted' || offer.status === 'ACCEPTED'
             if (!isAccepted || !offer.appointmentDate) return false
 

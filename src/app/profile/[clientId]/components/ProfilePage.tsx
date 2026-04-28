@@ -53,7 +53,7 @@ interface ProfilePageProps {
 export default function ProfilePage({ clientId }: ProfilePageProps) {
   const router = useRouter()
   const { success, error } = useToast()
-  const { client, refreshClient, logout } = useAuth()
+  const { refreshClient, logout } = useAuth()
   const [clientData, setClientData] = useState<Client | null>(null)
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [isLoading, setIsLoading] = useState(true)

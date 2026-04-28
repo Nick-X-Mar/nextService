@@ -55,12 +55,7 @@ export default function CarDetailsSection() {
           </div>
         )}
 
-        <CarBrandModelSelector
-          selectedBrand=""
-          selectedModel=""
-          onBrandChange={() => {}}
-          onModelChange={() => {}}
-        />
+        <CarBrandModelSelector />
       </div>
     </section>
   )

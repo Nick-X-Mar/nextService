@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import Image from 'next/image'
 import { useParams, useRouter } from 'next/navigation'
 import { DayPicker } from 'react-day-picker'
 import { addDays, addMonths, isWeekend, format } from 'date-fns'
@@ -362,11 +363,13 @@ export default function RequestDetailPage() {
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {data.photoUrls.map((url, i) => (
-              <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="block">
-                <img
+              <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="block relative h-32">
+                <Image
                   src={url}
                   alt={`Photo ${i + 1}`}
-                  className="w-full h-32 object-cover rounded-lg border border-outline-variant/20 hover:opacity-80 transition-opacity"
+                  fill
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  className="object-cover rounded-lg border border-outline-variant/20 hover:opacity-80 transition-opacity"
                 />
               </a>
             ))}

@@ -380,7 +380,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
         success('Ακύρωση', 'Το ραντεβού ακυρώθηκε.')
       }
       setCancelRequest(null)
-    } catch (err) {
+    } catch {
       error('Σφάλμα', 'Δεν ήταν δυνατή η ακύρωση.')
     } finally {
       setCancelLoading(false)

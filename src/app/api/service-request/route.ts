@@ -79,7 +79,7 @@ async function _POST(request: NextRequest) {
     const existingClientId = auth?.userType === 'client' ? auth.userId : (body.clientId || null)
 
     // Validate required fields
-    const { category, description, brand, model } = body
+    const { category, brand, model } = body
     
     const missingFields: string[] = []
     if (!category) missingFields.push('Κατηγορία')

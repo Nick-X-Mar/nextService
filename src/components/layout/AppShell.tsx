@@ -9,7 +9,7 @@ import BottomNav from './BottomNav'
 import Footer from './Footer'
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
-  const { userType, isLoading } = useAuth()
+  const { userType } = useAuth()
   const pathname = usePathname()
 
   // Admin routes have their own layout — bypass the main app shell entirely

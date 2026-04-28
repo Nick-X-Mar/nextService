@@ -94,7 +94,7 @@ export default function OffersSection() {
     x.set(getOffsetForIndex(equivalent))
     physicalRef.current = equivalent
     setActivePhysical(equivalent)
-  }, [x, springX, getOffsetForIndex])
+  }, [x, springX, getOffsetForIndex, N])
 
   // Animate to a physical index, then schedule re-center after spring settles
   const animateTo = useCallback((index: number) => {
@@ -121,7 +121,7 @@ export default function OffersSection() {
     if (diff > N / 2) diff -= N
     if (diff < -N / 2) diff += N
     animateTo(physicalRef.current + diff)
-  }, [animateTo])
+  }, [animateTo, N])
 
   // Center first card on mount
   useEffect(() => {
@@ -129,7 +129,7 @@ export default function OffersSection() {
       springX.jump(getOffsetForIndex(N))
       x.set(getOffsetForIndex(N))
     }
-  }, [cardW, containerW, x, springX, getOffsetForIndex])
+  }, [cardW, containerW, x, springX, getOffsetForIndex, N])
 
   // Auto-reveal after 2s centered
   useEffect(() => {

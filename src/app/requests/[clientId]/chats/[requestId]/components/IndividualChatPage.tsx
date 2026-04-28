@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
 import { styles } from '../../../../../../styles/styles'
@@ -58,7 +59,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   }
 
   // Fetch request details
-  const fetchRequestDetails = async () => {
+  const fetchRequestDetails = useCallback(async () => {
     try {
       const response = await fetch(`/api/requests/${requestId}`)
       if (response.ok) {
@@ -71,10 +72,10 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       console.error('Error fetching request details:', error)
       showToast({ type: 'error', title: 'Σφάλμα κατά τη φόρτωση των λεπτομερειών του αιτήματος' })
     }
-  }
+  }, [requestId, showToast])
 
   // Fetch garages that have messages for this request
-  const fetchGarages = async () => {
+  const fetchGarages = useCallback(async () => {
     try {
       const response = await fetch(`/api/chat/${requestId}/garages`)
       if (response.ok) {
@@ -88,10 +89,10 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       console.error('Error fetching garages:', error)
       showToast({ type: 'error', title: 'Σφάλμα κατά τη φόρτωση των συνεργείων' })
     }
-  }
+  }, [requestId, showToast])
 
   // Fetch messages for selected garage
-  const fetchMessages = async (garageId: string) => {
+  const fetchMessages = useCallback(async (garageId: string) => {
     try {
       const response = await fetch(`/api/chat/${requestId}/messages?garageId=${garageId}`)
       if (response.ok) {
@@ -109,10 +110,10 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       console.error('Error fetching messages:', error)
       showToast({ type: 'error', title: 'Σφάλμα κατά τη φόρτωση των μηνυμάτων' })
     }
-  }
+  }, [requestId, showToast])
 
   // Subscribe to real-time messages using AWS AppSync
-  const subscribeToMessages = async (garageId: string) => {
+  const subscribeToMessages = useCallback(async (garageId: string) => {
     // Clear existing subscription
     if (subscriptionRef.current) {
       appSyncService.unsubscribe(subscriptionRef.current)
@@ -151,7 +152,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       console.error('[Client] Error subscribing to AppSync:', error)
       showToast({ type: 'error', title: 'Σφάλμα στη σύνδεση για πραγματικό χρόνο' })
     }
-  }
+  }, [requestId, showToast])
 
   // Stop subscription
   const stopSubscription = () => {
@@ -202,7 +203,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   }
 
   // Mark messages as read
-  const markMessagesAsRead = async (garageId: string) => {
+  const markMessagesAsRead = useCallback(async (garageId: string) => {
     try {
       await fetch(`/api/chat/${requestId}/mark-read`, {
         method: 'POST',
@@ -214,7 +215,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
     } catch (error) {
       console.error('Error marking messages as read:', error)
     }
-  }
+  }, [requestId])
 
   // Handle garage selection
   const handleGarageSelect = (garage: Garage) => {
@@ -274,7 +275,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       setLoading(false)
     }
     loadData()
-  }, [requestId])
+  }, [requestId, fetchRequestDetails, fetchGarages])
 
   useEffect(() => {
     if (selectedGarage) {
@@ -283,7 +284,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       // Mark messages as read when garage is initially selected
       markMessagesAsRead(selectedGarage.id)
     }
-  }, [selectedGarage])
+  }, [selectedGarage, fetchMessages, subscribeToMessages, markMessagesAsRead])
 
   // Cleanup subscription on unmount
   useEffect(() => {
@@ -378,9 +379,11 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                           {/* Garage Avatar */}
                           <div className="relative flex-shrink-0">
                             {garage.logoUrl ? (
-                              <img
+                              <Image
                                 src={garage.logoUrl}
                                 alt={garage.companyName}
+                                width={44}
+                                height={44}
                                 className="w-11 h-11 rounded-full object-cover"
                               />
                             ) : (
@@ -449,9 +452,11 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                       </button>
                       <div className="relative">
                         {selectedGarage.logoUrl ? (
-                          <img
+                          <Image
                             src={selectedGarage.logoUrl}
                             alt={selectedGarage.companyName}
+                            width={40}
+                            height={40}
                             className="w-10 h-10 rounded-full object-cover"
                           />
                         ) : (

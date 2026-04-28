@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { styles } from '@/styles/styles'
 import { OfferStatus } from '@/types/statuses'
@@ -43,11 +43,7 @@ export default function MyOffers({ garageId }: MyOffersProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | OfferStatus>('all')
 
-  useEffect(() => {
-    loadOffers()
-  }, [garageId])
-
-  const loadOffers = async () => {
+  const loadOffers = useCallback(async () => {
     try {
       setIsLoading(true)
 
@@ -66,7 +62,11 @@ export default function MyOffers({ garageId }: MyOffersProps) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [garageId])
+
+  useEffect(() => {
+    loadOffers()
+  }, [loadOffers])
 
   const getStatusStyle = (status: OfferStatus) => {
     switch (status) {

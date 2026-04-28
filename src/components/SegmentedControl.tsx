@@ -18,7 +18,7 @@ export default function SegmentedControl({
   onChange,
   className = '',
   size = 'md',
-  variant = 'default'
+  variant: _variant = 'default'
 }: SegmentedControlProps) {
   const sizeClasses = {
     sm: 'py-1.5 px-3 text-xs',

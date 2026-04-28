@@ -25,7 +25,7 @@ async function _GET(request: NextRequest) {
     }
 
     // Strip sensitive fields
-    const { passwordHash, passwordResetTokenHash, passwordResetExpiresAt, ...safeUser } = user
+    const { passwordHash: _passwordHash, passwordResetTokenHash: _passwordResetTokenHash, passwordResetExpiresAt: _passwordResetExpiresAt, ...safeUser } = user
 
     return NextResponse.json({
       authenticated: true,

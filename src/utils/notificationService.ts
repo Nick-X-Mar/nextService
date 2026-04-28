@@ -11,7 +11,7 @@ interface SMSNotificationResult {
 }
 
 export const sendNotificationToGarages = async (
-  serviceRequestData: {
+  _serviceRequestData: {
     id: string
     clientId: string
     vehicleId: string

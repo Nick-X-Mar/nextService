@@ -7,8 +7,15 @@ import { withMetrics } from '@/utils/withMetrics'
 
 const checkRateLimit = createRateLimiter('register-vehicle', 3, 3600000)
 
+interface VehicleIdentifier {
+  vinNumber?: string
+  engineNumber?: string
+  brand?: string
+  model?: string
+}
+
 // Function to check if two vehicles are the same based on unique identifiers
-function areVehiclesSame(vehicle1: any, vehicle2: any): boolean {
+function areVehiclesSame(vehicle1: VehicleIdentifier, vehicle2: VehicleIdentifier): boolean {
   // Primary check: VIN number (most reliable unique identifier)
   if (vehicle1.vinNumber && vehicle2.vinNumber && 
       vehicle1.vinNumber.trim().toLowerCase() === vehicle2.vinNumber.trim().toLowerCase()) {
@@ -112,7 +119,7 @@ async function _POST(request: NextRequest) {
       if (existingVehicle && serviceRequestId) {
         // Update the existing vehicle with any missing information from the new vehicle
         const updateExpressions = []
-        const expressionAttributeValues: any = {
+        const expressionAttributeValues: Record<string, unknown> = {
           ':updatedAt': new Date().toISOString()
         }
         

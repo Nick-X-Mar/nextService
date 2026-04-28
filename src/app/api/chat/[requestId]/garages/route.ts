@@ -4,6 +4,17 @@ import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { requireClient } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
 
+interface ChatMessageItem {
+  id: string
+  requestId: string
+  senderId: string
+  senderType: 'client' | 'garage'
+  senderName?: string
+  message: string
+  timestamp: string
+  garageId?: string
+}
+
 async function _GET(
   request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
@@ -45,10 +56,11 @@ async function _GET(
     }
 
     // Get unique garage IDs from messages
+    const messages = result.Items as ChatMessageItem[]
     const garageIds = [...new Set(
-      result.Items
-        .filter((item: any) => item.senderType === 'garage')
-        .map((item: any) => item.senderId)
+      messages
+        .filter((item) => item.senderType === 'garage')
+        .map((item) => item.senderId)
     )]
 
     if (garageIds.length === 0) {
@@ -82,9 +94,9 @@ async function _GET(
       if (!garage) continue
 
       // Get last message and unread count for this garage
-      const garageMessages = result.Items
-        .filter((item: any) => item.senderId === garage.id)
-        .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      const garageMessages = messages
+        .filter((item) => item.senderId === garage.id)
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
       const lastMessage = garageMessages[0]
 
@@ -92,7 +104,7 @@ async function _GET(
       const lastReadByClient = garage.lastReadByClient || garage.createdAt
 
       // Check if there are any unread messages from garage
-      const hasUnreadMessages = garageMessages.some((msg: any) =>
+      const hasUnreadMessages = garageMessages.some((msg) =>
         msg.senderType === 'garage' &&
         new Date(msg.timestamp).getTime() > new Date(lastReadByClient).getTime()
       )

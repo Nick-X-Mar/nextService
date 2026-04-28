@@ -1,17 +1,16 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { HiUserPlus, HiArrowRightOnRectangle, HiBars3, HiUser, HiCog6Tooth } from 'react-icons/hi2'
 import { styles } from '../styles/styles'
 import { useUser } from '../contexts/UserContext'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function Header() {
-  const { user, isLoading: userLoading } = useUser()
+  const { isLoading: userLoading } = useUser()
   const { userType, client, garage, isLoading: authLoading, logout } = useAuth()
-  const router = useRouter()
-  
+
   const isLoading = userLoading || authLoading
 
   const handleLogout = () => {
@@ -25,7 +24,7 @@ export default function Header() {
           {/* Logo */}
           <div className="flex-shrink-0">
             <Link href="/" className="flex items-center">
-              <img src="/images/next_logo.svg" alt="NextService" className="h-8 w-auto" />
+              <Image src="/images/next_logo.svg" alt="NextService" width={100} height={80} className="h-8 w-auto" priority />
             </Link>
           </div>
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { styles } from '@/styles/styles'
 import { OfferStatus } from '@/types/statuses'
@@ -43,11 +43,7 @@ export default function Appointments({ garageId }: AppointmentsProps) {
   const [appointments, setAppointments] = useState<Offer[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    loadAppointments()
-  }, [garageId])
-
-  const loadAppointments = async () => {
+  const loadAppointments = useCallback(async () => {
     try {
       setIsLoading(true)
 
@@ -57,8 +53,8 @@ export default function Appointments({ garageId }: AppointmentsProps) {
       if (response.ok && data.success) {
         // Filter for accepted offers with appointment dates
         // Check both enum and string format for status
-        const appointmentsList = data.offers.filter((offer: any) => {
-          const isAccepted = offer.status === OfferStatus.ACCEPTED || offer.status === 'accepted'
+        const appointmentsList = data.offers.filter((offer: Offer) => {
+          const isAccepted = offer.status === OfferStatus.ACCEPTED || (offer.status as string) === 'accepted'
           const hasAppointmentDate = offer.appointmentDate && offer.appointmentDate.trim() !== ''
 
           if (isAccepted && hasAppointmentDate) {
@@ -93,7 +89,11 @@ export default function Appointments({ garageId }: AppointmentsProps) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [garageId])
+
+  useEffect(() => {
+    loadAppointments()
+  }, [loadAppointments])
 
   const formatAppointmentDate = (dateString: string) => {
     const date = new Date(`${dateString}T00:00:00`)

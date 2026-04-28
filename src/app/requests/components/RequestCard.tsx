@@ -24,7 +24,7 @@ export default function RequestCard({
   onChatClick,
   onCancelClick,
   hasGarageMessages = false,
-  getStatusIcon,
+  getStatusIcon: _getStatusIcon,
   getStatusText,
   getStatusColor,
   disabled = false,
