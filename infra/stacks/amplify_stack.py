@@ -130,7 +130,7 @@ class AmplifyStack(Stack):
             "ServiceRequests", "Offers", "ChatMessages",
             "EventLogs", "EmailLogs", "AdminUsers",
             "Payments", "WalletTransactions", "HotDeals",
-            "PerformanceMetrics",
+            "PerformanceMetrics", "ErrorResolutions",
         ]
         dynamo_resources = []
         for t in table_names:
@@ -173,6 +173,7 @@ class AmplifyStack(Stack):
                 f"arn:aws:dynamodb:{self.region}:{self.account}:table/WalletTransactions",
                 f"arn:aws:dynamodb:{self.region}:{self.account}:table/HotDeals",
                 f"arn:aws:dynamodb:{self.region}:{self.account}:table/PerformanceMetrics",
+                f"arn:aws:dynamodb:{self.region}:{self.account}:table/ErrorResolutions",
             ],
         ))
 

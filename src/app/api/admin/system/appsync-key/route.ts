@@ -116,13 +116,17 @@ async function _GET(request: NextRequest) {
     return NextResponse.json(payload)
   } catch (err) {
     console.error('AppSync key health check failed:', err)
+    const detail =
+      err instanceof Error
+        ? `${err.name}: ${err.message}`
+        : 'Unknown error'
     return NextResponse.json(
       {
         apiId: null,
         expiresAt: null,
         daysRemaining: null,
         severity: 'unknown',
-        message: 'Health check failed — see server logs.'
+        message: `Health check failed — ${detail}`
       } satisfies ApiKeyHealth,
       { status: 200 }
     )
