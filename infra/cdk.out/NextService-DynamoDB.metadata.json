@@ -55,6 +55,14 @@
       }
     }
   ],
+  "/NextService-DynamoDB/ErrorResolutionsTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "ErrorResolutionsTable69530338"
+      }
+    }
+  ],
   "/NextService-DynamoDB/ClientsTableArn": [
     {
       "type": "aws:cdk:logicalId",
@@ -95,6 +103,12 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "AdminUsersTableArn"
+    }
+  ],
+  "/NextService-DynamoDB/ErrorResolutionsTableArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ErrorResolutionsTableArn"
     }
   ],
   "/NextService-DynamoDB/ServiceRequestsStreamArn": [
@@ -155,6 +169,12 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "AdminUsersTable35B520A8"
+    }
+  ],
+  "/NextService-DynamoDB/ErrorResolutionsTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ErrorResolutionsTable69530338"
     }
   ],
   "/NextService-DynamoDB/CDKMetadata/Default": [

@@ -247,6 +247,34 @@ class DynamoDBStack(Stack):
             projection_type=dynamodb.ProjectionType.ALL,
         )
 
+        # ── ErrorResolutions ────────────────────────────────────
+        # Stores resolution state for grouped error fingerprints surfaced
+        # in the admin Errors page. Raw error events stay in CloudWatch;
+        # this table just records which fingerprints have been marked
+        # resolved/ignored so they can be hidden from the open list.
+        self.error_resolutions_table = dynamodb.Table(
+            self, "ErrorResolutionsTable",
+            table_name="ErrorResolutions",
+            partition_key=dynamodb.Attribute(
+                name="fingerprint", type=dynamodb.AttributeType.STRING
+            ),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.RETAIN,
+            point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
+                point_in_time_recovery_enabled=True,
+            ),
+        )
+        self.error_resolutions_table.add_global_secondary_index(
+            index_name="StatusIndex",
+            partition_key=dynamodb.Attribute(
+                name="status", type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="resolvedAt", type=dynamodb.AttributeType.STRING
+            ),
+            projection_type=dynamodb.ProjectionType.ALL,
+        )
+
         # ── Outputs ─────────────────────────────────────────────
         tables = {
             "Clients": self.clients_table,
@@ -256,6 +284,7 @@ class DynamoDBStack(Stack):
             "Offers": self.offers_table,
             "ChatMessages": self.chat_messages_table,
             "AdminUsers": self.admin_users_table,
+            "ErrorResolutions": self.error_resolutions_table,
         }
         for name, table in tables.items():
             CfnOutput(self, f"{name}TableArn",

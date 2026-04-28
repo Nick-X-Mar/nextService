@@ -498,6 +498,59 @@
     "aws:cdk:path": "NextService-DynamoDB/AdminUsersTable/Resource"
    }
   },
+  "ErrorResolutionsTable69530338": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "fingerprint",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "status",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "resolvedAt",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "StatusIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "status",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "resolvedAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "fingerprint",
+      "KeyType": "HASH"
+     }
+    ],
+    "PointInTimeRecoverySpecification": {
+     "PointInTimeRecoveryEnabled": true
+    },
+    "TableName": "ErrorResolutions"
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "NextService-DynamoDB/ErrorResolutionsTable/Resource"
+   }
+  },
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
@@ -584,6 +637,17 @@
    },
    "Export": {
     "Name": "NextService-AdminUsersTableArn"
+   }
+  },
+  "ErrorResolutionsTableArn": {
+   "Value": {
+    "Fn::GetAtt": [
+     "ErrorResolutionsTable69530338",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "NextService-ErrorResolutionsTableArn"
    }
   },
   "ServiceRequestsStreamArn": {
