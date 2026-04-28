@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
 import DateRangePicker from '../components/DateRangePicker'
+import PipelineDiagnostics from './components/PipelineDiagnostics'
 
 interface EmailStats {
   byStatus: Record<string, number>
@@ -161,35 +162,35 @@ export default function EmailsPage() {
   const [loading, setLoading] = useState(true)
   const [listLoading, setListLoading] = useState(true)
 
+  const fetchStats = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/admin/emails/stats?from=${from}&to=${to}`)
+      if (res.ok) setStats(await res.json())
+    } catch {
+      /* empty */
+    }
+    setLoading(false)
+  }, [from, to])
+
+  const fetchList = useCallback(async () => {
+    setListLoading(true)
+    try {
+      const res = await fetch(`/api/admin/emails/list?from=${from}&to=${to}&limit=50`)
+      if (res.ok) {
+        const data = await res.json()
+        setEmails(data.items || [])
+      }
+    } catch {
+      /* empty */
+    }
+    setListLoading(false)
+  }, [from, to])
+
   useEffect(() => {
-    async function fetchStats() {
-      setLoading(true)
-      try {
-        const res = await fetch(`/api/admin/emails/stats?from=${from}&to=${to}`)
-        if (res.ok) setStats(await res.json())
-      } catch {
-        /* empty */
-      }
-      setLoading(false)
-    }
-
-    async function fetchList() {
-      setListLoading(true)
-      try {
-        const res = await fetch(`/api/admin/emails/list?from=${from}&to=${to}&limit=50`)
-        if (res.ok) {
-          const data = await res.json()
-          setEmails(data.items || [])
-        }
-      } catch {
-        /* empty */
-      }
-      setListLoading(false)
-    }
-
     fetchStats()
     fetchList()
-  }, [from, to])
+  }, [fetchStats, fetchList])
 
   const funnel = stats?.funnel
   const rates = stats?.rates
@@ -307,6 +308,17 @@ export default function EmailsPage() {
           </div>
         </div>
       )}
+
+      {/* Pipeline Diagnostics — verifies the SES → SNS → Lambda → EmailLogs
+          chain is actually firing. Surfaces the most common failure modes
+          (config set missing, event destination disabled, sends stuck at
+          "queued", deliveries never arriving) without leaving the admin app. */}
+      <PipelineDiagnostics
+        onTestEmailLifecycleProgressed={() => {
+          fetchStats()
+          fetchList()
+        }}
+      />
 
       {/* Email List */}
       <h2 className="text-lg font-semibold text-on-surface mb-3">Recent Emails</h2>

@@ -65,7 +65,14 @@ export const EventName = {
   // garages that scrape contact info without making real offers.
   GarageViewedRequestDetails: 'garage_viewed_request_details',
   GarageViewedClientContact: 'garage_viewed_client_contact',
-  ClientViewedGarageProfile: 'client_viewed_garage_profile'
+  ClientViewedGarageProfile: 'client_viewed_garage_profile',
+
+  // Phase I — Admin tools
+  // Fired when an admin sends a test email to verify the SES events
+  // pipeline end-to-end. Used by the admin dashboard's diagnostic poll
+  // so the lifecycle of test sends can be inspected without polluting
+  // real-user analytics.
+  AdminTestEmail: 'admin_test_email'
 } as const
 
 export type EventNameValue = typeof EventName[keyof typeof EventName]

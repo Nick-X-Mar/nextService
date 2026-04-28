@@ -258,6 +258,20 @@ class AmplifyStack(Stack):
                 f"arn:aws:ses:{self.region}:{self.account}:configuration-set/nextservice-main",
             ],
         ))
+        # Read-only SES introspection used by the admin pipeline-diagnostics
+        # endpoint (src/app/api/admin/emails/diagnose). Lets the dashboard
+        # show whether the configuration set + event destinations are wired
+        # up correctly without requiring AWS console access. DescribeConfigurationSet
+        # is account-scoped and SES doesn't accept resource-level ARNs for it.
+        self.amplify_role.add_to_policy(iam.PolicyStatement(
+            sid="SESDescribeConfig",
+            actions=[
+                "ses:DescribeConfigurationSet",
+                "ses:GetConfigurationSet",
+                "ses:ListConfigurationSets",
+            ],
+            resources=["*"],
+        ))
 
         # SNS publish (for future notification service)
         self.amplify_role.add_to_policy(iam.PolicyStatement(
