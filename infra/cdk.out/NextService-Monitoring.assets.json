@@ -1,16 +1,16 @@
 {
   "version": "53.0.0",
   "files": {
-    "0e3338e0e273178fe71593424380103787a7dcfe3b44f55ee1f669ee8d553702": {
+    "3075603559234153839b96b4ca492be7d4a3606a18f3b955919d0a09c9120a46": {
       "displayName": "NextService-Monitoring Template",
       "source": {
         "path": "NextService-Monitoring.template.json",
         "packaging": "file"
       },
       "destinations": {
-        "766671488262-eu-central-1-8c1fc09a": {
+        "766671488262-eu-central-1-1d3687de": {
           "bucketName": "cdk-hnb659fds-assets-766671488262-eu-central-1",
-          "objectKey": "0e3338e0e273178fe71593424380103787a7dcfe3b44f55ee1f669ee8d553702.json",
+          "objectKey": "3075603559234153839b96b4ca492be7d4a3606a18f3b955919d0a09c9120a46.json",
           "region": "eu-central-1",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-file-publishing-role-766671488262-eu-central-1"
         }

@@ -152,7 +152,7 @@
    "Properties": {
     "Code": {
      "S3Bucket": "cdk-hnb659fds-assets-766671488262-eu-central-1",
-     "S3Key": "c6ebbcc0fa93b188c23e07601dea27867498eb3d40d963666c492bd2cd576287.zip"
+     "S3Key": "8c3f8f7ff49827450701656dd7367b7cc48bf36e3ec1200caf04807d0e097f3c.zip"
     },
     "Description": "Update EmailLogs rows from SES Configuration Set events",
     "Environment": {
@@ -178,7 +178,7 @@
    ],
    "Metadata": {
     "aws:cdk:path": "NextService-Notifications/SesEventProcessorFn/Resource",
-    "aws:asset:path": "asset.c6ebbcc0fa93b188c23e07601dea27867498eb3d40d963666c492bd2cd576287",
+    "aws:asset:path": "asset.8c3f8f7ff49827450701656dd7367b7cc48bf36e3ec1200caf04807d0e097f3c",
     "aws:asset:is-bundled": false,
     "aws:asset:property": "Code"
    }
@@ -468,7 +468,7 @@
       "Fn::ImportValue": "NextService-Monitoring:ExportsOutputRefAlertTopic2720D5359ADB6D3E"
      }
     ],
-    "AlarmDescription": "Broadcast Lambda threw >5 times in 5min",
+    "AlarmDescription": "Broadcast Lambda threw at least once in 5min",
     "AlarmName": "NextService-BroadcastLambda-Errors",
     "ComparisonOperator": "GreaterThanThreshold",
     "Dimensions": [
@@ -482,13 +482,54 @@
     "EvaluationPeriods": 1,
     "MetricName": "Errors",
     "Namespace": "AWS/Lambda",
+    "OKActions": [
+     {
+      "Fn::ImportValue": "NextService-Monitoring:ExportsOutputRefAlertTopic2720D5359ADB6D3E"
+     }
+    ],
     "Period": 300,
     "Statistic": "Sum",
-    "Threshold": 5,
+    "Threshold": 0,
     "TreatMissingData": "notBreaching"
    },
    "Metadata": {
     "aws:cdk:path": "NextService-Notifications/BroadcastErrorsAlarm/Resource"
+   }
+  },
+  "SesProcessorErrorsAlarmC35C39AD": {
+   "Type": "AWS::CloudWatch::Alarm",
+   "Properties": {
+    "AlarmActions": [
+     {
+      "Fn::ImportValue": "NextService-Monitoring:ExportsOutputRefAlertTopic2720D5359ADB6D3E"
+     }
+    ],
+    "AlarmDescription": "SES event processor Lambda threw at least once in 5min",
+    "AlarmName": "NextService-SesEventProcessor-Errors",
+    "ComparisonOperator": "GreaterThanThreshold",
+    "Dimensions": [
+     {
+      "Name": "FunctionName",
+      "Value": {
+       "Ref": "SesEventProcessorFnE8A772B8"
+      }
+     }
+    ],
+    "EvaluationPeriods": 1,
+    "MetricName": "Errors",
+    "Namespace": "AWS/Lambda",
+    "OKActions": [
+     {
+      "Fn::ImportValue": "NextService-Monitoring:ExportsOutputRefAlertTopic2720D5359ADB6D3E"
+     }
+    ],
+    "Period": 300,
+    "Statistic": "Sum",
+    "Threshold": 0,
+    "TreatMissingData": "notBreaching"
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Notifications/SesProcessorErrorsAlarm/Resource"
    }
   },
   "SESBounceRateAlarm5540DF45": {

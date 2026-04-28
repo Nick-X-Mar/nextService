@@ -95,7 +95,7 @@
       "Ref": "AlertTopic2720D535"
      }
     ],
-    "AlarmDescription": "5xx errors > 5 in 5 minutes",
+    "AlarmDescription": "At least one 5xx error in 5 minutes",
     "AlarmName": "NextService-5xx-Errors",
     "ComparisonOperator": "GreaterThanThreshold",
     "EvaluationPeriods": 1,
@@ -108,7 +108,7 @@
     ],
     "Period": 300,
     "Statistic": "Sum",
-    "Threshold": 5,
+    "Threshold": 0,
     "TreatMissingData": "notBreaching"
    },
    "Metadata": {

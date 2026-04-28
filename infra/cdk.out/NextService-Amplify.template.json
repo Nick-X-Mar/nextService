@@ -382,7 +382,9 @@
         "arn:aws:logs:eu-central-1:766671488262:log-group:/nextservice/*",
         "arn:aws:logs:eu-central-1:766671488262:log-group:/nextservice/*:*",
         "arn:aws:logs:eu-central-1:766671488262:log-group:/aws/amplify/*",
-        "arn:aws:logs:eu-central-1:766671488262:log-group:/aws/amplify/*:*"
+        "arn:aws:logs:eu-central-1:766671488262:log-group:/aws/amplify/*:*",
+        "arn:aws:logs:eu-central-1:766671488262:log-group:/aws/lambda/nextservice-*",
+        "arn:aws:logs:eu-central-1:766671488262:log-group:/aws/lambda/nextservice-*:*"
        ],
        "Sid": "CloudWatchLogs"
       },
@@ -407,6 +409,16 @@
         "arn:aws:ses:eu-central-1:766671488262:configuration-set/nextservice-main"
        ],
        "Sid": "SESSendEmail"
+      },
+      {
+       "Action": [
+        "ses:DescribeConfigurationSet",
+        "ses:GetConfigurationSet",
+        "ses:ListConfigurationSets"
+       ],
+       "Effect": "Allow",
+       "Resource": "*",
+       "Sid": "SESDescribeConfig"
       },
       {
        "Action": "sns:Publish",

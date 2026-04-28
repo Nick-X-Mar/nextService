@@ -20,11 +20,13 @@
  * Self-contained — uses only the AWS SDK v3 bundled with Node.js 20.
  */
 
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
+import {
+  DynamoDBClient,
+  ConditionalCheckFailedException
+} from '@aws-sdk/client-dynamodb'
 import {
   DynamoDBDocumentClient,
-  UpdateCommand,
-  ConditionalCheckFailedException
+  UpdateCommand
 } from '@aws-sdk/lib-dynamodb'
 
 const REGION = process.env.AWS_REGION || 'eu-central-1'

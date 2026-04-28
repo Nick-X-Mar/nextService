@@ -8,7 +8,13 @@ import path from 'path'
 import { withMetrics } from '@/utils/withMetrics'
 
 const REGION = process.env.REGION || 'eu-central-1'
-const LOG_GROUPS = ['/nextservice/app', '/nextservice/api']
+const LOG_GROUPS = [
+  '/nextservice/app',
+  '/nextservice/api',
+  '/aws/lambda/nextservice-new-request-broadcast',
+  '/aws/lambda/nextservice-ses-event-processor',
+  '/aws/lambda/nextservice-appsync-key-rotator',
+]
 
 function getCloudWatchClient(): CloudWatchLogsClient {
   const config: ConstructorParameters<typeof CloudWatchLogsClient>[0] = {

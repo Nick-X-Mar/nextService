@@ -83,14 +83,14 @@ class MonitoringStack(Stack):
         alarm_5xx = cw.Alarm(
             self, "5xxAlarm",
             alarm_name="NextService-5xx-Errors",
-            alarm_description="5xx errors > 5 in 5 minutes",
+            alarm_description="At least one 5xx error in 5 minutes",
             metric=cw.Metric(
                 namespace="NextService",
                 metric_name="5xxErrors",
                 statistic="Sum",
                 period=Duration.minutes(5),
             ),
-            threshold=5,
+            threshold=0,
             evaluation_periods=1,
             comparison_operator=cw.ComparisonOperator.GREATER_THAN_THRESHOLD,
             treat_missing_data=cw.TreatMissingData.NOT_BREACHING,

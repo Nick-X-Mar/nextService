@@ -95,6 +95,12 @@
       "data": "BroadcastErrorsAlarm5FEEB3C3"
     }
   ],
+  "/NextService-Notifications/SesProcessorErrorsAlarm/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SesProcessorErrorsAlarmC35C39AD"
+    }
+  ],
   "/NextService-Notifications/SESBounceRateAlarm/Resource": [
     {
       "type": "aws:cdk:logicalId",

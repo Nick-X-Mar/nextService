@@ -316,21 +316,44 @@ class NotificationsStack(Stack):
         dlq_alarm.add_ok_action(cw_actions.SnsAction(alert_topic))
 
         # Error-rate alarm on the Lambda itself (catches all-throws, not just
-        # DLQ drops which only fire after retries are exhausted).
+        # DLQ drops which only fire after retries are exhausted). Threshold 0
+        # — any single error fires the alarm, since email broadcasts are
+        # business-critical and silent partial failures shouldn't go unnoticed.
         error_alarm = cw.Alarm(
             self, "BroadcastErrorsAlarm",
             alarm_name="NextService-BroadcastLambda-Errors",
-            alarm_description="Broadcast Lambda threw >5 times in 5min",
+            alarm_description="Broadcast Lambda threw at least once in 5min",
             metric=self.broadcast_fn.metric_errors(
                 period=Duration.minutes(5),
                 statistic="Sum",
             ),
-            threshold=5,
+            threshold=0,
             evaluation_periods=1,
             comparison_operator=cw.ComparisonOperator.GREATER_THAN_THRESHOLD,
             treat_missing_data=cw.TreatMissingData.NOT_BREACHING,
         )
         error_alarm.add_alarm_action(cw_actions.SnsAction(alert_topic))
+        error_alarm.add_ok_action(cw_actions.SnsAction(alert_topic))
+
+        # Same coverage for the SES event processor Lambda. Without this, the
+        # init-time SyntaxError that broke the entire delivery-event pipeline
+        # in 2026-04 went undetected — emails kept being sent but never
+        # transitioned past status="sent".
+        processor_error_alarm = cw.Alarm(
+            self, "SesProcessorErrorsAlarm",
+            alarm_name="NextService-SesEventProcessor-Errors",
+            alarm_description="SES event processor Lambda threw at least once in 5min",
+            metric=self.ses_processor_fn.metric_errors(
+                period=Duration.minutes(5),
+                statistic="Sum",
+            ),
+            threshold=0,
+            evaluation_periods=1,
+            comparison_operator=cw.ComparisonOperator.GREATER_THAN_THRESHOLD,
+            treat_missing_data=cw.TreatMissingData.NOT_BREACHING,
+        )
+        processor_error_alarm.add_alarm_action(cw_actions.SnsAction(alert_topic))
+        processor_error_alarm.add_ok_action(cw_actions.SnsAction(alert_topic))
 
         # ── SES reputation alarms ───────────────────────────────
         # AWS auto-pauses the SES account when Reputation.BounceRate > 10% or

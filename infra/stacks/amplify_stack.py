@@ -228,6 +228,12 @@ class AmplifyStack(Stack):
                 f"arn:aws:logs:{self.region}:{self.account}:log-group:/nextservice/*:*",
                 f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/amplify/*",
                 f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/amplify/*:*",
+                # Read-only access to NextService Lambda log groups so the admin
+                # Error Monitoring page can surface init/runtime errors from the
+                # broadcast, SES event processor, and AppSync key rotator
+                # functions without requiring AWS console access.
+                f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/lambda/nextservice-*",
+                f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/lambda/nextservice-*:*",
             ],
         ))
 
