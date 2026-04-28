@@ -367,7 +367,11 @@
         "appsync:ListApiKeys"
        ],
        "Effect": "Allow",
-       "Resource": "arn:aws:appsync:eu-central-1:766671488262:apis/*",
+       "Resource": [
+        "arn:aws:appsync:eu-central-1:766671488262:apis/*",
+        "arn:aws:appsync:eu-central-1:766671488262:/v1/apis/*",
+        "arn:aws:appsync:eu-central-1:766671488262:/v1/apis/*/apikeys"
+       ],
        "Sid": "AppSyncAccess"
       },
       {

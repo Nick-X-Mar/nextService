@@ -195,6 +195,9 @@ class AmplifyStack(Stack):
         # AppSync access
         # `ListApiKeys` is used by the admin "system health" API route to
         # surface a banner when the chat API key is close to expiring.
+        # NOTE: ListApiKeys uses the v1 control-plane ARN format
+        # (`/v1/apis/{apiId}/apikeys`), NOT the data-plane format (`apis/*`).
+        # Both must be listed — GraphQL/Connect use the data-plane form.
         self.amplify_role.add_to_policy(iam.PolicyStatement(
             sid="AppSyncAccess",
             actions=[
@@ -204,6 +207,8 @@ class AmplifyStack(Stack):
             ],
             resources=[
                 f"arn:aws:appsync:{self.region}:{self.account}:apis/*",
+                f"arn:aws:appsync:{self.region}:{self.account}:/v1/apis/*",
+                f"arn:aws:appsync:{self.region}:{self.account}:/v1/apis/*/apikeys",
             ],
         ))
 

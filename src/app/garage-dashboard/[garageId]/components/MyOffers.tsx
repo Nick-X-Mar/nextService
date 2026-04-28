@@ -183,7 +183,7 @@ export default function MyOffers({ garageId }: MyOffersProps) {
             {filter === 'all' && (
               <button
                 onClick={() => {
-                  window.location.hash = 'available'
+                  router.push(`/garage-dashboard/${garageId}/?tab=requests`)
                 }}
                 className={styles.btnPrimary}
               >
