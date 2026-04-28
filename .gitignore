@@ -22,6 +22,22 @@ dynamodb-local/
 
 # AWS Local Development
 .aws/
+.aws-sam/
+
+# CDK / Python infra build artefacts
+# Keep cdk.out/*.template.json / manifest.json / tree.json (committed for
+# diffability) but everything below is regenerated on every `cdk synth`
+# and shouldn't pollute the repo.
+infra/.venv/
+infra/.claude/
+infra/__pycache__/
+infra/**/__pycache__/
+*.pyc
+*.pyo
+infra/.cdk.staging/
+infra/cdk.out/.cache/
+infra/cdk.out/asset.*/
+infra/cdk.out/cdk.out
 
 # IDE
 .vscode/
