@@ -18,8 +18,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const [admin, setAdmin] = useState<AdminInfo | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Skip auth check on login page
-  const isLoginPage = pathname === '/admin/login'
+  // Skip auth check on login page (next.config has trailingSlash: true,
+  // so usePathname returns '/admin/login/' — match both forms).
+  const isLoginPage = pathname === '/admin/login' || pathname === '/admin/login/'
 
   useEffect(() => {
     if (isLoginPage) {
