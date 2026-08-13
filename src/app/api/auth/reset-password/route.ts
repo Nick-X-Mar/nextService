@@ -55,7 +55,7 @@ async function _POST(request: NextRequest) {
     }
     if (!newPassword || typeof newPassword !== 'string' || newPassword.length < MIN_PASSWORD_LENGTH) {
       return NextResponse.json(
-        { error: 'Ο νέος κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες' },
+        { error: `Ο νέος κωδικός πρέπει να έχει τουλάχιστον ${MIN_PASSWORD_LENGTH} χαρακτήρες` },
         { status: 400 }
       )
     }

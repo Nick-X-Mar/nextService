@@ -102,7 +102,7 @@ export default function ResetPasswordPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Τουλάχιστον 6 χαρακτήρες"
+                  placeholder={`Τουλάχιστον ${MIN_PASSWORD_LENGTH} χαρακτήρες`}
                   required
                   disabled={isLoading}
                   className={`${styles.input} pr-10`}

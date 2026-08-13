@@ -9,6 +9,7 @@ import { useUser } from '@/contexts/UserContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { styles } from '@/styles/styles'
 import SegmentedControl from '@/components/SegmentedControl'
+import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -98,8 +99,8 @@ export default function LoginPage() {
       return
     }
 
-    if (password.length < 6) {
-      error('Σφάλμα', 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες')
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      error('Σφάλμα', `Ο κωδικός πρέπει να έχει τουλάχιστον ${MIN_PASSWORD_LENGTH} χαρακτήρες`)
       return
     }
 
@@ -113,8 +114,40 @@ export default function LoginPage() {
       return
     }
 
+    const normalizedEmail = email.trim().toLowerCase()
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      error('Σφάλμα', 'Παρακαλώ εισάγετε ένα έγκυρο email')
+      return
+    }
+
+    // Everything that can be judged from this screen must be judged HERE.
+    // Garages continue to a second page to fill in company details, and any
+    // failure discovered after that point costs them the whole form: they have
+    // to come back, fix one field, and retype everything.
+    setIsLoading(true)
+    try {
+      const check = await fetch('/api/auth/check-email/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, userType })
+      })
+      if (check.ok) {
+        const { exists } = await check.json()
+        if (exists) {
+          error('Σφάλμα', 'Υπάρχει ήδη λογαριασμός με αυτό το email. Δοκίμασε να συνδεθείς.')
+          return
+        }
+      }
+    } catch {
+      // A failed availability check shouldn't block signup — the server
+      // rejects duplicates anyway. Fall through.
+    } finally {
+      setIsLoading(false)
+    }
+
     if (userType === 'garage') {
-      sessionStorage.setItem('garageRegEmail', email.trim().toLowerCase())
+      sessionStorage.setItem('garageRegEmail', normalizedEmail)
       sessionStorage.setItem('garageRegPassword', password)
       router.push('/register-professional/')
       return
@@ -127,9 +160,9 @@ export default function LoginPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: email.trim().toLowerCase(),
+          email: normalizedEmail,
           password,
-          firstName: email.trim().split('@')[0],
+          firstName: normalizedEmail.split('@')[0],
           acceptedTerms: true
         })
       })
@@ -249,7 +282,7 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={mode === 'register' ? 'Τουλάχιστον 6 χαρακτήρες' : 'Εισάγετε τον κωδικό σας'}
+                  placeholder={mode === 'register' ? `Τουλάχιστον ${MIN_PASSWORD_LENGTH} χαρακτήρες` : 'Εισάγετε τον κωδικό σας'}
                   required
                   disabled={isLoading}
                   className={`${styles.input} pr-10`}

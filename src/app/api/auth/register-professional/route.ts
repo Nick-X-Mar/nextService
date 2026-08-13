@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { PutCommand, QueryCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { hashPassword } from '@/utils/passwordService'
 import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 import { logEvent } from '@/utils/eventLogger'
@@ -69,13 +69,14 @@ async function _POST(request: NextRequest) {
 
     if (!password || typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
       return NextResponse.json({
-        error: 'Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες'
+        error: `Ο κωδικός πρέπει να έχει τουλάχιστον ${MIN_PASSWORD_LENGTH} χαρακτήρες`
       }, { status: 400 })
     }
 
     // Basic email validation
+    const normalizedEmail = email.trim().toLowerCase()
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email.trim())) {
+    if (!emailRegex.test(normalizedEmail)) {
       return NextResponse.json({ 
         error: 'Παρακαλώ εισάγετε ένα έγκυρο email' 
       }, { status: 400 })
@@ -128,6 +129,26 @@ async function _POST(request: NextRequest) {
       }, { status: 409 })
     }
 
+    // Reject a duplicate email. Only the TIN was checked before, so two
+    // garages could register with the same address — and since login looks a
+    // user up by email and takes the first hit, one of them would simply never
+    // be able to sign in. Uses the EmailIndex added to the Garages table.
+    const existingEmailResult = await dynamoDB.send(
+      new QueryCommand({
+        TableName: 'Garages',
+        IndexName: 'EmailIndex',
+        KeyConditionExpression: 'email = :email',
+        ExpressionAttributeValues: { ':email': normalizedEmail },
+        Limit: 1
+      })
+    )
+
+    if (existingEmailResult.Items && existingEmailResult.Items.length > 0) {
+      return NextResponse.json({
+        error: 'Υπάρχει ήδη λογαριασμός με αυτό το email.'
+      }, { status: 409 })
+    }
+
     // Generate unique garage ID
     const garageId = `garage-${randomUUID()}`
 
@@ -141,7 +162,7 @@ async function _POST(request: NextRequest) {
       contactFirstName: contactFirstName ? contactFirstName.trim() : '',
       contactLastName: contactLastName ? contactLastName.trim() : '',
       tin: cleanTin,
-      email: email.trim().toLowerCase(),
+      email: normalizedEmail,
       passwordHash,
       taxAuthority: taxAuthority.trim(),
       address: address.trim(),

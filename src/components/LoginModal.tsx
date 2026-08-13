@@ -19,6 +19,10 @@ export default function LoginModal({ isOpen, onClose, email, firstName, onLoginS
   const [isLoading, setIsLoading] = useState(false)
 
   const handleLogin = async () => {
+    // Login only — deliberately NOT MIN_PASSWORD_LENGTH. Accounts created
+    // before the minimum was raised to 8 still have 6- and 7-character
+    // passwords, and enforcing the new rule here would lock those people out of
+    // their own accounts. New passwords are validated at registration/reset.
     if (!password || password.length < 6) {
       setError('Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες')
       return

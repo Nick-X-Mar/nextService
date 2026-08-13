@@ -410,14 +410,14 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Τουλάχιστον 6 χαρακτήρες"
+                        placeholder={`Τουλάχιστον ${MIN_PASSWORD_LENGTH} χαρακτήρες`}
                         className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 pr-12 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
                       />
                       <Icon name="lock" className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/50" size="md" />
                     </div>
                     {password && password.length < MIN_PASSWORD_LENGTH && (
                       <p className="text-xs text-error flex items-center gap-1">
-                        <Icon name="error" size="sm" className="text-error" /> Τουλάχιστον 6 χαρακτήρες
+                        <Icon name="error" size="sm" className="text-error" /> Τουλάχιστον {MIN_PASSWORD_LENGTH} χαρακτήρες
                       </p>
                     )}
                   </div>
