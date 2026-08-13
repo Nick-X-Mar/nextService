@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { loadLogoDataUri } from '@/lib/og-logo'
 
 export const alt = 'NextService — Βρες συνεργείο αυτοκινήτου με την καλύτερη τιμή'
 export const size = { width: 1200, height: 630 }
@@ -21,7 +22,7 @@ async function loadFonts() {
 }
 
 export default async function Image() {
-  const fonts = await loadFonts()
+  const [fonts, logo] = await Promise.all([loadFonts(), loadLogoDataUri()])
 
   return new ImageResponse(
     (
@@ -39,30 +40,32 @@ export default async function Image() {
           fontFamily: 'Inter',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 88,
-              height: 88,
-              borderRadius: 24,
-              background: '#ffffff',
-              color: '#8a5100',
-              fontSize: 52,
-              fontWeight: 900,
-            }}
-          >
-            N
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: 40, fontWeight: 900, letterSpacing: -1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          {/* The white plate is not decoration — the logo's letterforms are
+              knockouts, so whatever sits behind shows through them. Straight on
+              this card's orange gradient the word "next" disappears entirely.
+              White is the only backing that renders it correctly. */}
+          {logo ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 12,
+                borderRadius: 20,
+                background: '#ffffff',
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={logo} alt="NextService" width={150} height={120} />
+            </div>
+          ) : (
+            <div style={{ fontSize: 40, fontWeight: 900, letterSpacing: -1, display: 'flex' }}>
               NextService
             </div>
-            <div style={{ fontSize: 22, fontWeight: 500, opacity: 0.9 }}>
-              Car service marketplace · Ελλάδα
-            </div>
+          )}
+          <div style={{ fontSize: 24, fontWeight: 600, opacity: 0.92, display: 'flex' }}>
+            Car service marketplace · Ελλάδα
           </div>
         </div>
 

@@ -64,7 +64,7 @@ export default function HeroSection() {
     setIsOpen(false)
     saveFormData({ category: value })
     const clientId = localStorage.getItem('clientId')
-    fetch('/api/track', {
+    fetch('/api/track/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventName: 'category_selected', clientId, metadata: { category: value } }),

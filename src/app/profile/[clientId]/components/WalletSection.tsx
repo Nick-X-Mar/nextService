@@ -24,7 +24,7 @@ export default function WalletSection({ clientId }: WalletSectionProps) {
   useEffect(() => {
     const fetchBalance = async () => {
       try {
-        const res = await fetch(`/api/wallet/balance?clientId=${clientId}`)
+        const res = await fetch(`/api/wallet/balance/?clientId=${clientId}`)
         const data = await res.json()
         if (data.success) setPoints(data.points)
       } catch {
@@ -44,7 +44,7 @@ export default function WalletSection({ clientId }: WalletSectionProps) {
     setHistoryLoading(true)
     setShowHistory(true)
     try {
-      const res = await fetch(`/api/wallet/transactions?clientId=${clientId}`)
+      const res = await fetch(`/api/wallet/transactions/?clientId=${clientId}`)
       const data = await res.json()
       if (data.success) setTransactions(data.transactions)
     } catch {

@@ -8,6 +8,7 @@ import { ServiceRequestStatus } from '@/types/statuses'
 import type { ServiceRequest } from '@/types/requests'
 import { useAuth } from '@/contexts/AuthContext'
 import Icon from '@/components/ui/Icon'
+import { LoadMoreButton } from '@/components'
 import '@/lib/amplify-config'
 import appSyncService from '@/lib/appsync-service'
 import { getCategoryText } from '@/utils/categoryLabels'
@@ -28,6 +29,9 @@ interface ChatPageProps {
 
 export default function ChatPage({ garageId, requestId }: ChatPageProps) {
   const [messages, setMessages] = useState<Message[]>([])
+  // Cursor for the next page of OLDER messages; null once history is exhausted.
+  const [olderCursor, setOlderCursor] = useState<string | null>(null)
+  const [loadingOlder, setLoadingOlder] = useState(false)
   const [newMessage, setNewMessage] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [requestData, setRequestData] = useState<ServiceRequest | null>(null)
@@ -98,12 +102,41 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     }
   }
 
+  /**
+   * Pulls the next page of older messages and prepends it. The API returns
+   * newest-first pages, so each call walks further back through the thread.
+   */
+  const loadOlderMessages = useCallback(async () => {
+    if (!olderCursor || loadingOlder) return
+    setLoadingOlder(true)
+    try {
+      const res = await fetch(
+        `/api/chat/${requestId}/messages/?garageId=${garageId}&cursor=${encodeURIComponent(olderCursor)}`
+      )
+      if (res.ok) {
+        const result = await res.json()
+        const older = (result.messages || []).filter(
+          (msg: Message) => msg.timestamp && !isNaN(new Date(msg.timestamp).getTime())
+        )
+        setOlderCursor(result.nextCursor ?? null)
+        setMessages((prev) => {
+          const seen = new Set(prev.map((m) => m.id))
+          return [...older.filter((m: Message) => !seen.has(m.id)), ...prev]
+        })
+      }
+    } catch (error) {
+      console.error('Error loading older messages:', error)
+    } finally {
+      setLoadingOlder(false)
+    }
+  }, [olderCursor, loadingOlder, requestId, garageId])
+
   const loadChatData = useCallback(async () => {
     try {
       setIsLoading(true)
 
       // Load request data — pass viewerGarageId for the GDPR audit log
-      const requestResponse = await fetch(`/api/requests/${requestId}?viewerGarageId=${garageId}`)
+      const requestResponse = await fetch(`/api/requests/${requestId}/?viewerGarageId=${garageId}`)
       if (requestResponse.ok) {
         const requestResult = await requestResponse.json()
         // Some endpoints return { success, request }, others may return just { request }
@@ -112,7 +145,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
       }
 
       // Load garage data
-      const garageResponse = await fetch(`/api/garage/${garageId}`)
+      const garageResponse = await fetch(`/api/garage/${garageId}/`)
       if (garageResponse.ok) {
         const garageResult = await garageResponse.json()
         if (garageResult.success) {
@@ -121,13 +154,14 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
       }
 
       // Load chat messages (filtered by garageId for security)
-      const messagesResponse = await fetch(`/api/chat/${requestId}/messages?garageId=${garageId}`)
+      const messagesResponse = await fetch(`/api/chat/${requestId}/messages/?garageId=${garageId}`)
       if (messagesResponse.ok) {
         const messagesResult = await messagesResponse.json()
         if (messagesResult.success) {
           const validMessages = (messagesResult.messages || []).filter(
             (msg: Message) => msg.timestamp && !isNaN(new Date(msg.timestamp).getTime())
           )
+          setOlderCursor(messagesResult.nextCursor ?? null)
           setMessages(validMessages)
         }
       }
@@ -177,7 +211,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     try {
       setIsSending(true)
 
-      const response = await fetch(`/api/chat/${requestId}/messages`, {
+      const response = await fetch(`/api/chat/${requestId}/messages/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -319,6 +353,13 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
 
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto">
+        <LoadMoreButton
+          hasMore={!!olderCursor}
+          loading={loadingOlder}
+          onClick={loadOlderMessages}
+          label="Παλαιότερα μηνύματα"
+          icon="history"
+        />
         <div className="max-w-3xl mx-auto px-5 md:px-8 py-4">
           {messages.length === 0 ? (
             <div className="text-center py-16">

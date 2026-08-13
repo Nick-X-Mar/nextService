@@ -82,7 +82,7 @@ export default function ErrorsPage() {
     setLoading(true)
     try {
       const res = await fetch(
-        `/api/admin/errors/recent?range=${timeRange}&status=${statusFilter}`
+        `/api/admin/errors/recent/?range=${timeRange}&status=${statusFilter}`
       )
       if (res.ok) {
         const body = (await res.json()) as RecentResponse
@@ -103,11 +103,11 @@ export default function ErrorsPage() {
     setActingFp(group.fingerprint)
     try {
       if (next === 'open') {
-        await fetch(`/api/admin/errors/resolutions/${group.fingerprint}`, {
+        await fetch(`/api/admin/errors/resolutions/${group.fingerprint}/`, {
           method: 'DELETE'
         })
       } else {
-        await fetch(`/api/admin/errors/resolutions/${group.fingerprint}`, {
+        await fetch(`/api/admin/errors/resolutions/${group.fingerprint}/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

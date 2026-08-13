@@ -28,12 +28,12 @@ export default function AdminSidebar() {
   const [pendingGarageCount, setPendingGarageCount] = useState(0)
 
   useEffect(() => {
-    fetch('/api/admin/custom-vehicles')
+    fetch('/api/admin/custom-vehicles/')
       .then(res => res.ok ? res.json() : null)
       .then(data => { if (data?.total) setCustomVehicleCount(data.total) })
       .catch(() => {})
 
-    fetch('/api/admin/users/garages?limit=1&status=pending')
+    fetch('/api/admin/users/garages/?limit=1&status=pending')
       .then(res => res.ok ? res.json() : null)
       .then(data => { if (typeof data?.total === 'number') setPendingGarageCount(data.total) })
       .catch(() => {})

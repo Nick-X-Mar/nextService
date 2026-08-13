@@ -92,7 +92,7 @@ export default function ImportModal({ isOpen, onClose, onApplied }: ImportModalP
     if (!preview) return
     setSubmitting(true)
     try {
-      const res = await fetch('/api/admin/errors/import', {
+      const res = await fetch('/api/admin/errors/import/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

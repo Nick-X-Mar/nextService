@@ -86,7 +86,7 @@ export default function PipelineDiagnostics({ onTestEmailLifecycleProgressed }: 
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/emails/diagnose')
+      const res = await fetch('/api/admin/emails/diagnose/')
       if (res.ok) {
         setDiag(await res.json())
       }
@@ -112,7 +112,7 @@ export default function PipelineDiagnostics({ onTestEmailLifecycleProgressed }: 
       if (cancelled) return
       try {
         const res = await fetch(
-          `/api/admin/emails/test-send?to=${encodeURIComponent(testRecipient)}`
+          `/api/admin/emails/test-send/?to=${encodeURIComponent(testRecipient)}`
         )
         if (res.ok) {
           const data: TestStatus = await res.json()
@@ -148,7 +148,7 @@ export default function PipelineDiagnostics({ onTestEmailLifecycleProgressed }: 
     setTestStatus(null)
     lastSeenStatusRef.current = undefined
     try {
-      const res = await fetch('/api/admin/emails/test-send', {
+      const res = await fetch('/api/admin/emails/test-send/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ to: testRecipient || undefined })

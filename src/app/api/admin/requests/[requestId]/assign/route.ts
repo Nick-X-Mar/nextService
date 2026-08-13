@@ -6,6 +6,7 @@ import { logEvent } from '@/utils/eventLogger'
 import { sendEmail } from '@/utils/emailService'
 import { EventName, EmailTemplate } from '@/types/events'
 import { withMetrics } from '@/utils/withMetrics'
+import { randomUUID } from 'crypto'
 
 async function _POST(
   request: NextRequest,
@@ -46,7 +47,7 @@ async function _POST(
     }
 
     // Create offer on behalf of the garage
-    const offerId = `offer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const offerId = `offer_${randomUUID()}`
     const now = new Date().toISOString()
 
     const offer = {

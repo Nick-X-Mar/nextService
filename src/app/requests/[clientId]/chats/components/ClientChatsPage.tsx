@@ -53,7 +53,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
 
   const loadPendingConversations = useCallback(async () => {
     try {
-      const response = await fetch(`/api/requests?clientId=${clientId}`)
+      const response = await fetch(`/api/requests/?clientId=${clientId}`)
 
       if (!response.ok) {
         throw new Error('Failed to fetch requests')
@@ -71,7 +71,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
         const requestsWithMessages = await Promise.all(
           pendingRequests.map(async (request: ChatRequest) => {
             try {
-              const chatResponse = await fetch(`/api/chat/${request.id}/messages`)
+              const chatResponse = await fetch(`/api/chat/${request.id}/messages/`)
               if (chatResponse.ok) {
                 const chatData = await chatResponse.json()
                 if (chatData.messages && chatData.messages.length > 0) {
@@ -109,7 +109,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
 
   const loadAppointments = useCallback(async () => {
     try {
-      const response = await fetch(`/api/requests?clientId=${clientId}`)
+      const response = await fetch(`/api/requests/?clientId=${clientId}`)
 
       if (!response.ok) {
         throw new Error('Failed to fetch requests')
@@ -128,7 +128,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
         const requestsWithMessages = await Promise.all(
           appointmentRequests.map(async (request: ChatRequest) => {
             try {
-              const chatResponse = await fetch(`/api/chat/${request.id}/messages`)
+              const chatResponse = await fetch(`/api/chat/${request.id}/messages/`)
               if (chatResponse.ok) {
                 const chatData = await chatResponse.json()
                 if (chatData.messages && chatData.messages.length > 0) {
@@ -184,7 +184,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
 
   const loadUnsuccessfulConversations = useCallback(async () => {
     try {
-      const response = await fetch(`/api/requests?clientId=${clientId}`)
+      const response = await fetch(`/api/requests/?clientId=${clientId}`)
 
       if (!response.ok) {
         throw new Error('Failed to fetch requests')
@@ -205,7 +205,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
           requestsWithAcceptedOffer.map(async (request: ChatRequest) => {
             try {
               // Get all offers for this request
-              const offersResponse = await fetch(`/api/offers?serviceRequestId=${request.id}`)
+              const offersResponse = await fetch(`/api/offers/?serviceRequestId=${request.id}`)
               if (!offersResponse.ok) return
 
               const offersData = await offersResponse.json()
@@ -220,7 +220,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
               const acceptedGarageId = acceptedOffer.garageId
 
               // Get all garages that sent messages for this request
-              const garagesResponse = await fetch(`/api/chat/${request.id}/garages`)
+              const garagesResponse = await fetch(`/api/chat/${request.id}/garages/`)
               if (!garagesResponse.ok) return
 
               const garagesData = await garagesResponse.json()
@@ -234,7 +234,7 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
               // Get messages for each unsuccessful garage to get last message
               for (const garage of unsuccessfulGarages) {
                 try {
-                  const messagesResponse = await fetch(`/api/chat/${request.id}/messages`)
+                  const messagesResponse = await fetch(`/api/chat/${request.id}/messages/`)
                   if (messagesResponse.ok) {
                     const messagesData = await messagesResponse.json()
                     if (messagesData.messages) {

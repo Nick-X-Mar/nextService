@@ -76,6 +76,10 @@
      {
       "AttributeName": "mobile",
       "AttributeType": "S"
+     },
+     {
+      "AttributeName": "email",
+      "AttributeType": "S"
      }
     ],
     "BillingMode": "PAY_PER_REQUEST",
@@ -97,6 +101,18 @@
       "KeySchema": [
        {
         "AttributeName": "mobile",
+        "KeyType": "HASH"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "EmailIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "email",
         "KeyType": "HASH"
        }
       ],

@@ -79,8 +79,8 @@ export default function ProfilePage({ clientId }: ProfilePageProps) {
       setIsLoading(true)
       try {
         const [clientRes, vehiclesRes] = await Promise.all([
-          fetch(`/api/clients/${clientId}`),
-          fetch(`/api/clients/${clientId}/vehicles`),
+          fetch(`/api/clients/${clientId}/`),
+          fetch(`/api/clients/${clientId}/vehicles/`),
         ])
 
         if (cancelled) return
@@ -119,7 +119,7 @@ export default function ProfilePage({ clientId }: ProfilePageProps) {
   // Handle client data update
   const handleClientUpdate = useCallback(async (updatedClient: Partial<Client>) => {
     try {
-      const response = await fetch(`/api/clients/${clientId}`, {
+      const response = await fetch(`/api/clients/${clientId}/`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -152,7 +152,7 @@ export default function ProfilePage({ clientId }: ProfilePageProps) {
   // Handle vehicle update
   const handleVehicleUpdate = useCallback(async (vehicleId: string, updatedVehicle: Partial<Vehicle>) => {
     try {
-      const response = await fetch(`/api/vehicles/${vehicleId}`, {
+      const response = await fetch(`/api/vehicles/${vehicleId}/`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

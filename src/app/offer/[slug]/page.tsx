@@ -1,7 +1,16 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
+import Icon from '@/components/ui/Icon'
 import OfferDetailPage from './components/OfferDetailPage'
 import { getOfferBySlug, type Offer } from '@/lib/offers'
 import { SITE_URL } from '@/lib/site-url'
+import {
+  ORGANIZATION_ID,
+  breadcrumbJsonLd,
+  faqJsonLd,
+  graphJsonLd,
+  jsonLdScript,
+} from '@/lib/seo'
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -74,8 +83,8 @@ function buildOfferJsonLd(offer: Offer) {
     .slice(0, 10)
 
   return {
-    '@context': 'https://schema.org',
     '@type': 'Product',
+    '@id': `${url}#product`,
     name: offer.title,
     description: `${offer.title} — ${offer.subtitle}. ${offer.description}`,
     image,
@@ -84,6 +93,10 @@ function buildOfferJsonLd(offer: Offer) {
       name: 'NextService',
     },
     category: offer.category === 'fanopeia' ? 'Φανοποιεία' : 'Service αυτοκινήτου',
+    // Recency signal — AI search engines weight it heavily when choosing which
+    // of several competing sources to cite.
+    ...(offer.updatedAt ? { dateModified: offer.updatedAt } : {}),
+    ...(offer.createdAt ? { datePublished: offer.createdAt } : {}),
     offers: {
       '@type': 'Offer',
       url,
@@ -91,24 +104,45 @@ function buildOfferJsonLd(offer: Offer) {
       priceCurrency: 'EUR',
       availability: 'https://schema.org/InStock',
       priceValidUntil,
-      seller: {
-        '@type': 'Organization',
-        name: 'NextService',
-        url: SITE_URL,
-      },
+      seller: { '@id': ORGANIZATION_ID },
       areaServed: { '@type': 'Country', name: 'GR' },
       itemOffered: {
         '@type': 'Service',
         name: offer.workType,
         description: offer.description,
-        provider: {
-          '@type': 'Organization',
-          name: 'NextService',
-          url: SITE_URL,
-        },
+        provider: { '@id': ORGANIZATION_ID },
       },
     },
   }
+}
+
+/**
+ * Question-shaped restatement of the offer's own facts.
+ *
+ * Assistants extract and quote Q&A passages far more readily than they do
+ * marketing prose, and "πόσο κοστίζει X" is the single most common way this
+ * gets asked. Everything here is rendered on the page — schema that describes
+ * content a visitor can't see is a structured-data violation.
+ */
+function buildOfferFaqs(offer: Offer) {
+  return [
+    {
+      question: `Πόσο κοστίζει ${offer.title.toLowerCase()};`,
+      answer: `${offer.title} στο NextService ξεκινάει από ${offer.price}, με εργασία και επώνυμα ανταλλακτικά. Η τελική τιμή για το δικό σου όχημα επιβεβαιώνεται από το συνεργείο πριν κλείσεις ραντεβού.`,
+    },
+    {
+      question: `Πόση ώρα χρειάζεται ${offer.title.toLowerCase()};`,
+      answer: `Η εκτιμώμενη διάρκεια είναι ${offer.duration}. Το συνεργείο θα σου επιβεβαιώσει τον ακριβή χρόνο ανάλογα με το μοντέλο και την κατάσταση του οχήματος.`,
+    },
+    {
+      question: 'Τι περιλαμβάνει η τιμή;',
+      answer: `${offer.details.join('. ')}. Δεν υπάρχουν κρυφές χρεώσεις — αν κατά τον έλεγχο προκύψει κάτι επιπλέον, το συνεργείο οφείλει να σε ενημερώσει και να πάρει τη συγκατάθεσή σου πριν προχωρήσει.`,
+    },
+    {
+      question: 'Ισχύει για το δικό μου αυτοκίνητο;',
+      answer: `Η τιμή αφορά τα περισσότερα επιβατικά οχήματα. Στείλε αίτημα με μάρκα, μοντέλο και έτος και θα λάβεις επιβεβαίωση ή προσαρμοσμένη προσφορά από συνεργεία της περιοχής σου.`,
+    },
+  ]
 }
 
 export default async function OfferPage({ params }: PageProps) {
@@ -116,15 +150,74 @@ export default async function OfferPage({ params }: PageProps) {
   const decodedSlug = decodeURIComponent(slug)
   const offer = await getOfferBySlug(decodedSlug)
 
+  if (!offer) {
+    return <OfferDetailPage slug={decodedSlug} initialOffer={null} />
+  }
+
+  const url = `${SITE_URL}/offer/${offer.slug}/`
+  const faqs = buildOfferFaqs(offer)
+  const crumbs = breadcrumbJsonLd([
+    { name: 'Αρχική', url: `${SITE_URL}/` },
+    { name: 'Προσφορές', url: `${SITE_URL}/` },
+    { name: offer.title, url },
+  ])
+
   return (
     <>
-      {offer && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(buildOfferJsonLd(offer)) }}
-        />
-      )}
+      <script
+        {...jsonLdScript(graphJsonLd([buildOfferJsonLd(offer), crumbs, faqJsonLd(faqs)]))}
+      />
+
       <OfferDetailPage slug={decodedSlug} initialOffer={offer} />
+
+      {/* Server-rendered so it's in the HTML for crawlers that don't run JS. */}
+      <section className="bg-surface px-5 md:px-8 pb-16">
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-2xl font-bold tracking-tight text-on-surface mb-4">
+            Συχνές ερωτήσεις
+          </h2>
+
+          <div className="space-y-3">
+            {faqs.map((faq) => (
+              <details
+                key={faq.question}
+                className="group rounded-xl bg-surface-container-lowest border border-outline-variant/10 overflow-hidden"
+              >
+                <summary className="flex items-center justify-between gap-3 px-5 py-4 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                  <h3 className="font-bold text-on-surface text-sm md:text-base">
+                    {faq.question}
+                  </h3>
+                  <Icon
+                    name="expand_more"
+                    size="md"
+                    className="text-on-surface-variant transition-transform group-open:rotate-180 shrink-0"
+                  />
+                </summary>
+                <div className="px-5 pb-5 text-sm text-secondary leading-relaxed">
+                  {faq.answer}
+                </div>
+              </details>
+            ))}
+          </div>
+
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link
+              href="/locations/"
+              className="inline-flex border border-outline-variant/30 bg-surface-container-lowest text-on-surface hover:bg-surface-container px-4 py-2.5 rounded-lg text-sm font-bold transition-colors duration-200 items-center gap-2"
+            >
+              <Icon name="location_on" size="sm" />
+              Συνεργεία στην περιοχή μου
+            </Link>
+            <Link
+              href="/faq/"
+              className="inline-flex border border-outline-variant/30 bg-surface-container-lowest text-on-surface hover:bg-surface-container px-4 py-2.5 rounded-lg text-sm font-bold transition-colors duration-200 items-center gap-2"
+            >
+              <Icon name="help" size="sm" />
+              Όλες οι ερωτήσεις
+            </Link>
+          </div>
+        </div>
+      </section>
     </>
   )
 }

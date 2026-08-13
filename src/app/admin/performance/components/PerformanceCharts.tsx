@@ -88,7 +88,7 @@ export default function PerformanceCharts() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch(`/api/admin/performance/metrics?range=${range}`)
+      const res = await fetch(`/api/admin/performance/metrics/?range=${range}`)
       if (res.ok) {
         const json = await res.json()
         setData(json)

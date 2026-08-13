@@ -3,12 +3,27 @@ import { createHash } from 'crypto'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { hashPassword } from '@/utils/passwordService'
+import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
+import { createRateLimiter } from '@/utils/rateLimit'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { withMetrics } from '@/utils/withMetrics'
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
+}
+
+// The token is 32 random bytes, so guessing it is not realistic — but every
+// attempt costs a full table scan, so an unlimited endpoint is a cheap way to
+// burn read capacity. Limit by IP.
+const resetRate = createRateLimiter('reset-password', 10, 10 * 60 * 1000)
+
+function clientIp(request: NextRequest): string {
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'unknown'
+  )
 }
 
 /**
@@ -22,6 +37,13 @@ function hashToken(token: string): string {
  */
 async function _POST(request: NextRequest) {
   try {
+    if (!resetRate(clientIp(request))) {
+      return NextResponse.json(
+        { error: 'Πάρα πολλές προσπάθειες. Δοκιμάστε ξανά σε λίγο.' },
+        { status: 429 }
+      )
+    }
+
     const body = await request.json()
     const { token, userType = 'client', newPassword } = body || {}
 
@@ -31,9 +53,9 @@ async function _POST(request: NextRequest) {
     if (!['client', 'garage'].includes(userType)) {
       return NextResponse.json({ error: 'Invalid userType' }, { status: 400 })
     }
-    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < MIN_PASSWORD_LENGTH) {
       return NextResponse.json(
-        { error: 'Ο νέος κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες' },
+        { error: 'Ο νέος κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες' },
         { status: 400 }
       )
     }

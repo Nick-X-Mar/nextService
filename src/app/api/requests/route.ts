@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { decodeCursor, encodeCursor, parseLimit } from '@/utils/pagination'
 import { requireClient } from '@/utils/requireAuth'
 import { generatePresignedUrls } from '@/utils/s3Service'
 import { withMetrics } from '@/utils/withMetrics'
@@ -10,7 +11,11 @@ async function _GET(request: NextRequest) {
     const clientId = requireClient(request)
     if (clientId instanceof NextResponse) return clientId
 
-    // Query service requests by clientId using the ClientRequestsIndex
+    // Query service requests by clientId using the ClientRequestsIndex.
+    // Paginated: this read was previously unbounded, so a client with enough
+    // history would silently stop seeing their oldest requests once the result
+    // crossed DynamoDB's 1MB page limit.
+    const { searchParams } = new URL(request.url)
     const queryCommand = new QueryCommand({
       TableName: 'ServiceRequests',
       IndexName: 'ClientRequestsIndex',
@@ -18,7 +23,9 @@ async function _GET(request: NextRequest) {
       ExpressionAttributeValues: {
         ':clientId': clientId
       },
-      ScanIndexForward: false // Sort by createdAt descending (latest first)
+      ScanIndexForward: false, // Sort by createdAt descending (latest first)
+      Limit: parseLimit(searchParams.get('limit'), 20),
+      ExclusiveStartKey: decodeCursor(searchParams.get('cursor')),
     })
 
     const result = await dynamoDB.send(queryCommand)
@@ -26,7 +33,8 @@ async function _GET(request: NextRequest) {
     if (!result.Items) {
       return NextResponse.json({
         success: true,
-        requests: []
+        requests: [],
+        nextCursor: null
       })
     }
 
@@ -89,7 +97,8 @@ async function _GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      requests: requestsWithVehicles
+      requests: requestsWithVehicles,
+      nextCursor: encodeCursor(result.LastEvaluatedKey)
     })
 
   } catch (error) {

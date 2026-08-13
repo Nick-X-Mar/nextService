@@ -51,7 +51,7 @@ export default function OffersSection() {
   useEffect(() => {
     async function fetchDeals() {
       try {
-        const res = await fetch('/api/hot-deals')
+        const res = await fetch('/api/hot-deals/')
         if (res.ok) {
           const data = await res.json()
           if (Array.isArray(data) && data.length > 0) {

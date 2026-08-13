@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import LandingPage from './landing-page/LandingPage'
-import { faqs } from './landing-page/components/FAQSection'
+import { faqs } from '@/data/faq'
 import { SITE_URL } from '@/lib/site-url'
+import { faqJsonLd, graphJsonLd, jsonLdScript } from '@/lib/seo'
 
 export const metadata: Metadata = {
   alternates: { canonical: `${SITE_URL}/` },
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
     locale: 'el_GR',
     title: 'NextService — Βρες συνεργείο αυτοκινήτου με την καλύτερη τιμή',
     description:
-      'Στείλε αίτημα σε συνεργεία σε όλη την Ελλάδα και πάρε προσφορές. Hot deals σε service, συμπλέκτη, ιμάντα χρονισμού και φανοποιεία.',
+      'Στείλε δωρεάν αίτημα service και πάρε προσφορές από συνεργεία της περιοχής σου. Σταθερές τιμές σε service, συμπλέκτη, ιμάντα χρονισμού και φανοποιεία.',
     // Trailing slash required — without it, Next.js generates a URL that
     // 308-redirects and Facebook/Messenger crawlers don't follow OG image
     // redirects (preview shows the link with no image).
@@ -29,62 +30,16 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'NextService — Βρες συνεργείο αυτοκινήτου με την καλύτερη τιμή',
-    description: 'Στείλε αίτημα σε συνεργεία σε όλη την Ελλάδα και πάρε προσφορές σε service και φανοποιεία.',
+    description: 'Στείλε δωρεάν αίτημα service και πάρε προσφορές από συνεργεία της περιοχής σου.',
     images: [`${SITE_URL}/opengraph-image/`],
   },
 }
 
-const organizationJsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'Organization',
-  name: 'NextService',
-  url: SITE_URL,
-  logo: `${SITE_URL}/logo.png`,
-  areaServed: { '@type': 'Country', name: 'GR' },
-  contactPoint: {
-    '@type': 'ContactPoint',
-    email: 'info@nextservice.gr',
-    contactType: 'customer support',
-    availableLanguage: ['Greek', 'English'],
-  },
-}
-
-const websiteJsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'WebSite',
-  name: 'NextService',
-  url: SITE_URL,
-  inLanguage: 'el-GR',
-}
-
-const faqJsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'FAQPage',
-  mainEntity: faqs.map((f) => ({
-    '@type': 'Question',
-    name: f.question,
-    acceptedAnswer: {
-      '@type': 'Answer',
-      text: f.answer,
-    },
-  })),
-}
-
+// Organization + WebSite are emitted site-wide from the root layout.
 export default function Home() {
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
-      />
+      <script {...jsonLdScript(graphJsonLd([faqJsonLd(faqs)]))} />
       <LandingPage />
     </>
   )

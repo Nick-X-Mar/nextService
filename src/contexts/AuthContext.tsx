@@ -100,7 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Logout function - calls server to clear httpOnly cookie
   const logout = useCallback(async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' })
+      await fetch('/api/auth/logout/', { method: 'POST' })
     } catch {
       // Ignore errors - we're logging out anyway
     }
@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Refresh client data - memoized to prevent infinite loops
   const refreshClient = useCallback(async (clientId: string) => {
     try {
-      const response = await fetch(`/api/clients/${clientId}`)
+      const response = await fetch(`/api/clients/${clientId}/`)
       if (response.ok) {
         const data = await response.json()
         const clientData = data.client
@@ -151,7 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Refresh garage data - memoized to prevent infinite loops
   const refreshGarage = useCallback(async (garageId: string) => {
     try {
-      const response = await fetch(`/api/garage/${garageId}`)
+      const response = await fetch(`/api/garage/${garageId}/`)
       if (response.ok) {
         const data = await response.json()
         const garageData = data.garage
@@ -218,7 +218,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const checkAuth = async () => {
       try {
-        const response = await fetch('/api/auth/me')
+        const response = await fetch('/api/auth/me/')
         if (response.ok) {
           const data = await response.json()
           if (data.authenticated && data.user) {

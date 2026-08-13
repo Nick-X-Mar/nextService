@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import { DynamoDBDocumentClient, PutCommand, ScanCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
+import { DynamoDBDocumentClient, PutCommand, QueryCommand, UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
+import { collectAll } from '@/utils/pagination'
 import { OfferStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { sendEmail } from '@/utils/emailService'
@@ -8,6 +9,7 @@ import { EventName, EmailTemplate } from '@/types/events'
 import { requireAuth, requireGarage } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { randomUUID } from 'crypto'
 
 const checkOfferRate = createRateLimiter('offer-create', 10, 3600000)
 
@@ -51,7 +53,7 @@ async function _POST(request: NextRequest) {
     }
 
     // Generate unique offer ID
-    const offerId = `offer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const offerId = `offer_${randomUUID()}`
 
     const offer = {
       id: offerId,
@@ -134,42 +136,70 @@ async function _GET(request: NextRequest) {
       }, { status: 400 })
     }
 
-    let command
-    if (garageId && serviceRequestId) {
-      // Query offers by both garage and service request using Scan with filter
-      command = new ScanCommand({
-        TableName: 'Offers',
-        FilterExpression: 'garageId = :garageId AND serviceRequestId = :serviceRequestId',
-        ExpressionAttributeValues: {
-          ':garageId': garageId,
-          ':serviceRequestId': serviceRequestId
-        }
-      })
-    } else if (garageId) {
-      // Query offers by garage using Scan with filter
-      command = new ScanCommand({
-        TableName: 'Offers',
-        FilterExpression: 'garageId = :garageId',
-        ExpressionAttributeValues: {
-          ':garageId': garageId
-        }
-      })
-    } else {
-      // Query offers by service request using Scan with filter
-      command = new ScanCommand({
-        TableName: 'Offers',
-        FilterExpression: 'serviceRequestId = :serviceRequestId',
-        ExpressionAttributeValues: {
-          ':serviceRequestId': serviceRequestId
-        }
-      })
+    // Listing by request is how a client compares bids — but for a garage the
+    // same query would expose every competitor's price on a request it is
+    // bidding on. Clients get the full list for requests they own; garages are
+    // narrowed to their own offer regardless of what they asked for.
+    let scopedGarageId = garageId
+    if (serviceRequestId) {
+      const serviceRequest = await docClient.send(new GetCommand({
+        TableName: 'ServiceRequests',
+        Key: { id: serviceRequestId }
+      }))
+      if (!serviceRequest.Item) {
+        return NextResponse.json({ success: false, error: 'Request not found' }, { status: 404 })
+      }
+      if (auth.userType === 'client' && serviceRequest.Item.clientId !== auth.userId) {
+        return NextResponse.json({ success: false, error: 'Δεν έχετε πρόσβαση σε αυτόν τον πόρο' }, { status: 403 })
+      }
+      if (auth.userType === 'garage') {
+        scopedGarageId = auth.userId
+      }
     }
 
-    const result = await docClient.send(command)
+    // These were three Scans with FilterExpression even though Offers has both
+    // ServiceRequestOffersIndex and GarageOffersIndex — every call read the
+    // whole table. They are Queries on those indexes now.
+    //
+    // Deliberately NOT cursor-paginated: a client comparing bids has to see all
+    // of them at once, and a "load more" between offers would make comparison
+    // worse, not better. `collectAll` drains every page instead, so the list is
+    // complete rather than silently cut off at DynamoDB's 1MB boundary.
+    let offers: Record<string, unknown>[]
+
+    if (serviceRequestId) {
+      const byRequest = await collectAll<Record<string, unknown>>(
+        (startKey) =>
+          docClient.send(new QueryCommand({
+            TableName: 'Offers',
+            IndexName: 'ServiceRequestOffersIndex',
+            KeyConditionExpression: 'serviceRequestId = :serviceRequestId',
+            ExpressionAttributeValues: { ':serviceRequestId': serviceRequestId },
+            ExclusiveStartKey: startKey,
+          })),
+        `offers for request ${serviceRequestId}`
+      )
+      // A garage may only ever see its own offer on someone else's request.
+      offers = scopedGarageId
+        ? byRequest.filter((o) => o.garageId === scopedGarageId)
+        : byRequest
+    } else {
+      offers = await collectAll<Record<string, unknown>>(
+        (startKey) =>
+          docClient.send(new QueryCommand({
+            TableName: 'Offers',
+            IndexName: 'GarageOffersIndex',
+            KeyConditionExpression: 'garageId = :garageId',
+            ExpressionAttributeValues: { ':garageId': scopedGarageId },
+            ExclusiveStartKey: startKey,
+          })),
+        `offers for garage ${scopedGarageId}`
+      )
+    }
 
     return NextResponse.json({
       success: true,
-      offers: result.Items || []
+      offers
     })
 
   } catch (error) {

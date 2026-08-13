@@ -1,6 +1,15 @@
 import type { MetadataRoute } from 'next'
 import { SITE_URL } from '@/lib/site-url'
 
+// Crawl-budget control for authenticated app areas. Every one of these also
+// carries `robots: { index: false, follow: false }` on its layout, so the
+// Disallow is defence in depth rather than the primary control.
+//
+// NOTE: `/profile` is deliberately NOT listed. It is a legacy URL from the old
+// site that now 301s to /login/ — a Disallow would stop Google from ever
+// reading that redirect, stranding the URL's authority. The same reasoning
+// applies to any path added to the redirect map in next.config.ts: a redirect
+// source must stay crawlable.
 const disallowPrivate = [
   '/admin',
   '/admin/',
@@ -8,8 +17,6 @@ const disallowPrivate = [
   '/garage-dashboard/',
   '/requests',
   '/requests/',
-  '/profile',
-  '/profile/',
   '/car-details',
   '/car-specifications',
   '/reset-password/',

@@ -15,7 +15,7 @@ export default function AdminTopBar({ adminEmail, adminName }: AdminTopBarProps)
   async function handleLogout() {
     setLoggingOut(true)
     try {
-      await fetch('/api/admin/auth/logout', { method: 'POST' })
+      await fetch('/api/admin/auth/logout/', { method: 'POST' })
       router.push('/admin/login/')
     } catch {
       setLoggingOut(false)

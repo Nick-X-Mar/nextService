@@ -29,7 +29,7 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
   // Track form funnel
   useEffect(() => {
     const clientId = localStorage.getItem('clientId')
-    fetch('/api/track', {
+    fetch('/api/track/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventName: 'car_specs_started', clientId }),
@@ -95,7 +95,7 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
           ...(loggedInClientId && { clientId: loggedInClientId })
         }
 
-        const serviceResponse = await fetch('/api/service-request', {
+        const serviceResponse = await fetch('/api/service-request/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -122,7 +122,7 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
         formData.append('serviceRequestId', serviceResult.serviceRequestId)
         formData.append('vehicleId', serviceResult.vehicleId)
 
-        const uploadResponse = await fetch('/api/upload-photos', {
+        const uploadResponse = await fetch('/api/upload-photos/', {
           method: 'POST',
           body: formData,
         })

@@ -74,15 +74,35 @@ export interface DeleteResult {
  * @param fileName - Optional custom filename, defaults to timestamp + original name
  * @returns UploadResult with success status and S3 URL
  */
+/**
+ * Reduces an untrusted upload filename to something safe to embed in an S3 key.
+ *
+ * The name comes straight from the client's multipart part and is fully
+ * attacker-controlled. Anything outside [A-Za-z0-9.-] becomes an underscore,
+ * and runs of dots are collapsed so `../../` can't survive in any form — a key
+ * containing `..` escapes the intended `folder/` prefix once any client or CDN
+ * normalises the URL path.
+ */
+const sanitizeFileName = (name: string): string =>
+  (name || 'file')
+    .replace(/[^a-zA-Z0-9.-]/g, '_')
+    .replace(/\.{2,}/g, '.')
+    .replace(/^[.-]+/, '')
+    .slice(0, 100) || 'file'
+
 export const uploadFileToS3 = async (
   file: File,
   folder: string,
   fileName?: string
 ): Promise<UploadResult> => {
   try {
-    // Generate unique filename if not provided
+    // Generate unique filename if not provided.
+    // NOTE: the caller-supplied `fileName` is sanitised too. It used to be
+    // trusted as-is, and `uploadMultipleFilesToS3` — the path the public photo
+    // upload endpoint actually uses — passed the raw client filename through
+    // it, so the sanitising below was bypassed for every real upload.
     const timestamp = Date.now()
-    const finalFileName = fileName || `${timestamp}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+    const finalFileName = sanitizeFileName(fileName || `${timestamp}-${file.name}`)
     const key = `${folder}/${finalFileName}`
 
     // Convert File to Buffer
@@ -97,7 +117,11 @@ export const uploadFileToS3 = async (
       ContentType: file.type,
       ContentDisposition: 'inline',
       Metadata: {
-        originalName: file.name,
+        // S3 user metadata is sent as HTTP headers and must be US-ASCII.
+        // The app's users are Greek, so `φωτογραφία.jpg` is an ordinary
+        // filename here — passing it raw makes Node reject the request with
+        // "Invalid character in header content" and the upload fails.
+        originalName: encodeURIComponent(file.name).slice(0, 512),
         uploadedAt: new Date().toISOString(),
         fileSize: file.size.toString()
       }

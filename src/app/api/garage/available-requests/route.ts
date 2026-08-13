@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { collectAll, decodeCursor, encodeCursor, parseLimit } from '@/utils/pagination'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
@@ -23,32 +24,44 @@ async function _GET(request: NextRequest) {
 
     // Get all pending service requests via StatusIndex GSI, plus this garage's
     // existing offers (to filter them out) — both are independent so run in parallel.
-    const [result, offersResult] = await Promise.all([
+    // The pending-request feed is paginated. The garage's own offers are NOT:
+    // they are used to filter already-answered requests out of the feed, so a
+    // partial list would make requests the garage has already bid on reappear.
+    const { searchParams } = new URL(request.url)
+    const [result, garageOffers] = await Promise.all([
       dynamoDB.send(new QueryCommand({
         TableName: 'ServiceRequests',
         IndexName: 'StatusIndex',
         KeyConditionExpression: '#status = :status',
         ExpressionAttributeNames: { '#status': 'status' },
         ExpressionAttributeValues: { ':status': ServiceRequestStatus.PENDING },
-        ScanIndexForward: false
+        ScanIndexForward: false,
+        Limit: parseLimit(searchParams.get('limit'), 20),
+        ExclusiveStartKey: decodeCursor(searchParams.get('cursor')),
       })),
-      dynamoDB.send(new QueryCommand({
-        TableName: 'Offers',
-        IndexName: 'GarageOffersIndex',
-        KeyConditionExpression: 'garageId = :garageId',
-        ExpressionAttributeValues: { ':garageId': garageId }
-      }))
+      collectAll<{ serviceRequestId?: string }>(
+        (startKey) =>
+          dynamoDB.send(new QueryCommand({
+            TableName: 'Offers',
+            IndexName: 'GarageOffersIndex',
+            KeyConditionExpression: 'garageId = :garageId',
+            ExpressionAttributeValues: { ':garageId': garageId },
+            ExclusiveStartKey: startKey,
+          })),
+        `available-requests offers for ${garageId}`
+      )
     ])
 
     if (!result.Items || result.Items.length === 0) {
       return NextResponse.json({
         success: true,
-        requests: []
+        requests: [],
+        nextCursor: encodeCursor(result.LastEvaluatedKey)
       })
     }
 
     const garageOfferRequestIds = new Set(
-      offersResult.Items?.map(offer => offer.serviceRequestId) || []
+      garageOffers.map(offer => offer.serviceRequestId)
     )
 
     // Filter out requests that this garage has already made offers for
@@ -59,7 +72,8 @@ async function _GET(request: NextRequest) {
     if (availableRequests.length === 0) {
       return NextResponse.json({
         success: true,
-        requests: []
+        requests: [],
+        nextCursor: encodeCursor(result.LastEvaluatedKey)
       })
     }
 
@@ -120,7 +134,8 @@ async function _GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      requests: validRequests
+      requests: validRequests,
+      nextCursor: encodeCursor(result.LastEvaluatedKey)
     })
 
   } catch (error) {

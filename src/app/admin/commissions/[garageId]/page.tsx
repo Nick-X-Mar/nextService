@@ -80,7 +80,7 @@ export default function GarageCommissionsPage({ params }: { params: Promise<{ ga
     async function fetchData() {
       setLoading(true)
       try {
-        const res = await fetch(`/api/admin/commissions/garage/${garageId}?month=${month}`)
+        const res = await fetch(`/api/admin/commissions/garage/${garageId}/?month=${month}`)
         if (res.ok) {
           const json = (await res.json()) as GarageCommissionsData
           if (!cancelled) setData(json)

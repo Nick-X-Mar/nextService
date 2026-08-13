@@ -165,7 +165,7 @@ export default function EmailsPage() {
   const fetchStats = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/admin/emails/stats?from=${from}&to=${to}`)
+      const res = await fetch(`/api/admin/emails/stats/?from=${from}&to=${to}`)
       if (res.ok) setStats(await res.json())
     } catch {
       /* empty */
@@ -176,7 +176,7 @@ export default function EmailsPage() {
   const fetchList = useCallback(async () => {
     setListLoading(true)
     try {
-      const res = await fetch(`/api/admin/emails/list?from=${from}&to=${to}&limit=50`)
+      const res = await fetch(`/api/admin/emails/list/?from=${from}&to=${to}&limit=50`)
       if (res.ok) {
         const data = await res.json()
         setEmails(data.items || [])

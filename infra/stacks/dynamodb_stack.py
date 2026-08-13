@@ -68,6 +68,21 @@ class DynamoDBStack(Stack):
             ),
             projection_type=dynamodb.ProjectionType.ALL,
         )
+        # Garage login and email-existence checks look users up by email. Without
+        # this index they fall back to a full table scan on every attempt, which
+        # is both a latency cost and an unauthenticated cost-amplification lever.
+        # Clients already has the equivalent EmailIndex.
+        #
+        # NOTE: the code paths in `api/auth/login` and `api/auth/check-email`
+        # still scan the Garages table — switch them to query this index once
+        # the stack has been deployed and the index is ACTIVE.
+        self.garages_table.add_global_secondary_index(
+            index_name="EmailIndex",
+            partition_key=dynamodb.Attribute(
+                name="email", type=dynamodb.AttributeType.STRING
+            ),
+            projection_type=dynamodb.ProjectionType.ALL,
+        )
 
         # ── Vehicles ────────────────────────────────────────────
         self.vehicles_table = dynamodb.Table(

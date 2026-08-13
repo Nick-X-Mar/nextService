@@ -33,7 +33,7 @@ export default function GaragesPage() {
       setLoading(true)
       try {
         const status = tab === 'pending' ? 'pending' : 'all'
-        const res = await fetch(`/api/admin/users/garages?limit=50&status=${status}&search=${encodeURIComponent(search)}`)
+        const res = await fetch(`/api/admin/users/garages/?limit=50&status=${status}&search=${encodeURIComponent(search)}`)
         if (res.ok) {
           const json = await res.json()
           setData(json.items || [])
@@ -46,7 +46,7 @@ export default function GaragesPage() {
 
   async function handleActivate(garageId: string) {
     try {
-      const res = await fetch(`/api/admin/users/garages/${garageId}/activate`, { method: 'POST' })
+      const res = await fetch(`/api/admin/users/garages/${garageId}/activate/`, { method: 'POST' })
       if (res.ok) {
         setData((prev) => prev.filter((u) => u.id !== garageId))
       }

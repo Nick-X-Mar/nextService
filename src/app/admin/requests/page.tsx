@@ -73,8 +73,8 @@ export default function RequestsPage() {
       setListLoading(true)
       try {
         const [statsRes, listRes] = await Promise.all([
-          fetch(`/api/admin/requests/stats?from=${from}&to=${to}`),
-          fetch(`/api/admin/requests/list?from=${from}&to=${to}&limit=50`)
+          fetch(`/api/admin/requests/stats/?from=${from}&to=${to}`),
+          fetch(`/api/admin/requests/list/?from=${from}&to=${to}&limit=50`)
         ])
         if (statsRes.ok) setStats(await statsRes.json())
         if (listRes.ok) {

@@ -4,84 +4,167 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-NextService is a Greek car service marketplace web app connecting vehicle owners (clients) with garages (professionals). Clients submit service requests with vehicle details and photos; garages view, chat, and provide offers. Built with Next.js 15 App Router, TypeScript, Tailwind CSS, AWS DynamoDB, S3, and AppSync (real-time WebSocket chat).
+NextService is a Greek car service marketplace web app connecting vehicle owners (clients) with garages (professionals). Clients submit service requests with vehicle details and photos; garages view, chat, and provide offers. It also has a full internal **admin panel**, **Stripe deposits + wallet**, **SES email notifications**, and **analytics/observability** (funnel events, performance metrics, error grouping).
+
+Stack: Next.js 15 App Router, TypeScript, Tailwind CSS, AWS DynamoDB, S3, AppSync Events (real-time WebSocket), SES, Stripe. Infrastructure is AWS CDK (Python) in `infra/`; hosting is AWS Amplify (WEB_COMPUTE / SSR).
 
 ## Commands
 
-- `npm run dev` — start Next.js dev server (usually already running on localhost:3000)
+- `npm run dev` — Next.js dev server on :3000
+- `npm run services` — DynamoDB Local (:8000) + DynamoDB Admin UI (:8001) + AppSync mock (:3002)
+- `npm run dev:all` — `services` + dev server in one command
+- `npm run dev:full` — DynamoDB + AppSync mock + dev server
+- `npm run dynamodb` — DynamoDB Local + Admin UI only
+- `npm run mock-appsync` — AppSync WebSocket mock only (`local-appsync-server.js`)
 - `npm run build` — production build
-- `npm run lint` — ESLint
-- `npm run dev:full` — dev server + local AppSync mock server (WebSocket)
-- `npm run dev:all` — dev server + all local services (DynamoDB, AppSync mock)
-- `npm run dynamodb` — start local DynamoDB
-- `npm run mock-appsync` — start local AppSync WebSocket mock (`local-appsync-server.js`)
+- `npm run lint` — ESLint (flat config, `eslint.config.mjs`)
+- `npm run test:e2e` / `npm run test:e2e:ui` — Playwright E2E suite (`e2e/`, needs the app + local services running)
 
-No test framework is configured. Do not create test files.
+Seed / maintenance scripts (run against local DynamoDB by default):
+- `npx tsx scripts/seed-admin.ts` — create the admin user (`admin@nextservice.gr` / `admin123` defaults)
+- `npx tsx scripts/seed-hot-deals.ts` — seed landing-page hot deals
+- `npx tsx scripts/fix-seo-slugs.ts` — backfill SEO slugs
+
+Node 20 (`.nvmrc`). Java is required for DynamoDB Local.
+
+### Local ports
+
+| Service | URL |
+|---|---|
+| Next.js app | http://localhost:3000 |
+| DynamoDB Local | http://localhost:8000 |
+| DynamoDB Admin UI | http://localhost:8001 |
+| AppSync mock (WS) | ws://localhost:3002/graphql (health: `/health`) |
+
+Testing: Playwright E2E only (`e2e/*.spec.ts`). There is no unit-test framework — do not add unit test files; extend the existing E2E specs instead.
 
 ## Architecture
 
 ### Backend (API Routes)
 
-Server-side API routes in `src/app/api/` — Next.js Route Handlers that talk to DynamoDB and S3 directly:
-- `auth/` — client/garage login and registration
-- `service-request/` — CRUD for service requests
-- `offers/` — garage offer management
-- `chat/` — chat messages (persisted in DynamoDB, real-time via AppSync)
+~80 Route Handlers in `src/app/api/`, talking to DynamoDB / S3 / SES / Stripe directly:
+- `auth/` — client & garage login, registration, forgot/reset password, `me`
+- `service-request/`, `requests/` — request creation, detail, cancel, accept-offer
+- `offers/` — garage offers, client availability
+- `chat/` — messages, per-request garage threads, mark-read
 - `upload-photos/`, `upload/` — S3 photo uploads
-- `garage/`, `clients/`, `vehicles/`, `requests/` — entity CRUD
+- `garage/`, `clients/`, `vehicles/` — entity CRUD
+- `payments/`, `wallet/`, `webhooks/stripe` — Stripe deposits, saved cards, wallet balance/transactions
+- `price-estimation/`, `hot-deals/`, `track/` — public endpoints
+- `account/export`, `account/delete` — GDPR
+- `admin/**` — the whole admin surface (users, requests, payments, commissions, emails, errors, funnel, performance, hot-deals, custom vehicles, settings, tests)
+
+`src/app/api/test-*` are legacy scratch routes, not real features.
+
+Most routes are wrapped in `withMetrics(...)` (`src/utils/withMetrics.ts`) which fire-and-forget records latency/status into the `PerformanceMetrics` table.
+
+### Auth
+
+`src/middleware.ts` guards `/api/*` and `/admin/*`:
+- Client/garage: `auth-token` httpOnly JWT cookie (`jose`, HS256, `JWT_SECRET`), sliding expiry (`SESSION_EXPIRY`, default 2d).
+- Admin: completely separate JWT cookie + `ADMIN_JWT_SECRET` (`src/utils/adminAuth.ts`).
+- Public API prefixes: `/api/auth/`, `/api/webhooks/`, `/api/price-estimation`, `/api/service-request`, `/api/hot-deals`, `/api/track`.
 
 ### Frontend (App Router Pages)
 
-Each page follows the pattern: `src/app/<page-name>/page.tsx` with a `components/` subfolder for page-specific components.
+Pattern: `src/app/<page-name>/page.tsx` + a `components/` subfolder for page-specific components.
 
 Key routes:
-- `landing-page/` — public homepage
-- `login/` — client and garage auth
-- `car-specifications/` — multi-step vehicle + service request form
-- `requests/` — client views their service requests
-- `garage-dashboard/[garageId]/` — garage portal (requests, chats, appointments)
-- `register-professional/` — garage registration
-- `profile/` — user profile management
+- `/` — public homepage; the component tree lives in `src/app/landing-page/LandingPage.tsx` (there is **no** `/landing-page` route)
+- `/login`, `/forgot-password`, `/reset-password`
+- `/car-details` → `/car-specifications` — multi-step vehicle + service request form (localStorage-persisted)
+- `/requests/[clientId]` — client requests, `details/[requestId]`, `chats/[requestId]`
+- `/garage-dashboard/[garageId]` — garage portal + `offers/[requestId]`, `chats/`, `chats/appointments`, `chat/[requestId]`
+- `/register-professional`, `/profile/[clientId]`, `/offer`, `/privacy`, `/terms`
+- `/admin/**` — dashboard, users, requests, payments, commissions, emails, errors, funnel, performance, hot-deals, custom-vehicles, settings, tests
+
+SEO: `sitemap.ts`, `robots.ts`, `opengraph-image.tsx`, canonical URLs from `src/lib/site-url.ts` (`SITE_URL`). `trailingSlash: true` is enabled — URLs without a trailing slash 308-redirect.
 
 ### Shared Code
 
-- `src/components/` — reusable UI components (Button, Modal, Card, Input, Badge, Switch, etc.). Always use these instead of creating one-off equivalents.
-- `src/contexts/AuthContext.tsx` — auth state (client vs garage user types), persisted to localStorage
+- `src/components/` — reusable UI (Button, Modal, Card, Input, Badge, Switch, Toast, SegmentedControl, …) plus `layout/` (AppShell, Sidebar, TopHeader, BottomNav, Footer). Always reuse instead of creating one-off equivalents.
+- `src/contexts/AuthContext.tsx` — auth state (client vs garage), persisted to localStorage
 - `src/contexts/UserContext.tsx` — user-level state
-- `src/utils/dynamoService.ts` — DynamoDB client factory (auto-detects local vs AWS credentials vs IAM role)
-- `src/utils/s3Service.ts` — S3 upload helpers
-- `src/utils/formStorage.ts` — localStorage persistence for multi-step forms
-- `src/lib/amplify-config.ts` — AWS Amplify/AppSync initialization
-- `src/lib/websocket-service.ts` — WebSocket client for real-time chat
-- `src/hooks/useRealtimeChat.ts` — React hook for real-time chat via AppSync
-- `src/types/` — shared TypeScript types (`ServiceRequest`, `ServiceRequestStatus`, etc.)
+- `src/utils/dynamoService.ts` — DynamoDB client factory (local endpoint vs explicit creds vs `.aws/` profile vs IAM role)
+- `src/utils/ensure*Table.ts` — runtime table auto-creation for the newer tables (Admin, HotDeals, Payments/Wallet, Events, EmailLogs, Performance, ErrorResolutions)
+- `src/utils/eventLogger.ts` — fire-and-forget funnel events → `EventLogs` (365-day TTL)
+- `src/utils/performanceService.ts`, `withMetrics.ts` — API latency metrics
+- `src/utils/errorFingerprint.ts`, `errorGroups.ts` — admin error grouping
+- `src/utils/emailService.ts`, `notificationService.ts`, `src/lib/email-templates/` — SES emails
+- `src/utils/s3Service.ts`, `formStorage.ts`, `rateLimit.ts`, `requireAuth.ts`, `ttlCache.ts`, `requestBroadcast.ts`
+- `src/lib/` — `amplify-config.ts`, `appsync-service.ts`, `stripe-client.ts`, `stripe-server.ts`, `offers.ts`, `site-url.ts`
+- `src/hooks/` — `useRealtimeRequests`, `useNewRequestNotifier`, `useToast`
+- Dead code, do not build on: `src/lib/websocket-service.ts` and `src/hooks/useRealtimeChat.ts` have no importers, and the hook subscribes to a `chat-{id}-{garageId}` channel that no longer matches what the API publishes. Real-time chat goes through `appSyncService` directly from the chat page components.
+- `src/types/` — `index.ts`, `statuses.ts` (`ServiceRequestStatus`, `OfferStatus`), `requests.ts`, `payments.ts`, `events.ts`, `hotDeals.ts`
 
-### Two User Types
+### Two User Types (+ admin)
 
-The app has two distinct user roles with separate UIs:
-- **Client** — submits service requests, views offers, chats with garages
+- **Client** — submits service requests, views offers, pays deposit, chats with garages
 - **Garage** — views incoming requests, sends offers, chats with clients, manages appointments
+- **Admin** — separate auth + `/admin` back office
 
 Auth state determines which navigation (`ClientNavigation` vs `GarageNavigation`) and dashboard is shown.
 
-### Real-time Chat
+### Real-time
 
-Chat uses a dual approach: REST API routes for persistence (DynamoDB) and AppSync WebSocket for real-time delivery. The local mock server (`local-appsync-server.js`) simulates AppSync during development.
+Dual approach: REST routes persist to DynamoDB, AppSync Events pushes real-time. Used for chat *and* for fanning new requests out to garage dashboards (`requestBroadcast.ts`, `useRealtimeRequests`). `local-appsync-server.js` simulates AppSync in dev.
+
+### Notifications (out-of-band)
+
+`ServiceRequests` has a DynamoDB Stream → `infra/lambdas/new-request-broadcast` → SES fan-out to active garages. The Next.js route only writes to DynamoDB. `ses-event-processor` records deliveries/bounces into `EmailLogs` (surfaced in `/admin/emails`).
+
+## Data (DynamoDB)
+
+Single-region (`eu-central-1`), table names are literal (no stage prefix). CDK-managed tables: **Clients, Garages, Vehicles, ServiceRequests, Offers, ChatMessages, AdminUsers, ErrorResolutions**. Created at runtime by `ensure*Table.ts` helpers: **EventLogs, EmailLogs, HotDeals, Payments, WalletTransactions, PerformanceMetrics**.
+
+Notable GSIs: `Clients.EmailIndex/PhoneIndex`, `Garages.TINIndex/MobileIndex`, `Vehicles.ClientVehiclesIndex/VINIndex`, `ServiceRequests.ClientRequestsIndex/VehicleRequestsIndex/StatusIndex`, `Offers.ServiceRequestOffersIndex/GarageOffersIndex/StatusIndex`, `ChatMessages.RequestMessagesIndex/SenderMessagesIndex`.
+
+Schema docs: `docs/databases/dynamodb.md`, `docs/databases/ER-Diagram.md`. Flow docs: `docs/flows/`. Full behaviour spec: `FUNCTIONAL_SPEC.md`.
+
+Local data lives in `dynamodb-local/shared-local-instance.db` (gitignored, `-sharedDb` mode).
+
+## Infrastructure (`infra/`, AWS CDK Python)
+
+Account `766671488262`, region `eu-central-1`, stage `staging`. Stacks: `NextService-DynamoDB`, `-S3`, `-Monitoring`, `-AppSync`, `-Amplify`, `-Notifications`.
+
+```bash
+cd infra && source .venv/bin/activate
+cdk synth
+cdk deploy --all           # or a single stack name
+```
+
+Amplify quirk: app-level env vars are **build-time only**. Anything the SSR runtime needs must also be listed in the `env` block of `next.config.ts`.
 
 ## Environment
 
-Key env vars (in `.env.local`):
-- `REGION`, `DYNAMODB_ENDPOINT` — AWS/DynamoDB config
-- `S3_BUCKET_NAME` — photo storage bucket
-- `NEXT_PUBLIC_APPSYNC_*` — AppSync endpoint, API key, region
-- `ACCESS_KEY_ID`, `SECRET_ACCESS_KEY` — explicit AWS creds (optional; IAM role used in prod)
+`.env.local` (never commit; contains real Stripe/JWT secrets). Keys in use:
+- `DYNAMODB_ENDPOINT` (`http://localhost:8000` locally), `REGION`, `S3_BUCKET_NAME`
+- `ACCESS_KEY_ID` / `SECRET_ACCESS_KEY` — optional explicit AWS creds (IAM role in prod; `.aws/` profile as dev fallback)
+- `NEXT_PUBLIC_APPSYNC_*` — endpoint, WS endpoint, API key, region
+- `JWT_SECRET`, `SESSION_EXPIRY`, `ADMIN_JWT_SECRET`, `ADMIN_SESSION_EXPIRY`, `ADMIN_EMAIL`
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_PAYMENTS_ENABLED`, `NEXT_PUBLIC_PAYMENTS_REFUNDS_ENABLED`, `DEPOSIT_PERCENT`, `CANCELLATION_DEADLINE_DAYS`
+- `SES_FROM_ADDRESS`, `SES_REGION`, `SES_CONFIG_SET`, `NOTIFICATIONS_ENABLED`
+- `SITE_URL`, `NEXT_PUBLIC_APP_URL`
+- Table-name overrides: `ADMIN_USERS_TABLE`, `EVENT_LOGS_TABLE`, `EMAIL_LOGS_TABLE`, `HOT_DEALS_TABLE`, `PAYMENTS_TABLE`, `WALLET_TRANSACTIONS_TABLE`, `PERFORMANCE_TABLE`, `ERROR_RESOLUTIONS_TABLE`
+
+Local dev takes the DynamoDB-Local path only when `NODE_ENV=development` **and** `DYNAMODB_ENDPOINT` is set.
 
 Path alias: `@/` maps to `src/`.
+
+## Design System
+
+The app uses a complete Material Design 3 system: Inter (latin + greek subsets), Material Symbols Outlined icons, MD3 color tokens in `tailwind.config.js`, and class-string constants in `src/styles/styles.ts`. Light mode only.
+
+**Before writing or restyling any UI, load the `nextservice-design` skill** (`.claude/skills/nextservice-design/SKILL.md`) — it has the full token set, type ramp, component API and signature elements. Never hardcode hex values or duplicate a shared component.
+
+Note: `src/components/README.md` documents a pre-MD3 palette and two components (`Title`, `Text`) that no longer exist — treat `styles.ts` + `tailwind.config.js` as the source of truth.
 
 ## Rules
 
 - **NEVER commit automatically.** Only commit when the user explicitly asks for it.
-- Do not start the dev server — it is always running on localhost:3000.
+- Check `lsof -i :3000` before starting the dev server — it is often already running.
+- Never read `.env*` or `.aws/` files.
+- All AWS infra is CDK-managed in `infra/` — never suggest manual Console/CLI changes.
 - Clean up any temporary/test/debug files before completing work.
 - Use existing shared components from `src/components/` rather than creating duplicates.
 - Follow the page structure convention: `src/app/<page-name>/page.tsx` + `components/` subfolder.

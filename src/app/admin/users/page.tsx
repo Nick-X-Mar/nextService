@@ -23,7 +23,7 @@ export default function UsersPage() {
     async function fetchClients() {
       setLoading(true)
       try {
-        const res = await fetch(`/api/admin/users/clients?limit=50&search=${encodeURIComponent(search)}`)
+        const res = await fetch(`/api/admin/users/clients/?limit=50&search=${encodeURIComponent(search)}`)
         if (res.ok) {
           const json = await res.json()
           setData(json.items || [])

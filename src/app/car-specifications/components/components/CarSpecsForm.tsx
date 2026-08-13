@@ -9,6 +9,7 @@ import LoginModal from '@/components/LoginModal'
 import { saveFormData, loadFormData } from '../../../../utils/formStorage'
 import { useToast } from '../../../../hooks/useToast'
 import { useAuth } from '@/contexts/AuthContext'
+import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 
 interface CarSpecsFormProps {
   savedData: {
@@ -49,7 +50,6 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [emailExists, setEmailExists] = useState(false)
-  const [emailCheckName, setEmailCheckName] = useState('')
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [isCheckingEmail, setIsCheckingEmail] = useState(false)
   const [showEmailHint, setShowEmailHint] = useState(false)
@@ -57,7 +57,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   // Track form funnel
   useEffect(() => {
     const clientId = localStorage.getItem('clientId')
-    fetch('/api/track', {
+    fetch('/api/track/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventName: 'car_specs_started', clientId }),
@@ -79,7 +79,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   const estimatePrice = useCallback(async (data: PriceEstimateInput) => {
     setIsEstimatingPrice(true)
     try {
-      const response = await fetch('/api/price-estimation', {
+      const response = await fetch('/api/price-estimation/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -152,21 +152,20 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   }
 
   const isEmailValid = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
-  const isPasswordValid = password.length >= 6 && password === confirmPassword
+  const isPasswordValid = password.length >= MIN_PASSWORD_LENGTH && password === confirmPassword
 
   // Debounced email check
   const checkEmail = useCallback(async (emailToCheck: string) => {
     if (!isEmailValid(emailToCheck)) return
     setIsCheckingEmail(true)
     try {
-      const res = await fetch('/api/auth/check-email', {
+      const res = await fetch('/api/auth/check-email/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailToCheck, userType: 'client' })
       })
       const data = await res.json()
       setEmailExists(data.exists)
-      setEmailCheckName(data.firstName || '')
     } catch {
       setEmailExists(false)
     } finally {
@@ -219,7 +218,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
       }
 
       try {
-        const response = await fetch('/api/service-request', {
+        const response = await fetch('/api/service-request/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -416,7 +415,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                       />
                       <Icon name="lock" className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/50" size="md" />
                     </div>
-                    {password && password.length < 6 && (
+                    {password && password.length < MIN_PASSWORD_LENGTH && (
                       <p className="text-xs text-error flex items-center gap-1">
                         <Icon name="error" size="sm" className="text-error" /> Τουλάχιστον 6 χαρακτήρες
                       </p>
@@ -442,7 +441,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                         <Icon name="error" size="sm" className="text-error" /> Οι κωδικοί δεν ταιριάζουν
                       </p>
                     )}
-                    {confirmPassword && password === confirmPassword && password.length >= 6 && (
+                    {confirmPassword && password === confirmPassword && password.length >= MIN_PASSWORD_LENGTH && (
                       <p className="text-xs text-green-600 flex items-center gap-1">
                         <Icon name="check_circle" size="sm" className="text-green-600" /> Θα δημιουργηθεί ο λογαριασμός σας κατά την υποβολή
                       </p>
@@ -695,7 +694,6 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
         isOpen={showLoginModal}
         onClose={() => setShowLoginModal(false)}
         email={email}
-        firstName={emailCheckName}
         onLoginSuccess={(clientId) => {
           setIsLoggedIn(true)
           localStorage.removeItem('garageId')

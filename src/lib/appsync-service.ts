@@ -9,6 +9,91 @@ type AppSyncEvent = Record<string, unknown>
 type AppSyncCallback = (message: any) => void
 type ReconnectListener = () => void
 
+/**
+ * Fetches a short-lived realtime token from our own API.
+ *
+ * The AppSync Events API is authorized by a Lambda that validates this token
+ * and checks the caller against the channel they ask for. The API key is no
+ * longer an access control — it is public in this bundle, so anyone holding it
+ * could previously read or forge any conversation.
+ *
+ * Cached until shortly before expiry so reconnects don't hit the API each time.
+ */
+let realtimeToken: { value: string; expiresAt: number } | null = null
+
+async function getRealtimeToken(): Promise<string | null> {
+  if (realtimeToken && realtimeToken.expiresAt > Date.now() + 30_000) {
+    return realtimeToken.value
+  }
+  // On the server there is no /api to call and no cookie to present — mint a
+  // system token directly. API routes publishing chat messages and request
+  // broadcasts take this path.
+  if (typeof window === 'undefined') {
+    return mintSystemToken()
+  }
+  try {
+    const res = await fetch('/api/realtime/token/', { credentials: 'include' })
+    if (!res.ok) return null
+    const data = await res.json()
+    if (!data?.token) return null
+    realtimeToken = {
+      value: data.token,
+      expiresAt: Date.now() + (Number(data.expiresIn) || 900) * 1000,
+    }
+    return realtimeToken.value
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The credential attached to every subscribe/publish frame.
+ *
+ * Browser: the realtime token fetched above. Server (API routes publishing
+ * chat and request broadcasts): a token minted locally with the same secret and
+ * `userType: 'system'`, which the authorizer accepts for publishing to any
+ * channel. Falling back to the API key keeps the local mock server working,
+ * since it has no authorizer in front of it.
+ */
+/**
+ * Signs a short-lived `system` token for server-side publishing.
+ *
+ * Server code is already trusted — it is the thing that decided the message is
+ * legitimate — but the authorizer now requires a token on every publish, so it
+ * needs one of its own. Never reachable from the browser: `jose` is imported
+ * lazily inside the server-only branch so it stays out of the client bundle.
+ */
+async function mintSystemToken(): Promise<string | null> {
+  const secret = process.env.REALTIME_JWT_SECRET
+  if (!secret) {
+    console.error('[appsync] REALTIME_JWT_SECRET not set — cannot publish')
+    return null
+  }
+  try {
+    const { SignJWT } = await import('jose')
+    const ttl = 300
+    const token = await new SignJWT({ userId: 'system', userType: 'system' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setAudience('appsync-events')
+      .setExpirationTime(`${ttl}s`)
+      .sign(new TextEncoder().encode(secret))
+    realtimeToken = { value: token, expiresAt: Date.now() + ttl * 1000 }
+    return token
+  } catch (err) {
+    console.error('[appsync] failed to mint system token', err)
+    return null
+  }
+}
+
+function buildAuthorization(): Record<string, string | undefined> {
+  const host = process.env.NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT
+  if (realtimeToken && realtimeToken.expiresAt > Date.now()) {
+    return { Authorization: `Bearer ${realtimeToken.value}`, host }
+  }
+  return { 'x-api-key': process.env.NEXT_PUBLIC_APPSYNC_API_KEY, host }
+}
+
 class AppSyncService {
   private ws: WebSocket | null = null
   // Multiple components can listen on the same channel (e.g. the dashboard
@@ -23,6 +108,9 @@ class AppSyncService {
   private hasEverConnected = false
 
   async connect(): Promise<void> {
+    // Obtained before opening the socket: the authorizer rejects the
+    // connection without it.
+    const realtimeAuth = await getRealtimeToken()
     return new Promise((resolve, reject) => {
       try {
         const endpoint = process.env.NEXT_PUBLIC_APPSYNC_WEBSOCKET_ENDPOINT
@@ -40,11 +128,12 @@ class AppSyncService {
 
         console.log('🔌 Connecting to AppSync Events WebSocket:', endpoint)
         
-        // Create authorization object for AppSync Events
-        const authorization = { 
-          'x-api-key': apiKey, 
-          'host': graphqlEndpoint 
-        }
+        // Authorization for AppSync Events. The Lambda authorizer reads the
+        // bearer token; `x-api-key` is kept for the local mock server only,
+        // which has no authorizer.
+        const authorization: Record<string, string> = realtimeAuth
+          ? { Authorization: `Bearer ${realtimeAuth}`, host: graphqlEndpoint }
+          : { 'x-api-key': apiKey, host: graphqlEndpoint }
         
         // Construct the protocol header for the connection (AWS AppSync Events format)
         const getAuthProtocol = () => {
@@ -284,10 +373,7 @@ class AppSyncService {
           }
         } : {
           channel: defaultChannelName,
-          authorization: {
-            'x-api-key': process.env.NEXT_PUBLIC_APPSYNC_API_KEY,
-            'host': process.env.NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT
-          }
+          authorization: buildAuthorization()
         })
       }
 
@@ -355,10 +441,7 @@ class AppSyncService {
       } : {
         channel: `/default/${channelName}`,
         events: [JSON.stringify(message)],
-        authorization: { 
-          'x-api-key': process.env.NEXT_PUBLIC_APPSYNC_API_KEY,
-          'host': process.env.NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT
-        }
+        authorization: buildAuthorization()
       })
     }
 

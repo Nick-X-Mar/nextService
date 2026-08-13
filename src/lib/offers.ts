@@ -21,6 +21,10 @@ export interface Offer {
   popular?: boolean
   isActive?: boolean
   sortOrder?: number
+  /** ISO timestamp, written by the admin panel and the slug-fix script. Used
+   *  for `lastModified` in the sitemap and `dateModified` in JSON-LD. */
+  updatedAt?: string
+  createdAt?: string
 }
 
 export async function getAllOffers(): Promise<Offer[]> {

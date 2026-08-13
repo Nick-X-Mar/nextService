@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     template: "%s | NextService",
   },
   description:
-    "Στείλε αίτημα σε συνεργεία σε όλη την Ελλάδα και πάρε προσφορές. Hot deals σε service, συμπλέκτη, ιμάντα χρονισμού και φανοποιεία — εργασία και επώνυμα ανταλλακτικά.",
+    "Στείλε δωρεάν αίτημα service και πάρε προσφορές από συνεργεία που εξυπηρετούν την περιοχή σου. Σταθερές τιμές σε service, συμπλέκτη, ιμάντα χρονισμού και φανοποιεία — εργασία και επώνυμα ανταλλακτικά.",
   applicationName: "NextService",
   icons: {
     icon: "/favicon.ico",
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     url: SITE_URL,
     title: "NextService — Βρες συνεργείο αυτοκινήτου με την καλύτερη τιμή",
     description:
-      "Στείλε αίτημα σε συνεργεία σε όλη την Ελλάδα και πάρε προσφορές. Hot deals σε service, συμπλέκτη, ιμάντα χρονισμού και φανοποιεία.",
+      "Στείλε δωρεάν αίτημα service και πάρε προσφορές από συνεργεία της περιοχής σου. Σταθερές τιμές σε service, συμπλέκτη, ιμάντα χρονισμού και φανοποιεία.",
     // Explicit URL WITH trailing slash — without it, Next.js generates a URL
     // that 308-redirects under trailingSlash:true, which Facebook/Messenger
     // crawlers don't follow for OG images.
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "NextService — Βρες συνεργείο αυτοκινήτου με την καλύτερη τιμή",
     description:
-      "Στείλε αίτημα σε συνεργεία σε όλη την Ελλάδα και πάρε προσφορές σε service και φανοποιεία.",
+      "Στείλε δωρεάν αίτημα service και πάρε προσφορές από συνεργεία της περιοχής σου.",
     images: [`${SITE_URL}/opengraph-image/`],
   },
   robots: {
@@ -76,6 +76,16 @@ export default function RootLayout({
   return (
     <html lang="el" className={inter.variable}>
       <body className="font-body antialiased bg-surface text-on-surface">
+        {/* Points AI crawlers at /llms.txt. React hoists <link> into <head>.
+            Done here rather than through Next's `alternates.types` metadata,
+            which silently emits nothing for this media type. There is no formal
+            discovery standard for llms.txt yet — this is the closest convention. */}
+        <link
+          rel="alternate"
+          type="text/plain"
+          href={`${SITE_URL}/llms.txt`}
+          title="llms.txt"
+        />
         <AuthProvider>
           <UserProvider>
             <AppShell>

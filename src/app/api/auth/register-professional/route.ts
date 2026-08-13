@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { hashPassword } from '@/utils/passwordService'
+import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 import { logEvent } from '@/utils/eventLogger'
 import { sendEmail } from '@/utils/emailService'
 import { EventName, EmailTemplate } from '@/types/events'
 import { signToken, setAuthCookie } from '@/utils/auth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { randomUUID } from 'crypto'
 
 const checkRateLimit = createRateLimiter('register-pro', 3, 3600000)
 
@@ -65,9 +67,9 @@ async function _POST(request: NextRequest) {
     }
 
 
-    if (!password || typeof password !== 'string' || password.length < 6) {
+    if (!password || typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
       return NextResponse.json({
-        error: 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες'
+        error: 'Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες'
       }, { status: 400 })
     }
 
@@ -127,7 +129,7 @@ async function _POST(request: NextRequest) {
     }
 
     // Generate unique garage ID
-    const garageId = `garage-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    const garageId = `garage-${randomUUID()}`
 
     // Create new garage
     const passwordHash = await hashPassword(password)

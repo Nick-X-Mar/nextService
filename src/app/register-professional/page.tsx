@@ -1,11 +1,12 @@
 import type { Metadata } from 'next'
 import RegisterProfessionalPage from './components/RegisterProfessionalPage'
 import { SITE_URL } from '@/lib/site-url'
+import { breadcrumbJsonLd, graphJsonLd, jsonLdScript } from '@/lib/seo'
 
 export const metadata: Metadata = {
   title: 'Εγγραφή Συνεργείου',
   description:
-    'Εγγράψτε το συνεργείο σας στο NextService και λάβετε αιτήματα πελατών από όλη την Ελλάδα. Χωρίς μηνιαία συνδρομή — πληρώνετε μόνο όταν κλείνετε δουλειά.',
+    'Εγγράψτε το συνεργείο σας στο NextService και λάβετε αιτήματα πελατών από την περιοχή σας. Χωρίς μηνιαία συνδρομή — πληρώνετε μόνο όταν κλείνετε δουλειά.',
   alternates: { canonical: `${SITE_URL}/register-professional/` },
   openGraph: {
     type: 'website',
@@ -32,6 +33,31 @@ export const metadata: Metadata = {
   },
 }
 
+const URL = `${SITE_URL}/register-professional/`
+
 export default function Page() {
-  return <RegisterProfessionalPage />
+  return (
+    <>
+      <script
+        {...jsonLdScript(
+          graphJsonLd([
+            {
+              '@type': 'WebPage',
+              '@id': `${URL}#webpage`,
+              name: 'Εγγραφή Συνεργείου',
+              description:
+                'Εγγραφή επαγγελματικού συνεργείου στο NextService, για λήψη αιτημάτων service από πελάτες της περιοχής.',
+              url: URL,
+              inLanguage: 'el-GR',
+            },
+            breadcrumbJsonLd([
+              { name: 'Αρχική', url: `${SITE_URL}/` },
+              { name: 'Εγγραφή Συνεργείου', url: URL },
+            ]),
+          ])
+        )}
+      />
+      <RegisterProfessionalPage />
+    </>
+  )
 }

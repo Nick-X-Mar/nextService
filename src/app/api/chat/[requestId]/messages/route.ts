@@ -6,8 +6,10 @@ import { ServiceRequestStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { requireAuth } from '@/utils/requireAuth'
+import { decodeCursor, encodeCursor, parseLimit } from '@/utils/pagination'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { randomUUID } from 'crypto'
 
 const checkMessageRate = createRateLimiter('chat-message', 60, 3600000)
 
@@ -21,7 +23,7 @@ async function _GET(
 
     const { requestId } = await params
     const { searchParams } = new URL(request.url)
-    const garageId = searchParams.get('garageId')
+    const requestedGarageId = searchParams.get('garageId')
 
     if (!requestId) {
       return NextResponse.json({
@@ -42,6 +44,18 @@ async function _GET(
       return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
     }
 
+    // Every garage's conversation on a request lives under the same requestId,
+    // so the garage thread is separated by filter alone. That makes the filter
+    // a security boundary, not a convenience: a garage must never be able to
+    // choose someone else's thread, nor opt out of filtering and read them all.
+    let garageId = requestedGarageId
+    if (auth.userType === 'garage') {
+      if (requestedGarageId && requestedGarageId !== auth.userId) {
+        return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
+      }
+      garageId = auth.userId
+    }
+
     // Query messages by requestId via the RequestMessagesIndex GSI.
     // FilterExpression still narrows to a specific garage thread when requested
     // — Filter is applied AFTER the index read, so it stays cheap.
@@ -54,27 +68,33 @@ async function _GET(
       expressionValues[':clientType'] = 'client'
     }
 
+    // Newest page first (ScanIndexForward: false), so opening a conversation
+    // costs one small read regardless of how long the thread is. The client
+    // reverses each page for display and walks `nextCursor` backwards through
+    // history when the user asks for older messages.
+    //
+    // This read used to be unbounded: once a thread passed DynamoDB's 1MB page
+    // limit it returned a partial history with no indication anything was
+    // missing.
+    const limit = parseLimit(searchParams.get('limit'), 50)
     const result = await dynamoDB.send(new QueryCommand({
       TableName: 'ChatMessages',
       IndexName: 'RequestMessagesIndex',
       KeyConditionExpression: 'requestId = :requestId',
       ExpressionAttributeValues: expressionValues,
-      ...(filterExpression ? { FilterExpression: filterExpression } : {})
+      ...(filterExpression ? { FilterExpression: filterExpression } : {}),
+      ScanIndexForward: false,
+      Limit: limit,
+      ExclusiveStartKey: decodeCursor(searchParams.get('cursor')),
     }))
 
-    if (!result.Items || result.Items.length === 0) {
-      return NextResponse.json({
-        success: true,
-        messages: []
-      })
-    }
-
-    // RequestMessagesIndex sorts by timestamp ASC by default — keep that order.
-    const sortedMessages = result.Items
+    // Back to chronological order for rendering.
+    const messages = [...(result.Items || [])].reverse()
 
     return NextResponse.json({
       success: true,
-      messages: sortedMessages
+      messages,
+      nextCursor: encodeCursor(result.LastEvaluatedKey),
     })
 
   } catch (error) {
@@ -130,8 +150,15 @@ async function _POST(
     const senderId = auth.userId
     const senderType = auth.userType
 
-    // If garageId is not provided but senderType is garage, use senderId as garageId
-    const effectiveGarageId = garageId || (senderType === 'garage' ? senderId : null)
+    // The thread a message lands in — and the realtime channel it is published
+    // to — is decided by garageId. Taking it from the body unchecked would let
+    // one garage write into a competitor's conversation and have it appear live
+    // in the client's chat with that competitor. A garage always writes to its
+    // own thread; only a client (who owns the request) may address a garage.
+    if (senderType === 'garage' && garageId && garageId !== auth.userId) {
+      return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
+    }
+    const effectiveGarageId = senderType === 'garage' ? senderId : (garageId || null)
 
     if (!message || !senderId || !senderType) {
       return NextResponse.json({ 
@@ -155,7 +182,7 @@ async function _POST(
     }
 
     // Generate unique message ID
-    const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    const messageId = `msg-${randomUUID()}`
 
     // Get sender name based on type
     let senderName = 'Unknown'

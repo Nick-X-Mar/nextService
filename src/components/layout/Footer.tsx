@@ -10,11 +10,15 @@ const socialLinks = [
   { icon: 'share', label: 'Share', href: '#share' },
 ]
 
+// Trailing slashes are required — `trailingSlash: true` means a slashless href
+// costs every crawler an extra 308 hop before it reaches the page.
 const footerLinks = [
-  { label: 'Σχετικά', href: '/about' },
-  { label: 'Όροι Χρήσης', href: '/terms' },
-  { label: 'Πολιτική Απορρήτου', href: '/privacy' },
-  { label: 'Επικοινωνία', href: '/contact' },
+  { label: 'Σχετικά', href: '/about/' },
+  { label: 'Συχνές Ερωτήσεις', href: '/faq/' },
+  { label: 'Περιοχές', href: '/locations/' },
+  { label: 'Όροι Χρήσης', href: '/terms/' },
+  { label: 'Πολιτική Απορρήτου', href: '/privacy/' },
+  { label: 'Επικοινωνία', href: '/contact/' },
 ]
 
 export default function Footer() {

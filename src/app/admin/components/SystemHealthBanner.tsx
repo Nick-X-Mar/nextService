@@ -22,7 +22,7 @@ export default function SystemHealthBanner() {
 
     async function fetchHealth() {
       try {
-        const res = await fetch('/api/admin/system/appsync-key')
+        const res = await fetch('/api/admin/system/appsync-key/')
         if (!res.ok) return
         const data = (await res.json()) as ApiKeyHealth
         if (!cancelled) setHealth(data)

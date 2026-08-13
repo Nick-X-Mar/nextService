@@ -65,7 +65,7 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
     try {
       setIsLoading(true)
 
-      const response = await fetch(`/api/garage/${formData.id}`, {
+      const response = await fetch(`/api/garage/${formData.id}/`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

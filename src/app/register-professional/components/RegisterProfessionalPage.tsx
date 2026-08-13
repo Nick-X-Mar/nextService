@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Icon from '@/components/ui/Icon'
 import { useToast } from '@/hooks/useToast'
 import { styles } from '@/styles/styles'
+import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 
 const extraServices = [
   { icon: 'car_rental', label: 'Όχημα Αντικατάστασης', value: 'replacement-vehicle' },
@@ -140,8 +141,8 @@ export default function RegisterProfessionalPage() {
     }
 
     if (showPasswordFields) {
-      if (!password || password.length < 6) {
-        error('Σφάλμα', 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες')
+      if (!password || password.length < MIN_PASSWORD_LENGTH) {
+        error('Σφάλμα', 'Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες')
         return false
       }
       if (password !== confirmPassword) {
@@ -168,7 +169,7 @@ export default function RegisterProfessionalPage() {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/auth/register-professional', {
+      const response = await fetch('/api/auth/register-professional/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -52,7 +52,7 @@ export default function AccountDangerZone({ userId, userType }: AccountDangerZon
     }
     setIsLoading(true)
     try {
-      const response = await fetch('/api/account/export', {
+      const response = await fetch('/api/account/export/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, userType, password })
@@ -95,7 +95,7 @@ export default function AccountDangerZone({ userId, userType }: AccountDangerZon
     }
     setIsLoading(true)
     try {
-      const response = await fetch('/api/account/delete', {
+      const response = await fetch('/api/account/delete/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, userType, password })

@@ -65,8 +65,8 @@ export default function PaymentsPage() {
       setListLoading(true)
       try {
         const [statsRes, listRes] = await Promise.all([
-          fetch(`/api/admin/payments/stats?from=${from}&to=${to}`),
-          fetch(`/api/admin/payments/list?from=${from}&to=${to}&limit=50`)
+          fetch(`/api/admin/payments/stats/?from=${from}&to=${to}`),
+          fetch(`/api/admin/payments/list/?from=${from}&to=${to}&limit=50`)
         ])
         if (statsRes.ok) setStats(await statsRes.json())
         if (listRes.ok) {

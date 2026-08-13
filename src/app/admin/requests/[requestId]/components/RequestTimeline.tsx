@@ -75,7 +75,7 @@ export default function RequestTimeline({ requestId }: RequestTimelineProps) {
     let cancelled = false
     async function load() {
       try {
-        const res = await fetch(`/api/admin/requests/${requestId}/timeline`)
+        const res = await fetch(`/api/admin/requests/${requestId}/timeline/`)
         if (!res.ok) {
           const body = await res.json().catch(() => ({}))
           if (!cancelled) setError(body.error || `HTTP ${res.status}`)

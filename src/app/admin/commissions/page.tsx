@@ -67,7 +67,7 @@ export default function CommissionsPage() {
     async function fetchData() {
       setLoading(true)
       try {
-        const res = await fetch(`/api/admin/commissions/stats?month=${month}`)
+        const res = await fetch(`/api/admin/commissions/stats/?month=${month}`)
         if (res.ok) {
           const json = (await res.json()) as CommissionsStats
           if (!cancelled) setData(json)

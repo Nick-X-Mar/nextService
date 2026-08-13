@@ -20,7 +20,7 @@ export default function RequestDetailsPage({ clientId, requestId }: RequestDetai
 
   const loadRequest = useCallback(async () => {
     try {
-      const response = await fetch(`/api/requests?clientId=${clientId}`)
+      const response = await fetch(`/api/requests/?clientId=${clientId}`)
       if (!response.ok) throw new Error('Failed to fetch requests')
 
       const result = await response.json()

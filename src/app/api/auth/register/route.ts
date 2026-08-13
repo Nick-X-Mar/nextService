@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { hashPassword } from '@/utils/passwordService'
+import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { signToken, setAuthCookie } from '@/utils/auth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { randomUUID } from 'crypto'
 
 const checkRegisterRate = createRateLimiter('register', 3, 3600000)
 
@@ -23,8 +25,8 @@ async function _POST(request: NextRequest) {
       return NextResponse.json({ error: 'Το email είναι υποχρεωτικό' }, { status: 400 })
     }
 
-    if (!password || typeof password !== 'string' || password.length < 6) {
-      return NextResponse.json({ error: 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες' }, { status: 400 })
+    if (!password || typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
+      return NextResponse.json({ error: 'Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες' }, { status: 400 })
     }
 
     if (acceptedTerms !== true) {
@@ -56,7 +58,7 @@ async function _POST(request: NextRequest) {
       }, { status: 409 })
     }
 
-    const clientId = `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    const clientId = `client-${randomUUID()}`
     const passwordHash = await hashPassword(password)
 
     const nowIso = new Date().toISOString()

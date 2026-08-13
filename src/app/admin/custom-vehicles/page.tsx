@@ -29,7 +29,7 @@ export default function CustomVehiclesPage() {
   useEffect(() => {
     async function fetch_data() {
       try {
-        const res = await fetch('/api/admin/custom-vehicles')
+        const res = await fetch('/api/admin/custom-vehicles/')
         if (res.ok) {
           setData(await res.json())
         }

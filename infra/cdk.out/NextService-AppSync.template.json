@@ -1,25 +1,171 @@
 {
  "Resources": {
+  "EventsAuthorizerFnServiceRole37EFF19E": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/EventsAuthorizerFn/ServiceRole/Resource"
+   }
+  },
+  "EventsAuthorizerFnServiceRoleDefaultPolicyA3130703": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "dynamodb:GetItem",
+       "Effect": "Allow",
+       "Resource": "arn:aws:dynamodb:eu-central-1:766671488262:table/ServiceRequests"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "EventsAuthorizerFnServiceRoleDefaultPolicyA3130703",
+    "Roles": [
+     {
+      "Ref": "EventsAuthorizerFnServiceRole37EFF19E"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/EventsAuthorizerFn/ServiceRole/DefaultPolicy/Resource"
+   }
+  },
+  "EventsAuthorizerFnE9651D1C": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-766671488262-eu-central-1",
+     "S3Key": "a6dd8359712281cf57d0166ae805d89e99f55be69d35be3e44d6573c75719e20.zip"
+    },
+    "Description": "Authorizes AppSync Events connect/subscribe/publish per channel",
+    "Environment": {
+     "Variables": {
+      "SERVICE_REQUESTS_TABLE": "ServiceRequests",
+      "REALTIME_JWT_SECRET": "7173cea6eaa93281de25f1b8e5945f4e682ee201bc9f6733eb797166cea6675d"
+     }
+    },
+    "FunctionName": "nextservice-appsync-authorizer",
+    "Handler": "index.handler",
+    "MemorySize": 256,
+    "Role": {
+     "Fn::GetAtt": [
+      "EventsAuthorizerFnServiceRole37EFF19E",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs20.x",
+    "Timeout": 10
+   },
+   "DependsOn": [
+    "EventsAuthorizerFnServiceRoleDefaultPolicyA3130703",
+    "EventsAuthorizerFnServiceRole37EFF19E"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/EventsAuthorizerFn/Resource",
+    "aws:asset:path": "asset.a6dd8359712281cf57d0166ae805d89e99f55be69d35be3e44d6573c75719e20",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "EventsAuthorizerFnAppSyncInvokeAuthorizer2292CEA4": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "EventsAuthorizerFnE9651D1C",
+      "Arn"
+     ]
+    },
+    "Principal": "appsync.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:aws:appsync:eu-central-1:766671488262:apis/",
+       {
+        "Fn::GetAtt": [
+         "ChatEventsApi",
+         "ApiId"
+        ]
+       }
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/EventsAuthorizerFn/AppSyncInvokeAuthorizer"
+   }
+  },
   "ChatEventsApi": {
    "Type": "AWS::AppSync::Api",
    "Properties": {
     "EventConfig": {
      "AuthProviders": [
       {
+       "AuthType": "AWS_LAMBDA",
+       "LambdaAuthorizerConfig": {
+        "AuthorizerResultTtlInSeconds": 300,
+        "AuthorizerUri": {
+         "Fn::GetAtt": [
+          "EventsAuthorizerFnE9651D1C",
+          "Arn"
+         ]
+        }
+       }
+      },
+      {
        "AuthType": "API_KEY"
       }
      ],
      "ConnectionAuthModes": [
+      {
+       "AuthType": "AWS_LAMBDA"
+      },
       {
        "AuthType": "API_KEY"
       }
      ],
      "DefaultPublishAuthModes": [
       {
+       "AuthType": "AWS_LAMBDA"
+      },
+      {
        "AuthType": "API_KEY"
       }
      ],
      "DefaultSubscribeAuthModes": [
+      {
+       "AuthType": "AWS_LAMBDA"
+      },
       {
        "AuthType": "API_KEY"
       }
@@ -244,7 +390,7 @@
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/02OTWvDMAxAf0vvjrY1g+2aFnYZbCH9AUV1tEaLP0JkLwTj/z6c7LDTe0jioSMcn1/h8YCLVLofK8M3SJeAelS4yDXhNMnqNKTzl2smVjveaS12HtA5Mh9oSSbUlJVBe+sR0lt0OrB35eq/tzRbFmHvsmK0kDpvqCw2tt6w3sq7ZSX1FUUoCDQFSmo4RT1SOKGQoh9yQSB18S8SDWWljY/9gkEPkBqDs92eLpKz2jKXgHd29zL/jGGKIat2DYN3DzU81fBy+Bbmao4usCXodv4CGFvf8ioBAAA="
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/02NQWrDMBBFz5K9Mm3jQrt1DN0UWuMcIEzkSaxYGhmPVGOE7l6sdNHVe8wf/j/A4fUdnne4yF73496aC6RTQD0qXOScLLpLj5A+IutgPKvmyv+9pdkZEeM5K4MOUuctbUFh663Ra/krlpVUZxShIFBvUFLBMeqRwhGFFE6TrKwhNVeuJ6Me+KRS0QzITPYLHcmEmrKiH+IgkLr4txktZaWtj/2CQQ+QaouzKzWb5KzK6ingzfBtu3/HMMWQVbuGwfNTBS8VvO3uYsx+jhyMI+ge/AWWzgmKKgEAAA=="
    },
    "Metadata": {
     "aws:cdk:path": "NextService-AppSync/CDKMetadata/Default"

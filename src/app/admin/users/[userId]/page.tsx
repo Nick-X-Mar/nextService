@@ -34,9 +34,9 @@ export default function UserDetailPage() {
     async function fetchUser() {
       try {
         // Try client first, then garage
-        let res = await fetch(`/api/admin/users/clients/${userId}`)
+        let res = await fetch(`/api/admin/users/clients/${userId}/`)
         if (!res.ok) {
-          res = await fetch(`/api/admin/users/garages/${userId}`)
+          res = await fetch(`/api/admin/users/garages/${userId}/`)
         }
         if (res.ok) {
           setUser(await res.json())

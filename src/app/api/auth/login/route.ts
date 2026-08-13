@@ -1,12 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { verifyPassword } from '@/utils/passwordService'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { signToken, setAuthCookie } from '@/utils/auth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+
+/** The fields this route reads off a Clients/Garages record. */
+interface AuthUser {
+  id: string
+  email?: string
+  passwordHash?: string
+  isActive?: boolean
+  companyName?: string
+  mobile?: string
+  address?: string
+  tin?: string
+  firstName?: string
+  lastName?: string
+  phoneNumber?: string
+}
 
 const checkIPRate = createRateLimiter('login-ip', 10, 3600000)
 const checkEmailRate = createRateLimiter('login-email', 5, 3600000)
@@ -43,36 +58,37 @@ async function _POST(request: NextRequest) {
     }
 
     const normalizedEmail = email.trim().toLowerCase()
-    const tableName = userType === 'garage' ? 'Garages' : 'Clients'
 
-    const result = await dynamoDB.send(new ScanCommand({
-      TableName: tableName,
-      FilterExpression: 'email = :email',
-      ExpressionAttributeValues: { ':email': normalizedEmail }
+    // Both tables have an EmailIndex, so neither login path scans. A scan read
+    // the whole table on every attempt, making cost and latency grow with
+    // signups — and giving an unauthenticated caller a cheap way to burn read
+    // capacity.
+    const result = await dynamoDB.send(new QueryCommand({
+      TableName: userType === 'garage' ? 'Garages' : 'Clients',
+      IndexName: 'EmailIndex',
+      KeyConditionExpression: 'email = :email',
+      ExpressionAttributeValues: { ':email': normalizedEmail },
+      Limit: 1
     }))
+    const user = result.Items?.[0] as AuthUser | undefined
 
-    const user = result.Items?.[0]
+    // One generic message for "no such account", "account has no password" and
+    // "wrong password". Distinguishing them turns the login form into an
+    // account-enumeration oracle: an attacker learns which email addresses are
+    // registered just by submitting them. Same reason /api/auth/check-email no
+    // longer returns anything but booleans.
+    const invalidCredentials = NextResponse.json({
+      success: false,
+      error: 'Λάθος email ή κωδικός πρόσβασης'
+    }, { status: 401 })
 
-    if (!user) {
-      return NextResponse.json({
-        success: false,
-        error: 'Δεν βρέθηκε λογαριασμός με αυτό το email'
-      }, { status: 401 })
-    }
-
-    if (!user.passwordHash) {
-      return NextResponse.json({
-        success: false,
-        error: 'Ο λογαριασμός δεν έχει κωδικό. Επικοινωνήστε με την υποστήριξη.'
-      }, { status: 401 })
+    if (!user || !user.passwordHash) {
+      return invalidCredentials
     }
 
     const passwordValid = await verifyPassword(password, user.passwordHash)
     if (!passwordValid) {
-      return NextResponse.json({
-        success: false,
-        error: 'Λάθος κωδικός πρόσβασης'
-      }, { status: 401 })
+      return invalidCredentials
     }
 
     // Strip passwordHash from response

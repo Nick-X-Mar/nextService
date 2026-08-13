@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { styles } from '@/styles/styles'
 import Icon from '@/components/ui/Icon'
+import { LoadMoreButton } from '@/components'
 import type { ServiceRequest } from '@/types/requests'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { getCategoryText } from '@/utils/categoryLabels'
@@ -52,6 +53,9 @@ const HIGHLIGHT_DURATION_MS = 10_000
 
 export default function AvailableRequests({ garageId }: AvailableRequestsProps) {
   const [requests, setRequests] = useState<ServiceRequest[]>([])
+  // Cursor into the pending-request feed; null once it is exhausted.
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState<string>('all')
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null)
@@ -67,14 +71,44 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
   // server-side; we only need it for cards added later.
   const respondedRequestIdsRef = useRef<Set<string>>(new Set())
 
+  /**
+   * Appends the next page of the pending-request feed.
+   *
+   * A page can come back with few or no rows even when more exist, because the
+   * server drops requests this garage has already bid on *after* reading the
+   * page. The cursor still advances, so pressing again keeps moving forward.
+   */
+  const loadMoreRequests = useCallback(async () => {
+    if (!nextCursor || loadingMore) return
+    setLoadingMore(true)
+    try {
+      const response = await fetch(
+        `/api/garage/available-requests/?garageId=${garageId}&cursor=${encodeURIComponent(nextCursor)}`
+      )
+      const data = await response.json()
+      if (response.ok && data.success) {
+        setNextCursor(data.nextCursor ?? null)
+        setRequests((prev) => {
+          const seen = new Set(prev.map((r) => r.id))
+          return [...prev, ...(data.requests || []).filter((r: ServiceRequest) => !seen.has(r.id))]
+        })
+      }
+    } catch (error) {
+      console.error('Error loading more requests:', error)
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [nextCursor, loadingMore, garageId])
+
   const loadAvailableRequests = useCallback(async () => {
     try {
       setIsLoading(true)
 
-      const response = await fetch(`/api/garage/available-requests?garageId=${garageId}`)
+      const response = await fetch(`/api/garage/available-requests/?garageId=${garageId}`)
       const data = await response.json()
 
       if (response.ok && data.success) {
+        setNextCursor(data.nextCursor ?? null)
         setRequests(data.requests)
       } else {
         console.error('Error loading requests:', data.error)
@@ -379,6 +413,12 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
               </article>
             )
           })}
+          <LoadMoreButton
+            hasMore={!!nextCursor}
+            loading={loadingMore}
+            onClick={loadMoreRequests}
+            label="Περισσότερα αιτήματα"
+          />
         </div>
       )}
 

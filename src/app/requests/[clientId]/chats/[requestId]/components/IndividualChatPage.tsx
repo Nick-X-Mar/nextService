@@ -7,7 +7,7 @@ import Icon from '@/components/ui/Icon'
 import { styles } from '../../../../../../styles/styles'
 import { useToast } from '../../../../../../hooks/useToast'
 // Navigation handled by AppShell
-import { RequestDetailsPanel } from '../../../../../../components'
+import { RequestDetailsPanel, LoadMoreButton } from '../../../../../../components'
 import { ServiceRequestStatus } from '../../../../../../types/statuses'
 import type { ServiceRequest } from '../../../../../../types/requests'
 import '@/lib/amplify-config'
@@ -44,6 +44,9 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   const [garages, setGarages] = useState<Garage[]>([])
   const [selectedGarage, setSelectedGarage] = useState<Garage | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  // Cursor for the next page of OLDER messages; null once history is exhausted.
+  const [olderCursor, setOlderCursor] = useState<string | null>(null)
+  const [loadingOlder, setLoadingOlder] = useState(false)
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -61,7 +64,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   // Fetch request details
   const fetchRequestDetails = useCallback(async () => {
     try {
-      const response = await fetch(`/api/requests/${requestId}`)
+      const response = await fetch(`/api/requests/${requestId}/`)
       if (response.ok) {
         const data = await response.json()
         // Some endpoints return { success, request }, others may return just { request }
@@ -77,7 +80,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   // Fetch garages that have messages for this request
   const fetchGarages = useCallback(async () => {
     try {
-      const response = await fetch(`/api/chat/${requestId}/garages`)
+      const response = await fetch(`/api/chat/${requestId}/garages/`)
       if (response.ok) {
         const data = await response.json()
         setGarages(data.garages || [])
@@ -91,15 +94,49 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
     }
   }, [requestId, showToast])
 
-  // Fetch messages for selected garage
+  /**
+   * Pulls the next page of older messages and prepends it.
+   *
+   * The API returns newest-first pages, so each call walks further back in
+   * time. Without this the conversation would simply stop at the most recent
+   * page with no way to reach anything before it.
+   */
+  const loadOlderMessages = useCallback(async () => {
+    if (!olderCursor || !selectedGarage || loadingOlder) return
+    setLoadingOlder(true)
+    try {
+      const response = await fetch(
+        `/api/chat/${requestId}/messages/?garageId=${selectedGarage.id}&cursor=${encodeURIComponent(olderCursor)}`
+      )
+      if (response.ok) {
+        const data = await response.json()
+        const older = (data.messages || []).filter(
+          (msg: ChatMessage) => msg.timestamp && !isNaN(new Date(msg.timestamp).getTime())
+        )
+        setOlderCursor(data.nextCursor ?? null)
+        setMessages((prev) => {
+          const seen = new Set(prev.map((m) => m.id))
+          return [...older.filter((m: ChatMessage) => !seen.has(m.id)), ...prev]
+        })
+      }
+    } catch (error) {
+      console.error('Error loading older messages:', error)
+    } finally {
+      setLoadingOlder(false)
+    }
+  }, [olderCursor, selectedGarage, loadingOlder, requestId])
+
+  // Fetch the most recent page of messages for the selected garage. Older
+  // history is pulled in on demand by loadOlderMessages().
   const fetchMessages = useCallback(async (garageId: string) => {
     try {
-      const response = await fetch(`/api/chat/${requestId}/messages?garageId=${garageId}`)
+      const response = await fetch(`/api/chat/${requestId}/messages/?garageId=${garageId}`)
       if (response.ok) {
         const data = await response.json()
         const validMessages = (data.messages || []).filter(
           (msg: ChatMessage) => msg.timestamp && !isNaN(new Date(msg.timestamp).getTime())
         )
+        setOlderCursor(data.nextCursor ?? null)
         setMessages(validMessages)
         // Scroll to bottom after messages are loaded
         setTimeout(() => {
@@ -169,7 +206,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
 
     setSending(true)
     try {
-      const response = await fetch(`/api/chat/${requestId}/messages`, {
+      const response = await fetch(`/api/chat/${requestId}/messages/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -205,7 +242,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   // Mark messages as read
   const markMessagesAsRead = useCallback(async (garageId: string) => {
     try {
-      await fetch(`/api/chat/${requestId}/mark-read`, {
+      await fetch(`/api/chat/${requestId}/mark-read/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -477,6 +514,13 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
 
                   {/* Messages */}
                   <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+                    <LoadMoreButton
+                      hasMore={!!olderCursor}
+                      loading={loadingOlder}
+                      onClick={loadOlderMessages}
+                      label="Παλαιότερα μηνύματα"
+                      icon="history"
+                    />
                     {messages.length === 0 ? (
                       <div className="text-center py-16">
                         <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mx-auto mb-4">

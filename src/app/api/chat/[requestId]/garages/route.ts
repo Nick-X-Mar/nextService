@@ -40,6 +40,8 @@ async function _GET(
       return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
     }
 
+    const clientReadAt = (requestResult.Item.clientReadAt || {}) as Record<string, string>
+
     // Get all messages for this request via the RequestMessagesIndex GSI
     const result = await dynamoDB.send(new QueryCommand({
       TableName: 'ChatMessages',
@@ -100,13 +102,14 @@ async function _GET(
 
       const lastMessage = garageMessages[0]
 
-      // Get the last time client read messages from this garage
-      const lastReadByClient = garage.lastReadByClient || garage.createdAt
+      // Read state is per (request, garage) — see the note in mark-read.
+      // Absent entry means this client has never opened the thread, so every
+      // garage message counts as unread.
+      const lastRead = clientReadAt[garage.id]
 
-      // Check if there are any unread messages from garage
       const hasUnreadMessages = garageMessages.some((msg) =>
         msg.senderType === 'garage' &&
-        new Date(msg.timestamp).getTime() > new Date(lastReadByClient).getTime()
+        (!lastRead || new Date(msg.timestamp).getTime() > new Date(lastRead).getTime())
       )
 
       garages.push({

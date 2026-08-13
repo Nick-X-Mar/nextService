@@ -61,7 +61,7 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
 
   const loadGarageData = async (garageId: string) => {
     try {
-      const response = await fetch(`/api/garage/${garageId}`)
+      const response = await fetch(`/api/garage/${garageId}/`)
 
       if (!response.ok) {
         if (response.status === 404) {
@@ -89,7 +89,7 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
   const loadCounts = useCallback(async () => {
     try {
       // Load available requests count
-      const requestsResponse = await fetch(`/api/garage/available-requests?garageId=${garageId}`)
+      const requestsResponse = await fetch(`/api/garage/available-requests/?garageId=${garageId}`)
       if (requestsResponse.ok) {
         const requestsData = await requestsResponse.json()
         if (requestsData.success) {
@@ -102,7 +102,7 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
       }
 
       // Load offers count
-      const offersResponse = await fetch(`/api/garage/offers?garageId=${garageId}`)
+      const offersResponse = await fetch(`/api/garage/offers/?garageId=${garageId}`)
       if (offersResponse.ok) {
         const offersData = await offersResponse.json()
         if (offersData.success) {

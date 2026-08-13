@@ -22,7 +22,7 @@ export default function HotDealsAdminPage() {
 
   const fetchDeals = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/hot-deals')
+      const res = await fetch('/api/admin/hot-deals/')
       if (res.ok) {
         const data = await res.json()
         setDeals(data.items || [])
@@ -39,7 +39,7 @@ export default function HotDealsAdminPage() {
 
     try {
       if (isNew) {
-        const res = await fetch('/api/admin/hot-deals', {
+        const res = await fetch('/api/admin/hot-deals/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...editing, sortOrder: deals.length })
@@ -49,7 +49,7 @@ export default function HotDealsAdminPage() {
           fetchDeals()
         }
       } else {
-        const res = await fetch(`/api/admin/hot-deals/${editing.dealId}`, {
+        const res = await fetch(`/api/admin/hot-deals/${editing.dealId}/`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(editing)
@@ -66,7 +66,7 @@ export default function HotDealsAdminPage() {
   async function handleDelete(dealId: string) {
     if (!confirm('Delete this deal?')) return
     try {
-      await fetch(`/api/admin/hot-deals/${dealId}`, { method: 'DELETE' })
+      await fetch(`/api/admin/hot-deals/${dealId}/`, { method: 'DELETE' })
       fetchDeals()
     } catch { /* empty */ }
   }
@@ -79,7 +79,7 @@ export default function HotDealsAdminPage() {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const res = await fetch('/api/admin/hot-deals/upload', {
+      const res = await fetch('/api/admin/hot-deals/upload/', {
         method: 'POST',
         body: formData
       })
@@ -111,7 +111,7 @@ export default function HotDealsAdminPage() {
     setDeals(newOrder)
 
     try {
-      await fetch('/api/admin/hot-deals/reorder', {
+      await fetch('/api/admin/hot-deals/reorder/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ order: newOrder.map((d) => d.dealId) })

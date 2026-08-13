@@ -36,7 +36,7 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
 
   const loadGarageData = useCallback(async () => {
     try {
-      const response = await fetch(`/api/garage/${garageId}`)
+      const response = await fetch(`/api/garage/${garageId}/`)
       if (response.ok) {
         const data = await response.json()
         if (data.success) {
@@ -54,8 +54,8 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
 
       // Get request IDs from both offers and chat messages
       const [offersResponse, chatsResponse] = await Promise.all([
-        fetch(`/api/garage/offers?garageId=${garageId}`),
-        fetch(`/api/chat/garage-chats?garageId=${garageId}`)
+        fetch(`/api/garage/offers/?garageId=${garageId}`),
+        fetch(`/api/chat/garage-chats/?garageId=${garageId}`)
       ])
 
       const requestIdsSet = new Set<string>()
@@ -88,7 +88,7 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
       const requestsWithDetails = await Promise.all(
         requestIds.map(async (requestId: string) => {
           try {
-            const requestResponse = await fetch(`/api/requests/${requestId}`)
+            const requestResponse = await fetch(`/api/requests/${requestId}/`)
             if (requestResponse.ok) {
               const requestData = await requestResponse.json()
               if (requestData.success && requestData.request) {
@@ -113,7 +113,7 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
       const requestsWithMessages = await Promise.all(
         openRequests.map(async (request: ChatRequest) => {
           try {
-            const chatResponse = await fetch(`/api/chat/${request.id}/messages?garageId=${garageId}`)
+            const chatResponse = await fetch(`/api/chat/${request.id}/messages/?garageId=${garageId}`)
             if (chatResponse.ok) {
               const chatData = await chatResponse.json()
               if (chatData.messages && chatData.messages.length > 0) {

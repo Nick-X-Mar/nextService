@@ -53,6 +53,18 @@
       "data": "CheckBootstrapVersion"
     }
   ],
+  "/NextService-AppSync/EventsAuthorizerFn/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "EventsAuthorizerFnE9651D1C"
+    }
+  ],
+  "/NextService-AppSync/EventsAuthorizerFn/AppSyncInvokeAuthorizer": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "EventsAuthorizerFnAppSyncInvokeAuthorizer2292CEA4"
+    }
+  ],
   "/NextService-AppSync/ApiKeyRotatorFn/Resource": [
     {
       "type": "aws:cdk:logicalId",
@@ -95,10 +107,22 @@
       "data": "ExportsOutputFnGetAttChatApiKeyApiKeyCBB19482"
     }
   ],
+  "/NextService-AppSync/EventsAuthorizerFn/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "EventsAuthorizerFnServiceRole37EFF19E"
+    }
+  ],
   "/NextService-AppSync/ApiKeyRotatorFn/ServiceRole/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ApiKeyRotatorFnServiceRole510DF920"
+    }
+  ],
+  "/NextService-AppSync/EventsAuthorizerFn/ServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "EventsAuthorizerFnServiceRoleDefaultPolicyA3130703"
     }
   ],
   "/NextService-AppSync/ApiKeyRotatorFn/ServiceRole/DefaultPolicy/Resource": [

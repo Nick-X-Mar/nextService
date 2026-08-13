@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Icon from '@/components/ui/Icon'
 import { useToast } from '@/hooks/useToast'
 import { styles } from '@/styles/styles'
+import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 
 export default function ResetPasswordPage() {
   const params = useParams<{ token: string }>()
@@ -26,8 +27,8 @@ export default function ResetPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (password.length < 6) {
-      error('Σφάλμα', 'Ο κωδικός πρέπει να έχει τουλάχιστον 6 χαρακτήρες')
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      error('Σφάλμα', 'Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες')
       return
     }
     if (password !== confirmPassword) {
@@ -38,7 +39,7 @@ export default function ResetPasswordPage() {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/auth/reset-password', {
+      const response = await fetch('/api/auth/reset-password/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, userType, newPassword: password })

@@ -1,13 +1,34 @@
 import Link from 'next/link'
+import { SITE_URL } from '@/lib/site-url'
+import { breadcrumbJsonLd, graphJsonLd, jsonLdScript } from '@/lib/seo'
 
 export const metadata = {
-  title: 'Πολιτική Απορρήτου - NextService',
-  description: 'Πώς το NextService συλλέγει, χρησιμοποιεί και προστατεύει τα προσωπικά σας δεδομένα.'
+  title: 'Πολιτική Απορρήτου',
+  description: 'Πώς το NextService συλλέγει, χρησιμοποιεί και προστατεύει τα προσωπικά σας δεδομένα.',
+  alternates: { canonical: `${SITE_URL}/privacy/` },
 }
 
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen bg-surface px-4 py-10">
+    <>
+      <script
+        {...jsonLdScript(
+          graphJsonLd([
+            {
+              '@type': 'WebPage',
+              '@id': `${SITE_URL}/privacy/#webpage`,
+              name: 'Πολιτική Απορρήτου',
+              url: `${SITE_URL}/privacy/`,
+              inLanguage: 'el-GR',
+            },
+            breadcrumbJsonLd([
+              { name: 'Αρχική', url: `${SITE_URL}/` },
+              { name: 'Πολιτική Απορρήτου', url: `${SITE_URL}/privacy/` },
+            ]),
+          ])
+        )}
+      />
+    <div className="min-h-screen bg-surface px-4 py-10">
       <div className="max-w-3xl mx-auto bg-surface-container-lowest rounded-2xl p-8 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10">
         <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 mb-8">
           <p className="text-sm font-bold text-amber-900 mb-1">⚠️ ΠΡΟΣΧΕΔΙΟ — Δεν είναι το τελικό κείμενο</p>
@@ -149,6 +170,7 @@ export default function PrivacyPage() {
           <Link href="/" className="text-sm text-primary underline">Επιστροφή στην αρχική</Link>
         </div>
       </div>
-    </main>
+    </div>
+    </>
   )
 }

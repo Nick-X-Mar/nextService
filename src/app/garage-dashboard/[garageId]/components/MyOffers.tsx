@@ -47,7 +47,7 @@ export default function MyOffers({ garageId }: MyOffersProps) {
     try {
       setIsLoading(true)
 
-      const response = await fetch(`/api/garage/offers?garageId=${garageId}`)
+      const response = await fetch(`/api/garage/offers/?garageId=${garageId}`)
       const data = await response.json()
 
       if (response.ok && data.success) {

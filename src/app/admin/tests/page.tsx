@@ -37,7 +37,7 @@ export default function TestsPage() {
   const [selectedFile, setSelectedFile] = useState<string>('')
 
   useEffect(() => {
-    fetch('/api/admin/tests/run')
+    fetch('/api/admin/tests/run/')
       .then(res => res.ok ? res.json() : null)
       .then(data => { if (data?.testFiles) setTestFiles(data.testFiles) })
       .catch(() => {})
@@ -47,7 +47,7 @@ export default function TestsPage() {
     setRunning(true)
     setResults(null)
     try {
-      const res = await fetch('/api/admin/tests/run', {
+      const res = await fetch('/api/admin/tests/run/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ testFile: testFile || undefined }),

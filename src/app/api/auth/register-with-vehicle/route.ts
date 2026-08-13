@@ -4,6 +4,7 @@ import { ScanCommand, PutCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/
 import { signToken, setAuthCookie } from '@/utils/auth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { randomUUID } from 'crypto'
 
 const checkRateLimit = createRateLimiter('register-vehicle', 3, 3600000)
 
@@ -228,7 +229,7 @@ async function _POST(request: NextRequest) {
 
     // User doesn't exist - create new client (this should not happen in normal flow)
     // as we should have already created a client during service request creation
-    const clientId = `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    const clientId = `client-${randomUUID()}`
 
     const clientData = {
       id: clientId,

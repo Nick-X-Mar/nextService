@@ -11,6 +11,7 @@ import { getAuth } from '@/utils/requireAuth'
 import { signToken, setAuthCookie } from '@/utils/auth'
 import { withMetrics } from '@/utils/withMetrics'
 import { broadcastNewRequest } from '@/utils/requestBroadcast'
+import { randomUUID } from 'crypto'
 
 // Helper function to normalize string values for comparison
 const normalizeString = (value: string | undefined | null): string => {
@@ -113,8 +114,8 @@ async function _POST(request: NextRequest) {
     }
     
     // Generate unique IDs
-    const serviceRequestId = `sr-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    const clientId = existingClientId || `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    const serviceRequestId = `sr-${randomUUID()}`
+    const clientId = existingClientId || `client-${randomUUID()}`
     
     // Check if we should use existing vehicle or create a new one
     let vehicleId: string
@@ -143,7 +144,7 @@ async function _POST(request: NextRequest) {
         console.log('Vehicle data unchanged, using existing vehicle ID:', vehicleId)
       } else {
         // Vehicle data changed - create new vehicle
-        vehicleId = `vehicle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        vehicleId = `vehicle-${randomUUID()}`
         shouldCreateNewVehicle = true
         console.log('Vehicle data changed, creating new vehicle with ID:', vehicleId)
       }
@@ -166,12 +167,12 @@ async function _POST(request: NextRequest) {
         shouldCreateNewVehicle = false
         console.log('Matched existing vehicle for logged-in user:', vehicleId)
       } else {
-        vehicleId = `vehicle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        vehicleId = `vehicle-${randomUUID()}`
         shouldCreateNewVehicle = true
       }
     } else {
       // New guest user - create new vehicle
-      vehicleId = `vehicle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      vehicleId = `vehicle-${randomUUID()}`
       shouldCreateNewVehicle = true
     }
     

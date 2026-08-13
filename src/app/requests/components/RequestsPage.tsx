@@ -80,7 +80,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     const entries = await Promise.all(
       requestIds.map(async (requestId): Promise<[string, boolean]> => {
         try {
-          const response = await fetch(`/api/chat/${requestId}/garages`)
+          const response = await fetch(`/api/chat/${requestId}/garages/`)
           if (!response.ok) return [requestId, false]
           const data = await response.json()
           return [requestId, !!(data.garages && data.garages.length > 0)]
@@ -100,7 +100,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     await Promise.all(
       requestIds.map(async (requestId) => {
         try {
-          const response = await fetch(`/api/offers?serviceRequestId=${requestId}`)
+          const response = await fetch(`/api/offers/?serviceRequestId=${requestId}`)
           if (!response.ok) return
           const data = await response.json()
           const offers = data.offers || data
@@ -111,7 +111,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
             offers.map(async (offer: OfferSummary) => {
               if (!offer.garageId) return offer
               try {
-                const garageRes = await fetch(`/api/garage/${offer.garageId}`)
+                const garageRes = await fetch(`/api/garage/${offer.garageId}/`)
                 if (garageRes.ok) {
                   const garageResult = await garageRes.json()
                   const garageData = garageResult.garage || garageResult
@@ -153,7 +153,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
 
       // First, check if user is registered by fetching client info
       try {
-        const clientResponse = await fetch(`/api/clients/${clientId}`)
+        const clientResponse = await fetch(`/api/clients/${clientId}/`)
         if (clientResponse.ok) {
           const clientData = await clientResponse.json()
           // Check if user has email (indicates they're registered)
@@ -169,7 +169,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
       }
 
       // Fetch requests from API
-      const response = await fetch(`/api/requests?clientId=${clientId}`)
+      const response = await fetch(`/api/requests/?clientId=${clientId}`)
 
       if (!response.ok) {
         throw new Error('Failed to fetch requests')
@@ -357,7 +357,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     if (!cancelRequest) return
     setCancelLoading(true)
     try {
-      const res = await fetch(`/api/requests/${cancelRequest.id}/cancel`, {
+      const res = await fetch(`/api/requests/${cancelRequest.id}/cancel/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId }),
@@ -411,7 +411,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
 
       if (formData.email) {
         // Use the new endpoint that handles email deduplication and vehicle merging
-        response = await fetch('/api/auth/register-from-requests', {
+        response = await fetch('/api/auth/register-from-requests/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -426,7 +426,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
         })
       } else {
         // Use the regular client update endpoint (no email provided)
-        response = await fetch(`/api/clients/${clientId}`, {
+        response = await fetch(`/api/clients/${clientId}/`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',

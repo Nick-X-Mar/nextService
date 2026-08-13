@@ -346,7 +346,7 @@ export default function RequestDetailsContent({
         [offer.id]: null
       }))
 
-      const response = await fetch(`/api/offers/${offer.id}/client-availability`, {
+      const response = await fetch(`/api/offers/${offer.id}/client-availability/`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -422,7 +422,7 @@ export default function RequestDetailsContent({
         payload.paymentIntentId = paymentIntentId
       }
 
-      const response = await fetch(`/api/requests/${request.id}/accept-offer`, {
+      const response = await fetch(`/api/requests/${request.id}/accept-offer/`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -492,7 +492,7 @@ export default function RequestDetailsContent({
 
       try {
         const clientId = localStorage.getItem('clientId')
-        const res = await fetch('/api/payments/create-intent', {
+        const res = await fetch('/api/payments/create-intent/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -542,7 +542,7 @@ export default function RequestDetailsContent({
       setOffersError(null)
 
       try {
-        const response = await fetch(`/api/offers?serviceRequestId=${request.id}`)
+        const response = await fetch(`/api/offers/?serviceRequestId=${request.id}`)
 
         if (!response.ok) {
           throw new Error('Failed to fetch offers')
@@ -563,7 +563,7 @@ export default function RequestDetailsContent({
             }
 
             try {
-              const garageResponse = await fetch(`/api/garage/${offer.garageId}`)
+              const garageResponse = await fetch(`/api/garage/${offer.garageId}/`)
 
               if (!garageResponse.ok) {
                 garageCache.set(offer.garageId, null)
@@ -749,7 +749,7 @@ export default function RequestDetailsContent({
     }
 
     try {
-      const response = await fetch(`/api/vehicles/${request.vehicleId}`, {
+      const response = await fetch(`/api/vehicles/${request.vehicleId}/`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'

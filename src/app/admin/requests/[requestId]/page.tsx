@@ -90,7 +90,7 @@ export default function RequestDetailPage() {
 
   const fetchDetail = useCallback(async () => {
     try {
-      const res = await fetch(`/api/admin/requests/${requestId}`)
+      const res = await fetch(`/api/admin/requests/${requestId}/`)
       if (res.ok) {
         setData(await res.json())
       }
@@ -106,7 +106,7 @@ export default function RequestDetailPage() {
     if (!confirm('Σίγουρα θέλετε να ακυρώσετε αυτό το request;')) return
     setCancelling(true)
     try {
-      const res = await fetch(`/api/admin/requests/${requestId}/cancel`, { method: 'PATCH' })
+      const res = await fetch(`/api/admin/requests/${requestId}/cancel/`, { method: 'PATCH' })
       if (res.ok) {
         await fetchDetail()
       } else {
@@ -122,7 +122,7 @@ export default function RequestDetailPage() {
     if (garages.length === 0) {
       setGaragesLoading(true)
       try {
-        const res = await fetch('/api/admin/users/garages?limit=100&status=active')
+        const res = await fetch('/api/admin/users/garages/?limit=100&status=active')
         if (res.ok) {
           const data = await res.json()
           setGarages((data.items || []).map((g: { id: string; name: string }) => ({ id: g.id, name: g.name })))
@@ -143,7 +143,7 @@ export default function RequestDetailPage() {
         .sort((a, b) => a.getTime() - b.getTime())
         .map((d) => format(d, 'yyyy-MM-dd'))
 
-      const res = await fetch(`/api/admin/requests/${requestId}/assign`, {
+      const res = await fetch(`/api/admin/requests/${requestId}/assign/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

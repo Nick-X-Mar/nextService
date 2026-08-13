@@ -37,7 +37,7 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
 
   const loadGarageData = useCallback(async () => {
     try {
-      const response = await fetch(`/api/garage/${garageId}`)
+      const response = await fetch(`/api/garage/${garageId}/`)
       if (response.ok) {
         const data = await response.json()
         if (data.success) {
@@ -54,7 +54,7 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
       setIsLoading(true)
 
       // Get all offers made by this garage
-      const offersResponse = await fetch(`/api/garage/offers?garageId=${garageId}`)
+      const offersResponse = await fetch(`/api/garage/offers/?garageId=${garageId}`)
       if (!offersResponse.ok) {
         throw new Error('Failed to fetch offers')
       }
@@ -105,7 +105,7 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
       const requestsWithDetails = await Promise.all(
         requestIds.map(async (requestId: string) => {
           try {
-            const requestResponse = await fetch(`/api/requests/${requestId}`)
+            const requestResponse = await fetch(`/api/requests/${requestId}/`)
             if (requestResponse.ok) {
               const requestData = await requestResponse.json()
               if (requestData.success && requestData.request) {
@@ -134,7 +134,7 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
       const requestsWithMessages = await Promise.all(
         appointmentRequests.map(async (request: ChatRequest) => {
           try {
-            const chatResponse = await fetch(`/api/chat/${request.id}/messages?garageId=${garageId}`)
+            const chatResponse = await fetch(`/api/chat/${request.id}/messages/?garageId=${garageId}`)
             if (chatResponse.ok) {
               const chatData = await chatResponse.json()
               if (chatData.messages && chatData.messages.length > 0) {

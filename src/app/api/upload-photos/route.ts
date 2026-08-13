@@ -7,6 +7,7 @@ import { EventName } from '@/types/events'
 import { requireAuth } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { randomUUID } from 'crypto'
 
 const checkUploadRate = createRateLimiter('photo-upload', 20, 3600000)
 
@@ -104,7 +105,7 @@ async function _POST(request: NextRequest) {
       const file = files[i]
       
       const photoRecord = {
-        id: `photo-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `photo-${randomUUID()}`,
         s3Url: result.url!,
         s3Key: result.key!,
         originalName: file.name,

@@ -9,6 +9,53 @@ const EVENT_LOGS_TABLE = process.env.EVENT_LOGS_TABLE || 'EventLogs'
 const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
 
 /**
+ * Collects every log row belonging to one user, following DynamoDB's pagination.
+ *
+ * This used to be a single scan with `Limit: 500`. In DynamoDB `Limit` caps the
+ * items *examined*, not the items returned after `FilterExpression` — so on a
+ * table holding every user's events, that call examined 500 arbitrary rows and
+ * returned only those few that happened to belong to this user. A person
+ * exercising their GDPR right of access could receive almost none of their
+ * data, with no indication anything was missing.
+ *
+ * MAX_PAGES is a safety stop so a very large table can't hang the request; if
+ * it is ever reached that is logged rather than silently truncating.
+ */
+const MAX_PAGES = 50
+
+async function scanAllForUser(
+  tableName: string,
+  attrName: string,
+  userId: string
+): Promise<Record<string, unknown>[]> {
+  const items: Record<string, unknown>[] = []
+  let startKey: Record<string, unknown> | undefined
+  let pages = 0
+
+  do {
+    const res = await dynamoDB.send(
+      new ScanCommand({
+        TableName: tableName,
+        FilterExpression: `${attrName} = :id`,
+        ExpressionAttributeValues: { ':id': userId },
+        ExclusiveStartKey: startKey,
+      })
+    )
+    items.push(...((res.Items || []) as Record<string, unknown>[]))
+    startKey = res.LastEvaluatedKey as Record<string, unknown> | undefined
+    pages++
+  } while (startKey && pages < MAX_PAGES)
+
+  if (startKey) {
+    console.warn(
+      `[account/export] ${tableName}: stopped after ${MAX_PAGES} pages for ${userId} — export may be incomplete`
+    )
+  }
+
+  return items
+}
+
+/**
  * POST /api/account/export
  *
  * Body: { userId, userType: 'client' | 'garage', password }
@@ -153,29 +200,9 @@ async function _POST(request: NextRequest) {
       exportData.chatMessages = chatRes.Items || []
     }
 
-    // Include the user's audit trail from EventLogs (truncated to last 500
-    // entries to keep the export reasonable in size)
     const eventAttr = userType === 'garage' ? 'garageId' : 'clientId'
-    const eventsRes = await dynamoDB.send(
-      new ScanCommand({
-        TableName: EVENT_LOGS_TABLE,
-        FilterExpression: `${eventAttr} = :id`,
-        ExpressionAttributeValues: { ':id': userId },
-        Limit: 500
-      })
-    )
-    exportData.activityLog = eventsRes.Items || []
-
-    // Include emails sent to/about this user
-    const emailsRes = await dynamoDB.send(
-      new ScanCommand({
-        TableName: EMAIL_LOGS_TABLE,
-        FilterExpression: `${eventAttr} = :id`,
-        ExpressionAttributeValues: { ':id': userId },
-        Limit: 500
-      })
-    )
-    exportData.emailsReceived = emailsRes.Items || []
+    exportData.activityLog = await scanAllForUser(EVENT_LOGS_TABLE, eventAttr, userId)
+    exportData.emailsReceived = await scanAllForUser(EMAIL_LOGS_TABLE, eventAttr, userId)
 
     return new NextResponse(JSON.stringify(exportData, null, 2), {
       status: 200,

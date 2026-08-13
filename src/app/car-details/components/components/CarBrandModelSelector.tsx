@@ -204,7 +204,7 @@ export default function CarBrandModelSelector() {
   // Track form funnel
   useEffect(() => {
     const clientId = typeof window !== 'undefined' ? localStorage.getItem('clientId') : null
-    fetch('/api/track', {
+    fetch('/api/track/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventName: 'car_details_started', clientId, metadata: { category } }),
@@ -228,7 +228,7 @@ export default function CarBrandModelSelector() {
     // Fetch user's vehicles if logged in
     const clientId = localStorage.getItem('clientId')
     if (clientId) {
-      fetch(`/api/clients/${clientId}/vehicles`)
+      fetch(`/api/clients/${clientId}/vehicles/`)
         .then(r => r.json())
         .then(data => {
           if (data.success && data.vehicles?.length > 0) {
@@ -347,7 +347,7 @@ export default function CarBrandModelSelector() {
       isTurbo
     })
     const clientId = localStorage.getItem('clientId')
-    fetch('/api/track', {
+    fetch('/api/track/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -383,7 +383,7 @@ export default function CarBrandModelSelector() {
           ...(origData && { originalVehicleData: origData }),
           ...(clientId && { clientId })
         }
-        const serviceResponse = await fetch('/api/service-request', {
+        const serviceResponse = await fetch('/api/service-request/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(serviceRequestData),
@@ -398,7 +398,7 @@ export default function CarBrandModelSelector() {
         descriptionPhotos.forEach(file => formData.append('files', file))
         formData.append('serviceRequestId', serviceResult.serviceRequestId)
         formData.append('vehicleId', serviceResult.vehicleId)
-        const uploadRes = await fetch('/api/upload-photos', { method: 'POST', body: formData })
+        const uploadRes = await fetch('/api/upload-photos/', { method: 'POST', body: formData })
         const uploadData = await uploadRes.json().catch(() => ({}))
         const photosUploaded = uploadData.success === true
 

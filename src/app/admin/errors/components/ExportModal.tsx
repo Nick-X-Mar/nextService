@@ -28,7 +28,7 @@ export default function ExportModal({ isOpen, onClose, range, status }: ExportMo
       setCopied(false)
       try {
         const res = await fetch(
-          `/api/admin/errors/export?format=${format}&range=${range}&status=${status}`
+          `/api/admin/errors/export/?format=${format}&range=${range}&status=${status}`
         )
         const text = await res.text()
         if (!cancelled) setContent(text)

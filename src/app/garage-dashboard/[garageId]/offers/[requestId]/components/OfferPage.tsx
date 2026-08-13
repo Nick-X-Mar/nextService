@@ -124,7 +124,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
       setIsLoading(true)
 
       // Load service request — pass viewerGarageId for the GDPR audit log
-      const requestResponse = await fetch(`/api/requests/${requestId}?viewerGarageId=${garageId}`)
+      const requestResponse = await fetch(`/api/requests/${requestId}/?viewerGarageId=${garageId}`)
       if (requestResponse.ok) {
         const requestData = await requestResponse.json()
         if (requestData.success) {
@@ -137,7 +137,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
       }
 
       // Load garage data
-      const garageResponse = await fetch(`/api/garage/${garageId}`)
+      const garageResponse = await fetch(`/api/garage/${garageId}/`)
       if (garageResponse.ok) {
         const garageData = await garageResponse.json()
         if (garageData.success) {
@@ -150,7 +150,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
       }
 
       // Check for existing offers for this request from this garage
-      const offersResponse = await fetch(`/api/offers?serviceRequestId=${requestId}&garageId=${garageId}`)
+      const offersResponse = await fetch(`/api/offers/?serviceRequestId=${requestId}&garageId=${garageId}`)
       if (offersResponse.ok) {
         const offersData = await offersResponse.json()
         if (offersData.success && offersData.offers && offersData.offers.length > 0) {
@@ -237,7 +237,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
           status: OfferStatus.PENDING
         }
 
-        const response = await fetch('/api/offers', {
+        const response = await fetch('/api/offers/', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updateData),
@@ -340,7 +340,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
           status: OfferStatus.PENDING
         }
 
-        const response = await fetch('/api/offers', {
+        const response = await fetch('/api/offers/', {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -399,7 +399,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
           garageId: garageId
         }
 
-        const response = await fetch('/api/offers', {
+        const response = await fetch('/api/offers/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
