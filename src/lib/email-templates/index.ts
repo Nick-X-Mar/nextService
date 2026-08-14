@@ -13,6 +13,14 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://nextservice.gr'
 
 const link = (path: string) => `${APP_URL}${path}`
 
+// Deep link through the login page: the recipient may well be logged out by the
+// time they open the mail (approval can take days), so we send them to /login
+// with the destination attached instead of dropping them on a generic page.
+const garageDeepLink = (garageId?: string) =>
+  garageId
+    ? link(`/login/?next=${encodeURIComponent(`/garage-dashboard/${garageId}/`)}`)
+    : link('/login/')
+
 const renderers: Record<EmailTemplateName, TemplateRenderer> = {
   [EmailTemplate.WelcomeGarage]: (v) => {
     const subject = 'Καλωσόρισες στο NextService'
@@ -23,7 +31,9 @@ const renderers: Record<EmailTemplateName, TemplateRenderer> = {
         <p>Λάβαμε την εγγραφή σου στο NextService. Η ομάδα μας θα ελέγξει τα στοιχεία της εταιρείας σου και θα ενεργοποιήσει τον λογαριασμό σου σύντομα.</p>
         <p>Όταν ενεργοποιηθεί, θα μπορείς να βλέπεις αιτήματα πελατών, να στέλνεις προσφορές και να συνομιλείς απευθείας μαζί τους.</p>
         <p>Θα σε ειδοποιήσουμε με νέο email μόλις ο λογαριασμός σου είναι έτοιμος.</p>
-      `
+      `,
+      ctaLabel: 'Δες την κατάσταση της αίτησής σου',
+      ctaUrl: garageDeepLink(v.garageId)
     })
     return { subject, html, text: htmlToPlainText(html) }
   },
@@ -37,7 +47,7 @@ const renderers: Record<EmailTemplateName, TemplateRenderer> = {
         <p>Ο λογαριασμός σου στο NextService ενεργοποιήθηκε. Μπορείς τώρα να συνδεθείς, να δεις διαθέσιμα αιτήματα πελατών στην περιοχή σου και να ξεκινήσεις να στέλνεις προσφορές.</p>
       `,
       ctaLabel: 'Είσοδος στο dashboard',
-      ctaUrl: link('/login')
+      ctaUrl: garageDeepLink(v.garageId)
     })
     return { subject, html, text: htmlToPlainText(html) }
   },

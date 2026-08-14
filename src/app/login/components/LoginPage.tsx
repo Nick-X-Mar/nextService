@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Icon from '@/components/ui/Icon'
 import { useToast } from '@/hooks/useToast'
@@ -24,9 +24,24 @@ export default function LoginPage() {
   const [showEmailHint, setShowEmailHint] = useState(false)
 
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { success, error } = useToast()
   const { refreshUser } = useUser()
   const { refreshClient, refreshGarage, userType: authUserType, client, garage, isLoading: authLoading } = useAuth()
+
+  // Where to land after signing in — set by the middleware when it intercepts a
+  // protected page, and by the activation email's deep link. Only same-origin
+  // paths inside the user's own area are honoured, so it can't be used as an
+  // open redirect.
+  const nextParam = searchParams.get('next')
+  const destinationFor = useCallback((type: 'client' | 'garage', userId: string): string => {
+    const fallback = type === 'garage' ? `/garage-dashboard/${userId}/` : `/requests/${userId}/`
+    if (!nextParam || !nextParam.startsWith('/') || nextParam.startsWith('//')) return fallback
+    const allowed = type === 'garage'
+      ? ['/garage-dashboard']
+      : ['/requests', '/profile']
+    return allowed.some(prefix => nextParam.startsWith(prefix)) ? nextParam : fallback
+  }, [nextParam])
 
   // If the user is already authenticated, bounce them to their home.
   // Without this, landing on /login (e.g. via browser back) shows the login
@@ -34,11 +49,11 @@ export default function LoginPage() {
   useEffect(() => {
     if (authLoading) return
     if (authUserType === 'garage' && garage) {
-      router.replace(`/garage-dashboard/${garage.id}/`)
+      router.replace(destinationFor('garage', garage.id))
     } else if (authUserType === 'client' && client) {
-      router.replace(`/requests/${client.id}/`)
+      router.replace(destinationFor('client', client.id))
     }
-  }, [authLoading, authUserType, client, garage, router])
+  }, [authLoading, authUserType, client, garage, router, destinationFor])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -65,7 +80,7 @@ export default function LoginPage() {
         localStorage.removeItem('clientId')
         localStorage.setItem('garageId', data.user.id)
         await refreshGarage(data.user.id)
-        router.push(`/garage-dashboard/${data.user.id}/`)
+        router.push(destinationFor('garage', data.user.id))
         return
       }
 
@@ -77,13 +92,13 @@ export default function LoginPage() {
           localStorage.setItem('garageId', user.id)
           success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.companyName}!`)
           await refreshGarage(user.id)
-          router.push(`/garage-dashboard/${user.id}/`)
+          router.push(destinationFor('garage', user.id))
         } else {
           localStorage.removeItem('garageId')
           localStorage.setItem('clientId', user.id)
           success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.firstName}!`)
           await refreshClient(user.id)
-          router.push(`/requests/${user.id}/`)
+          router.push(destinationFor('client', user.id))
         }
       } else {
         error('Σφάλμα Σύνδεσης', data.error || 'Λάθος email ή κωδικός')

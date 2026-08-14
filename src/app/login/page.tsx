@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import LoginPage from './components/LoginPage'
 
 // Title suffix comes from the `%s | NextService` template in the root layout —
@@ -11,6 +12,13 @@ export const metadata = {
   robots: { index: false, follow: true },
 }
 
+// LoginPage reads the `next` search param (set by the middleware and by the
+// activation email), so it needs its own Suspense boundary — see the note in
+// AppShell about why the shell doesn't provide one.
 export default function Page() {
-  return <LoginPage />
+  return (
+    <Suspense fallback={null}>
+      <LoginPage />
+    </Suspense>
+  )
 }

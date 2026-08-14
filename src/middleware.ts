@@ -94,6 +94,39 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next({ request: { headers: adminHeaders } })
   }
 
+  // ── Garage pages ─────────────────────────────────────────
+  // Guarded server-side so the decision comes from the cookie instead of the
+  // cached identity in localStorage. The client-side guard trusted a stale
+  // cache, which bounced freshly-approved garages into a /login ↔ dashboard
+  // redirect loop and made them log in again for no reason.
+  // `isActive` is deliberately NOT checked here — that would cost a DynamoDB
+  // read on every page view; the dashboard renders the status panel instead.
+  if (pathname.startsWith('/garage-dashboard')) {
+    const token = request.cookies.get(TOKEN_COOKIE_NAME)?.value
+    const loginUrl = new URL('/login/', request.url)
+
+    if (!token) {
+      loginUrl.searchParams.set('next', pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+
+    try {
+      const { payload } = await jwtVerify(token, getSecret())
+      if (payload.userType !== 'garage' || !payload.userId) {
+        return NextResponse.redirect(new URL('/login/', request.url))
+      }
+      const response = NextResponse.next()
+      // Sliding session on page views too, so a garage browsing its dashboard
+      // never expires mid-session.
+      const refreshed = await issueRefreshedToken(payload.userId as string, 'garage')
+      applySlidingCookie(response, refreshed)
+      return response
+    } catch {
+      loginUrl.searchParams.set('next', pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+  }
+
   // Only protect API routes
   if (!pathname.startsWith('/api/')) {
     return NextResponse.next()
@@ -184,5 +217,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/:path*', '/admin/:path*'],
+  matcher: ['/api/:path*', '/admin/:path*', '/garage-dashboard/:path*'],
 }

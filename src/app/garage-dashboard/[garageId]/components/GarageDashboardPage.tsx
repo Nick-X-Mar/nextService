@@ -11,6 +11,7 @@ import MyOffers from './MyOffers'
 import AvailableRequests from './AvailableRequests'
 import Appointments from './Appointments'
 import GarageSettings from './GarageSettings'
+import ActivationWelcome from './ActivationWelcome'
 import { useRealtimeRequests, type BroadcastRequest, type RequestUpdatePayload } from '@/hooks/useRealtimeRequests'
 import { useToast } from '@/hooks/useToast'
 import { useNewRequestNotifier } from '@/hooks/useNewRequestNotifier'
@@ -156,11 +157,18 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
       return
     }
 
-    // Check if user is authenticated as a garage
-    if (userType !== 'garage' || !authGarage || authGarage.id !== garageId) {
-      // User is not authenticated as this garage or is a client
-      console.warn('Unauthorized access attempt to garage dashboard')
-      router.push('/login/')
+    // Signed in as a different garage (usually a stale cached identity from a
+    // previous session): send them to their own dashboard rather than to the
+    // login form, which would only bounce them back here.
+    if (userType === 'garage' && authGarage && authGarage.id !== garageId) {
+      router.replace(`/garage-dashboard/${authGarage.id}/`)
+      return
+    }
+
+    // Not a garage session at all — keep the destination so login can return
+    // them here instead of dropping them on a generic page.
+    if (userType !== 'garage' || !authGarage) {
+      router.push(`/login/?next=${encodeURIComponent(`/garage-dashboard/${garageId}/`)}`)
       return
     }
 
@@ -316,6 +324,11 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
   return (
     <div className="pt-2 pb-8">
       <div className={styles.container}>
+        <ActivationWelcome
+          garageId={garageId}
+          companyName={authGarage?.companyName}
+          activatedAt={authGarage?.activatedAt}
+        />
         {renderContent()}
       </div>
     </div>

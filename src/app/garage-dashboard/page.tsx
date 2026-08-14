@@ -21,7 +21,7 @@ export default function Page() {
       // application status there.
       router.replace(`/garage-dashboard/${garage.id}/`)
     } else {
-      router.replace('/login/')
+      router.replace('/login/?next=%2Fgarage-dashboard%2F')
     }
   }, [router, userType, garage, isLoading])
 

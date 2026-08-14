@@ -197,7 +197,7 @@ async function _POST(request: NextRequest) {
     sendEmail({
       to: garageData.email,
       templateName: EmailTemplate.WelcomeGarage,
-      variables: { companyName: garageData.companyName },
+      variables: { companyName: garageData.companyName, garageId },
       triggerEvent: EventName.GarageRegistered,
       garageId
     })

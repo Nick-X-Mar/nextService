@@ -46,6 +46,7 @@ async function _GET(
         taxAuthority: garage.taxAuthority,
         description: garage.description,
         isActive: garage.isActive,
+        activatedAt: garage.activatedAt || null,
         benefits: garage.benefits || [],
         createdAt: garage.createdAt,
         updatedAt: garage.updatedAt

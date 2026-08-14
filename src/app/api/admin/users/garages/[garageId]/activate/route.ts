@@ -50,6 +50,7 @@ async function _POST(
       templateName: EmailTemplate.GarageActivated,
       variables: {
         companyName: garage.companyName || '',
+        garageId,
       },
       triggerEvent: EventName.GarageValidated,
       garageId,

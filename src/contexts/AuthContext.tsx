@@ -23,6 +23,8 @@ interface GarageUser {
   taxAuthority: string
   description?: string
   isActive: boolean
+  /** Set by the admin activation — drives the one-off welcome banner */
+  activatedAt?: string
 }
 
 interface AuthContextType {
@@ -166,7 +168,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             tin: garageData.tin,
             taxAuthority: garageData.taxAuthority,
             description: garageData.description,
-            isActive: garageData.isActive
+            isActive: garageData.isActive,
+            activatedAt: garageData.activatedAt || undefined
           }
           setGarage(userData)
           setUserType('garage')
@@ -246,7 +249,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 tin: data.user.tin,
                 taxAuthority: data.user.taxAuthority,
                 description: data.user.description,
-                isActive: data.user.isActive
+                isActive: data.user.isActive,
+                activatedAt: data.user.activatedAt || undefined
               }
               setGarage(userData)
               setUserType('garage')
