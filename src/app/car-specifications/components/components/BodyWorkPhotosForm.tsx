@@ -25,6 +25,10 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
   const { success, error } = useToast()
   const [photos, setPhotos] = useState<File[]>([])
   const [dragActive, setDragActive] = useState(false)
+  // Covers the whole submit: create the request, then push the photos to S3.
+  // Stays true through the redirect so the button doesn't flick back to idle
+  // while the requests page is still loading.
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Track form funnel
   useEffect(() => {
@@ -76,7 +80,8 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
   const isFormValid = photos.length >= 1
 
   const handleSubmit = async () => {
-    if (isFormValid) {
+    if (isFormValid && !isSubmitting) {
+      setIsSubmitting(true)
       try {
         // Load latest form data to include originalVehicleId and originalVehicleData
         const latestFormData = loadFormData()
@@ -111,6 +116,7 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
 
         if (!serviceResult.success) {
           error('Σφαλμα', serviceResult.error || 'Αγνωστο σφαλμα')
+          setIsSubmitting(false)
           return
         }
 
@@ -147,10 +153,12 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
           }
         } else {
           error('Σφαλμα', uploadResult.error || 'Αγνωστο σφαλμα')
+          setIsSubmitting(false)
         }
       } catch (err) {
         console.error('Error submitting service request:', err)
         error('Σφαλμα', 'Σφαλμα κατα την αποστολη. Παρακαλω δοκιμαστε ξανα.')
+        setIsSubmitting(false)
       }
     }
   }
@@ -294,7 +302,12 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
         <div className="fixed bottom-0 left-0 right-0 bg-surface/80 backdrop-blur-xl border-t border-outline-variant/10 px-5 pt-4 pb-8 z-30">
           <div className="max-w-lg mx-auto">
             {/* CTA Button */}
-            <GearSubmitButton onClick={handleSubmit} disabled={!isFormValid} />
+            <GearSubmitButton
+              onClick={handleSubmit}
+              disabled={!isFormValid}
+              isLoading={isSubmitting}
+              loadingLabel="Αποστολη φωτογραφιων..."
+            />
 
             {/* Back link */}
             <div className="mt-3 text-center">

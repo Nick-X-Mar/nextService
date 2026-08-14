@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
 import { useToast } from '@/hooks/useToast'
 import { styles } from '@/styles/styles'
 import SegmentedControl from '@/components/SegmentedControl'
@@ -132,7 +133,7 @@ export default function ForgotPasswordPage() {
               className={`${styles.btnPrimary} w-full justify-center text-base py-3 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               disabled={isLoading}
             >
-              <Icon name="mail" size="sm" />
+              {isLoading ? <Spinner size="sm" /> : <Icon name="mail" size="sm" />}
               {isLoading ? 'Παρακαλώ περιμένετε...' : 'Στείλε μου σύνδεσμο'}
             </button>
           </form>

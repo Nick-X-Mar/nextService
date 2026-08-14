@@ -6,10 +6,13 @@ import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
+import { useAsyncTask } from '@/hooks/useAsyncTask'
 import { clearFormData } from '@/utils/formStorage'
 
 export default function TopHeader() {
   const { userType, client, garage, logout } = useAuth()
+  const { run, isPending } = useAsyncTask()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
@@ -103,10 +106,12 @@ export default function TopHeader() {
                 )}
               </div>
               <button
-                onClick={logout}
-                className="hidden md:flex items-center gap-1 text-sm text-secondary hover:text-tertiary transition-colors"
+                onClick={() => run(logout)}
+                disabled={isPending()}
+                aria-label="Αποσύνδεση"
+                className="hidden md:flex items-center gap-1 text-sm text-secondary hover:text-tertiary transition-colors disabled:opacity-60"
               >
-                <Icon name="logout" size="sm" />
+                {isPending() ? <Spinner size="sm" /> : <Icon name="logout" size="sm" />}
               </button>
             </div>
           )}

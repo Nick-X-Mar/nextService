@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
+import { useNavigation } from '@/hooks/useNavigation'
 import { ServiceRequestStatus } from '../../../../../types/statuses'
 import type { ServiceRequest } from '../../../../../types/requests'
 import { getCategoryText } from '@/utils/categoryLabels'
@@ -43,7 +44,7 @@ interface ClientChatsPageProps {
 type TabType = 'pending' | 'appointments' | 'unsuccessful'
 
 export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
-  const router = useRouter()
+  const { navigate, isNavigating } = useNavigation()
   const [activeTab, setActiveTab] = useState<TabType>('pending')
   const [pendingConversations, setPendingConversations] = useState<ChatRequest[]>([])
   const [appointments, setAppointments] = useState<ChatRequest[]>([])
@@ -333,13 +334,14 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
     }
   }
 
+  const chatHref = (requestId: string, garageId?: string) =>
+    garageId
+      ? `/requests/${clientId}/chats/${requestId}/?garageId=${garageId}`
+      : `/requests/${clientId}/chats/${requestId}/`
+
   const handleChatClick = (requestId: string, garageId?: string) => {
     // Navigate to the individual chat page for this request
-    if (garageId) {
-      router.push(`/requests/${clientId}/chats/${requestId}/?garageId=${garageId}`)
-    } else {
-      router.push(`/requests/${clientId}/chats/${requestId}/`)
-    }
+    navigate(chatHref(requestId, garageId))
   }
 
   const isPastAppointment = (appointmentDate?: string) => {
@@ -365,6 +367,10 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
       ? `${chatRequest.vehicle.brand} ${chatRequest.vehicle.model}`
       : 'Αίτημα'
     const vehicleYear = chatRequest.vehicle?.modelYear || ''
+
+    const isOpening = isNavigating(
+      chatHref(chatRequest.id, isUnsuccessful ? request.garageId : undefined)
+    )
 
     const isActive = !isCompleted
     const statusLabel = isActive ? 'ΕΝΕΡΓΟ' : 'ΟΛΟΚΛΗΡΩΘΗΚΕ'
@@ -413,9 +419,16 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
                   {vehicleYear && !isUnsuccessful ? ` ${vehicleYear}` : ''}
                 </h3>
               </div>
-              <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0 ml-2 ${statusClasses}`}>
-                {statusLabel}
-              </span>
+              {isOpening ? (
+                <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0 ml-2 bg-primary/10 text-primary">
+                  <Spinner size="sm" />
+                  Άνοιγμα…
+                </span>
+              ) : (
+                <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0 ml-2 ${statusClasses}`}>
+                  {statusLabel}
+                </span>
+              )}
             </div>
 
             {/* Service type */}
@@ -474,10 +487,13 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
       <h3 className="text-lg font-bold text-on-surface mb-2">{message}</h3>
       <p className="text-sm text-on-surface-variant mb-8 max-w-sm mx-auto">{description}</p>
       <button
-        onClick={() => router.push(`/requests/${clientId}/`)}
-        className="inline-flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded-full font-medium text-sm hover:opacity-90 transition-opacity mx-auto"
+        onClick={() => navigate(`/requests/${clientId}/`)}
+        disabled={isNavigating(`/requests/${clientId}/`)}
+        className="inline-flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded-full font-medium text-sm hover:opacity-90 transition-opacity mx-auto disabled:opacity-70"
       >
-        <Icon name="list_alt" size="sm" />
+        {isNavigating(`/requests/${clientId}/`)
+          ? <Spinner size="sm" />
+          : <Icon name="list_alt" size="sm" />}
         Δείτε τα Αιτήματά σας
       </button>
     </div>

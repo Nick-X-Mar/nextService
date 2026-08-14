@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
 import { useToast } from '@/hooks/useToast'
 import { useUser } from '@/contexts/UserContext'
 import { useAuth } from '@/contexts/AuthContext'
@@ -340,7 +341,9 @@ export default function LoginPage() {
               className={`${styles.btnPrimary} w-full justify-center text-base py-3 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               disabled={isLoading}
             >
-              <Icon name={mode === 'login' ? 'login' : 'person_add'} size="sm" />
+              {isLoading
+                ? <Spinner size="sm" />
+                : <Icon name={mode === 'login' ? 'login' : 'person_add'} size="sm" />}
               {isLoading ? 'Παρακαλώ περιμένετε...' : (mode === 'login' ? 'Σύνδεση' : 'Εγγραφή')}
             </button>
           </form>

@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { usePathname, useSearchParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
+import { useAsyncTask } from '@/hooks/useAsyncTask'
 import { clearFormData } from '@/utils/formStorage'
 
 interface NavItem {
@@ -15,6 +17,7 @@ interface NavItem {
 
 export default function Sidebar() {
   const { userType, client, garage, logout } = useAuth()
+  const { run, isPending } = useAsyncTask()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const currentTab = searchParams.get('tab')
@@ -108,11 +111,14 @@ export default function Sidebar() {
       {/* Bottom actions */}
       <div className="px-4 py-6 border-t border-outline-variant/10">
         <button
-          onClick={logout}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-secondary hover:text-tertiary hover:bg-surface-container transition-colors"
+          onClick={() => run(logout)}
+          disabled={isPending()}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-secondary hover:text-tertiary hover:bg-surface-container transition-colors disabled:opacity-60"
         >
-          <Icon name="logout" />
-          <span className="text-xs uppercase tracking-wider">Αποσύνδεση</span>
+          {isPending() ? <Spinner size="md" /> : <Icon name="logout" />}
+          <span className="text-xs uppercase tracking-wider">
+            {isPending() ? 'Αποσύνδεση…' : 'Αποσύνδεση'}
+          </span>
         </button>
       </div>
     </aside>

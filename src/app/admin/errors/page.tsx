@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import StatCard from '../components/StatCard'
+import Spinner from '@/components/Spinner'
 import ExportModal from './components/ExportModal'
 import ImportModal from './components/ImportModal'
 
@@ -262,8 +263,9 @@ export default function ErrorsPage() {
                             <button
                               disabled={acting}
                               onClick={() => updateStatus(g, 'resolved')}
-                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
                             >
+                              {acting && <Spinner size="sm" />}
                               Mark resolved
                             </button>
                           )}
@@ -271,8 +273,9 @@ export default function ErrorsPage() {
                             <button
                               disabled={acting}
                               onClick={() => updateStatus(g, 'ignored')}
-                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-container-high text-on-surface hover:bg-surface-container-highest disabled:opacity-50"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-container-high text-on-surface hover:bg-surface-container-highest disabled:opacity-50"
                             >
+                              {acting && <Spinner size="sm" />}
                               Mark ignored
                             </button>
                           )}
@@ -280,8 +283,9 @@ export default function ErrorsPage() {
                             <button
                               disabled={acting}
                               onClick={() => updateStatus(g, 'open')}
-                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-on-primary hover:opacity-90 disabled:opacity-50"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-on-primary hover:opacity-90 disabled:opacity-50"
                             >
+                              {acting && <Spinner size="sm" />}
                               Reopen
                             </button>
                           )}

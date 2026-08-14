@@ -4,7 +4,9 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useState } from 'react'
 import Image from 'next/image'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
 import { Badge } from '@/components/ui/badge'
+import { useNavigation } from '@/hooks/useNavigation'
 import { saveFormData } from '@/utils/formStorage'
 
 interface Offer {
@@ -31,6 +33,7 @@ interface OfferDetailPageProps {
 
 export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) {
   const router = useRouter()
+  const { navigate, isNavigating } = useNavigation()
   const [offer] = useState<Offer | null>(initialOffer)
   const [shared, setShared] = useState(false)
 
@@ -40,8 +43,8 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
       category: offer.category,
       description: offer.workType,
     })
-    router.push('/car-details/')
-  }, [offer, router])
+    navigate('/car-details/')
+  }, [offer, navigate])
 
   const handleShare = useCallback(async () => {
     if (!offer) return
@@ -193,9 +196,12 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
         <div className="max-w-2xl mx-auto">
           <button
             onClick={handleGetOffer}
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl machined-gradient text-on-primary font-bold text-base shadow-lg shadow-primary/20 active:scale-[0.97] transition-transform"
+            disabled={isNavigating('/car-details/')}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl machined-gradient text-on-primary font-bold text-base shadow-lg shadow-primary/20 active:scale-[0.97] transition-transform disabled:opacity-70"
           >
-            <Icon name="build" size="sm" className="text-on-primary" />
+            {isNavigating('/car-details/')
+              ? <Spinner size="sm" className="text-on-primary" />
+              : <Icon name="build" size="sm" className="text-on-primary" />}
             Πάρε Προσφορά
           </button>
         </div>

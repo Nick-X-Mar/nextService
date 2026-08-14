@@ -1,15 +1,18 @@
 'use client'
 
 import { useState } from 'react'
+import Spinner from '@/components/Spinner'
 
 export default function SettingsPage() {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [message, setMessage] = useState('')
+  const [saving, setSaving] = useState(false)
 
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault()
     setMessage('')
+    setSaving(true)
 
     try {
       const res = await fetch('/api/admin/settings/change-password/', {
@@ -28,6 +31,8 @@ export default function SettingsPage() {
       }
     } catch {
       setMessage('Network error')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -67,9 +72,11 @@ export default function SettingsPage() {
           )}
           <button
             type="submit"
-            className="bg-primary text-on-primary px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+            disabled={saving}
+            className="bg-primary text-on-primary px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
           >
-            Update Password
+            {saving && <Spinner size="sm" />}
+            {saving ? 'Updating…' : 'Update Password'}
           </button>
         </form>
       </div>

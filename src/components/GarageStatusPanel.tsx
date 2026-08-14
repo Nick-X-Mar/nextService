@@ -1,6 +1,8 @@
 'use client'
 
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
+import { useAsyncTask } from '@/hooks/useAsyncTask'
 import { styles } from '@/styles/styles'
 
 interface GarageStatusPanelProps {
@@ -13,8 +15,10 @@ interface GarageStatusPanelProps {
   /** Manual "check again" — the panel also polls on its own */
   onCheck?: () => void
   isChecking?: boolean
-  onEnter?: () => void
-  onLogout?: () => void
+  /** May return a promise — the button spins until it settles. */
+  onEnter?: () => void | Promise<unknown>
+  /** May return a promise — the button spins until it settles. */
+  onLogout?: () => void | Promise<unknown>
 }
 
 const pendingSteps = [
@@ -39,6 +43,7 @@ export default function GarageStatusPanel({
   onLogout,
 }: GarageStatusPanelProps) {
   const isApproved = status === 'approved'
+  const { run, isPending } = useAsyncTask()
 
   return (
     <div className="w-full max-w-lg mx-auto">
@@ -95,8 +100,12 @@ export default function GarageStatusPanel({
 
         <div className="space-y-3">
           {isApproved && onEnter && (
-            <button onClick={onEnter} className={`${styles.btnPrimary} w-full justify-center py-3.5`}>
-              <Icon name="dashboard" size="sm" />
+            <button
+              onClick={() => run('enter', async () => onEnter())}
+              disabled={isPending('enter')}
+              className={`${styles.btnPrimary} w-full justify-center py-3.5 disabled:opacity-70`}
+            >
+              {isPending('enter') ? <Spinner size="sm" /> : <Icon name="dashboard" size="sm" />}
               Μετάβαση στον πίνακα ελέγχου
             </button>
           )}
@@ -113,9 +122,13 @@ export default function GarageStatusPanel({
           )}
 
           {onLogout && (
-            <button onClick={onLogout} className={`${styles.btnOutline} w-full justify-center py-3.5`}>
-              <Icon name="logout" size="sm" />
-              Αποσύνδεση
+            <button
+              onClick={() => run('logout', async () => onLogout())}
+              disabled={isPending('logout')}
+              className={`${styles.btnOutline} w-full justify-center py-3.5 disabled:opacity-60`}
+            >
+              {isPending('logout') ? <Spinner size="sm" /> : <Icon name="logout" size="sm" />}
+              {isPending('logout') ? 'Αποσύνδεση…' : 'Αποσύνδεση'}
             </button>
           )}
         </div>

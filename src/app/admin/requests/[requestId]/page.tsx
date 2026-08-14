@@ -8,6 +8,7 @@ import { addDays, addMonths, isWeekend, format } from 'date-fns'
 import { el } from 'date-fns/locale'
 import 'react-day-picker/dist/style.css'
 import RequestTimeline from './components/RequestTimeline'
+import Spinner from '@/components/Spinner'
 
 interface RequestDetail {
   id: string
@@ -220,9 +221,12 @@ export default function RequestDetailPage() {
             {canAssign && (
               <button
                 onClick={openAssignModal}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-on-primary rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+                disabled={garagesLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-on-primary rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
-                <span className="material-symbols-outlined text-[18px]">assignment_ind</span>
+                {garagesLoading
+                  ? <Spinner size="sm" />
+                  : <span className="material-symbols-outlined text-[18px]">assignment_ind</span>}
                 Ανάθεση σε Συνεργείο
               </button>
             )}
@@ -232,7 +236,9 @@ export default function RequestDetailPage() {
                 disabled={cancelling}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-error-container text-on-error-container rounded-lg text-sm font-medium hover:bg-error-container/80 transition-colors disabled:opacity-50"
               >
-                <span className="material-symbols-outlined text-[18px]">cancel</span>
+                {cancelling
+                  ? <Spinner size="sm" />
+                  : <span className="material-symbols-outlined text-[18px]">cancel</span>}
                 {cancelling ? 'Ακύρωση...' : 'Ακύρωση'}
               </button>
             )}
@@ -518,8 +524,9 @@ export default function RequestDetailPage() {
               <button
                 onClick={handleAssign}
                 disabled={assigning || !assignForm.garageId || !assignForm.price}
-                className="px-4 py-2 bg-primary text-on-primary rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
+                {assigning && <Spinner size="sm" />}
                 {assigning ? 'Ανάθεση...' : 'Ανάθεση & Ειδοποίηση'}
               </button>
             </div>

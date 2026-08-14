@@ -5,6 +5,7 @@ import { useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js'
 import Modal from '@/components/Modal'
 import StripeProvider from '@/components/StripeProvider'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
 import type { SavedCard } from '@/types/payments'
 
 interface PaymentModalProps {
@@ -317,7 +318,7 @@ function PaymentStep({
         >
           {isProcessing ? (
             <>
-              <div className="w-4 h-4 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
+              <Spinner size="sm" />
               Επεξεργασία...
             </>
           ) : (

@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
 import { styles } from '@/styles/styles'
 import Icon from '@/components/ui/Icon'
-import { LoadMoreButton } from '@/components'
+import { LoadMoreButton, Spinner } from '@/components'
+import { useNavigation } from '@/hooks/useNavigation'
 import type { ServiceRequest } from '@/types/requests'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { getCategoryText } from '@/utils/categoryLabels'
@@ -63,7 +63,7 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
   // Ids that arrived via realtime in the last few seconds — used purely for a
   // visual highlight on the corresponding card.
   const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set())
-  const router = useRouter()
+  const { navigate, isNavigating } = useNavigation()
 
   // Hold a ref to the offer-request ids the garage has already responded to so
   // we can filter realtime arrivals that are no longer relevant. The initial
@@ -196,18 +196,21 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
     return Array.from(new Set(categories))
   }
 
+  const offerHref = (requestId: string) => `/garage-dashboard/${garageId}/offers/${requestId}/`
+  const chatHref = (requestId: string) => `/garage-dashboard/${garageId}/chat/${requestId}/`
+
   const handleMakeOffer = (request: ServiceRequest) => {
     respondedRequestIdsRef.current.add(request.id)
-    router.push(`/garage-dashboard/${garageId}/offers/${request.id}/`)
+    navigate(offerHref(request.id))
   }
 
   const handleOpenChat = (request: ServiceRequest) => {
-    router.push(`/garage-dashboard/${garageId}/chat/${request.id}/`)
+    navigate(chatHref(request.id))
   }
 
   const handleCardClick = (request: ServiceRequest) => {
     respondedRequestIdsRef.current.add(request.id)
-    router.push(`/garage-dashboard/${garageId}/offers/${request.id}/`)
+    navigate(offerHref(request.id))
   }
 
   const filteredRequests = requests.filter(request => {
@@ -395,9 +398,12 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
                       e.stopPropagation()
                       handleMakeOffer(request)
                     }}
-                    className="bg-gradient-to-br from-primary to-primary-container text-on-primary px-6 py-3 rounded-lg text-sm font-bold transition-all duration-200 active:scale-95 shadow-lg shadow-primary/20 flex items-center gap-2 flex-1 justify-center"
+                    disabled={isNavigating(offerHref(request.id))}
+                    className="bg-gradient-to-br from-primary to-primary-container text-on-primary px-6 py-3 rounded-lg text-sm font-bold transition-all duration-200 active:scale-95 shadow-lg shadow-primary/20 flex items-center gap-2 flex-1 justify-center disabled:opacity-70"
                   >
-                    <Icon name="send" size="sm" />
+                    {isNavigating(offerHref(request.id))
+                      ? <Spinner size="sm" />
+                      : <Icon name="send" size="sm" />}
                     Κανε Προσφορα
                   </button>
                   <button
@@ -405,9 +411,13 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
                       e.stopPropagation()
                       handleOpenChat(request)
                     }}
-                    className="bg-surface-variant text-on-surface-variant hover:bg-surface-container-high px-4 py-3 rounded-lg text-sm font-bold transition-colors duration-200 flex items-center gap-2"
+                    disabled={isNavigating(chatHref(request.id))}
+                    aria-label="Άνοιγμα συνομιλίας"
+                    className="bg-surface-variant text-on-surface-variant hover:bg-surface-container-high px-4 py-3 rounded-lg text-sm font-bold transition-colors duration-200 flex items-center gap-2 disabled:opacity-70"
                   >
-                    <Icon name="chat" size="sm" />
+                    {isNavigating(chatHref(request.id))
+                      ? <Spinner size="sm" />
+                      : <Icon name="chat" size="sm" />}
                   </button>
                 </div>
               </article>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Spinner from '@/components/Spinner'
 
 interface TestResult {
   title: string
@@ -91,9 +92,11 @@ export default function TestsPage() {
                 : 'bg-primary text-on-primary hover:shadow-lg active:scale-95'
             }`}
           >
-            <span className="material-symbols-outlined text-[18px]">
-              {running ? 'hourglass_top' : 'play_arrow'}
-            </span>
+            {running ? (
+              <Spinner size="sm" />
+            ) : (
+              <span className="material-symbols-outlined text-[18px]">play_arrow</span>
+            )}
             {running ? 'Εκτέλεση...' : 'Εκτέλεση Tests'}
           </button>
         </div>

@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import DataTable, { type Column } from '../components/DataTable'
+import Spinner from '@/components/Spinner'
+import { useAsyncTask } from '@/hooks/useAsyncTask'
 
 type Tab = 'garages' | 'pending'
 
@@ -44,6 +46,8 @@ export default function GaragesPage() {
     fetchGarages()
   }, [tab, search])
 
+  const { run, isPending } = useAsyncTask()
+
   async function handleActivate(garageId: string) {
     try {
       const res = await fetch(`/api/admin/users/garages/${garageId}/activate/`, { method: 'POST' })
@@ -68,9 +72,11 @@ export default function GaragesPage() {
       header: 'Actions',
       render: (item: GarageRecord) => (
         <button
-          onClick={(e) => { e.stopPropagation(); handleActivate(item.id) }}
-          className="bg-primary text-on-primary px-3 py-1 rounded-lg text-xs font-medium hover:bg-primary/90"
+          onClick={(e) => { e.stopPropagation(); run(item.id, () => handleActivate(item.id)) }}
+          disabled={isPending(item.id)}
+          className="inline-flex items-center gap-1.5 bg-primary text-on-primary px-3 py-1 rounded-lg text-xs font-medium hover:bg-primary/90 disabled:opacity-50"
         >
+          {isPending(item.id) && <Spinner size="sm" />}
           Approve
         </button>
       )

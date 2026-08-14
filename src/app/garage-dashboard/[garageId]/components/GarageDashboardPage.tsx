@@ -2,7 +2,8 @@
 
 import { useCallback, useRef, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { SegmentedControl, GarageStatusPanel } from '@/components'
+import { SegmentedControl, GarageStatusPanel, Spinner } from '@/components'
+import { useNavigation } from '@/hooks/useNavigation'
 import { styles } from '@/styles/styles'
 import { OfferStatus, ServiceRequestStatus } from '@/types/statuses'
 import { useAuth } from '@/contexts/AuthContext'
@@ -41,6 +42,7 @@ interface OfferLite {
 
 export default function GarageDashboardPage({ garageId }: GarageDashboardPageProps) {
   const router = useRouter()
+  const { navigate, isNavigating } = useNavigation()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
   const { userType, garage: authGarage, isLoading: authLoading, logout } = useAuth()
@@ -234,7 +236,7 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
   })
 
   const handleLogout = () => {
-    router.push('/login/')
+    navigate('/login/')
   }
 
   if (isPendingValidation) {
@@ -274,9 +276,12 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
           <p className="text-base text-secondary leading-relaxed mb-6">Δεν ηταν δυνατη η φορτωση των δεδομενων του συνεργειου.</p>
           <button
             onClick={handleLogout}
+            disabled={isNavigating('/login/')}
             className={styles.btnSecondary}
           >
-            <Icon name="arrow_back" size="sm" />
+            {isNavigating('/login/')
+              ? <Spinner size="sm" />
+              : <Icon name="arrow_back" size="sm" />}
             Επιστροφη στη Συνδεση
           </button>
         </div>

@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { styles } from '@/styles/styles'
 import { OfferStatus } from '@/types/statuses'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
+import { useNavigation } from '@/hooks/useNavigation'
 import { getCategoryText } from '@/utils/categoryLabels'
 
 interface Offer {
@@ -39,7 +40,7 @@ interface AppointmentsProps {
 }
 
 export default function Appointments({ garageId }: AppointmentsProps) {
-  const router = useRouter()
+  const { navigate, isNavigating } = useNavigation()
   const [appointments, setAppointments] = useState<Offer[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -132,12 +133,14 @@ export default function Appointments({ garageId }: AppointmentsProps) {
     }
   }
 
+  const chatHref = (requestId: string) => `/garage-dashboard/${garageId}/chat/${requestId}/`
+
   const handleChatClick = (requestId: string) => {
-    router.push(`/garage-dashboard/${garageId}/chat/${requestId}/`)
+    navigate(chatHref(requestId))
   }
 
   const handleCardClick = (offer: Offer) => {
-    router.push(`/garage-dashboard/${garageId}/offers/${offer.serviceRequestId}/`)
+    navigate(`/garage-dashboard/${garageId}/offers/${offer.serviceRequestId}/`)
   }
 
   // Filter to show only today and future appointments
@@ -274,9 +277,12 @@ export default function Appointments({ garageId }: AppointmentsProps) {
                   e.stopPropagation()
                   handleChatClick(offer.serviceRequestId)
                 }}
-                className="bg-gradient-to-br from-primary to-primary-container text-on-primary px-6 py-3 rounded-lg text-sm font-bold transition-all duration-200 active:scale-95 shadow-lg shadow-primary/20 flex items-center gap-2 w-full justify-center"
+                disabled={isNavigating(chatHref(offer.serviceRequestId))}
+                className="bg-gradient-to-br from-primary to-primary-container text-on-primary px-6 py-3 rounded-lg text-sm font-bold transition-all duration-200 active:scale-95 shadow-lg shadow-primary/20 flex items-center gap-2 w-full justify-center disabled:opacity-70"
               >
-                <Icon name="chat" size="sm" />
+                {isNavigating(chatHref(offer.serviceRequestId))
+                  ? <Spinner size="sm" />
+                  : <Icon name="chat" size="sm" />}
                 Ανοιγμα Συνομιλιας
               </button>
             </article>

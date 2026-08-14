@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Spinner from '@/components/Spinner'
+import { useAsyncTask } from '@/hooks/useAsyncTask'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line, AreaChart, Area,
@@ -85,6 +87,7 @@ export default function PerformanceCharts() {
   const [data, setData] = useState<MetricsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const { run, isPending } = useAsyncTask()
 
   const fetchData = useCallback(async () => {
     try {
@@ -150,8 +153,15 @@ export default function PerformanceCharts() {
           >
             <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${autoRefresh ? 'left-5' : 'left-0.5'}`} />
           </button>
-          <button onClick={fetchData} className="ml-2 p-2 rounded-lg hover:bg-surface-container transition-colors">
-            <span className="material-symbols-outlined text-[18px] text-secondary">refresh</span>
+          <button
+            onClick={() => run(fetchData)}
+            disabled={isPending()}
+            aria-label="Ανανέωση"
+            className="ml-2 p-2 rounded-lg hover:bg-surface-container transition-colors disabled:opacity-50"
+          >
+            {isPending()
+              ? <Spinner size="md" className="text-secondary" />
+              : <span className="material-symbols-outlined text-[18px] text-secondary">refresh</span>}
           </button>
         </div>
       </div>

@@ -8,6 +8,10 @@
 :root {
   --background: #fbf9f8;
   --foreground: #1b1c1c;
+
+  /* App shell chrome — keep in sync with TopHeader (h-16) and BottomNav (h-20). */
+  --app-header-h: 4rem;
+  --app-bottom-nav-h: 5rem;
 }
 
 * {
@@ -42,6 +46,33 @@ body {
   direction: ltr;
   vertical-align: middle;
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/*
+ * Height of the space a page actually gets to fill: the viewport minus the app
+ * shell chrome (sticky TopHeader above, fixed BottomNav below on mobile).
+ *
+ * Use this instead of `h-screen` on any screen that pins UI to its bottom edge,
+ * such as a chat composer. `h-screen` measures the whole viewport while
+ * ignoring both the header above and the bottom nav below, so the pinned UI
+ * ends up ~150px past the fold and the user has to scroll to reach it.
+ *
+ * `dvh` rather than `vh` so a mobile browser's collapsing URL bar is accounted
+ * for as well; the plain `vh` line above it is the fallback for browsers
+ * without `dvh` support. Pages using this must not sit inside the app shell's
+ * pt-14/pb-24 chrome padding — see AppShell's `isViewportPage`.
+ */
+.app-viewport {
+  height: calc(100vh - var(--app-header-h) - var(--app-bottom-nav-h));
+  height: calc(100dvh - var(--app-header-h) - var(--app-bottom-nav-h));
+}
+
+@media (min-width: 768px) {
+  /* BottomNav is `md:hidden`, so only the header is taken out on desktop. */
+  .app-viewport {
+    height: calc(100vh - var(--app-header-h));
+    height: calc(100dvh - var(--app-header-h));
+  }
 }
 
 /* Utility classes from designs */

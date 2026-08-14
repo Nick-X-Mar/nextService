@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
+import { useNavigation } from '@/hooks/useNavigation'
 import { styles } from '../../../styles/styles'
 import RequestCard from './RequestCard'
 import OfferSummaryCard from './OfferSummaryCard'
@@ -33,7 +35,6 @@ interface RequestsPageProps {
 }
 
 export default function RequestsPage({ clientId }: RequestsPageProps) {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
 
@@ -41,6 +42,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     tabParam === 'appointment' ? 'appointment' : tabParam === 'closed' ? 'closed' : 'open'
   const { success, error } = useToast()
   const { refreshUser } = useUser()
+  const { navigate, isNavigating } = useNavigation()
   const [requests, setRequests] = useState<ServiceRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null)
@@ -330,8 +332,11 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     ...pastAppointments
   ]
 
+  const detailsHref = (requestId: string) => `/requests/${clientId}/details/${requestId}/`
+  const chatHref = (requestId: string) => `/requests/${clientId}/chats/${requestId}/`
+
   const handleViewDetails = (request: ServiceRequest) => {
-    router.push(`/requests/${clientId}/details/${request.id}/`)
+    navigate(detailsHref(request.id))
   }
 
   const handleCloseModal = () => {
@@ -350,7 +355,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
 
   const handleChatClick = (requestId: string) => {
     // Navigate to the client's individual chat page
-    router.push(`/requests/${clientId}/chats/${requestId}/`)
+    navigate(chatHref(requestId))
   }
 
   const handleCancelAppointment = async () => {
@@ -582,9 +587,11 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                         Συμπληρώστε Στοιχεία
                       </button>
                       <button
-                        onClick={() => router.push('/login/')}
+                        onClick={() => navigate('/login/')}
+                        disabled={isNavigating('/login/')}
                         className={`${styles.btnOutline}`}
                       >
+                        {isNavigating('/login/') && <Spinner size="sm" />}
                         Σύνδεση
                       </button>
                     </div>
@@ -648,6 +655,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                             isSubmitting || !formData.email ? 'opacity-50 cursor-not-allowed' : ''
                           }`}
                         >
+                          {isSubmitting ? <Spinner size="sm" /> : <Icon name="save" size="sm" />}
                           {isSubmitting ? 'Αποθήκευση...' : 'Αποθήκευση Στοιχείων'}
                         </button>
                         <button
@@ -705,6 +713,13 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                       request.status === ServiceRequestStatus.APPOINTMENT
                         ? () => setCancelRequest(request)
                         : undefined
+                    }
+                    pendingAction={
+                      isNavigating(detailsHref(request.id))
+                        ? 'details'
+                        : isNavigating(chatHref(request.id))
+                          ? 'chat'
+                          : null
                     }
                     hasGarageMessages={garageMessagesMap[request.id] || false}
                     getStatusIcon={getStatusIcon}
@@ -786,9 +801,11 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                             Συμπληρώστε Στοιχεία
                           </button>
                           <button
-                            onClick={() => router.push('/login/')}
+                            onClick={() => navigate('/login/')}
+                            disabled={isNavigating('/login/')}
                             className={styles.btnOutline}
                           >
+                            {isNavigating('/login/') && <Spinner size="sm" />}
                             Σύνδεση
                           </button>
                         </div>
@@ -859,6 +876,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                               isSubmitting || !formData.firstName || !formData.phoneNumber ? 'opacity-50 cursor-not-allowed' : ''
                             }`}
                           >
+                            {isSubmitting ? <Spinner size="sm" /> : <Icon name="save" size="sm" />}
                             {isSubmitting ? 'Αποθήκευση...' : 'Αποθήκευση Στοιχείων'}
                           </button>
                           <button
@@ -882,10 +900,13 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                   <h3 className="text-lg font-bold text-on-surface mb-2">Δεν υπάρχουν αιτήματα</h3>
                   <p className="text-sm text-on-surface-variant mb-6">Δεν έχετε κάνει ακόμα κανένα αίτημα υπηρεσίας.</p>
                   <button
-                    onClick={() => router.push('/')}
+                    onClick={() => navigate('/')}
+                    disabled={isNavigating('/')}
                     className={styles.btnPrimary}
                   >
-                    <Icon name="add_circle" filled size="sm" />
+                    {isNavigating('/')
+                      ? <Spinner size="sm" />
+                      : <Icon name="add_circle" filled size="sm" />}
                     Δημιουργία Αιτήματος
                   </button>
                 </div>

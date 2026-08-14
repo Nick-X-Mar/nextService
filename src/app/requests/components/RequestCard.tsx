@@ -1,6 +1,7 @@
 'use client'
 
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
 import { ServiceRequestStatus } from '../../../types/statuses'
 import type { ServiceRequest } from '../../../types/requests'
 import { getCategoryText } from '@/utils/categoryLabels'
@@ -16,6 +17,8 @@ interface RequestCardProps {
   getStatusColor: (status: ServiceRequestStatus) => string
   disabled?: boolean
   hasOffers?: boolean
+  /** Which of the card's buttons is still waiting on its destination page. */
+  pendingAction?: 'details' | 'chat' | null
 }
 
 export default function RequestCard({
@@ -28,7 +31,8 @@ export default function RequestCard({
   getStatusText,
   getStatusColor,
   disabled = false,
-  hasOffers = false
+  hasOffers = false,
+  pendingAction = null
 }: RequestCardProps) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -158,13 +162,14 @@ export default function RequestCard({
                 e.stopPropagation()
                 if (hasGarageMessages) onChatClick()
               }}
-              disabled={!hasGarageMessages}
-              className={`px-4 py-2.5 text-xs font-bold uppercase tracking-widest rounded-lg transition-colors ${
+              disabled={!hasGarageMessages || pendingAction === 'chat'}
+              className={`px-4 py-2.5 text-xs font-bold uppercase tracking-widest rounded-lg transition-colors inline-flex items-center gap-1.5 ${
                 hasGarageMessages
                   ? 'text-on-surface-variant bg-surface-variant hover:bg-surface-container-high'
                   : 'text-on-surface-variant/40 bg-surface-container cursor-not-allowed'
               }`}
             >
+              {pendingAction === 'chat' && <Spinner size="sm" />}
               Συνομιλία
             </button>
           )}
@@ -184,9 +189,10 @@ export default function RequestCard({
               e.stopPropagation()
               if (!disabled) onViewDetails()
             }}
-            disabled={disabled}
-            className="px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-on-primary bg-gradient-to-br from-primary to-primary-container rounded-lg shadow-sm active:scale-95 transition-all"
+            disabled={disabled || pendingAction === 'details'}
+            className="px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-on-primary bg-gradient-to-br from-primary to-primary-container rounded-lg shadow-sm active:scale-95 transition-all inline-flex items-center gap-1.5 disabled:opacity-70"
           >
+            {pendingAction === 'details' && <Spinner size="sm" />}
             Λεπτομέρειες
           </button>
         </div>

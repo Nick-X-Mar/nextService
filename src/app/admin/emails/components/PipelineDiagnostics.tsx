@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Spinner from '@/components/Spinner'
 
 interface DestinationCheck {
   name: string
@@ -182,8 +183,9 @@ export default function PipelineDiagnostics({ onTestEmailLifecycleProgressed }: 
           type="button"
           onClick={refresh}
           disabled={loading}
-          className="text-xs px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high transition disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high transition disabled:opacity-50"
         >
+          {loading && <Spinner size="sm" />}
           {loading ? 'Checking…' : 'Re-run check'}
         </button>
       </div>
@@ -343,13 +345,14 @@ export default function PipelineDiagnostics({ onTestEmailLifecycleProgressed }: 
             type="button"
             onClick={sendTest}
             disabled={testRunning || !diag?.notificationsEnabled}
-            className="text-xs px-3 py-1.5 rounded-lg bg-primary text-on-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-primary text-on-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             title={
               !diag?.notificationsEnabled
                 ? 'Enable NOTIFICATIONS_ENABLED first'
                 : 'Send a test email and watch the lifecycle'
             }
           >
+            {testRunning && <Spinner size="sm" />}
             {testRunning ? 'Watching…' : 'Send test'}
           </button>
         </div>

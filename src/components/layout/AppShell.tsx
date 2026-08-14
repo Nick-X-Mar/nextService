@@ -20,6 +20,15 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const isLanding = pathname === '/'
   const isFullPage = pathname.startsWith('/offer/') || pathname === '/login'
 
+  // Chat screens size themselves with `.app-viewport` and pin their composer to
+  // the bottom edge. Main's pt-14/pb-24 chrome padding must not stack on top of
+  // that height — those extra ~150px are exactly what pushed the composer below
+  // the fold and forced the user to scroll down to write a message.
+  const isViewportPage =
+    /^\/garage-dashboard\/[^/]+\/chat\/[^/]+/.test(pathname) ||
+    /^\/requests\/[^/]+\/chats\/[^/]+/.test(pathname)
+  const noShellPadding = isFullPage || isViewportPage
+
   // Public content pages carry the footer; the authenticated app screens don't,
   // because BottomNav already occupies that space on mobile.
   //
@@ -48,7 +57,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           <Sidebar />
         </Suspense>
       )}
-      <main className={`${isLanding ? '' : isFullPage ? 'pt-0' : 'pt-14'} ${isFullPage ? 'pb-0' : 'pb-24'} md:pb-0 ${showSidebar ? 'md:ml-64' : ''}`}>
+      <main className={`${isLanding ? '' : noShellPadding ? 'pt-0' : 'pt-14'} ${noShellPadding ? 'pb-0' : 'pb-24'} md:pb-0 ${showSidebar ? 'md:ml-64' : ''}`}>
         {children}
       </main>
       {isPublicContentPage && <Footer />}

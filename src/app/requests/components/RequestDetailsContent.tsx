@@ -7,7 +7,7 @@ import { DayPicker } from 'react-day-picker'
 import 'react-day-picker/dist/style.css'
 import { addDays, addMonths, format, isWeekend } from 'date-fns'
 import { el } from 'date-fns/locale'
-import { ServiceVehicleCard, Modal, Input, Button, Checkbox } from '@/components'
+import { ServiceVehicleCard, Modal, Input, Button, Checkbox, Spinner } from '@/components'
 import PaymentModal from './PaymentModal'
 import { styles } from '../../../styles/styles'
 import { ServiceRequestStatus, OfferStatus } from '../../../types/statuses'
@@ -1170,6 +1170,9 @@ export default function RequestDetailsContent({
                                       isSaving || customDates.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
                                     }`}
                                   >
+                                    {isSaving
+                                      ? <Spinner size="sm" />
+                                      : <Icon name="send" size="sm" />}
                                     {isSaving ? 'Αποστολή...' : 'Αποστολή προτεινόμενων ημερομηνιών'}
                                   </button>
                                   <button
@@ -1211,7 +1214,9 @@ export default function RequestDetailsContent({
                                   : ''
                               }`}
                             >
-                              <Icon name="check_circle" size="sm" />
+                              {acceptingOfferId === offer.id
+                                ? <Spinner size="sm" />
+                                : <Icon name="check_circle" size="sm" />}
                               {acceptingOfferId === offer.id ? 'Αποδοχή...' : 'Αποδοχή προσφοράς'}
                             </button>
                           </div>

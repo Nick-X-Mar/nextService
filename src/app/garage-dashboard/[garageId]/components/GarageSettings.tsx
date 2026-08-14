@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Input } from '@/components'
+import { Input, Spinner } from '@/components'
 import AccountDangerZone from '@/components/AccountDangerZone'
 import NotificationSettings from './NotificationSettings'
 import { styles } from '@/styles/styles'
@@ -248,7 +248,7 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
                 >
                   {isLoading ? (
                     <span className="flex items-center gap-2">
-                      <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></span>
+                      <Spinner size="sm" />
                       Αποθηκευση...
                     </span>
                   ) : (

@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import IndividualChatPage from './components/IndividualChatPage'
 
 interface PageProps {
@@ -9,7 +10,12 @@ interface PageProps {
 
 export default async function Page({ params }: PageProps) {
   const { clientId, requestId } = await params
-  return <IndividualChatPage clientId={clientId} requestId={requestId} />
+  // Local boundary: IndividualChatPage reads ?garageId= via useSearchParams().
+  return (
+    <Suspense fallback={<div className="app-viewport bg-surface" />}>
+      <IndividualChatPage clientId={clientId} requestId={requestId} />
+    </Suspense>
+  )
 }
 
 export const metadata = {

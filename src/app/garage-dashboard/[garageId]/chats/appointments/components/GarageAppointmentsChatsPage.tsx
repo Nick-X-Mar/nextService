@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { styles } from '@/styles/styles'
 import { useToast } from '@/hooks/useToast'
 import { ServiceRequestStatus } from '@/types/statuses'
 import type { ServiceRequest } from '@/types/requests'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
+import { useNavigation } from '@/hooks/useNavigation'
 import { getCategoryText } from '@/utils/categoryLabels'
 
 interface ChatRequest extends Omit<ServiceRequest, 'vehicle'> {
@@ -29,7 +30,7 @@ interface GarageAppointmentsChatsPageProps {
 }
 
 export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointmentsChatsPageProps) {
-  const router = useRouter()
+  const { navigate, isNavigating } = useNavigation()
   const { error } = useToast()
   const [chatRequests, setChatRequests] = useState<ChatRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -220,8 +221,10 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
     return `Σε ${diffDays} ημέρες`
   }
 
+  const chatHref = (requestId: string) => `/garage-dashboard/${garageId}/chat/${requestId}/`
+
   const handleChatClick = (requestId: string) => {
-    router.push(`/garage-dashboard/${garageId}/chat/${requestId}/`)
+    navigate(chatHref(requestId))
   }
 
   if (isLoading) {
@@ -242,10 +245,13 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
         <div className="max-w-3xl mx-auto px-5 md:px-8">
           <div className="flex items-center gap-4 py-4">
             <button
-              onClick={() => router.push(`/garage-dashboard/${garageId}/`)}
-              className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-highest transition-colors"
+              onClick={() => navigate(`/garage-dashboard/${garageId}/`)}
+              disabled={isNavigating(`/garage-dashboard/${garageId}/`)}
+              className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-highest transition-colors disabled:opacity-60"
             >
-              <Icon name="arrow_back" size="sm" className="text-on-surface" />
+              {isNavigating(`/garage-dashboard/${garageId}/`)
+                ? <Spinner size="sm" className="text-on-surface" />
+                : <Icon name="arrow_back" size="sm" className="text-on-surface" />}
             </button>
             <div className="flex-1">
               <h1 className="text-xl font-bold text-on-surface">Ραντεβού</h1>
@@ -295,7 +301,9 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
                 <div className="flex items-start gap-3">
                   {/* Avatar */}
                   <div className="w-11 h-11 rounded-full bg-surface-container flex items-center justify-center flex-shrink-0">
-                    <Icon name="directions_car" size="sm" className="text-primary" filled />
+                    {isNavigating(chatHref(request.id))
+                      ? <Spinner size="sm" className="text-primary" />
+                      : <Icon name="directions_car" size="sm" className="text-primary" filled />}
                   </div>
 
                   {/* Content */}
@@ -348,10 +356,13 @@ export default function GarageAppointmentsChatsPage({ garageId }: GarageAppointm
               Δεν έχετε προγραμματισμένα ραντεβού από σήμερα και μετά.
             </p>
             <button
-              onClick={() => router.push(`/garage-dashboard/${garageId}/?tab=appointments`)}
+              onClick={() => navigate(`/garage-dashboard/${garageId}/?tab=appointments`)}
+              disabled={isNavigating(`/garage-dashboard/${garageId}/?tab=appointments`)}
               className={styles.btnPrimary + ' mx-auto'}
             >
-              <Icon name="calendar_month" size="sm" />
+              {isNavigating(`/garage-dashboard/${garageId}/?tab=appointments`)
+                ? <Spinner size="sm" />
+                : <Icon name="calendar_month" size="sm" />}
               Δείτε τα Ραντεβού
             </button>
           </div>

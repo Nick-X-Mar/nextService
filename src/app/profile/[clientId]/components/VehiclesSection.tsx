@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
 import ServiceCategoryModal from '@/components/ServiceCategoryModal'
 import { styles } from '../../../../styles/styles'
 
@@ -430,7 +431,7 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
             disabled={isSubmitting || !formData.brand?.trim() || !formData.model?.trim()}
             className={`${styles.btnPrimary} ${(isSubmitting || !formData.brand?.trim() || !formData.model?.trim()) ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            <Icon name="check" size="sm" />
+            {isSubmitting ? <Spinner size="sm" /> : <Icon name="check" size="sm" />}
             {isSubmitting ? 'Αποθήκευση...' : 'Αποθήκευση'}
           </button>
           <button

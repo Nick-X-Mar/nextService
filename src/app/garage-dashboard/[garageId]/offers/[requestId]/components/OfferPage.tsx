@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { ServiceVehicleCard } from '@/components'
+import { ServiceVehicleCard, Spinner } from '@/components'
+import { useNavigation } from '@/hooks/useNavigation'
 import { styles } from '@/styles/styles'
 import { OfferStatus } from '@/types/statuses'
 import Icon from '@/components/ui/Icon'
@@ -103,6 +104,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
   const [clientAvailabilityDates, setClientAvailabilityDates] = useState<string[]>([])
   const [addingClientDate, setAddingClientDate] = useState<string | null>(null)
   const router = useRouter()
+  const { navigate, isNavigating } = useNavigation()
 
   const showToast = (toast: Omit<ToastData, 'id'>) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
@@ -508,10 +510,14 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
             </div>
             {!isAccepted && (
               <button
-                onClick={() => router.push(`/garage-dashboard/${garageId}/chat/${requestId}/`)}
-                className="w-10 h-10 rounded-full machined-gradient flex items-center justify-center shadow-lg shadow-primary/20 active:scale-95 transition-transform"
+                onClick={() => navigate(`/garage-dashboard/${garageId}/chat/${requestId}/`)}
+                disabled={isNavigating(`/garage-dashboard/${garageId}/chat/${requestId}/`)}
+                aria-label="Άνοιγμα συνομιλίας"
+                className="w-10 h-10 rounded-full machined-gradient flex items-center justify-center shadow-lg shadow-primary/20 active:scale-95 transition-transform disabled:opacity-70"
               >
-                <Icon name="chat" size="sm" className="text-on-primary" filled />
+                {isNavigating(`/garage-dashboard/${garageId}/chat/${requestId}/`)
+                  ? <Spinner size="sm" className="text-on-primary" />
+                  : <Icon name="chat" size="sm" className="text-on-primary" filled />}
               </button>
             )}
           </div>
@@ -766,12 +772,16 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
                             : 'bg-amber-100 border border-amber-300 text-amber-900 hover:bg-primary/10 hover:border-primary/30 hover:text-primary cursor-pointer'
                       }`}
                     >
-                      <Icon
-                        name={alreadyAdded ? 'check_circle' : isAdding ? 'hourglass_top' : 'add_circle'}
-                        size="sm"
-                        filled={alreadyAdded}
-                        className={alreadyAdded ? 'text-green-600' : isAdding ? 'text-amber-700' : 'text-amber-700'}
-                      />
+                      {isAdding ? (
+                        <Spinner size="sm" className="text-amber-700" />
+                      ) : (
+                        <Icon
+                          name={alreadyAdded ? 'check_circle' : 'add_circle'}
+                          size="sm"
+                          filled={alreadyAdded}
+                          className={alreadyAdded ? 'text-green-600' : 'text-amber-700'}
+                        />
+                      )}
                       {new Date(`${date}T00:00:00`).toLocaleDateString('el-GR', {
                         weekday: 'long',
                         day: '2-digit',
@@ -849,9 +859,11 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
           ) : (
             <div className="flex gap-3 mt-5">
               <button
-                onClick={() => router.push(`/garage-dashboard/${garageId}/#available`)}
+                onClick={() => navigate(`/garage-dashboard/${garageId}/#available`)}
+                disabled={isNavigating(`/garage-dashboard/${garageId}/#available`)}
                 className={`${styles.btnOutline} flex-1 justify-center`}
               >
+                {isNavigating(`/garage-dashboard/${garageId}/#available`) && <Spinner size="sm" />}
                 Ακύρωση
               </button>
               <button
@@ -864,7 +876,10 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
                 } flex-1 justify-center`}
               >
                 {isSubmitting ? (
-                  <div className="w-5 h-5 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
+                  <>
+                    <Spinner size="sm" />
+                    {existingOffer ? 'Ενημέρωση…' : 'Αποστολή…'}
+                  </>
                 ) : (
                   <>
                     <Icon name={existingOffer ? 'sync' : 'send'} size="sm" />

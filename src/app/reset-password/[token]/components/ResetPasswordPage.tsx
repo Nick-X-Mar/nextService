@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
 import { useToast } from '@/hooks/useToast'
 import { styles } from '@/styles/styles'
 import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
@@ -138,7 +139,7 @@ export default function ResetPasswordPage() {
               className={`${styles.btnPrimary} w-full justify-center text-base py-3 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               disabled={isLoading}
             >
-              <Icon name="lock_reset" size="sm" />
+              {isLoading ? <Spinner size="sm" /> : <Icon name="lock_reset" size="sm" />}
               {isLoading ? 'Παρακαλώ περιμένετε...' : 'Ενημέρωση κωδικού'}
             </button>
           </form>

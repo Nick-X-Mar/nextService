@@ -2,6 +2,7 @@
 
 import { useRef } from 'react'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
 
 interface GearSubmitButtonProps {
   label?: string
@@ -53,7 +54,9 @@ export default function GearSubmitButton({
             : 'bg-surface-container-highest/30 text-on-surface-variant/50'
         }`}
       >
-        <Icon name={isLoading ? 'progress_activity' : 'settings'} size="md" />
+        {isLoading
+          ? <Spinner size="md" />
+          : <Icon name="settings" size="md" />}
       </div>
       <span className="relative z-10 mx-auto">
         {isLoading ? loadingLabel : label}

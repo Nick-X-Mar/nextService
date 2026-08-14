@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Modal from '@/components/Modal'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
+import { useNavigation } from '@/hooks/useNavigation'
 import { saveFormData } from '@/utils/formStorage'
 
 const categories = [
@@ -23,17 +24,22 @@ interface ServiceCategoryModalProps {
 }
 
 export default function ServiceCategoryModal({ isOpen, onClose, extraFormData }: ServiceCategoryModalProps) {
-  const router = useRouter()
+  const { navigate, isNavigating } = useNavigation()
   const [search, setSearch] = useState('')
+  const [pendingCategory, setPendingCategory] = useState('')
 
   const filtered = search
     ? categories.filter(c => c.label.toLowerCase().includes(search.toLowerCase()))
     : categories
 
   const selectCategory = (value: string) => {
+    if (pendingCategory) return
+    setPendingCategory(value)
     saveFormData({ ...extraFormData, category: value })
-    onClose()
-    router.push('/car-details/')
+    // No onClose() here on purpose: the modal stays up, spinner running, until
+    // /car-details is ready and the navigation unmounts it. Closing first would
+    // drop the spinner and leave the user on an unchanged page with no feedback.
+    navigate('/car-details/')
   }
 
   return (
@@ -63,13 +69,16 @@ export default function ServiceCategoryModal({ isOpen, onClose, extraFormData }:
           <button
             key={cat.value}
             onClick={() => selectCategory(cat.value)}
-            className="w-full flex items-center justify-between p-3 rounded-xl bg-surface-container hover:bg-surface-container-high transition-colors"
+            disabled={isNavigating('/car-details/')}
+            className="w-full flex items-center justify-between p-3 rounded-xl bg-surface-container hover:bg-surface-container-high transition-colors disabled:opacity-60"
           >
             <div className="flex items-center gap-3">
               <Icon name={cat.icon} size="sm" className="text-on-surface-variant/60" />
               <span className="text-sm font-bold text-on-surface">{cat.label}</span>
             </div>
-            <Icon name="arrow_forward" size="sm" className="text-on-surface-variant/30" />
+            {pendingCategory === cat.value
+              ? <Spinner size="sm" className="text-primary" />
+              : <Icon name="arrow_forward" size="sm" className="text-on-surface-variant/30" />}
           </button>
         ))}
         {filtered.length === 0 && (

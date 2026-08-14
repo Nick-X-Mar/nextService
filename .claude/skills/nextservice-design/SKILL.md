@@ -82,21 +82,36 @@ These are what make the app look like itself. Reuse them rather than inventing n
 
 ## Shared components — exact API
 
-Import from the barrel: `import { Button, Card, Input, Modal, Badge, Switch, Checkbox, SegmentedControl } from '@/components'`.
+Import from the barrel: `import { Button, Input, Modal, Spinner, Switch, Checkbox, SegmentedControl } from '@/components'`.
 
 | Component | Props |
 |---|---|
-| `Button` | `variant`: primary \| secondary \| danger \| success \| outline \| ghost · `size`: sm \| md \| lg · `loading` · `fullWidth` · `disabled` |
-| `Card` | `variant`: default \| outlined \| elevated \| simple · `padding`: none \| sm \| md \| lg · `hover` · `onClick` |
+| `Button` | `variant`: primary \| secondary \| danger \| success \| outline \| ghost · `size`: sm \| md \| lg · `loading` · `fullWidth` · `disabled`. An `onClick` that returns a promise makes it spin on its own. |
 | `Input` | `value` + `onChange(value: string)` (**not** the event) · `label` · `error` · `size`: sm \| md \| lg · `required` · plus the usual HTML attrs |
 | `Modal` | `isOpen` · `onClose` · `title` · `footer` · `size`: sm \| md \| lg \| xl · `closeOnEscape` · `closeOnBackdropClick` |
-| `Badge` | `variant`: default \| primary \| secondary \| success \| warning \| danger \| info · `size`: sm \| md \| lg · `dot` |
+| `Spinner` | `size`: sm \| md \| lg \| xl · `className`. The only spinner — inherits `currentColor`. |
 | `SegmentedControl` | `options[{value,label}]` · `value` · `onChange` · `variant` · `size` |
 | `Switch`, `Checkbox` | `checked` · `onChange` · `label` |
+| `LoadMoreButton` | `onClick` · `loading` · `hasMore` · `label` · `loadingLabel` · `icon` |
+
+`Badge` is the shadcn-style one at `@/components/ui/badge` (`variant` · `className`) — there is no barrel `Badge`. There is no shared `Card` component either; cards are composed inline from `styles.card` and the surface tokens.
 
 Toasts are global — `const { showSuccess, showError, showInfo } = useToast()` from `@/hooks/useToast`. Types: success \| error \| info \| warning.
 
-Do **not** create a new Button/Card/Modal/Input variant file. Extend the existing component's variant map instead, and only when a genuinely new case appears.
+Do **not** create a new Button/Modal/Input/Spinner variant file. Extend the existing component's variant map instead, and only when a genuinely new case appears.
+
+## Loading states
+
+Every control that fires a request or a navigation must show a spinner — a button that only swaps its label reads as broken on a slow connection.
+
+- Network action → `useAsyncTask` (`src/hooks/useAsyncTask.ts`): `run(fn)`, or `run(key, fn)` when a list has one button per row. It also swallows double-clicks.
+- Route change → `useNavigation` (`src/hooks/useNavigation.ts`): `navigate(href)` + `isNavigating(href)`. Plain `router.push` returns immediately and gives no feedback while the server component loads.
+
+Inside a button the spinner **replaces** the leading icon rather than being added next to it, so the label never shifts:
+
+```tsx
+{saving ? <Spinner size="sm" /> : <Icon name="save" size="sm" />}
+```
 
 ## Layout shell
 
@@ -129,5 +144,4 @@ The global `frontend-design` skill exists to invent a *distinctive new visual id
 
 ## Known drift — don't copy these
 
-- `src/components/README.md` documents a stale palette (`#ea580c` orange, generic grays) from before the MD3 migration, and mentions `Title` / `Text` components **that do not exist**. `tailwind.config.js` + `styles.ts` win.
-- `Badge`'s success/warning/danger/info variants and the status chips use raw Tailwind palette colors (`green-100`, `amber-100`, `blue-100`) rather than MD3 tokens. That's the existing convention for semantic states — match it, but don't spread raw palette colors into new brand/surface work.
+- The status chips use raw Tailwind palette colors (`green-100`, `amber-100`, `blue-100`) rather than MD3 tokens. That's the existing convention for semantic states — match it, but don't spread raw palette colors into new brand/surface work.

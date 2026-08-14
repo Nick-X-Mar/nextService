@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { styles } from '../../../../styles/styles'
 // Navigation handled by AppShell
 import UserInfoSection from './UserInfoSection'
@@ -11,6 +10,9 @@ import AccountDangerZone from '@/components/AccountDangerZone'
 import { useToast } from '../../../../hooks/useToast'
 import { useAuth } from '../../../../contexts/AuthContext'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
+import { useAsyncTask } from '@/hooks/useAsyncTask'
+import { useNavigation } from '@/hooks/useNavigation'
 
 interface Client {
   id: string
@@ -51,9 +53,10 @@ interface ProfilePageProps {
 }
 
 export default function ProfilePage({ clientId }: ProfilePageProps) {
-  const router = useRouter()
   const { success, error } = useToast()
   const { refreshClient, logout } = useAuth()
+  const { run, isPending } = useAsyncTask()
+  const { navigate, isNavigating } = useNavigation()
   const [clientData, setClientData] = useState<Client | null>(null)
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -259,14 +262,17 @@ export default function ProfilePage({ clientId }: ProfilePageProps) {
               key={item.label}
               onClick={() => {
                 if (item.href.startsWith('/')) {
-                  router.push(item.href)
+                  navigate(item.href)
                 }
               }}
-              className="w-full flex items-center gap-4 px-3 py-3.5 rounded-xl hover:bg-surface-container transition-colors group"
+              disabled={isNavigating(item.href)}
+              className="w-full flex items-center gap-4 px-3 py-3.5 rounded-xl hover:bg-surface-container transition-colors group disabled:opacity-60"
             >
               <Icon name={item.icon} className="text-primary" />
               <span className="flex-1 text-left text-sm font-bold text-on-surface">{item.label}</span>
-              <Icon name="chevron_right" className="text-on-surface-variant/50" />
+              {isNavigating(item.href)
+                ? <Spinner size="md" className="text-primary" />
+                : <Icon name="chevron_right" className="text-on-surface-variant/50" />}
             </button>
           ))}
         </div>
@@ -276,11 +282,14 @@ export default function ProfilePage({ clientId }: ProfilePageProps) {
 
         {/* Logout Button */}
         <button
-          onClick={logout}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3.5 text-tertiary hover:bg-error-container/30 rounded-xl transition-colors mt-6"
+          onClick={() => run(logout)}
+          disabled={isPending()}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3.5 text-tertiary hover:bg-error-container/30 rounded-xl transition-colors mt-6 disabled:opacity-60"
         >
-          <Icon name="logout" className="text-tertiary" />
-          <span className="text-sm font-bold">Αποσύνδεση</span>
+          {isPending()
+            ? <Spinner size="md" className="text-tertiary" />
+            : <Icon name="logout" className="text-tertiary" />}
+          <span className="text-sm font-bold">{isPending() ? 'Αποσύνδεση…' : 'Αποσύνδεση'}</span>
         </button>
       </div>
     </section>

@@ -1,9 +1,11 @@
 'use client'
 
 import React, { useState, useLayoutEffect, useRef, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { gsap } from 'gsap'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
+import { useNavigation } from '@/hooks/useNavigation'
 import { saveFormData } from '@/utils/formStorage'
 
 const categories = [
@@ -16,9 +18,12 @@ const categories = [
 ]
 
 export default function HeroSection() {
-  const router = useRouter()
+  const { navigate } = useNavigation()
   const searchParams = useSearchParams()
   const [selectedCategory, setSelectedCategory] = useState('')
+  // The category tap fires a 500ms close animation before the push, so without
+  // this the row sits there looking inert for the whole wait.
+  const [pendingCategory, setPendingCategory] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const itemsRef = useRef<HTMLDivElement[]>([])
@@ -59,7 +64,9 @@ export default function HeroSection() {
   }
 
   const selectCategory = (value: string) => {
+    if (pendingCategory) return
     setSelectedCategory(value)
+    setPendingCategory(value)
     if (tlRef.current) tlRef.current.reverse()
     setIsOpen(false)
     saveFormData({ category: value })
@@ -70,7 +77,7 @@ export default function HeroSection() {
       body: JSON.stringify({ eventName: 'category_selected', clientId, metadata: { category: value } }),
     }).catch(() => {})
     setTimeout(() => {
-      router.push('/car-details/')
+      navigate('/car-details/')
     }, 500)
   }
 
@@ -132,11 +139,15 @@ export default function HeroSection() {
                     {cat.label}
                   </span>
                 </div>
-                <Icon
-                  name="arrow_forward"
-                  size="sm"
-                  className={selectedCategory === cat.value ? 'text-primary' : 'text-on-surface-variant/30'}
-                />
+                {pendingCategory === cat.value ? (
+                  <Spinner size="sm" className="text-primary" />
+                ) : (
+                  <Icon
+                    name="arrow_forward"
+                    size="sm"
+                    className={selectedCategory === cat.value ? 'text-primary' : 'text-on-surface-variant/30'}
+                  />
+                )}
               </div>
             ))}
           </div>

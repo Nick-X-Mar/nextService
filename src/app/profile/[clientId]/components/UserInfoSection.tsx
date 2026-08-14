@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
 import { styles } from '../../../../styles/styles'
 
 interface Client {
@@ -137,7 +138,7 @@ export default function UserInfoSection({ client, onUpdate }: UserInfoSectionPro
             disabled={isSubmitting || !formData.firstName.trim()}
             className={`${styles.btnPrimary} ${(isSubmitting || !formData.firstName.trim()) ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            <Icon name="check" size="sm" />
+            {isSubmitting ? <Spinner size="sm" /> : <Icon name="check" size="sm" />}
             {isSubmitting ? 'Αποθήκευση...' : 'Αποθήκευση'}
           </button>
           <button

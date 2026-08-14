@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
+import { useNavigation } from '@/hooks/useNavigation'
 import { styles } from '../../../../../../styles/styles'
 import { useToast } from '../../../../../../hooks/useToast'
 // Navigation handled by AppShell
-import { RequestDetailsPanel, LoadMoreButton } from '../../../../../../components'
+import { RequestDetailsPanel, LoadMoreButton, Spinner } from '../../../../../../components'
 import { ServiceRequestStatus } from '../../../../../../types/statuses'
 import type { ServiceRequest } from '../../../../../../types/requests'
 import '@/lib/amplify-config'
@@ -38,8 +39,11 @@ interface IndividualChatPageProps {
 }
 
 export default function IndividualChatPage({ clientId, requestId }: IndividualChatPageProps) {
-  const router = useRouter()
+  const { navigate, isNavigating } = useNavigation()
   const { showToast } = useToast()
+  // The chats list links to a specific thread (?garageId=...). On mobile the
+  // garage sidebar is hidden, so this is the only way to land on the right one.
+  const requestedGarageId = useSearchParams().get('garageId')
 
   const [garages, setGarages] = useState<Garage[]>([])
   const [selectedGarage, setSelectedGarage] = useState<Garage | null>(null)
@@ -83,16 +87,17 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       const response = await fetch(`/api/chat/${requestId}/garages/`)
       if (response.ok) {
         const data = await response.json()
-        setGarages(data.garages || [])
-        if (data.garages && data.garages.length > 0) {
-          setSelectedGarage(data.garages[0])
+        const list: Garage[] = data.garages || []
+        setGarages(list)
+        if (list.length > 0) {
+          setSelectedGarage(list.find(g => g.id === requestedGarageId) || list[0])
         }
       }
     } catch (error) {
       console.error('Error fetching garages:', error)
       showToast({ type: 'error', title: 'Σφάλμα κατά τη φόρτωση των συνεργείων' })
     }
-  }, [requestId, showToast])
+  }, [requestId, requestedGarageId, showToast])
 
   /**
    * Pulls the next page of older messages and prepends it.
@@ -347,24 +352,22 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
 
   if (loading) {
     return (
-      <section className="min-h-screen bg-surface">
-
-        <div className={styles.pageCenter}>
-          <div className="text-center">
-            <div className={styles.loadingSpinner}></div>
-            <p className={styles.bodyText}>Φόρτωση συνομιλιών...</p>
-          </div>
+      <section className="app-viewport bg-surface flex items-center justify-center">
+        <div className="text-center">
+          <div className={styles.loadingSpinner}></div>
+          <p className={styles.bodyText}>Φόρτωση συνομιλιών...</p>
         </div>
       </section>
     )
   }
 
   return (
-    <section className="min-h-screen bg-surface">
-      <div className="px-5 max-w-4xl mx-auto pt-4 pb-8">
-        {/* Request and Car Details */}
+    <section className="app-viewport overflow-hidden bg-surface flex flex-col">
+      <div className="px-4 md:px-5 max-w-4xl w-full mx-auto pt-4 pb-4 flex-1 min-h-0 flex flex-col">
+        {/* Request and Car Details — capped so an expanded panel scrolls inside
+            itself instead of pushing the composer off the screen. */}
         {requestDetails && (
-          <div className="mb-6">
+          <div className="mb-4 flex-shrink-0 max-h-[45%] overflow-y-auto">
             <RequestDetailsPanel
               request={requestDetails}
               allowEdit={true}
@@ -376,17 +379,23 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
           </div>
         )}
 
-        <div className="bg-surface-container-lowest rounded-2xl shadow-[0_4px_24px_rgba(27,28,28,0.06)] border border-outline-variant/10 overflow-hidden">
-          <div className="flex h-[calc(100vh-280px)] min-h-[500px]">
-            {/* Sidebar with garages */}
-            <div className="w-80 border-r border-outline-variant/10 bg-surface flex flex-col">
+        <div className="bg-surface-container-lowest rounded-2xl shadow-[0_4px_24px_rgba(27,28,28,0.06)] border border-outline-variant/10 overflow-hidden flex-1 min-h-0">
+          <div className="flex h-full">
+            {/* Sidebar with garages — hidden on mobile, where its fixed 320px
+                width left the chat (and its composer) about 30px wide. Phones
+                pick a thread from the chats list instead, which deep-links here
+                with ?garageId=. */}
+            <div className="hidden md:flex w-80 border-r border-outline-variant/10 bg-surface flex-col">
               <div className="p-4 border-b border-outline-variant/10">
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => router.push(`/requests/${clientId}/chats/`)}
-                    className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container transition-colors"
+                    onClick={() => navigate(`/requests/${clientId}/chats/`)}
+                    disabled={isNavigating(`/requests/${clientId}/chats/`)}
+                    className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container transition-colors disabled:opacity-60"
                   >
-                    <Icon name="arrow_back" size="md" className="text-on-surface" />
+                    {isNavigating(`/requests/${clientId}/chats/`)
+                      ? <Spinner size="md" className="text-on-surface" />
+                      : <Icon name="arrow_back" size="md" className="text-on-surface" />}
                   </button>
                   <h2 className="text-base font-bold text-on-surface">Συνεργεία</h2>
                 </div>
@@ -474,7 +483,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
             </div>
 
             {/* Main chat area */}
-            <div className="flex-1 flex flex-col bg-surface-container-low/50">
+            <div className="flex-1 min-w-0 flex flex-col bg-surface-container-low/50">
               {selectedGarage ? (
                 <>
                   {/* Chat header */}
@@ -482,10 +491,13 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                     <div className="flex items-center gap-3">
                       {/* Mobile back button (hidden on desktop since sidebar is visible) */}
                       <button
-                        onClick={() => router.push(`/requests/${clientId}/chats/`)}
-                        className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container transition-colors md:hidden"
+                        onClick={() => navigate(`/requests/${clientId}/chats/`)}
+                        disabled={isNavigating(`/requests/${clientId}/chats/`)}
+                        className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-surface-container transition-colors md:hidden disabled:opacity-60"
                       >
-                        <Icon name="arrow_back" size="md" className="text-on-surface" />
+                        {isNavigating(`/requests/${clientId}/chats/`)
+                          ? <Spinner size="md" className="text-on-surface" />
+                          : <Icon name="arrow_back" size="md" className="text-on-surface" />}
                       </button>
                       <div className="relative">
                         {selectedGarage.logoUrl ? (
@@ -513,7 +525,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                   </div>
 
                   {/* Messages */}
-                  <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+                  <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3">
                     <LoadMoreButton
                       hasMore={!!olderCursor}
                       loading={loadingOlder}
@@ -620,7 +632,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                           className="w-10 h-10 rounded-full machined-gradient flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95 shadow-lg shadow-primary/20 flex-shrink-0 mb-0.5"
                         >
                           {sending ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
+                            <Spinner size="sm" className="text-white" />
                           ) : (
                             <Icon name="send" filled size="sm" className="text-white" />
                           )}

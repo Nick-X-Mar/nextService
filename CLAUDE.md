@@ -54,8 +54,6 @@ Testing: Playwright E2E only (`e2e/*.spec.ts`). There is no unit-test framework 
 - `account/export`, `account/delete` — GDPR
 - `admin/**` — the whole admin surface (users, requests, payments, commissions, emails, errors, funnel, performance, hot-deals, custom vehicles, settings, tests)
 
-`src/app/api/test-*` are legacy scratch routes, not real features.
-
 Most routes are wrapped in `withMetrics(...)` (`src/utils/withMetrics.ts`) which fire-and-forget records latency/status into the `PerformanceMetrics` table.
 
 ### Auth
@@ -82,7 +80,7 @@ SEO: `sitemap.ts`, `robots.ts`, `opengraph-image.tsx`, canonical URLs from `src/
 
 ### Shared Code
 
-- `src/components/` — reusable UI (Button, Modal, Card, Input, Badge, Switch, Toast, SegmentedControl, …) plus `layout/` (AppShell, Sidebar, TopHeader, BottomNav, Footer). Always reuse instead of creating one-off equivalents.
+- `src/components/` — reusable UI (Button, Modal, Input, Spinner, Switch, Checkbox, Toast, SegmentedControl, LoadMoreButton, …) plus `layout/` (AppShell, Sidebar, TopHeader, BottomNav, Footer) and `ui/` (Icon, badge). Always reuse instead of creating one-off equivalents.
 - `src/contexts/AuthContext.tsx` — auth state (client vs garage), persisted to localStorage
 - `src/contexts/UserContext.tsx` — user-level state
 - `src/utils/dynamoService.ts` — DynamoDB client factory (local endpoint vs explicit creds vs `.aws/` profile vs IAM role)
@@ -94,7 +92,7 @@ SEO: `sitemap.ts`, `robots.ts`, `opengraph-image.tsx`, canonical URLs from `src/
 - `src/utils/s3Service.ts`, `formStorage.ts`, `rateLimit.ts`, `requireAuth.ts`, `ttlCache.ts`, `requestBroadcast.ts`
 - `src/lib/` — `amplify-config.ts`, `appsync-service.ts`, `stripe-client.ts`, `stripe-server.ts`, `offers.ts`, `site-url.ts`
 - `src/hooks/` — `useRealtimeRequests`, `useNewRequestNotifier`, `useToast`
-- Dead code, do not build on: `src/lib/websocket-service.ts` and `src/hooks/useRealtimeChat.ts` have no importers, and the hook subscribes to a `chat-{id}-{garageId}` channel that no longer matches what the API publishes. Real-time chat goes through `appSyncService` directly from the chat page components.
+- Real-time chat goes through `appSyncService` directly from the chat page components — there is no shared chat hook. (The old `websocket-service.ts` / `useRealtimeChat.ts` pair was deleted; it subscribed to a `chat-{id}-{garageId}` channel the API no longer publishes.)
 - `src/types/` — `index.ts`, `statuses.ts` (`ServiceRequestStatus`, `OfferStatus`), `requests.ts`, `payments.ts`, `events.ts`, `hotDeals.ts`
 
 ### Two User Types (+ admin)
@@ -157,7 +155,7 @@ The app uses a complete Material Design 3 system: Inter (latin + greek subsets),
 
 **Before writing or restyling any UI, load the `nextservice-design` skill** (`.claude/skills/nextservice-design/SKILL.md`) — it has the full token set, type ramp, component API and signature elements. Never hardcode hex values or duplicate a shared component.
 
-Note: `src/components/README.md` documents a pre-MD3 palette and two components (`Title`, `Text`) that no longer exist — treat `styles.ts` + `tailwind.config.js` as the source of truth.
+Loading states: every button that fires a request or a navigation shows a spinner. Use `Spinner` (`src/components/Spinner.tsx`) with `useAsyncTask` for requests and `useNavigation` for route changes — a bare `router.push` gives the user no feedback at all.
 
 ## Rules
 

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
 import { useToast } from '@/hooks/useToast'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -188,8 +189,9 @@ export default function AccountDangerZone({ userId, userType }: AccountDangerZon
               <button
                 onClick={handleExport}
                 disabled={isLoading}
-                className="flex-1 px-4 py-3 rounded-xl bg-primary text-on-primary font-bold text-sm disabled:opacity-50"
+                className="flex-1 px-4 py-3 rounded-xl bg-primary text-on-primary font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
               >
+                {isLoading ? <Spinner size="sm" /> : <Icon name="download" size="sm" />}
                 {isLoading ? 'Περίμενε...' : 'Κατέβασε'}
               </button>
             </div>
@@ -262,8 +264,9 @@ export default function AccountDangerZone({ userId, userType }: AccountDangerZon
               <button
                 onClick={handleDelete}
                 disabled={isLoading}
-                className="flex-1 px-4 py-3 rounded-xl bg-error text-on-error font-bold text-sm disabled:opacity-50"
+                className="flex-1 px-4 py-3 rounded-xl bg-error text-on-error font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
               >
+                {isLoading ? <Spinner size="sm" /> : <Icon name="delete_forever" size="sm" />}
                 {isLoading ? 'Διαγραφή...' : 'Διαγραφή οριστικά'}
               </button>
             </div>

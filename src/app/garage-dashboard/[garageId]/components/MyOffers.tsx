@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { styles } from '@/styles/styles'
 import { OfferStatus } from '@/types/statuses'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
+import { useNavigation } from '@/hooks/useNavigation'
 
 interface Offer {
   id: string
@@ -38,7 +39,7 @@ interface MyOffersProps {
 }
 
 export default function MyOffers({ garageId }: MyOffersProps) {
-  const router = useRouter()
+  const { navigate, isNavigating } = useNavigation()
   const [offers, setOffers] = useState<Offer[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | OfferStatus>('all')
@@ -114,7 +115,7 @@ export default function MyOffers({ garageId }: MyOffersProps) {
   }
 
   const handleOfferClick = (offer: Offer) => {
-    router.push(`/garage-dashboard/${garageId}/offers/${offer.serviceRequestId}/`)
+    navigate(`/garage-dashboard/${garageId}/offers/${offer.serviceRequestId}/`)
   }
 
   const filteredOffers = offers.filter(offer => {
@@ -183,11 +184,14 @@ export default function MyOffers({ garageId }: MyOffersProps) {
             {filter === 'all' && (
               <button
                 onClick={() => {
-                  router.push(`/garage-dashboard/${garageId}/?tab=requests`)
+                  navigate(`/garage-dashboard/${garageId}/?tab=requests`)
                 }}
+                disabled={isNavigating(`/garage-dashboard/${garageId}/?tab=requests`)}
                 className={styles.btnPrimary}
               >
-                <Icon name="add" size="sm" />
+                {isNavigating(`/garage-dashboard/${garageId}/?tab=requests`)
+                  ? <Spinner size="sm" />
+                  : <Icon name="add" size="sm" />}
                 Δειτε Διαθεσιμα Αιτηματα
               </button>
             )}

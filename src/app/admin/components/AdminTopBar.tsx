@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import Spinner from '@/components/Spinner'
 
 interface AdminTopBarProps {
   adminEmail?: string
@@ -35,8 +36,10 @@ export default function AdminTopBar({ adminEmail, adminName }: AdminTopBarProps)
           disabled={loggingOut}
           className="flex items-center gap-1.5 text-sm text-on-surface/60 hover:text-tertiary transition-colors disabled:opacity-50"
         >
-          <span className="material-symbols-outlined text-[18px]">logout</span>
-          Logout
+          {loggingOut
+            ? <Spinner size="sm" />
+            : <span className="material-symbols-outlined text-[18px]">logout</span>}
+          {loggingOut ? 'Logging out…' : 'Logout'}
         </button>
       </div>
     </header>

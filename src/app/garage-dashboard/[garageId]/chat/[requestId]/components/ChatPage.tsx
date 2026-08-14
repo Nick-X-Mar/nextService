@@ -8,7 +8,7 @@ import { ServiceRequestStatus } from '@/types/statuses'
 import type { ServiceRequest } from '@/types/requests'
 import { useAuth } from '@/contexts/AuthContext'
 import Icon from '@/components/ui/Icon'
-import { LoadMoreButton } from '@/components'
+import { LoadMoreButton, Spinner } from '@/components'
 import '@/lib/amplify-config'
 import appSyncService from '@/lib/appsync-service'
 import { getCategoryText } from '@/utils/categoryLabels'
@@ -287,7 +287,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
 
   if (isLoading) {
     return (
-      <div className={styles.pageCenter}>
+      <div className="app-viewport bg-surface flex items-center justify-center">
         <div className="text-center">
           <div className={styles.loadingSpinner}></div>
           <p className={styles.bodyText}>Φόρτωση συνομιλίας...</p>
@@ -298,7 +298,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
 
   if (!requestData || !garageData) {
     return (
-      <div className={styles.pageCenter}>
+      <div className="app-viewport bg-surface flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center mx-auto mb-4">
             <Icon name="error" size="lg" className="text-tertiary" />
@@ -315,7 +315,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-surface">
+    <div className="flex flex-col app-viewport overflow-hidden bg-surface">
       {/* Header */}
       <div className="bg-surface-container-lowest border-b border-outline-variant/10 flex-shrink-0 z-20">
         <div className="max-w-3xl mx-auto px-5 md:px-8">
@@ -343,8 +343,9 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
         </div>
       </div>
 
-      {/* Request Context (collapsible) */}
-      <div className="max-w-3xl mx-auto w-full px-5 md:px-8 pt-3 flex-shrink-0">
+      {/* Request Context (collapsible) — capped so an expanded panel scrolls
+          inside itself instead of pushing the composer off the screen. */}
+      <div className="max-w-3xl mx-auto w-full px-5 md:px-8 pt-3 flex-shrink-0 max-h-[45%] overflow-y-auto">
         <RequestDetailsPanel
           request={requestData}
           allowEdit={false}
@@ -352,7 +353,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
       </div>
 
       {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         <LoadMoreButton
           hasMore={!!olderCursor}
           loading={loadingOlder}
@@ -445,7 +446,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
                 className="w-10 h-10 rounded-full machined-gradient flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95 shadow-lg shadow-primary/20 flex-shrink-0 mb-0.5"
               >
                 {isSending ? (
-                  <div className="w-4 h-4 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
+                  <Spinner size="sm" className="text-on-primary" />
                 ) : (
                   <Icon name="send" size="sm" className="text-on-primary" filled />
                 )}

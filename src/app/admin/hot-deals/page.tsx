@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Image from 'next/image'
+import Spinner from '@/components/Spinner'
+import { useAsyncTask } from '@/hooks/useAsyncTask'
 import type { HotDeal } from '@/types/hotDeals'
 
 const emptyDeal: Partial<HotDeal> = {
@@ -18,6 +20,7 @@ export default function HotDealsAdminPage() {
   const [saving, setSaving] = useState(false)
   const [detailInput, setDetailInput] = useState('')
   const [uploading, setUploading] = useState(false)
+  const { run, isPending } = useAsyncTask()
   const fileRef = useRef<HTMLInputElement>(null)
 
   const fetchDeals = useCallback(async () => {
@@ -337,7 +340,9 @@ export default function HotDealsAdminPage() {
               disabled={saving || !editing.title}
               className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-on-primary text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
             >
-              <span className="material-symbols-outlined text-[18px]">save</span>
+              {saving
+                ? <Spinner size="sm" />
+                : <span className="material-symbols-outlined text-[18px]">save</span>}
               {saving ? 'Saving...' : 'Save Deal'}
             </button>
             <button
@@ -433,11 +438,14 @@ export default function HotDealsAdminPage() {
                   <span className="material-symbols-outlined text-[20px]">edit</span>
                 </button>
                 <button
-                  onClick={() => handleDelete(deal.dealId)}
-                  className="p-2 rounded-lg hover:bg-error-container/30 text-on-surface/60 hover:text-error transition-colors"
+                  onClick={() => run(deal.dealId, () => handleDelete(deal.dealId))}
+                  disabled={isPending(deal.dealId)}
+                  className="p-2 rounded-lg hover:bg-error-container/30 text-on-surface/60 hover:text-error transition-colors disabled:opacity-50"
                   title="Delete"
                 >
-                  <span className="material-symbols-outlined text-[20px]">delete</span>
+                  {isPending(deal.dealId)
+                    ? <Spinner size="md" />
+                    : <span className="material-symbols-outlined text-[20px]">delete</span>}
                 </button>
               </div>
             </div>

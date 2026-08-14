@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
 import { GarageStatusPanel } from '@/components'
 import { useToast } from '@/hooks/useToast'
 import { useAuth } from '@/contexts/AuthContext'
@@ -504,7 +505,7 @@ export default function RegisterProfessionalPage() {
                 disabled={isLoading}
                 className={`${styles.btnPrimary} w-full justify-center py-4 text-base ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                <Icon name="how_to_reg" size="sm" />
+                {isLoading ? <Spinner size="sm" /> : <Icon name="how_to_reg" size="sm" />}
                 {isLoading ? 'Εγγραφή...' : 'Εγγραφή Εταιρείας'}
               </button>
             </div>

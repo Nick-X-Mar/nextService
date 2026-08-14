@@ -2,6 +2,7 @@
 
 import Modal from '@/components/Modal'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
 import type { ServiceRequest } from '@/types/requests'
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 
@@ -116,7 +117,7 @@ export default function CancellationModal({
           >
             {isLoading ? (
               <>
-                <div className="w-4 h-4 border-2 border-on-error/30 border-t-on-error rounded-full animate-spin" />
+                <Spinner size="sm" />
                 Ακύρωση...
               </>
             ) : (
