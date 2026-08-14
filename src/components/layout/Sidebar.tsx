@@ -28,6 +28,12 @@ export default function Sidebar() {
     { label: 'Προφίλ', icon: 'person', href: `/profile/${client.id}` },
   ] : []
 
+  // A garage still waiting for validation has nothing to do in the app yet —
+  // every tab would be empty, so we only point at its application status.
+  const garagePendingNavItems: NavItem[] = garage ? [
+    { label: 'Κατάσταση Αίτησης', icon: 'hourglass_top', href: `/garage-dashboard/${garage.id}` },
+  ] : []
+
   const garageNavItems: NavItem[] = garage ? [
     { label: 'Νέα Αιτήματα', icon: 'list_alt', href: `/garage-dashboard/${garage.id}?tab=requests`, matchTab: 'requests' },
     { label: 'Προσφορές', icon: 'local_offer', href: `/garage-dashboard/${garage.id}?tab=offers`, matchTab: 'offers' },
@@ -37,7 +43,9 @@ export default function Sidebar() {
     { label: 'Ρυθμίσεις', icon: 'settings', href: `/garage-dashboard/${garage.id}?tab=settings`, matchTab: 'settings' },
   ] : []
 
-  const navItems = userType === 'garage' ? garageNavItems : clientNavItems
+  const navItems = userType === 'garage'
+    ? (garage?.isActive ? garageNavItems : garagePendingNavItems)
+    : clientNavItems
 
   const isActive = (item: NavItem) => {
     if (item.matchTab) {

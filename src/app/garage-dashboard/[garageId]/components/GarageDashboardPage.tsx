@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { SegmentedControl } from '@/components'
+import { SegmentedControl, GarageStatusPanel } from '@/components'
 import { styles } from '@/styles/styles'
 import { OfferStatus, ServiceRequestStatus } from '@/types/statuses'
 import { useAuth } from '@/contexts/AuthContext'
@@ -14,6 +14,7 @@ import GarageSettings from './GarageSettings'
 import { useRealtimeRequests, type BroadcastRequest, type RequestUpdatePayload } from '@/hooks/useRealtimeRequests'
 import { useToast } from '@/hooks/useToast'
 import { useNewRequestNotifier } from '@/hooks/useNewRequestNotifier'
+import { useGarageApprovalWatch } from '@/hooks/useGarageApprovalWatch'
 import { getCategoryText } from '@/utils/categoryLabels'
 
 interface GarageDashboardPageProps {
@@ -41,12 +42,13 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
   const router = useRouter()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
-  const { userType, garage: authGarage, isLoading: authLoading } = useAuth()
+  const { userType, garage: authGarage, isLoading: authLoading, logout } = useAuth()
+  const isPendingValidation = userType === 'garage' && !!authGarage && !authGarage.isActive
 
   const [garageData, setGarageData] = useState<GarageData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [counts, setCounts] = useState({ requests: 0, offers: 0, appointments: 0 })
-  const { info } = useToast()
+  const { info, success } = useToast()
   const { notify } = useNewRequestNotifier()
   // Track which request ids we've already seen via realtime so the badge
   // counter and toast don't fire twice (e.g. an event arriving twice during
@@ -147,9 +149,10 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
       return
     }
 
-    // Check if garage is pending validation
+    // Pending validation: stay here and render the status panel below. Bouncing
+    // to /login only bounced them straight back (login redirects a logged-in
+    // garage to the dashboard), and told them nothing about their application.
     if (userType === 'garage' && authGarage && !authGarage.isActive) {
-      router.push('/login/')
       return
     }
 
@@ -208,8 +211,15 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
     if (garageData) loadCounts()
   }, [garageData, loadCounts])
 
+  // While the application is under review, watch for the admin's approval so
+  // the dashboard opens by itself instead of waiting for a manual reload.
+  const { checkNow, isChecking } = useGarageApprovalWatch(
+    isPendingValidation,
+    () => success('Ο λογαριασμός σας ενεργοποιήθηκε!', 'Καλώς ήρθατε — μπορείτε πλέον να δείτε αιτήματα πελατών.')
+  )
+
   useRealtimeRequests({
-    enabled: !!garageData,
+    enabled: !!garageData && !isPendingValidation,
     onNewRequest: handleRealtimeNewRequest,
     onRequestUpdate: handleRealtimeRequestUpdate,
     onReconnect: refreshCountsAfterReconnect,
@@ -217,6 +227,21 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
 
   const handleLogout = () => {
     router.push('/login/')
+  }
+
+  if (isPendingValidation) {
+    return (
+      <div className="pt-6 pb-12 px-4">
+        <GarageStatusPanel
+          status="pending"
+          companyName={authGarage?.companyName}
+          email={authGarage?.email}
+          onCheck={checkNow}
+          isChecking={isChecking}
+          onLogout={logout}
+        />
+      </div>
+    )
   }
 
   if (isLoading) {

@@ -18,7 +18,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [pendingValidation, setPendingValidation] = useState<{ companyName: string } | null>(null)
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [userType, setUserType] = useState('client')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
@@ -61,7 +60,12 @@ export default function LoginPage() {
       const data = await response.json()
 
       if (data.success && data.pendingValidation) {
-        setPendingValidation({ companyName: data.user.companyName })
+        // Still under review — send them to the dashboard, which shows the
+        // application status and flips to the real dashboard on approval.
+        localStorage.removeItem('clientId')
+        localStorage.setItem('garageId', data.user.id)
+        await refreshGarage(data.user.id)
+        router.push(`/garage-dashboard/${data.user.id}/`)
         return
       }
 
@@ -184,44 +188,6 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  if (pendingValidation) {
-    return (
-      <div className="bg-surface flex items-start justify-center px-4 pt-8 md:pt-16 pb-4">
-        <div className="w-full max-w-md">
-          <div className="bg-surface-container-lowest rounded-2xl p-8 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10 text-center">
-            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-amber-50 mb-6">
-              <Icon name="hourglass_top" filled className="text-amber-600" size="xl" />
-            </div>
-
-            <h2 className="text-xl font-black tracking-tight text-on-surface mb-3">
-              Η αίτησή σας εξετάζεται
-            </h2>
-
-            <p className={`${styles.bodyText} mb-2`}>
-              Η εταιρεία <strong className="text-on-surface">{pendingValidation.companyName}</strong> έχει εγγραφεί επιτυχώς.
-            </p>
-
-            <p className={`${styles.bodyText} mb-8`}>
-              Η αίτησή σας βρίσκεται υπό έλεγχο. Θα ενημερωθείτε μόλις ενεργοποιηθεί ο λογαριασμός σας.
-            </p>
-
-            <button
-              onClick={() => {
-                setPendingValidation(null)
-                setPassword('')
-                setEmail('')
-              }}
-              className={`${styles.btnOutline} w-full justify-center py-3.5`}
-            >
-              <Icon name="logout" size="sm" />
-              Επιστροφή
-            </button>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   return (

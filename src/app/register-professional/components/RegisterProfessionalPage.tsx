@@ -4,7 +4,10 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Icon from '@/components/ui/Icon'
+import { GarageStatusPanel } from '@/components'
 import { useToast } from '@/hooks/useToast'
+import { useAuth } from '@/contexts/AuthContext'
+import { useGarageApprovalWatch } from '@/hooks/useGarageApprovalWatch'
 import { styles } from '@/styles/styles'
 import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 
@@ -48,10 +51,21 @@ export default function RegisterProfessionalPage() {
   const [customServiceInput, setCustomServiceInput] = useState('')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [isSubmitted, setIsSubmitted] = useState(false)
+  const [justRegistered, setJustRegistered] = useState(false)
 
   const router = useRouter()
   const { success, error } = useToast()
+  const { userType, garage, isLoading: authLoading, logout, refreshGarage } = useAuth()
+
+  // A garage that already has an account must never see the empty form again —
+  // it shows its application status instead.
+  const hasGarageSession = userType === 'garage' && !!garage
+  const isApproved = !!garage?.isActive
+
+  const { checkNow, isChecking } = useGarageApprovalWatch(
+    hasGarageSession && !isApproved,
+    () => success('Ο λογαριασμός σας ενεργοποιήθηκε!', 'Μπορείτε πλέον να δείτε αιτήματα και να στείλετε προσφορές.')
+  )
 
   useEffect(() => {
     const savedEmail = sessionStorage.getItem('garageRegEmail')
@@ -187,8 +201,14 @@ export default function RegisterProfessionalPage() {
       if (response.ok && data.success) {
         sessionStorage.removeItem('garageRegEmail')
         sessionStorage.removeItem('garageRegPassword')
-        setIsSubmitted(true)
+        setJustRegistered(true)
         success('Επιτυχής Εγγραφή', 'Το συνεργείο σας εγγράφηκε επιτυχώς! Θα επικοινωνήσουμε μαζί σας σύντομα.')
+        // The API already signed us in — pull the session into the auth context
+        // so the status screen survives a refresh instead of falling back to
+        // the empty form.
+        if (data.garage?.id) {
+          await refreshGarage(data.garage.id)
+        }
       } else {
         error('Σφάλμα Εγγραφής', data.error || 'Δεν ήταν δυνατή η εγγραφή του συνεργείου')
       }
@@ -200,58 +220,34 @@ export default function RegisterProfessionalPage() {
     }
   }
 
-  if (isSubmitted) {
-    return (
-      <div className="min-h-screen bg-surface flex items-center justify-center px-4">
-        <div className="w-full max-w-md">
-          <div className="bg-surface-container-lowest rounded-2xl p-8 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10 text-center">
-            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-50 mb-6">
-              <Icon name="check_circle" filled className="text-green-600" size="xl" />
-            </div>
-
-            <h2 className="text-2xl font-black tracking-tight text-on-surface mb-4">
-              Εγγραφή Ολοκληρώθηκε!
-            </h2>
-
-            <p className={`${styles.bodyText} mb-8`}>
-              Η εταιρεία <strong className="text-on-surface">{formData.companyName}</strong> εγγράφηκε επιτυχώς στο σύστημά μας.
-              Θα επικοινωνήσουμε μαζί σας σύντομα για να ενεργοποιήσουμε τον λογαριασμό σας.
-            </p>
-
-            <div className="space-y-3">
-              <button
-                onClick={() => router.push('/')}
-                className={`${styles.btnPrimary} w-full justify-center py-3.5`}
-              >
-                <Icon name="home" size="sm" />
-                Επιστροφή στην Αρχική
-              </button>
-
-              <button
-                onClick={() => {
-                  setIsSubmitted(false)
-                  setFormData({
-                    companyName: '',
-                    contactFirstName: '',
-                    contactLastName: '',
-                    tin: '',
-                    email: '',
-                    taxAuthority: '',
-                    address: '',
-                    mobile: ''
-                  })
-                  setSelectedServices([])
-                  setCustomServices([])
-                  setCustomServiceInput('')
-                }}
-                className={`${styles.btnOutline} w-full justify-center py-3.5`}
-              >
-                <Icon name="add" size="sm" />
-                Νέα Εγγραφή
-              </button>
-            </div>
+  // Already registered (this session or an earlier one): show where the
+  // application stands instead of an empty form. Waits for the auth check only
+  // when we know a garage just registered, so the public page still renders its
+  // form immediately for visitors and crawlers.
+  if (hasGarageSession || justRegistered) {
+    if (justRegistered && authLoading && !garage) {
+      return (
+        <div className={styles.pageCenter}>
+          <div className="text-center">
+            <div className={styles.loadingSpinner}></div>
+            <p className={styles.bodyText}>Φόρτωση...</p>
           </div>
         </div>
+      )
+    }
+
+    return (
+      <div className="min-h-screen bg-surface flex items-start justify-center px-4 pt-8 md:pt-16 pb-8">
+        <GarageStatusPanel
+          status={isApproved ? 'approved' : 'pending'}
+          companyName={garage?.companyName || formData.companyName}
+          email={garage?.email || formData.email}
+          justRegistered={justRegistered}
+          onCheck={garage ? checkNow : undefined}
+          isChecking={isChecking}
+          onEnter={garage ? () => router.push(`/garage-dashboard/${garage.id}/`) : undefined}
+          onLogout={garage ? logout : undefined}
+        />
       </div>
     )
   }

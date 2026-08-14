@@ -29,6 +29,13 @@ export default function BottomNav() {
     { label: 'Σύνδεση', icon: 'login', href: '/login', matchPaths: ['/login'] },
   ]
 
+  // Pending validation: the app tabs would all be empty, so the only
+  // destination is the application status screen.
+  const garagePendingNavItems: NavItem[] = garage ? [
+    { label: 'Κατάσταση', icon: 'hourglass_top', href: `/garage-dashboard/${garage.id}`, matchPaths: [`/garage-dashboard/${garage.id}`] },
+    { label: 'Αρχική', icon: 'home', href: '/', matchPaths: ['/'] },
+  ] : []
+
   const garageNavItems: NavItem[] = garage ? [
     { label: 'Αιτήματα', icon: 'list_alt', href: `/garage-dashboard/${garage.id}?tab=requests`, matchTab: 'requests', matchPaths: [`/garage-dashboard/${garage.id}`] },
     { label: 'Προσφορές', icon: 'local_offer', href: `/garage-dashboard/${garage.id}?tab=offers`, matchTab: 'offers' },
@@ -37,7 +44,9 @@ export default function BottomNav() {
     { label: 'Ρυθμίσεις', icon: 'settings', href: `/garage-dashboard/${garage.id}?tab=settings`, matchTab: 'settings' },
   ] : []
 
-  const navItems = userType === 'garage' ? garageNavItems : clientNavItems
+  const navItems = userType === 'garage'
+    ? (garage?.isActive ? garageNavItems : garagePendingNavItems)
+    : clientNavItems
 
   const isActive = (item: NavItem) => {
     if (item.matchTab && currentTab === item.matchTab) return true

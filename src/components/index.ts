@@ -12,6 +12,7 @@ export { default as Toast } from './Toast'
 export { default as ToastContainer } from './ToastContainer'
 export { default as RequestDetailsPanel } from './RequestDetailsPanel'
 export { default as ServiceVehicleCard } from './ServiceVehicleCard'
+export { default as GarageStatusPanel } from './GarageStatusPanel'
 
 // Existing components
 export { default as Header } from './Header'
