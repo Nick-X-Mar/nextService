@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isSMSConfigured } from '@/utils/notificationService'
 import { dynamoDB } from '@/utils/dynamoService'
-import { PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { hashPassword } from '@/utils/passwordService'
 import { logEvent } from '@/utils/eventLogger'
@@ -150,9 +150,13 @@ async function _POST(request: NextRequest) {
       }
     } else if (existingClientId) {
       // Logged-in user: check for existing vehicle by VIN or engine number
-      const existingVehicles = await dynamoDB.send(new ScanCommand({
+      // Vehicles.ClientVehiclesIndex is keyed on clientId. This sits on the
+      // main request-creation funnel, where it used to scan the entire Vehicles
+      // table to find the handful of cars belonging to one client.
+      const existingVehicles = await dynamoDB.send(new QueryCommand({
         TableName: 'Vehicles',
-        FilterExpression: 'clientId = :clientId',
+        IndexName: 'ClientVehiclesIndex',
+        KeyConditionExpression: 'clientId = :clientId',
         ExpressionAttributeValues: { ':clientId': existingClientId }
       }))
 

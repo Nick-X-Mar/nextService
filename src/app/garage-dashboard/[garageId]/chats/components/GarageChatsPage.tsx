@@ -126,8 +126,14 @@ export default function GarageChatsPage({ garageId }: GarageChatsPageProps) {
                     timestamp: lastMessage.timestamp,
                     sender: (lastMessage.senderType === 'garage' ? 'garage' : 'client') as 'garage' | 'client'
                   },
-                  unreadCount: chatData.messages.filter((msg: { senderType?: string; read?: boolean }) =>
-                    msg.senderType === 'client' && !msg.read
+                  // Unread = newer than this garage's read marker for the
+                  // thread. The `read` flag on the message row is never written
+                  // by anything, so counting on it showed every client message
+                  // as unread forever.
+                  unreadCount: chatData.messages.filter((msg: { senderType?: string; timestamp?: string }) =>
+                    msg.senderType === 'client' &&
+                    (!chatData.lastReadAt ||
+                      new Date(msg.timestamp || 0).getTime() > new Date(chatData.lastReadAt).getTime())
                   ).length
                 }
               }

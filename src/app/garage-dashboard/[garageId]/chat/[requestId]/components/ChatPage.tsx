@@ -11,6 +11,7 @@ import Icon from '@/components/ui/Icon'
 import { LoadMoreButton, Spinner } from '@/components'
 import '@/lib/amplify-config'
 import appSyncService from '@/lib/appsync-service'
+import { useNotifications } from '@/contexts/NotificationsContext'
 import { getCategoryText } from '@/utils/categoryLabels'
 
 interface Message {
@@ -40,6 +41,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const router = useRouter()
+  const { refresh: refreshUnread } = useNotifications()
   const isReadOnly = requestData?.status === ServiceRequestStatus.APPOINTMENT
 
   // Subscription refs
@@ -191,7 +193,14 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     }
 
     loadChatData()
-  }, [garageId, requestId, router, userType, authGarage, authLoading, loadChatData])
+
+    // Opening the thread is what clears it. Without this the garage's unread
+    // badge and chat-list counts would never come down — nothing else writes
+    // the garage's read marker.
+    fetch(`/api/chat/${requestId}/mark-read/`, { method: 'POST' })
+      .then(() => refreshUnread())
+      .catch(() => { /* a stale badge is not worth interrupting the chat for */ })
+  }, [garageId, requestId, router, userType, authGarage, authLoading, loadChatData, refreshUnread])
 
   // Cleanup subscription on unmount
   useEffect(() => {

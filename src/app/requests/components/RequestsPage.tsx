@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
+import AlertStack from '@/components/AlertStack'
 import { useNavigation } from '@/hooks/useNavigation'
 import { styles } from '../../../styles/styles'
 import RequestCard from './RequestCard'
@@ -76,73 +77,6 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
   // Check if clientId is valid (starts with 'client-')
   const isValidClientId = clientId && clientId.startsWith('client-')
 
-  const checkGarageMessages = useCallback(async (requestIds: string[]) => {
-    // Run all garage-message checks in parallel — sequential await on a list of
-    // independent requests was the main source of UI lag on this page.
-    const entries = await Promise.all(
-      requestIds.map(async (requestId): Promise<[string, boolean]> => {
-        try {
-          const response = await fetch(`/api/chat/${requestId}/garages/`)
-          if (!response.ok) return [requestId, false]
-          const data = await response.json()
-          return [requestId, !!(data.garages && data.garages.length > 0)]
-        } catch (error) {
-          console.error(`Error checking garage messages for request ${requestId}:`, error)
-          return [requestId, false]
-        }
-      })
-    )
-
-    setGarageMessagesMap(Object.fromEntries(entries))
-  }, [])
-
-  const loadOffersForRequests = useCallback(async (requestIds: string[]) => {
-    const map: Record<string, OfferSummary[]> = {}
-
-    await Promise.all(
-      requestIds.map(async (requestId) => {
-        try {
-          const response = await fetch(`/api/offers/?serviceRequestId=${requestId}`)
-          if (!response.ok) return
-          const data = await response.json()
-          const offers = data.offers || data
-          if (!Array.isArray(offers) || offers.length === 0) return
-
-          // Fetch garage details for each offer
-          const offersWithGarage: OfferSummary[] = await Promise.all(
-            offers.map(async (offer: OfferSummary) => {
-              if (!offer.garageId) return offer
-              try {
-                const garageRes = await fetch(`/api/garage/${offer.garageId}/`)
-                if (garageRes.ok) {
-                  const garageResult = await garageRes.json()
-                  const garageData = garageResult.garage || garageResult
-                  return {
-                    ...offer,
-                    garage: {
-                      companyName: garageData.companyName,
-                      address: garageData.address,
-                      benefits: Array.isArray(garageData.benefits) ? garageData.benefits : []
-                    }
-                  }
-                }
-              } catch {
-                // ignore garage fetch errors
-              }
-              return offer
-            })
-          )
-
-          map[requestId] = offersWithGarage
-        } catch {
-          // ignore individual request offer fetch errors
-        }
-      })
-    )
-
-    setOffersMap(map)
-  }, [])
-
   const loadRequests = useCallback(async () => {
     try {
       if (!isValidClientId) {
@@ -170,8 +104,11 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
         setIsRegisteredUser(false)
       }
 
-      // Fetch requests from API
-      const response = await fetch(`/api/requests/?clientId=${clientId}`)
+      // include=summary returns the offers and the has-a-garage-written flags
+      // alongside the requests. This page used to fetch those per request — and
+      // one extra call per offer to name its garage — so a client with 10
+      // requests opened dozens of connections just to render the list.
+      const response = await fetch(`/api/requests/?clientId=${clientId}&include=summary`)
 
       if (!response.ok) {
         throw new Error('Failed to fetch requests')
@@ -181,12 +118,8 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
 
       if (result.success) {
         setRequests(result.requests)
-        // Check for garage messages for all requests
-        const requestIds = result.requests.map((req: ServiceRequest) => req.id)
-        if (requestIds.length > 0) {
-          checkGarageMessages(requestIds)
-          loadOffersForRequests(requestIds)
-        }
+        setGarageMessagesMap(result.garageMessages || {})
+        setOffersMap(result.offers || {})
       } else {
         console.error('API error:', result.error)
         setRequests([])
@@ -197,7 +130,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     } finally {
       setIsLoading(false)
     }
-  }, [clientId, isValidClientId, checkGarageMessages, loadOffersForRequests])
+  }, [clientId, isValidClientId])
 
   // Load requests on component mount. AuthContext already handles auth state
   // — no need to re-fetch the client here. Just keep localStorage in sync.
@@ -553,6 +486,9 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
           <h2 className="text-3xl font-bold tracking-tight mb-2">Τα Αιτήματά μου</h2>
           <p className="text-on-surface-variant text-sm">Διαχειριστείτε τα αιτήματα και τα ραντεβού σας.</p>
         </div>
+
+        {/* Renders nothing when there is nothing waiting on the user. */}
+        <AlertStack className="mb-6" />
 
         {/* Guest User Registration Prompt */}
         {!isLoading && isRegisteredUser === false && requests.length > 0 && (

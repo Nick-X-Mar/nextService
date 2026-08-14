@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { GetCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { ServiceRequestStatus, OfferStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { sendEmail } from '@/utils/emailService'
@@ -182,15 +182,14 @@ async function _PATCH(
     const updatedRequest = updateRequestResult.Attributes
 
     // Then, update all related offers: one accepted, all others rejected
-    const offersScanCommand = new ScanCommand({
+    // Offers.ServiceRequestOffersIndex is keyed on serviceRequestId — no need
+    // to read every offer in the table to find the ones on this request.
+    const offersResult = await dynamoDB.send(new QueryCommand({
       TableName: 'Offers',
-      FilterExpression: 'serviceRequestId = :serviceRequestId',
-      ExpressionAttributeValues: {
-        ':serviceRequestId': requestId
-      }
-    })
-
-    const offersResult = await dynamoDB.send(offersScanCommand)
+      IndexName: 'ServiceRequestOffersIndex',
+      KeyConditionExpression: 'serviceRequestId = :serviceRequestId',
+      ExpressionAttributeValues: { ':serviceRequestId': requestId }
+    }))
     const offers = offersResult.Items || []
 
     const updateOfferPromises = offers.map((offer) => {

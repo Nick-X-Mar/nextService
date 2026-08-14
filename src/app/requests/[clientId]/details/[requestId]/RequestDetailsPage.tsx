@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useNotifications } from '@/contexts/NotificationsContext'
 import { useRouter } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
 import RequestDetailsContent from '../../../components/RequestDetailsContent'
@@ -13,6 +14,21 @@ interface RequestDetailsPageProps {
 }
 
 export default function RequestDetailsPage({ clientId, requestId }: RequestDetailsPageProps) {
+  const { refresh: refreshNotifications } = useNotifications()
+
+  // Opening this page is what clears the "νέες προσφορές" alert — the offers
+  // are right here, so leaving the banner up would make it wallpaper.
+  useEffect(() => {
+    if (!requestId) return
+    fetch('/api/notifications/seen/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'offers', id: requestId }),
+    })
+      .then(() => refreshNotifications())
+      .catch(() => { /* a stale banner is not worth interrupting the page for */ })
+  }, [requestId, refreshNotifications])
+
   const router = useRouter()
   const [request, setRequest] = useState<ServiceRequest | null>(null)
   const [isLoading, setIsLoading] = useState(true)

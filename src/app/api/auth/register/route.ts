@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { hashPassword } from '@/utils/passwordService'
 import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 import { logEvent } from '@/utils/eventLogger'
@@ -43,11 +43,15 @@ async function _POST(request: NextRequest) {
 
     const normalizedEmail = email.trim().toLowerCase()
 
-    // Check if email already exists
-    const existingResult = await dynamoDB.send(new ScanCommand({
+    // Check if email already exists. Clients.EmailIndex is keyed on email, so
+    // this is a point lookup — it used to scan the whole Clients table on every
+    // single registration attempt.
+    const existingResult = await dynamoDB.send(new QueryCommand({
       TableName: 'Clients',
-      FilterExpression: 'email = :email',
-      ExpressionAttributeValues: { ':email': normalizedEmail }
+      IndexName: 'EmailIndex',
+      KeyConditionExpression: 'email = :email',
+      ExpressionAttributeValues: { ':email': normalizedEmail },
+      Limit: 1
     }))
 
     if (existingResult.Items && existingResult.Items.length > 0) {

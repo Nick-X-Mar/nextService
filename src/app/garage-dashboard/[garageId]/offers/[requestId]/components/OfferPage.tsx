@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { ServiceVehicleCard, Spinner } from '@/components'
 import { useNavigation } from '@/hooks/useNavigation'
+import { useNotifications } from '@/contexts/NotificationsContext'
 import { styles } from '@/styles/styles'
 import { OfferStatus } from '@/types/statuses'
 import Icon from '@/components/ui/Icon'
@@ -93,6 +94,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
   const [selectedBenefits, setSelectedBenefits] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
   const [toasts, setToasts] = useState<ToastData[]>([])
   const [existingOffer, setExistingOffer] = useState<{ id: string; status?: OfferStatus } | null>(null)
   const [originalOffer, setOriginalOffer] = useState<{
@@ -105,6 +107,20 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
   const [addingClientDate, setAddingClientDate] = useState<string | null>(null)
   const router = useRouter()
   const { navigate, isNavigating } = useNavigation()
+  const { refresh: refreshNotifications } = useNotifications()
+
+  // Seeing the accepted offer is what clears its alert.
+  useEffect(() => {
+    if (existingOffer?.status !== OfferStatus.ACCEPTED) return
+    fetch('/api/notifications/seen/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'accepted', id: existingOffer.id }),
+    })
+      .then(() => refreshNotifications())
+      .catch(() => { /* stale banner only */ })
+  }, [existingOffer, refreshNotifications])
+
 
   const showToast = (toast: Omit<ToastData, 'id'>) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`

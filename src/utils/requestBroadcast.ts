@@ -3,7 +3,7 @@
 // enrichment (client + vehicle + presigned photo URLs) so that callers in API
 // routes only need to provide the request id.
 import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand } from '@aws-sdk/lib-dynamodb'
 import { generatePresignedUrls } from '@/utils/s3Service'
 import appSyncService from '@/lib/appsync-service'
 
@@ -52,13 +52,18 @@ interface BroadcastRequest {
   } | null
 }
 
+/**
+ * `id` is the partition key on all three tables this reads, so this is a point
+ * lookup. It used to be a Scan with `FilterExpression: 'id = :id'`, which read
+ * every row in the table and threw all but one away — three full table scans on
+ * every single new request, on the path that fans out to every active garage.
+ */
 async function loadById(table: string, id: string) {
-  const res = await dynamoDB.send(new ScanCommand({
+  const res = await dynamoDB.send(new GetCommand({
     TableName: table,
-    FilterExpression: 'id = :id',
-    ExpressionAttributeValues: { ':id': id }
+    Key: { id }
   }))
-  return res.Items?.[0]
+  return res.Item
 }
 
 // Look up everything a garage dashboard card needs to render, mirroring the

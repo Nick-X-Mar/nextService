@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { decodeCursor, encodeCursor, parseLimit } from '@/utils/pagination'
 import { requireClient } from '@/utils/requireAuth'
 import { generatePresignedUrls } from '@/utils/s3Service'
@@ -94,6 +94,81 @@ async function _GET(request: NextRequest) {
         }
       })
     )
+
+    // `include=summary` folds in the two things the requests page used to fetch
+    // per row: whether any garage has written, and the offers on the request.
+    //
+    // Doing it here turns 1 + R + R + (R x offers) browser round trips into one.
+    // The nested loop was the worst of it: the page fetched every offer, then
+    // fetched that offer's garage individually — the same garage re-fetched once
+    // per offer. Here the garages are deduped and read once.
+    if (searchParams.get('include') === 'summary') {
+      const requestIds = requestsWithVehicles
+        .map((r) => (r as { id?: string }).id)
+        .filter((id): id is string => !!id)
+
+      const [messageFlags, offersPerRequest] = await Promise.all([
+        Promise.all(requestIds.map(async (requestId) => {
+          const messages = await dynamoDB.send(new QueryCommand({
+            TableName: 'ChatMessages',
+            IndexName: 'RequestMessagesIndex',
+            KeyConditionExpression: 'requestId = :requestId',
+            FilterExpression: 'senderType = :garage',
+            ExpressionAttributeValues: { ':requestId': requestId, ':garage': 'garage' },
+            ProjectionExpression: 'requestId',
+            Limit: 1,
+          }))
+          return [requestId, (messages.Items?.length ?? 0) > 0] as const
+        })),
+        Promise.all(requestIds.map(async (requestId) => {
+          const offers = await dynamoDB.send(new QueryCommand({
+            TableName: 'Offers',
+            IndexName: 'ServiceRequestOffersIndex',
+            KeyConditionExpression: 'serviceRequestId = :requestId',
+            ExpressionAttributeValues: { ':requestId': requestId },
+          }))
+          return [requestId, offers.Items ?? []] as const
+        })),
+      ])
+
+      const garageIds = [...new Set(
+        offersPerRequest.flatMap(([, offers]) => offers.map((o) => o.garageId as string)).filter(Boolean)
+      )]
+      const garageRows = await Promise.all(
+        garageIds.map((id) => dynamoDB.send(new GetCommand({ TableName: 'Garages', Key: { id } })))
+      )
+      const garageById = new Map(
+        garageRows
+          .map((g) => g.Item)
+          .filter((g): g is Record<string, unknown> => !!g)
+          .map((g) => [g.id as string, g])
+      )
+
+      return NextResponse.json({
+        success: true,
+        requests: requestsWithVehicles,
+        garageMessages: Object.fromEntries(messageFlags),
+        offers: Object.fromEntries(
+          offersPerRequest.map(([requestId, offers]) => [
+            requestId,
+            offers.map((offer) => {
+              const garage = garageById.get(offer.garageId as string)
+              return {
+                ...offer,
+                garage: garage
+                  ? {
+                      companyName: garage.companyName,
+                      address: garage.address,
+                      benefits: Array.isArray(garage.benefits) ? garage.benefits : [],
+                    }
+                  : null,
+              }
+            }),
+          ])
+        ),
+        nextCursor: encodeCursor(result.LastEvaluatedKey)
+      })
+    }
 
     return NextResponse.json({
       success: true,

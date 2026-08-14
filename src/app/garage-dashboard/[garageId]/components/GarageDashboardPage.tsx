@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SegmentedControl, GarageStatusPanel, Spinner } from '@/components'
+import AlertStack from '@/components/AlertStack'
 import { useNavigation } from '@/hooks/useNavigation'
 import { styles } from '@/styles/styles'
 import { OfferStatus, ServiceRequestStatus } from '@/types/statuses'
@@ -93,16 +94,20 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
 
   const loadCounts = useCallback(async () => {
     try {
-      // Load available requests count
-      const requestsResponse = await fetch(`/api/garage/available-requests/?garageId=${garageId}`)
+      // countOnly skips the per-request client/vehicle/presigned-URL hydration —
+      // this is a badge, it only needs ids. It also counts every pending request
+      // rather than just the first page, which the full feed could not do.
+      const requestsResponse = await fetch(
+        `/api/garage/available-requests/?garageId=${garageId}&countOnly=1`
+      )
       if (requestsResponse.ok) {
         const requestsData = await requestsResponse.json()
         if (requestsData.success) {
-          const list: { id: string }[] = requestsData.requests || []
-          setCounts(prev => ({ ...prev, requests: list.length }))
+          const ids: string[] = requestsData.requestIds || []
+          setCounts(prev => ({ ...prev, requests: requestsData.count ?? ids.length }))
           // Seed the seen-set so subsequent request-update events about
           // these existing requests can decrement the badge correctly.
-          seenRequestIdsRef.current = new Set(list.map(r => r.id))
+          seenRequestIdsRef.current = new Set(ids)
         }
       }
 
@@ -334,6 +339,8 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
           companyName={authGarage?.companyName}
           activatedAt={authGarage?.activatedAt}
         />
+        {/* Renders nothing when there is nothing waiting on the user. */}
+        <AlertStack className="mb-6" />
         {renderContent()}
       </div>
     </div>

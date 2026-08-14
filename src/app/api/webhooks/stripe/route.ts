@@ -42,6 +42,20 @@ async function _POST(request: NextRequest) {
           })
         )
 
+        // Mirror the paid state onto the request. Without this, answering
+        // "does this booking still owe a deposit?" means scanning Payments,
+        // which the notification summary would have to do on every poll.
+        if (pi.metadata?.requestId) {
+          await dynamoDB.send(
+            new UpdateCommand({
+              TableName: 'ServiceRequests',
+              Key: { id: pi.metadata.requestId },
+              UpdateExpression: 'SET depositPaidAt = :now, updatedAt = :now',
+              ExpressionAttributeValues: { ':now': now }
+            })
+          )
+        }
+
         logEvent({
           eventName: EventName.PaymentSucceeded,
           actorType: 'system',

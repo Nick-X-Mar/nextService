@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash, randomBytes } from 'crypto'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { sendEmail } from '@/utils/emailService'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName, EmailTemplate } from '@/types/events'
@@ -64,11 +64,15 @@ async function _POST(request: NextRequest) {
     const normalizedEmail = email.trim().toLowerCase()
     const tableName = userType === 'garage' ? 'Garages' : 'Clients'
 
+    // Both Clients and Garages carry an EmailIndex keyed on email, so this
+    // resolves without reading the table.
     const result = await dynamoDB.send(
-      new ScanCommand({
+      new QueryCommand({
         TableName: tableName,
-        FilterExpression: 'email = :email',
-        ExpressionAttributeValues: { ':email': normalizedEmail }
+        IndexName: 'EmailIndex',
+        KeyConditionExpression: 'email = :email',
+        ExpressionAttributeValues: { ':email': normalizedEmail },
+        Limit: 1
       })
     )
     const user = result.Items?.[0]

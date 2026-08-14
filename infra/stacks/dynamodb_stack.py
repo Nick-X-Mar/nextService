@@ -240,6 +240,25 @@ class DynamoDBStack(Stack):
             ),
             projection_type=dynamodb.ProjectionType.ALL,
         )
+        # "Every thread this garage is in" — the garage chats list and the
+        # notification summary both need it. Without this index they fall back to
+        # a filtered scan of the whole ChatMessages table, which was already the
+        # slowest read in the app (p95 ~3.5s on a near-empty dataset) and gets
+        # worse with every message anyone sends.
+        #
+        # Note `garageId` is absent on some older client-authored rows; those
+        # simply do not appear in the index, which is correct — a message with no
+        # garage does not belong to any garage's thread list.
+        self.chat_messages_table.add_global_secondary_index(
+            index_name="GarageMessagesIndex",
+            partition_key=dynamodb.Attribute(
+                name="garageId", type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="timestamp", type=dynamodb.AttributeType.STRING
+            ),
+            projection_type=dynamodb.ProjectionType.ALL,
+        )
 
         # ── AdminUsers ──────────────────────────────────────────
         self.admin_users_table = dynamodb.Table(

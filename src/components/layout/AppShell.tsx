@@ -3,6 +3,7 @@
 import { Suspense } from 'react'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { NotificationsProvider } from '@/contexts/NotificationsContext'
 import TopHeader from './TopHeader'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
@@ -80,5 +81,9 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
  * page component that needs `useSearchParams` must bring its own local boundary.
  */
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  return <AppShellInner>{children}</AppShellInner>
+  return (
+    <NotificationsProvider>
+      <AppShellInner>{children}</AppShellInner>
+    </NotificationsProvider>
+  )
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { PutCommand, QueryCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { hashPassword } from '@/utils/passwordService'
 import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 import { logEvent } from '@/utils/eventLogger'
@@ -112,16 +112,15 @@ async function _POST(request: NextRequest) {
       }, { status: 429 })
     }
 
-    // Check if TIN already exists (primary duplicate check for Greek companies)
-    const tinScanCommand = new ScanCommand({
+    // Check if TIN already exists (primary duplicate check for Greek companies).
+    // Garages.TINIndex is keyed on tin, so this no longer scans the table.
+    const existingTinResult = await dynamoDB.send(new QueryCommand({
       TableName: 'Garages',
-      FilterExpression: 'tin = :tin',
-      ExpressionAttributeValues: {
-        ':tin': cleanTin
-      }
-    })
-
-    const existingTinResult = await dynamoDB.send(tinScanCommand)
+      IndexName: 'TINIndex',
+      KeyConditionExpression: 'tin = :tin',
+      ExpressionAttributeValues: { ':tin': cleanTin },
+      Limit: 1
+    }))
 
     if (existingTinResult.Items && existingTinResult.Items.length > 0) {
       return NextResponse.json({ 

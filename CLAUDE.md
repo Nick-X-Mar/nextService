@@ -140,6 +140,7 @@ Amplify quirk: app-level env vars are **build-time only**. Anything the SSR runt
 - `ACCESS_KEY_ID` / `SECRET_ACCESS_KEY` — optional explicit AWS creds (IAM role in prod; `.aws/` profile as dev fallback)
 - `NEXT_PUBLIC_APPSYNC_*` — endpoint, WS endpoint, API key, region
 - `JWT_SECRET`, `SESSION_EXPIRY`, `ADMIN_JWT_SECRET`, `ADMIN_SESSION_EXPIRY`, `ADMIN_EMAIL`
+- `REALTIME_JWT_SECRET` — signs the short-lived tokens the browser presents to AppSync (`/api/realtime/token`). **Required locally too**: without it that route 500s, `getRealtimeToken()` returns null, and real-time falls back to an API key the production authorizer rejects. Any random string works for local dev; in AWS it must match the value on the `nextservice-appsync-authorizer` Lambda.
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_PAYMENTS_ENABLED`, `NEXT_PUBLIC_PAYMENTS_REFUNDS_ENABLED`, `DEPOSIT_PERCENT`, `CANCELLATION_DEADLINE_DAYS`
 - `SES_FROM_ADDRESS`, `SES_REGION`, `SES_CONFIG_SET`, `NOTIFICATIONS_ENABLED`
 - `SITE_URL`, `NEXT_PUBLIC_APP_URL`

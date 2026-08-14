@@ -173,6 +173,7 @@ function withEncodedVariants(
  *  - js.stripe.com / api.stripe.com / hooks.stripe.com — Stripe.js and its
  *    payment frames, loaded by lib/stripe-client.ts
  *  - *.amazonaws.com — S3 photo uploads (images) and AppSync (wss for chat)
+ *  - ws://localhost:* — dev only, the AppSync mock from `npm run mock-appsync`
  */
 const isProd = process.env.NODE_ENV === 'production'
 
@@ -185,7 +186,14 @@ const CSP = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: https://*.amazonaws.com",
-  "connect-src 'self' https://*.amazonaws.com wss://*.amazonaws.com https://api.stripe.com",
+  // The ws://localhost entries are development-only. `'self'` covers the app's
+  // own origin but not a different port, and never the ws: scheme — so without
+  // them the AppSync mock on :3002 is blocked and every chat / new-request
+  // subscription dies with "violates the following Content Security Policy
+  // directive". Real AppSync is wss://*.amazonaws.com and needs neither.
+  `connect-src 'self' https://*.amazonaws.com wss://*.amazonaws.com https://api.stripe.com${
+    isProd ? '' : ' ws://localhost:* ws://127.0.0.1:*'
+  }`,
   "frame-src https://js.stripe.com https://hooks.stripe.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",

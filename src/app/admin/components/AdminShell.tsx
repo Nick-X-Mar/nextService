@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import AdminSidebar from './AdminSidebar'
 import AdminTopBar from './AdminTopBar'
 import SystemHealthBanner from './SystemHealthBanner'
+import AdminAlertsBanner from './AdminAlertsBanner'
 
 interface AdminInfo {
   adminId: string
@@ -66,6 +67,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       <div className="ml-60">
         <AdminTopBar adminEmail={admin?.email} />
         <SystemHealthBanner />
+        <AdminAlertsBanner />
         <main className="p-6">
           {children}
         </main>

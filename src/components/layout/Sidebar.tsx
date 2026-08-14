@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
 import { useAsyncTask } from '@/hooks/useAsyncTask'
+import { useNotifications } from '@/contexts/NotificationsContext'
 import { clearFormData } from '@/utils/formStorage'
 
 interface NavItem {
@@ -13,11 +14,14 @@ interface NavItem {
   icon: string
   href: string
   matchTab?: string
+  /** Unread conversations behind this destination. Hidden when 0. */
+  badge?: number
 }
 
 export default function Sidebar() {
   const { userType, client, garage, logout } = useAuth()
   const { run, isPending } = useAsyncTask()
+  const { threads, openThreads, appointmentThreads } = useNotifications()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const currentTab = searchParams.get('tab')
@@ -27,7 +31,7 @@ export default function Sidebar() {
     { label: 'Νέο Αίτημα', icon: 'add_circle', href: '#new-request' },
     { label: 'Αιτήματα', icon: 'build', href: `/requests/${client.id}` },
     { label: 'Ραντεβού', icon: 'calendar_today', href: `/requests/${client.id}?tab=appointment`, matchTab: 'appointment' },
-    { label: 'Μηνύματα', icon: 'chat', href: `/requests/${client.id}/chats` },
+    { label: 'Μηνύματα', icon: 'chat', href: `/requests/${client.id}/chats`, badge: threads },
     { label: 'Προφίλ', icon: 'person', href: `/profile/${client.id}` },
   ] : []
 
@@ -41,8 +45,8 @@ export default function Sidebar() {
     { label: 'Νέα Αιτήματα', icon: 'list_alt', href: `/garage-dashboard/${garage.id}?tab=requests`, matchTab: 'requests' },
     { label: 'Προσφορές', icon: 'local_offer', href: `/garage-dashboard/${garage.id}?tab=offers`, matchTab: 'offers' },
     { label: 'Ραντεβού', icon: 'calendar_today', href: `/garage-dashboard/${garage.id}?tab=appointments`, matchTab: 'appointments' },
-    { label: 'Ανοιχτές Συνομιλίες', icon: 'chat', href: `/garage-dashboard/${garage.id}/chats` },
-    { label: 'Συνομιλίες Ραντεβού', icon: 'forum', href: `/garage-dashboard/${garage.id}/chats/appointments` },
+    { label: 'Ανοιχτές Συνομιλίες', icon: 'chat', href: `/garage-dashboard/${garage.id}/chats`, badge: openThreads },
+    { label: 'Συνομιλίες Ραντεβού', icon: 'forum', href: `/garage-dashboard/${garage.id}/chats/appointments`, badge: appointmentThreads },
     { label: 'Ρυθμίσεις', icon: 'settings', href: `/garage-dashboard/${garage.id}?tab=settings`, matchTab: 'settings' },
   ] : []
 
@@ -102,7 +106,15 @@ export default function Sidebar() {
               }`}
             >
               <Icon name={item.icon} filled={isActive(item)} className={isActive(item) ? 'text-primary' : ''} />
-              <span className="text-xs">{item.label}</span>
+              <span className="text-xs flex-1">{item.label}</span>
+              {!!item.badge && item.badge > 0 && (
+                <span
+                  aria-label={`${item.badge} συνομιλίες με νέα μηνύματα`}
+                  className="bg-primary text-on-primary text-[10px] font-bold leading-none h-5 min-w-5 px-1.5 rounded-full flex items-center justify-center"
+                >
+                  {item.badge > 9 ? '9+' : item.badge}
+                </span>
+              )}
             </Link>
           )
         })}

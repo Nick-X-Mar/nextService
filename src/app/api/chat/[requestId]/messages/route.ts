@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { PutCommand, GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { PutCommand, GetCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import appSyncService from '@/lib/appsync-service'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
-import { EventName } from '@/types/events'
+import { EventName, EmailTemplate } from '@/types/events'
 import { requireAuth } from '@/utils/requireAuth'
 import { decodeCursor, encodeCursor, parseLimit } from '@/utils/pagination'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { sendEmail } from '@/utils/emailService'
 import { randomUUID } from 'crypto'
 
 const checkMessageRate = createRateLimiter('chat-message', 60, 3600000)
@@ -91,9 +92,20 @@ async function _GET(
     // Back to chronological order for rendering.
     const messages = [...(result.Items || [])].reverse()
 
+    // How far this viewer has read the thread, so callers can mark messages
+    // unread without a second round trip. ChatMessages rows carry a `read`
+    // flag that nothing ever sets — the read state lives on the request as a
+    // per-thread timestamp map instead. See mark-read.
+    const readMap = (auth.userType === 'garage'
+      ? requestResult.Item.garageReadAt
+      : requestResult.Item.clientReadAt) as Record<string, string> | undefined
+    const readKey = auth.userType === 'garage' ? auth.userId : garageId
+    const lastReadAt = readKey ? readMap?.[readKey] ?? null : null
+
     return NextResponse.json({
       success: true,
       messages,
+      lastReadAt,
       nextCursor: encodeCursor(result.LastEvaluatedKey),
     })
 
@@ -236,9 +248,21 @@ async function _POST(
       metadata: { messageId, senderName, length: messageData.message.length }
     })
 
-    // NOTE: email-on-new-chat is intentionally deferred. Without
-    // online-presence detection it would spam users for every keystroke.
-    // Add it once we have a debounced/offline detector.
+    // Email the other side — but only if they are actually missing it.
+    //
+    // This was deferred for a good reason: mailing on every message would spam
+    // people mid-conversation. Two gates make it safe without needing presence
+    // detection. First, we skip anyone whose read marker for this thread is
+    // newer than the previous message — if they are reading, they don't need an
+    // email. Second, a cooldown per (request, recipient) means a burst of five
+    // messages sends one mail, not five.
+    notifyByEmail({
+      requestId,
+      request: requestResult.Item,
+      senderType,
+      senderName,
+      garageId: effectiveGarageId,
+    }).catch((err) => console.error('[chat] notify failed:', err))
 
             // Publish message to AppSync Events for real-time updates
             if (effectiveGarageId) {
@@ -271,4 +295,77 @@ async function _POST(
 }
 
 export const GET = withMetrics(_GET)
+
+const CHAT_EMAIL_COOLDOWN_MS = 15 * 60 * 1000
+
+/**
+ * Fire-and-forget "you have a new message" mail to whoever did not send it.
+ *
+ * Never awaited by the request path: a slow SES call must not delay the message
+ * appearing in the sender's own chat window.
+ */
+async function notifyByEmail(args: {
+  requestId: string
+  request: Record<string, unknown>
+  senderType: 'client' | 'garage'
+  senderName: string
+  garageId: string | null
+}): Promise<void> {
+  const { requestId, request, senderType, senderName, garageId } = args
+  if (!garageId) return
+
+  const recipientKey = senderType === 'garage' ? 'client' : garageId
+  const notifiedAt = (request.chatNotifiedAt || {}) as Record<string, string>
+  const lastNotified = notifiedAt[recipientKey]
+  if (lastNotified && Date.now() - new Date(lastNotified).getTime() < CHAT_EMAIL_COOLDOWN_MS) {
+    return
+  }
+
+  // If the recipient has read this thread more recently than we last mailed
+  // them, they are engaged — no mail.
+  const readMap = (senderType === 'garage' ? request.clientReadAt : request.garageReadAt) as
+    | Record<string, string>
+    | undefined
+  const lastRead = readMap?.[garageId]
+  if (lastRead && Date.now() - new Date(lastRead).getTime() < CHAT_EMAIL_COOLDOWN_MS) {
+    return
+  }
+
+  const clientId = request.clientId as string | undefined
+  const table = senderType === 'garage' ? 'Clients' : 'Garages'
+  const recipientId = senderType === 'garage' ? clientId : garageId
+  if (!recipientId) return
+
+  const recipient = await dynamoDB.send(new GetCommand({ TableName: table, Key: { id: recipientId } }))
+  const email = recipient.Item?.email as string | undefined
+  if (!email) return
+
+  const chatUrl =
+    senderType === 'garage'
+      ? `/requests/${clientId}/chats/${requestId}/?garageId=${garageId}`
+      : `/garage-dashboard/${garageId}/chat/${requestId}/`
+
+  sendEmail({
+    to: email,
+    templateName: EmailTemplate.NewChatMessage,
+    variables: { senderName, chatUrl },
+    triggerEvent: EventName.ChatMessageSent,
+    ...(senderType === 'garage' ? { clientId } : { garageId }),
+  })
+
+  await dynamoDB.send(new UpdateCommand({
+    TableName: 'ServiceRequests',
+    Key: { id: requestId },
+    UpdateExpression: 'SET chatNotifiedAt = if_not_exists(chatNotifiedAt, :empty)',
+    ExpressionAttributeValues: { ':empty': {} },
+  }))
+  await dynamoDB.send(new UpdateCommand({
+    TableName: 'ServiceRequests',
+    Key: { id: requestId },
+    UpdateExpression: 'SET chatNotifiedAt.#k = :now',
+    ExpressionAttributeNames: { '#k': recipientKey },
+    ExpressionAttributeValues: { ':now': new Date().toISOString() },
+  }))
+}
+
 export const POST = withMetrics(_POST)

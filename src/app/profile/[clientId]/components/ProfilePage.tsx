@@ -11,6 +11,7 @@ import { useToast } from '../../../../hooks/useToast'
 import { useAuth } from '../../../../contexts/AuthContext'
 import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
+import InlineNudge from '@/components/InlineNudge'
 import { useAsyncTask } from '@/hooks/useAsyncTask'
 import { useNavigation } from '@/hooks/useNavigation'
 
@@ -228,6 +229,14 @@ export default function ProfilePage({ clientId }: ProfilePageProps) {
             {displayName}
           </h1>
         </div>
+
+        <InlineNudge
+          when={!clientData.phoneNumber}
+          icon="sms"
+          title="Λείπει το κινητό σου"
+          detail="Χωρίς αυτό δεν λαμβάνεις ειδοποιήσεις όταν ένα συνεργείο απαντήσει στο αίτημά σου."
+          className="mb-6"
+        />
 
         {/* User Information Section */}
         <div id="user-info-section" className="mb-6">

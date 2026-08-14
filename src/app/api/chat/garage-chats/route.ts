@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { requireGarage } from '@/utils/requireAuth'
+import { fetchGarageMessages } from '@/utils/garageMessages'
 import { withMetrics } from '@/utils/withMetrics'
 
 async function _GET(request: NextRequest) {
@@ -10,13 +9,7 @@ async function _GET(request: NextRequest) {
     if (garageId instanceof NextResponse) return garageId
 
     // Find all chat messages where this garage is involved
-    const messagesResult = await dynamoDB.send(new ScanCommand({
-      TableName: 'ChatMessages',
-      FilterExpression: 'garageId = :garageId',
-      ExpressionAttributeValues: { ':garageId': garageId }
-    }))
-
-    const messages = messagesResult.Items || []
+    const messages = await fetchGarageMessages(garageId)
 
     if (messages.length === 0) {
       return NextResponse.json({ success: true, requestIds: [] })

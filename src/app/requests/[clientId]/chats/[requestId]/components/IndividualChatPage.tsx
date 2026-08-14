@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
 import { useNavigation } from '@/hooks/useNavigation'
+import { useNotifications } from '@/contexts/NotificationsContext'
 import { styles } from '../../../../../../styles/styles'
 import { useToast } from '../../../../../../hooks/useToast'
 // Navigation handled by AppShell
@@ -40,6 +41,7 @@ interface IndividualChatPageProps {
 
 export default function IndividualChatPage({ clientId, requestId }: IndividualChatPageProps) {
   const { navigate, isNavigating } = useNavigation()
+  const { refresh: refreshUnread } = useNotifications()
   const { showToast } = useToast()
   // The chats list links to a specific thread (?garageId=...). On mobile the
   // garage sidebar is hidden, so this is the only way to land on the right one.
@@ -254,10 +256,12 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
         },
         body: JSON.stringify({ garageId })
       })
+      // Drop the nav badge straight away rather than at the next poll.
+      refreshUnread()
     } catch (error) {
       console.error('Error marking messages as read:', error)
     }
-  }, [requestId])
+  }, [requestId, refreshUnread])
 
   // Handle garage selection
   const handleGarageSelect = (garage: Garage) => {

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Input, Spinner } from '@/components'
+import InlineNudge from '@/components/InlineNudge'
 import AccountDangerZone from '@/components/AccountDangerZone'
 import NotificationSettings from './NotificationSettings'
 import { styles } from '@/styles/styles'
@@ -121,6 +122,13 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
           Διαχειριστειτε τα στοιχεια του συνεργειου σας
         </p>
       </div>
+
+      <InlineNudge
+        when={!formData.description?.trim() || (formData.benefits?.length ?? 0) === 0}
+        icon="storefront"
+        title="Το προφίλ σου είναι ελλιπές"
+        detail="Οι πελάτες βλέπουν την περιγραφή και τις παροχές σου δίπλα στην προσφορά. Χωρίς αυτές, η προσφορά σου συγκρίνεται μόνο με την τιμή."
+      />
 
       {/* Company Information */}
       <article className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10">
