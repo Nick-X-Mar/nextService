@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { getByIdOrNull } from '@/utils/getById'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { requireAuth, requireOwner } from '@/utils/requireAuth'
@@ -60,19 +61,13 @@ async function _GET(
 
     // Fetch client + vehicle + presigned photo URLs in parallel — they're independent.
     const rawPhotoUrls = serviceRequest.photoUrls || []
-    const [clientResult, vehicleResult, presignedPhotoUrls] = await Promise.all([
-      dynamoDB.send(new GetCommand({
-        TableName: 'Clients',
-        Key: { id: serviceRequest.clientId }
-      })),
-      dynamoDB.send(new GetCommand({
-        TableName: 'Vehicles',
-        Key: { id: serviceRequest.vehicleId }
-      })),
+    // getByIdOrNull rather than a bare GetCommand: a row missing clientId or
+    // vehicleId would otherwise throw and fail this whole Promise.all.
+    const [client, vehicle, presignedPhotoUrls] = await Promise.all([
+      getByIdOrNull('Clients', serviceRequest.clientId as string | undefined),
+      getByIdOrNull('Vehicles', serviceRequest.vehicleId as string | undefined),
       rawPhotoUrls.length > 0 ? generatePresignedUrls(rawPhotoUrls) : Promise.resolve([])
     ])
-    const client = clientResult.Item
-    const vehicle = vehicleResult.Item
 
     // GDPR audit log: when a garage views a request that contains client
     // PII (name, phone) and vehicle PII (plate, VIN), record the access.
@@ -265,19 +260,11 @@ async function _PATCH(
 
     // Fetch client + vehicle + presigned photo URLs in parallel.
     const rawPatchPhotoUrls = updatedRequest.photoUrls || []
-    const [clientResult, vehicleResult, presignedPatchPhotoUrls] = await Promise.all([
-      dynamoDB.send(new GetCommand({
-        TableName: 'Clients',
-        Key: { id: updatedRequest.clientId }
-      })),
-      dynamoDB.send(new GetCommand({
-        TableName: 'Vehicles',
-        Key: { id: updatedRequest.vehicleId }
-      })),
+    const [client, vehicle, presignedPatchPhotoUrls] = await Promise.all([
+      getByIdOrNull('Clients', updatedRequest.clientId as string | undefined),
+      getByIdOrNull('Vehicles', updatedRequest.vehicleId as string | undefined),
       rawPatchPhotoUrls.length > 0 ? generatePresignedUrls(rawPatchPhotoUrls) : Promise.resolve([])
     ])
-    const client = clientResult.Item
-    const vehicle = vehicleResult.Item
 
     return NextResponse.json({
       success: true,

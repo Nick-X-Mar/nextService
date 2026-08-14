@@ -809,7 +809,7 @@ export default function RequestDetailsContent({
           category={request.category}
           estimatedCost={request.estimatedCost}
           vehicle={vehicleDetails}
-          photoCount={request.photoUrls.length}
+          photoCount={request.photoUrls?.length ?? 0}
           showEstimatedCost={request.estimatedCost !== undefined && request.estimatedCost !== null}
           editable={Boolean(request.vehicleId) && request.status !== ServiceRequestStatus.APPOINTMENT}
           onEditClick={handleOpenVehicleModal}
@@ -830,14 +830,14 @@ export default function RequestDetailsContent({
         )}
 
         {/* Photos */}
-        {request.photoUrls.length > 0 && (
+        {(request.photoUrls?.length ?? 0) > 0 && (
           <div className="bg-surface-container-lowest rounded-xl p-5 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10">
             <h3 className="text-lg font-bold text-on-surface mb-3 flex items-center gap-2">
               <Icon name="photo_library" size="md" className="text-on-surface-variant" />
-              Φωτογραφίες ({request.photoUrls.length})
+              Φωτογραφίες ({request.photoUrls?.length ?? 0})
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {request.photoUrls.map((url, index) => (
+              {(request.photoUrls ?? []).map((url, index) => (
                 <div key={index} className="relative aspect-square bg-surface-container rounded-xl overflow-hidden">
                   <Image
                     src={url}

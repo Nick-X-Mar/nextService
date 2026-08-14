@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 
 interface AdminAlerts {
   pendingGarages: number
@@ -22,6 +23,13 @@ const POLL_INTERVAL_MS = 2 * 60 * 1000
  */
 export default function AdminAlertsBanner() {
   const [alerts, setAlerts] = useState<AdminAlerts | null>(null)
+  const pathname = usePathname()
+
+  // The dashboard already leads with these as cards and repeats the approvals
+  // count as a sidebar badge. A third copy in a banner directly above them is
+  // noise, and noise is what teaches people to scroll past the banner on the
+  // pages where it is the only signal.
+  const isDashboard = pathname === '/admin/dashboard' || pathname === '/admin/dashboard/'
 
   useEffect(() => {
     let cancelled = false
@@ -45,7 +53,7 @@ export default function AdminAlertsBanner() {
     }
   }, [])
 
-  if (!alerts) return null
+  if (!alerts || isDashboard) return null
 
   const items: Array<{ href: string; label: string; count: number; tone: string }> = [
     {

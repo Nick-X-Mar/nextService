@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { getByIdOrNull } from '@/utils/getById'
 import { requireGarage } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
 
@@ -38,18 +39,12 @@ async function _GET(request: NextRequest) {
           return null
         }
 
-        const [clientResult, vehicleResult] = await Promise.all([
-          dynamoDB.send(new GetCommand({
-            TableName: 'Clients',
-            Key: { id: serviceRequest.clientId }
-          })),
-          dynamoDB.send(new GetCommand({
-            TableName: 'Vehicles',
-            Key: { id: serviceRequest.vehicleId }
-          }))
+        // Tolerates a request row missing clientId/vehicleId — one such row used
+        // to fail this whole Promise.all and blank the garage's offers tab.
+        const [client, vehicle] = await Promise.all([
+          getByIdOrNull('Clients', serviceRequest.clientId as string | undefined),
+          getByIdOrNull('Vehicles', serviceRequest.vehicleId as string | undefined),
         ])
-        const client = clientResult.Item
-        const vehicle = vehicleResult.Item
 
         return {
           id: offer.id,

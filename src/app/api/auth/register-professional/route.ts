@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { queryIndexOrScan } from '@/utils/indexQuery'
 import { hashPassword } from '@/utils/passwordService'
 import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 import { logEvent } from '@/utils/eventLogger'
@@ -113,16 +114,19 @@ async function _POST(request: NextRequest) {
     }
 
     // Check if TIN already exists (primary duplicate check for Greek companies).
-    // Garages.TINIndex is keyed on tin, so this no longer scans the table.
-    const existingTinResult = await dynamoDB.send(new QueryCommand({
-      TableName: 'Garages',
-      IndexName: 'TINIndex',
-      KeyConditionExpression: 'tin = :tin',
-      ExpressionAttributeValues: { ':tin': cleanTin },
-      Limit: 1
-    }))
+    // Garages.TINIndex is keyed on tin. It is declared in the CDK stack but the
+    // local tables are not built from it, so this tolerates the index being
+    // absent instead of failing registration outright.
+    const existingTins = await queryIndexOrScan<{ id: string }>({
+      table: 'Garages',
+      indexName: 'TINIndex',
+      keyConditionExpression: 'tin = :tin',
+      scanFilterExpression: 'tin = :tin',
+      expressionAttributeValues: { ':tin': cleanTin },
+      limit: 1,
+    })
 
-    if (existingTinResult.Items && existingTinResult.Items.length > 0) {
+    if (existingTins.length > 0) {
       return NextResponse.json({ 
         error: 'Υπάρχει ήδη εταιρεία με αυτόν τον ΑΦΜ. Ο ΑΦΜ είναι μοναδικός αναγνωριστικός αριθμός για κάθε εταιρεία.' 
       }, { status: 409 })
