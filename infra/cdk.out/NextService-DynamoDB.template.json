@@ -415,6 +415,10 @@
      {
       "AttributeName": "senderId",
       "AttributeType": "S"
+     },
+     {
+      "AttributeName": "garageId",
+      "AttributeType": "S"
      }
     ],
     "BillingMode": "PAY_PER_REQUEST",
@@ -440,6 +444,22 @@
       "KeySchema": [
        {
         "AttributeName": "senderId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "timestamp",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "GarageMessagesIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "garageId",
         "KeyType": "HASH"
        },
        {

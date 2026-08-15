@@ -69,7 +69,7 @@
     "Environment": {
      "Variables": {
       "SERVICE_REQUESTS_TABLE": "ServiceRequests",
-      "REALTIME_JWT_SECRET": "7173cea6eaa93281de25f1b8e5945f4e682ee201bc9f6733eb797166cea6675d"
+      "REALTIME_JWT_SECRET": "unused-for-dynamodb-stack"
      }
     },
     "FunctionName": "nextservice-appsync-authorizer",
