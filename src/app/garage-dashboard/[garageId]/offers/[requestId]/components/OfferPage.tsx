@@ -703,6 +703,9 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
             Επιλέξτε τις ημέρες που μπορείτε να δεχτείτε το όχημα (Δευτέρα - Παρασκευή, έως 2 μήνες)
           </p>
 
+          {/* p-2 on narrow phones: react-day-picker's grid has a fixed minimum
+              width, so a full 1rem of padding per side tipped the calendar past
+              a 320px screen and made the whole page scroll sideways. */}
           <div className={`flex justify-center ${isAccepted ? 'opacity-50 pointer-events-none' : ''}`}>
             <DayPicker
               mode="multiple"
@@ -716,7 +719,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
               ]}
               fromDate={addDays(new Date(), 1)}
               toDate={addMonths(new Date(), 2)}
-              className="border border-outline-variant/20 rounded-xl p-4 bg-surface-container-lowest"
+              className="border border-outline-variant/20 rounded-xl p-2 sm:p-4 bg-surface-container-lowest max-w-full"
               modifiersClassNames={{
                 selected: '!bg-primary !text-on-primary hover:!bg-primary/90 !rounded-lg',
                 today: '!font-bold !text-primary'

@@ -8,12 +8,11 @@ import Spinner from '@/components/Spinner'
 import { useAsyncTask } from '@/hooks/useAsyncTask'
 import { useNotifications } from '@/contexts/NotificationsContext'
 import { clearFormData } from '@/utils/formStorage'
+import { resolveActiveHref, type ActiveNavItem } from '@/utils/activeNav'
 
-interface NavItem {
+interface NavItem extends ActiveNavItem {
   label: string
   icon: string
-  href: string
-  matchTab?: string
   /** Unread conversations behind this destination. Hidden when 0. */
   badge?: number
 }
@@ -54,15 +53,11 @@ export default function Sidebar() {
     ? (garage?.isActive ? garageNavItems : garagePendingNavItems)
     : clientNavItems
 
-  const isActive = (item: NavItem) => {
-    if (item.matchTab) {
-      return currentTab === item.matchTab
-    }
-    // Exact match for root, startsWith for other paths
-    if (item.href === '/') return pathname === '/'
-    const basePath = item.href.split('?')[0]
-    return pathname === basePath || pathname.startsWith(basePath + '/')
-  }
+  // Same single-winner rule as the mobile BottomNav — without it the nested
+  // routes lit two entries at once (Αιτήματα + Μηνύματα on `/requests/x/chats`,
+  // and both chat entries on `/garage-dashboard/x/chats/appointments`).
+  const activeHref = resolveActiveHref(navItems, pathname, currentTab)
+  const isActive = (item: NavItem) => item.href === activeHref
 
   if (!userType || userType === 'guest') return null
 

@@ -5,13 +5,11 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import Icon from '@/components/ui/Icon'
 import { useNotifications } from '@/contexts/NotificationsContext'
+import { resolveActiveHref, type ActiveNavItem } from '@/utils/activeNav'
 
-interface NavItem {
+interface NavItem extends ActiveNavItem {
   label: string
   icon: string
-  href: string
-  matchPaths?: string[]
-  matchTab?: string
   /** Unread conversations behind this destination. Hidden when 0. */
   badge?: number
 }
@@ -52,32 +50,29 @@ export default function BottomNav() {
     ? (garage?.isActive ? garageNavItems : garagePendingNavItems)
     : clientNavItems
 
-  const isActive = (item: NavItem) => {
-    if (item.matchTab && currentTab === item.matchTab) return true
-    if (item.matchPaths) {
-      return item.matchPaths.some(p => {
-        if (p === '/') return pathname === '/'
-        return pathname === p || pathname.startsWith(p + '/')
-      })
-    }
-    return false
-  }
+  const activeHref = resolveActiveHref(navItems, pathname, currentTab)
 
   // Don't show bottom nav on desktop
   if (!navItems.length) return null
 
   return (
     <nav className="fixed bottom-0 w-full z-50 md:hidden rounded-t-3xl bg-[#fbf9f8]/80 backdrop-blur-xl border-t border-outline-variant/20 shadow-[0_-4px_20px_0_rgba(0,0,0,0.04)]">
-      <div className="flex justify-around items-center h-20 px-2">
+      {/* Each tab takes an equal share (`flex-1 min-w-0`) instead of sizing to
+          its label. The garage's five tabs used to add up past the screen on a
+          320px phone, pushing Ρυθμίσεις off the right edge entirely; equal
+          shares plus a truncating label keep every tab reachable. The active
+          pill's padding is horizontal-free for the same reason — it used to add
+          32px to whichever tab happened to be selected. */}
+      <div className="flex items-center h-20 px-2">
         {navItems.map((item) => {
-          const active = isActive(item)
+          const active = item.href === activeHref
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center justify-center active:scale-90 duration-200 ${
+              className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 mx-0.5 rounded-2xl active:scale-90 duration-200 ${
                 active
-                  ? 'text-primary bg-primary-container/10 rounded-2xl px-4 py-1'
+                  ? 'text-primary bg-primary-container/10'
                   : 'text-on-surface/60 hover:text-primary-container'
               }`}
             >
@@ -92,7 +87,11 @@ export default function BottomNav() {
                   </span>
                 )}
               </span>
-              <span className="font-body text-[10px] uppercase tracking-[0.05em] font-bold mt-1">
+              {/* Below 360px the garage's five Greek labels don't fit at the
+                  normal size, so they drop a point and give up their letter
+                  spacing rather than all ending in an ellipsis. From 360px up
+                  — every current iPhone and Android — nothing changes. */}
+              <span className="font-body text-[9px] tracking-normal min-[360px]:text-[10px] min-[360px]:tracking-[0.05em] uppercase font-bold mt-1 max-w-full truncate">
                 {item.label}
               </span>
             </Link>

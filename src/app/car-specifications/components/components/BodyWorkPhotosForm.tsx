@@ -89,9 +89,6 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
         // Load latest form data to include originalVehicleId and originalVehicleData
         const latestFormData = loadFormData()
 
-        // Get client ID from localStorage if user is logged in
-        const loggedInClientId = localStorage.getItem('clientId')
-
         // First, create the service request to get IDs
         const serviceRequestData = {
           ...savedData,
@@ -101,8 +98,8 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
           // Include original vehicle tracking data if present
           ...(latestFormData.originalVehicleId && { originalVehicleId: latestFormData.originalVehicleId }),
           ...(latestFormData.originalVehicleData && { originalVehicleData: latestFormData.originalVehicleData }),
-          // Include client ID if user is logged in
-          ...(loggedInClientId && { clientId: loggedInClientId })
+          // No clientId: the API takes it from the auth cookie, so the request
+          // can only land in the account this browser is actually signed into.
         }
 
         const serviceResponse = await fetch('/api/service-request/', {

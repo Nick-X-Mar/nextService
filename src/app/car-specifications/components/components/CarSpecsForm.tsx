@@ -36,7 +36,7 @@ interface CarSpecsFormProps {
 export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   const router = useRouter()
   const { success, error } = useToast()
-  const { refreshClient } = useAuth()
+  const { refreshClient, client, isVerified } = useAuth()
   const [vinNumber, setVinNumber] = useState('')
   const [engineNumber, setEngineNumber] = useState('')
   const [email, setEmail] = useState('')
@@ -48,7 +48,14 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   const [showVinInfo, setShowVinInfo] = useState(false)
   const [showEngineInfo, setShowEngineInfo] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  // Set by the inline LoginModal, whose refreshClient() lands a tick later.
+  const [justLoggedIn, setJustLoggedIn] = useState(false)
+  // Whether to submit as an existing account or register a new one. Derived from
+  // the server-confirmed session only — the old `localStorage.getItem('clientId')`
+  // check would hide the registration fields for a signed-out visitor whose
+  // browser still remembered someone else, and the request went to that account.
+  const authSettled = isVerified || justLoggedIn
+  const isLoggedIn = justLoggedIn || (isVerified && !!client)
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [emailExists, setEmailExists] = useState(false)
@@ -71,7 +78,6 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   // Load saved data on component mount
   useEffect(() => {
     setMounted(true)
-    setIsLoggedIn(!!localStorage.getItem('clientId'))
     const data = loadFormData()
     if (data.vinNumber) setVinNumber(data.vinNumber)
     if (data.engineNumber) setEngineNumber(data.engineNumber)
@@ -132,6 +138,9 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   }, [email, mounted, isLoggedIn, checkEmail])
 
   const isFormValid =
+    // Until the session is settled we don't know which of the two shapes below
+    // this submit takes, so the button stays disabled rather than guessing.
+    authSettled &&
     vinNumber.trim() !== '' &&
     (engineNumber.trim() !== '' || licensePhoto !== null || !!existingLicensePhotoUrl) &&
     (isLoggedIn || (isEmailValid(email) && !emailExists && isPasswordValid && acceptedTerms))
@@ -145,9 +154,6 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
         vinNumber,
         engineNumber
       })
-
-      // Get client ID from localStorage if user is logged in
-      const loggedInClientId = localStorage.getItem('clientId')
 
       // Load latest form data to include originalVehicleId and originalVehicleData
       const latestFormData = loadFormData()
@@ -163,10 +169,10 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
         // Include original vehicle tracking data if present
         ...(latestFormData.originalVehicleId && { originalVehicleId: latestFormData.originalVehicleId }),
         ...(latestFormData.originalVehicleData && { originalVehicleData: latestFormData.originalVehicleData }),
-        // Include client ID if user is logged in
-        ...(loggedInClientId && { clientId: loggedInClientId }),
-        // Include email and password for new users + the consent flag
-        ...(!loggedInClientId && email && { email, password, acceptedTerms: true })
+        // No clientId is sent: the API reads it from the auth cookie, so the
+        // request can only ever land in the account this browser is actually
+        // signed into. Signed-out visitors register inline instead.
+        ...(!isLoggedIn && email && { email, password, acceptedTerms: true })
       }
 
       try {
@@ -190,8 +196,10 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
           const transmissionText = savedData.isAutomatic ? 'Αυτοματο' : 'Χειροκινητο'
           const driveText = savedData.is4x4 ? '4x4' : '2WD'
 
-          // Auto-login: server set the auth cookie, now set localStorage
-          if (!loggedInClientId && result.clientId) {
+          // A brand-new account was just registered inline and the server set
+          // its auth cookie, so pull the identity into AuthContext. Existing
+          // sessions are already there and need no second look.
+          if (!isLoggedIn && result.clientId) {
             localStorage.setItem('clientId', result.clientId)
             localStorage.setItem('userType', 'client')
             refreshClient(result.clientId)
@@ -205,9 +213,9 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
           // Redirect to requests page with clientId
           if (result.clientId) {
             router.push(`/requests/${result.clientId}/`)
-          } else if (loggedInClientId) {
-            // Fallback to logged in client ID
-            router.push(`/requests/${loggedInClientId}/`)
+          } else if (client) {
+            // Fallback to the signed-in client
+            router.push(`/requests/${client.id}/`)
           } else {
             router.push('/requests/')
           }
@@ -278,7 +286,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
         <div className="mt-6 space-y-6">
 
           {/* Email & Password for guest users */}
-          {mounted && !isLoggedIn && (
+          {mounted && authSettled && !isLoggedIn && (
             <div className="space-y-5">
               {/* Email */}
               <div className="space-y-3">
@@ -623,7 +631,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
         onClose={() => setShowLoginModal(false)}
         email={email}
         onLoginSuccess={(clientId) => {
-          setIsLoggedIn(true)
+          setJustLoggedIn(true)
           localStorage.removeItem('garageId')
           localStorage.setItem('clientId', clientId)
           // Sync the global AuthContext so the header (and any other

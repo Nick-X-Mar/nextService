@@ -32,6 +32,14 @@ interface AuthContextType {
   client: ClientUser | null
   garage: GarageUser | null
   isLoading: boolean
+  /**
+   * True only once the server has answered who we are. The localStorage cache
+   * below can populate `client`/`garage` instantly for rendering, but it must
+   * never be enough to *act* on — redirecting someone into an account or
+   * attaching data to it has to wait for this flag, otherwise a browser left
+   * signed in on another machine hands the next person the previous identity.
+   */
+  isVerified: boolean
   setClient: (client: ClientUser | null) => void
   setGarage: (garage: GarageUser | null) => void
   logout: () => void
@@ -87,6 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // immediately flips this to false if we have a cached identity, avoiding the
   // app-wide auth spinner on every navigation.
   const [isLoading, setIsLoading] = useState(true)
+  // Flipped once — and only once — a server round-trip has confirmed (or
+  // denied) the session. Never reset by clearAuth: "the server said no" is
+  // itself a verified answer.
+  const [isVerified, setIsVerified] = useState(false)
 
   // Clear all authentication data - memoized to prevent infinite loops
   const clearAuth = useCallback(() => {
@@ -147,6 +159,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearAuth()
     } finally {
       setIsLoading(false)
+      // Every path through this function has either heard back from the server
+      // or given up and cleared the session — both are settled answers.
+      setIsVerified(true)
     }
   }, [clearAuth])
 
@@ -191,6 +206,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearAuth()
     } finally {
       setIsLoading(false)
+      // Every path through this function has either heard back from the server
+      // or given up and cleared the session — both are settled answers.
+      setIsVerified(true)
     }
   }, [clearAuth])
 
@@ -203,6 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
       setUserType('guest')
       setIsLoading(false)
+      setIsVerified(true)
       return
     }
 
@@ -266,18 +285,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUserType('guest')
           }
         } else {
-          // Not authenticated - check localStorage for backward compatibility
-          const clientId = localStorage.getItem('clientId')
-          const garageId = localStorage.getItem('garageId')
-
-          if (clientId && !garageId) {
-            // Old session without JWT - clear it, user needs to log in again
-            clearAuth()
-          } else if (garageId && !clientId) {
-            clearAuth()
-          }
+          // The server did not recognise us. Drop every trace of the previous
+          // identity — leaving it behind is what let a forgotten session on a
+          // shared browser resurface for whoever opened the app next.
+          clearAuth()
           setUserType('guest')
         }
+        // Both branches above are answers from the server, so the identity is
+        // now confirmed. Deliberately not in `finally`: a network failure
+        // leaves the cached identity in place and must NOT be marked verified.
+        setIsVerified(true)
       } catch {
         // Network error: keep cached identity if any, otherwise mark guest.
         if (!cached) setUserType('guest')
@@ -307,6 +324,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         client,
         garage,
         isLoading,
+        isVerified,
         setClient,
         setGarage,
         logout,

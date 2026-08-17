@@ -34,6 +34,29 @@ function isPublicRoute(pathname: string): boolean {
   return PUBLIC_API_ROUTES.some(route => pathname.startsWith(route))
 }
 
+// Pages that require a signed-in user of a specific type. Guarded server-side so
+// the decision comes from the httpOnly cookie and nothing else — a cached
+// identity in localStorage must never be enough to open one of these. Keep in
+// sync with the `matcher` at the bottom of this file.
+const PROTECTED_PAGES: { prefix: string; userType: 'client' | 'garage' }[] = [
+  { prefix: '/garage-dashboard', userType: 'garage' },
+  { prefix: '/requests', userType: 'client' },
+  { prefix: '/profile', userType: 'client' },
+]
+
+function matchProtectedPage(pathname: string) {
+  return PROTECTED_PAGES.find(
+    p => pathname === p.prefix || pathname.startsWith(p.prefix + '/')
+  )
+}
+
+/** Where a signed-in user belongs when they land somewhere that isn't theirs. */
+function homeFor(userType: string, userId: string): string {
+  return userType === 'garage'
+    ? `/garage-dashboard/${userId}/`
+    : `/requests/${userId}/`
+}
+
 async function issueRefreshedToken(userId: string, userType: string): Promise<string> {
   return new SignJWT({ userId, userType })
     .setProtectedHeader({ alg: 'HS256' })
@@ -94,35 +117,57 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next({ request: { headers: adminHeaders } })
   }
 
-  // ── Garage pages ─────────────────────────────────────────
-  // Guarded server-side so the decision comes from the cookie instead of the
-  // cached identity in localStorage. The client-side guard trusted a stale
-  // cache, which bounced freshly-approved garages into a /login ↔ dashboard
-  // redirect loop and made them log in again for no reason.
-  // `isActive` is deliberately NOT checked here — that would cost a DynamoDB
-  // read on every page view; the dashboard renders the status panel instead.
-  if (pathname.startsWith('/garage-dashboard')) {
+  // ── Protected pages (client + garage) ────────────────────
+  // The cookie is the only source of truth. The client-side guard this replaces
+  // trusted a stale localStorage cache, which both bounced freshly-approved
+  // garages into a /login ↔ dashboard redirect loop and — on a browser someone
+  // forgot to sign out of — rendered the previous user's area for whoever came
+  // next. `isActive` is deliberately NOT checked here: that would cost a
+  // DynamoDB read on every page view; the dashboard renders the status panel.
+  const protectedPage = matchProtectedPage(pathname)
+  if (protectedPage) {
     const token = request.cookies.get(TOKEN_COOKIE_NAME)?.value
     const loginUrl = new URL('/login/', request.url)
+    loginUrl.searchParams.set('next', pathname)
 
     if (!token) {
-      loginUrl.searchParams.set('next', pathname)
       return NextResponse.redirect(loginUrl)
     }
 
     try {
       const { payload } = await jwtVerify(token, getSecret())
-      if (payload.userType !== 'garage' || !payload.userId) {
-        return NextResponse.redirect(new URL('/login/', request.url))
+      const userId = payload.userId as string
+      const userType = payload.userType as string
+
+      if (!userId || !userType) {
+        return NextResponse.redirect(loginUrl)
       }
+
+      // Signed in, but as the other kind of user — send them to their own area
+      // rather than to a login form they don't actually need.
+      if (userType !== protectedPage.userType) {
+        return NextResponse.redirect(new URL(homeFor(userType, userId), request.url))
+      }
+
+      // The id in the URL is part of the identity: /requests/<someone-else>/…
+      // must never render. The APIs behind it already answer 403, but that only
+      // produced an empty broken page instead of an honest redirect.
+      const ownerId = pathname.split('/')[2]
+      if (
+        ownerId &&
+        ownerId !== userId &&
+        (ownerId.startsWith('client-') || ownerId.startsWith('garage-'))
+      ) {
+        return NextResponse.redirect(new URL(homeFor(userType, userId), request.url))
+      }
+
       const response = NextResponse.next()
-      // Sliding session on page views too, so a garage browsing its dashboard
+      // Sliding session on page views too, so someone browsing their own area
       // never expires mid-session.
-      const refreshed = await issueRefreshedToken(payload.userId as string, 'garage')
+      const refreshed = await issueRefreshedToken(userId, userType)
       applySlidingCookie(response, refreshed)
       return response
     } catch {
-      loginUrl.searchParams.set('next', pathname)
       return NextResponse.redirect(loginUrl)
     }
   }
@@ -217,5 +262,13 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/:path*', '/admin/:path*', '/garage-dashboard/:path*'],
+  matcher: [
+    '/api/:path*',
+    '/admin/:path*',
+    // Mirrors PROTECTED_PAGES above — a prefix listed there but missing here is
+    // simply not guarded, so the two lists have to move together.
+    '/garage-dashboard/:path*',
+    '/requests/:path*',
+    '/profile/:path*',
+  ],
 }

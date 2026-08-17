@@ -408,6 +408,10 @@ export default function RegisterProfessionalPage() {
                 </div>
               </div>
 
+              {/* min-w-0 appears twice below: once on the chip so its grid
+                  column can shrink under the label's width, once on the label
+                  so it may wrap. Without them the longest labels spill out past
+                  the chip's rounded background on a phone. */}
               <div className="grid grid-cols-2 gap-2">
                 {extraServices.map((service) => {
                   const isSelected = selectedServices.includes(service.value)
@@ -416,7 +420,7 @@ export default function RegisterProfessionalPage() {
                       key={service.value}
                       type="button"
                       onClick={() => toggleService(service.value)}
-                      className={`flex items-center gap-2 p-3 rounded-xl text-left transition-all ${
+                      className={`flex items-center gap-2 p-3 rounded-xl text-left transition-all min-w-0 ${
                         isSelected
                           ? 'bg-primary/10 border-2 border-primary'
                           : 'bg-surface-container border-2 border-transparent hover:bg-surface-container-high'
@@ -425,9 +429,9 @@ export default function RegisterProfessionalPage() {
                       <Icon
                         name={service.icon}
                         size="sm"
-                        className={isSelected ? 'text-primary' : 'text-on-surface-variant/60'}
+                        className={`shrink-0 ${isSelected ? 'text-primary' : 'text-on-surface-variant/60'}`}
                       />
-                      <span className={`text-xs font-bold ${isSelected ? 'text-primary' : 'text-on-surface'}`}>
+                      <span className={`text-xs font-bold min-w-0 break-words ${isSelected ? 'text-primary' : 'text-on-surface'}`}>
                         {service.label}
                       </span>
                     </button>

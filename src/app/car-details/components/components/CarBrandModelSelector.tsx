@@ -5,6 +5,7 @@ import Icon from '@/components/ui/Icon'
 import GearSubmitButton from '@/components/GearSubmitButton'
 import { saveFormData, loadFormData, clearFormData } from '../../../../utils/formStorage'
 import { useToast } from '../../../../hooks/useToast'
+import { useAuth } from '@/contexts/AuthContext'
 
 // Greek to Latin phonetic transliteration for search matching
 const greekToLatinMap: Record<string, string> = {
@@ -126,6 +127,7 @@ export default function CarBrandModelSelector() {
   const [isAutomatic, setIsAutomatic] = useState(false)
   const [is4x4, setIs4x4] = useState(false)
   const [isTurbo, setIsTurbo] = useState(false)
+  const { client, isVerified } = useAuth()
   const [mounted, setMounted] = useState(false)
 
   // Vehicle selector for logged-in users
@@ -225,19 +227,25 @@ export default function CarBrandModelSelector() {
       saveFormData({ category: data.category, description: data.description })
     }
 
-    // Fetch user's vehicles if logged in
-    const clientId = localStorage.getItem('clientId')
-    if (clientId) {
-      fetch(`/api/clients/${clientId}/vehicles/`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.success && data.vehicles?.length > 0) {
-            setVehicles(data.vehicles.filter((v: Vehicle) => v.brand && v.model))
-          }
-        })
-        .catch(() => {})
-    }
   }, [])
+
+  // Pre-fill the garage picker with the client's own vehicles. Keyed on the
+  // server-confirmed session rather than a localStorage id, so a stale id left
+  // by a previous user can't put their cars in front of this one.
+  useEffect(() => {
+    if (!isVerified || !client) return
+    let cancelled = false
+    fetch(`/api/clients/${client.id}/vehicles/`)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return
+        if (data.success && data.vehicles?.length > 0) {
+          setVehicles(data.vehicles.filter((v: Vehicle) => v.brand && v.model))
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [isVerified, client])
 
   // Save data whenever it changes
   useEffect(() => {

@@ -28,7 +28,7 @@ export default function LoginPage() {
   const searchParams = useSearchParams()
   const { success, error } = useToast()
   const { refreshUser } = useUser()
-  const { refreshClient, refreshGarage, userType: authUserType, client, garage, isLoading: authLoading } = useAuth()
+  const { refreshClient, refreshGarage, userType: authUserType, client, garage, isLoading: authLoading, isVerified } = useAuth()
 
   // Where to land after signing in — set by the middleware when it intercepts a
   // protected page, and by the activation email's deep link. Only same-origin
@@ -47,14 +47,19 @@ export default function LoginPage() {
   // If the user is already authenticated, bounce them to their home.
   // Without this, landing on /login (e.g. via browser back) shows the login
   // form alongside the logged-in chrome (sidebar/header).
+  //
+  // Gated on `isVerified`, not just `isLoading`: the auth cache hydrates
+  // synchronously, so bouncing on it alone would fling someone whose cookie has
+  // expired at a protected page, which the middleware sends straight back here —
+  // a /login ↔ dashboard loop that only breaks when /api/auth/me finally lands.
   useEffect(() => {
-    if (authLoading) return
+    if (authLoading || !isVerified) return
     if (authUserType === 'garage' && garage) {
       router.replace(destinationFor('garage', garage.id))
     } else if (authUserType === 'client' && client) {
       router.replace(destinationFor('client', client.id))
     }
-  }, [authLoading, authUserType, client, garage, router, destinationFor])
+  }, [authLoading, isVerified, authUserType, client, garage, router, destinationFor])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()

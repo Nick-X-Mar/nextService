@@ -1113,7 +1113,7 @@ export default function RequestDetailsContent({
                                     ]}
                                     fromDate={addDays(new Date(), 1)}
                                     toDate={addMonths(new Date(), 2)}
-                                    className="border border-outline-variant/10 rounded-xl p-4"
+                                    className="border border-outline-variant/10 rounded-xl p-2 sm:p-4 max-w-full"
                                     modifiersClassNames={{
                                       selected: 'bg-primary text-on-primary hover:bg-primary-container',
                                       today: 'font-bold text-primary'

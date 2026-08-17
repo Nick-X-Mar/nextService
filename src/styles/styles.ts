@@ -104,11 +104,17 @@ export const styles = {
   statusCompleted: "text-[0.65rem] font-black uppercase tracking-[0.1em] text-green-700 bg-green-100 px-2 py-1 rounded-sm",
   statusCancelled: "text-[0.65rem] font-black uppercase tracking-[0.1em] text-red-700 bg-red-100 px-2 py-1 rounded-sm",
 
-  // Bento grid for vehicle specs
+  // Bento grid for vehicle specs.
+  // `min-w-0` on the cell is load-bearing: a grid item's automatic minimum size
+  // is its min-content width, so one unbreakable value — a 17-character VIN —
+  // would widen its whole column and push its text out past the cell's rounded
+  // background. With the floor removed the column can shrink, and `break-words`
+  // then wraps that value onto a second line. It only breaks strings that have
+  // no other option, so Greek labels like "Χειροκίνητο" still stay whole.
   specGrid: "grid grid-cols-3 gap-2",
-  specCell: "bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center",
+  specCell: "bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center min-w-0",
   specLabel: "text-[9px] font-black uppercase text-outline opacity-70",
-  specValue: "text-xs font-bold",
+  specValue: "text-xs font-bold text-center break-words max-w-full",
 
   // Mobile
   mobileMenu: "md:hidden bg-surface border-t border-outline-variant/20 px-2 pt-2 pb-3 space-y-1",

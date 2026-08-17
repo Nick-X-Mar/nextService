@@ -74,10 +74,14 @@ async function _POST(request: NextRequest) {
   try {
     const body = await request.json()
     
-    // Use authenticated clientId from JWT when available (set by middleware),
-    // falling back to body.clientId for guest users only
+    // Identity comes from the JWT (set by the middleware) and from nowhere else.
+    // This used to fall back to body.clientId, which the forms read out of
+    // localStorage — so on a browser someone had left signed in, the next
+    // person's request was filed into the previous person's account, silently
+    // and without any cookie ever being presented. A caller without a valid
+    // session is a guest, full stop, and registers like one below.
     const auth = getAuth(request)
-    const existingClientId = auth?.userType === 'client' ? auth.userId : (body.clientId || null)
+    const existingClientId = auth?.userType === 'client' ? auth.userId : null
 
     // Validate required fields
     const { category, brand, model } = body
