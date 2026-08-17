@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import CarBrandModelSelector from './CarBrandModelSelector'
 import { loadFormData } from '../../../../utils/formStorage'
+import { getCategoryText } from '@/utils/categoryLabels'
 import Icon from '@/components/ui/Icon'
 
 export default function CarDetailsSection() {
@@ -15,16 +16,10 @@ export default function CarDetailsSection() {
     setCategory(data.category || '')
   }, [])
 
-  const categoryLabels: Record<string, string> = {
-    service: 'Service',
-    kteo: 'ΚΤΕΟ',
-    elastika: 'Ελαστικά',
-    fanopeia: 'Φανοποιεία',
-    'oliki-vafi': 'Ολική Βαφή',
-    'meriki-vafi': 'Μερική Βαφή',
-    oils: 'Λάδια',
-    disk: 'Δίσκος',
-  }
+  // Only render the badge when we have a real Greek label — an unmapped slug
+  // would otherwise show up raw (e.g. "symplektis").
+  const categoryLabel = category ? getCategoryText(category) : ''
+  const hasLabel = categoryLabel !== category
 
   return (
     <section className="pb-12 pt-0">
@@ -45,10 +40,10 @@ export default function CarDetailsSection() {
         </p>
 
         {/* Selected category badge */}
-        {category && (
+        {hasLabel && (
           <div className="mt-4 inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full">
             <Icon name="build" size="sm" />
-            <span className="text-xs font-bold">{categoryLabels[category] || category}</span>
+            <span className="text-xs font-bold">{categoryLabel}</span>
             <button onClick={() => router.push('/')} className="ml-1 hover:text-primary-container">
               <Icon name="edit" size="sm" />
             </button>

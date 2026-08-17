@@ -52,7 +52,7 @@ Testing: Playwright E2E only (`e2e/*.spec.ts`). There is no unit-test framework 
 - `upload-photos/`, `upload/` — S3 photo uploads
 - `garage/`, `clients/`, `vehicles/` — entity CRUD
 - `payments/`, `wallet/`, `webhooks/stripe` — Stripe deposits, saved cards, wallet balance/transactions
-- `price-estimation/`, `hot-deals/`, `track/` — public endpoints. Price estimation is a nearest-neighbour lookup over past quotes (`src/lib/price-lookup.ts` + `src/data/price-examples.json`), not a formula: it finds the closest cars we have quoted before and returns the lowest of those prices.
+- `price-estimation/`, `hot-deals/`, `track/` — public endpoints. Price estimation is a strict lookup over past quotes (`src/lib/price-lookup.ts` + `src/data/price-examples.json`), not a formula: it answers only when the same car is already in the dataset — same category, brand and model, model year ±1, same fuel, engine cc ±150 and same turbo/4x4 (that engine gate is skipped for bodywork, where the form never collects those) — and returns the lowest of those past prices, shown as "Εκτιμώμενο κόστος από X€". No match ⇒ `estimation: null` and the UI shows nothing. Leave-one-out coverage is ~20%, so most requests legitimately get no estimate.
 - `account/export`, `account/delete` — GDPR
 - `admin/**` — the whole admin surface (users, requests, payments, commissions, emails, errors, funnel, performance, hot-deals, custom vehicles, settings, tests)
 

@@ -466,18 +466,23 @@ sequenceDiagram
 sequenceDiagram
     participant UI as Car Specs Form
     participant API as Price Estimation API
-    participant Logic as Estimation Logic
+    participant Logic as Lookup (src/lib/price-lookup.ts)
     
-    UI->>API: POST /api/price-estimation<br/>{category, brand, model, modelYear, engineCC, fuelType, isAutomatic, is4x4}
+    UI->>API: POST /api/price-estimation<br/>{category, brand, model, modelYear, engineCC, fuelType, isAutomatic, is4x4, isTurbo}
     
-    API->>Logic: Calculate estimated price
-    Note over Logic: Base price by category<br/>+ Adjustments for:<br/>- Year<br/>- Engine size<br/>- Fuel type<br/>- Transmission<br/>- 4x4<br/>+ Market variation
+    API->>Logic: Look the car up in past quotes
+    Note over Logic: Match on: same category<br/>+ same brand/model<br/>+ model year ±1<br/>+ same fuel<br/>+ engine cc ±150<br/>+ same turbo / 4x4<br/>(engine gate skipped for bodywork)
     
-    Logic-->>API: Return {estimatedCost, confidence, basedOnSimilarCars}
-    API-->>UI: Return estimation
-    
-    UI->>UI: Display estimated price
-    UI->>LS: Save estimatedPrice to form data
+    alt Same car found
+        Logic-->>API: Return {price, sampleSize, yearFrom, yearTo}
+        API-->>UI: Return estimation
+        UI->>UI: Display "Εκτιμώμενο κόστος από X€"
+        UI->>LS: Save estimatedPrice to form data
+    else No match
+        Logic-->>API: null
+        API-->>UI: {success: true, estimation: null}
+        UI->>UI: Hide the estimate card entirely
+    end
 ```
 
 ### Price Estimation Data
@@ -492,22 +497,31 @@ sequenceDiagram
   "engineCC": "1800",
   "fuelType": "petrol",
   "isAutomatic": false,
-  "is4x4": false
+  "is4x4": false,
+  "isTurbo": false
 }
 ```
 
-**Response:**
+**Response (we have quoted this exact car before):**
 ```json
 {
   "success": true,
   "estimation": {
     "estimatedCost": 150,
     "currency": "EUR",
-    "confidence": "high",
-    "basedOnSimilarCars": 20,
-    "category": "service"
+    "basedOnPastJobs": 4,
+    "yearFrom": 2019,
+    "yearTo": 2021,
+    "category": "service",
+    "brand": "toyota",
+    "model": "Corolla"
   }
 }
+```
+
+**Response (no matching past job — the UI shows no estimate):**
+```json
+{ "success": true, "estimation": null }
 ```
 
 ## Data Query Patterns

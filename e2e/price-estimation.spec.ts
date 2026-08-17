@@ -1,61 +1,68 @@
 import { test, expect } from '@playwright/test'
 
+/**
+ * The estimate only answers for a car we have already quoted: same brand/model, model
+ * year within one, and — outside bodywork — same fuel, cc and turbo/4x4. Everything else
+ * comes back as `estimation: null` so the UI shows no price at all. The fixtures below
+ * are real rows of src/data/price-examples.json (Peugeot 206 1.4 βενζίνη, συμπλέκτης).
+ */
+const PEUGEOT_206 = {
+  category: 'symplektis',
+  brand: 'Peugeot',
+  model: '206',
+  modelYear: '2006',
+  engineCC: '1400',
+  fuelType: 'petrol',
+  is4x4: false,
+  isTurbo: false,
+}
+
 test.describe('Price Estimation API', () => {
 
-  test('Returns estimation for valid input', async ({ request }) => {
-    const resp = await request.post('/api/price-estimation', {
-      data: {
-        category: 'service',
-        brand: 'Toyota',
-        model: 'Yaris',
-        modelYear: '2020',
-        engineCC: '1500',
-        fuelType: 'petrol',
-        isAutomatic: false,
-        is4x4: false,
-      },
-    })
+  test('Car we have quoted before gets a price', async ({ request }) => {
+    const resp = await request.post('/api/price-estimation', { data: PEUGEOT_206 })
     expect(resp.status()).toBe(200)
     const data = await resp.json()
     expect(data.success).toBe(true)
     expect(data.estimation.estimatedCost).toBeGreaterThan(0)
     expect(data.estimation.currency).toBe('EUR')
-    expect(['low', 'medium', 'high']).toContain(data.estimation.confidence)
+    expect(data.estimation.basedOnPastJobs).toBeGreaterThan(0)
+    // The jobs it drew on are within a year of what was asked.
+    expect(data.estimation.yearFrom).toBeGreaterThanOrEqual(2005)
+    expect(data.estimation.yearTo).toBeLessThanOrEqual(2007)
   })
 
-  test('Popular brand gets high confidence', async ({ request }) => {
+  test('Same car with a different engine gets no price', async ({ request }) => {
+    for (const variant of [
+      { ...PEUGEOT_206, fuelType: 'diesel' },
+      { ...PEUGEOT_206, engineCC: '2000' },
+      { ...PEUGEOT_206, isTurbo: true },
+      { ...PEUGEOT_206, modelYear: '2015' },
+    ]) {
+      const resp = await request.post('/api/price-estimation', { data: variant })
+      expect(resp.status()).toBe(200)
+      expect((await resp.json()).estimation).toBeNull()
+    }
+  })
+
+  test('Car we have never quoted gets no price', async ({ request }) => {
     const resp = await request.post('/api/price-estimation', {
-      data: {
-        category: 'service',
-        brand: 'BMW',
-        model: '320i',
-        modelYear: '2019',
-        engineCC: '2000',
-        fuelType: 'diesel',
-      },
+      data: { ...PEUGEOT_206, brand: 'Ferrari', model: 'F40' },
     })
-    const data = await resp.json()
-    expect(data.estimation.confidence).toBe('high')
+    expect(resp.status()).toBe(200)
+    expect((await resp.json()).estimation).toBeNull()
   })
 
-  test('Diesel + automatic + 4x4 costs more than base petrol', async ({ request }) => {
-    const base = await request.post('/api/price-estimation', {
-      data: { category: 'service', brand: 'Toyota', model: 'Yaris', modelYear: '2015', engineCC: '1200', fuelType: 'petrol' },
+  test('Category with no history gets no price', async ({ request }) => {
+    const resp = await request.post('/api/price-estimation', {
+      data: { ...PEUGEOT_206, category: 'kteo' },
     })
-    const premium = await request.post('/api/price-estimation', {
-      data: { category: 'service', brand: 'Toyota', model: 'Land Cruiser', modelYear: '2022', engineCC: '3000', fuelType: 'diesel', isAutomatic: true, is4x4: true },
-    })
-    const baseData = await base.json()
-    const premiumData = await premium.json()
-    // Premium should generally cost more (accounting for randomness, test range)
-    expect(premiumData.estimation.estimatedCost).toBeGreaterThanOrEqual(80)
-    expect(baseData.estimation.estimatedCost).toBeGreaterThanOrEqual(80)
+    expect(resp.status()).toBe(200)
+    expect((await resp.json()).estimation).toBeNull()
   })
 
   test('No auth required (public endpoint)', async ({ request }) => {
-    const resp = await request.post('/api/price-estimation', {
-      data: { category: 'oils', brand: 'Ford', model: 'Focus', modelYear: '2018', engineCC: '1500', fuelType: 'petrol' },
-    })
+    const resp = await request.post('/api/price-estimation', { data: PEUGEOT_206 })
     expect(resp.status()).toBe(200)
   })
 })

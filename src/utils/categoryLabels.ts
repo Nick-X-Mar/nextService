@@ -4,7 +4,7 @@ const categoryLabels: Record<string, string> = {
   oils: 'Λάδια',
   'allagi-ladion': 'Αλλαγή Λαδιών',
   imantas: 'Ιμάντας',
-  symplektis: 'Συμπλέκτης',
+  symplektis: 'Συμπλέκτης (Δίσκο-πλατό)',
   'oliki-vafi': 'Ολική Βαφή',
   'meriki-vafi': 'Μερική Βαφή',
   aisthitires: 'Αισθητήρες',

@@ -5,25 +5,17 @@
  *   npx tsx scripts/validate-price-lookup.ts
  *
  * For every past job we hide it from the dataset, ask the lookup what it would have
- * quoted for that exact car, and compare against what the garages actually said. Run it
- * after regenerating src/data/price-examples.json to see whether the change helped.
+ * quoted for that exact car, and compare against what the garages actually said. Since
+ * the lookup only answers when it finds the same car, there are two numbers to watch:
+ * κάλυψη (how often we say anything at all) and, of those, how far off the floor was.
+ * Run it after regenerating src/data/price-examples.json to see whether a change helped.
  */
-import { EXAMPLES, lookupPriceIn, type MatchLevel } from '../src/lib/price-lookup'
+import { EXAMPLES, lookupPriceIn } from '../src/lib/price-lookup'
 
-interface Bucket { n: number; errors: number[]; under: number; over: number }
+interface Bucket { n: number; covered: number; errors: number[]; under: number }
 
-const newBucket = (): Bucket => ({ n: 0, errors: [], under: 0, over: 0 })
-const byLevel = new Map<MatchLevel | 'none', Bucket>()
+const newBucket = (): Bucket => ({ n: 0, covered: 0, errors: [], under: 0 })
 const byCategory = new Map<string, Bucket>()
-
-function record(map: Map<string, Bucket>, key: string, err: number, ratio: number) {
-  if (!map.has(key)) map.set(key, newBucket())
-  const b = map.get(key)!
-  b.n++
-  b.errors.push(err)
-  if (ratio < 0.75) b.under++
-  if (ratio > 1.5) b.over++
-}
 
 for (let i = 0; i < EXAMPLES.length; i++) {
   const target = EXAMPLES[i]
@@ -36,16 +28,19 @@ for (let i = 0; i < EXAMPLES.length; i++) {
     cc: target.cc,
     fuel: target.f,
     is4x4: target.x4,
+    isTurbo: target.tb,
   })
 
-  if (!result) {
-    record(byLevel as Map<string, Bucket>, 'none', 1, 1)
-    continue
-  }
-  const ratio = result.price / target.p
-  const err = Math.abs(result.price - target.p) / target.p
-  record(byLevel as Map<string, Bucket>, result.matchLevel, err, ratio)
-  record(byCategory, target.c, err, ratio)
+  if (!byCategory.has(target.c)) byCategory.set(target.c, newBucket())
+  const b = byCategory.get(target.c)!
+  b.n++
+  if (!result) continue
+
+  b.covered++
+  b.errors.push(Math.abs(result.price - target.p) / target.p)
+  // The floor came in well under what the garage actually charged — the "από 200€"
+  // that turns into a 400€ invoice, which is the failure mode worth counting.
+  if (result.price / target.p < 0.75) b.under++
 }
 
 function median(ns: number[]): number {
@@ -56,27 +51,33 @@ function median(ns: number[]): number {
 
 function line(key: string, b: Bucket): string {
   const within25 = b.errors.filter((e) => e <= 0.25).length
+  const pct = (n: number, of: number) => (of ? Math.round((n / of) * 100) : 0)
   return (
     `  ${key.padEnd(14)} n=${String(b.n).padStart(3)}  ` +
-    `διάμεσο σφάλμα ${(median(b.errors) * 100).toFixed(0).padStart(3)}%  ` +
-    `εντός ±25%: ${((within25 / b.n) * 100).toFixed(0).padStart(3)}%  ` +
-    `υποεκτίμηση >25%: ${String(b.under).padStart(3)}  υπερεκτίμηση >50%: ${String(b.over).padStart(3)}`
+    `κάλυψη ${String(pct(b.covered, b.n)).padStart(3)}%  ` +
+    `διάμεσο σφάλμα ${String(Math.round(median(b.errors) * 100)).padStart(3)}%  ` +
+    `εντός ±25%: ${String(pct(within25, b.errors.length)).padStart(3)}%  ` +
+    `υποεκτίμηση >25%: ${String(b.under).padStart(3)}`
   )
 }
 
 console.log(`Leave-one-out σε ${EXAMPLES.length} παραδείγματα\n`)
-console.log('Ανά επίπεδο ταιριάσματος:')
-for (const level of ['model', 'brand', 'engine', 'category', 'none'] as const) {
-  const b = (byLevel as Map<string, Bucket>).get(level)
-  if (b) console.log(line(level, b))
-}
-console.log('\nΑνά κατηγορία:')
+console.log('Ανά κατηγορία:')
 for (const [cat, b] of [...byCategory.entries()].sort((a, b) => b[1].n - a[1].n)) {
   console.log(line(cat, b))
 }
 
-const all = [...byCategory.values()].flatMap((b) => b.errors)
+const total = [...byCategory.values()].reduce(
+  (acc, b) => ({
+    n: acc.n + b.n,
+    covered: acc.covered + b.covered,
+    errors: [...acc.errors, ...b.errors],
+    under: acc.under + b.under,
+  }),
+  newBucket()
+)
+console.log(`\n${line('ΣΥΝΟΛΟ', total)}`)
 console.log(
-  `\nΣύνολο: διάμεσο σφάλμα ${(median(all) * 100).toFixed(0)}%, ` +
-  `εντός ±25% το ${((all.filter((e) => e <= 0.25).length / all.length) * 100).toFixed(0)}%`
+  `\nΣε ${total.n - total.covered} από ${total.n} περιπτώσεις δεν βρέθηκε ίδιο αυτοκίνητο ` +
+  `και δεν θα εμφανιζόταν καθόλου εκτίμηση.`
 )

@@ -10,6 +10,7 @@ const inter = Inter({
 });
 import AppShell from "@/components/layout/AppShell";
 import ToastContainer from "@/components/ToastContainer";
+import InAppBrowserEscape from "@/components/InAppBrowserEscape";
 import { UserProvider } from "@/contexts/UserContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SITE_URL } from "@/lib/site-url";
@@ -92,6 +93,7 @@ export default function RootLayout({
               {children}
             </AppShell>
             <ToastContainer />
+            <InAppBrowserEscape />
           </UserProvider>
         </AuthProvider>
       </body>

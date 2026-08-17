@@ -15,24 +15,19 @@ export interface PriceEstimateVehicle {
   isTurbo?: boolean
 }
 
-export interface PriceEstimateExample {
-  brand: string
-  model: string
-  year: number | null
-  price: number
-}
-
 export interface PriceEstimate {
+  /** The floor — the lowest of the matching past quotes. Shown as "από X€". */
   estimatedCost: number
-  /** Set only when the estimate is extrapolated — then the card reads "X€ – Y€". */
-  estimatedCostMax: number | null
   currency: string
-  confidence: 'high' | 'medium' | 'low'
-  matchLevel: 'model' | 'brand' | 'engine' | 'category'
-  basedOnSimilarCars: number
-  similarCarsAvailable: number
-  closestExamples: PriceEstimateExample[]
+  /** How many past jobs on this exact car the floor came from. */
+  basedOnPastJobs: number
+  /** Model years those jobs covered. */
+  yearFrom: number
+  yearTo: number
   category: string
+  /** Echoed back from the request — the car the jobs were for. */
+  brand: string
+  model?: string
 }
 
 /**

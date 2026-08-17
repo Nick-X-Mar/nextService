@@ -129,11 +129,11 @@ flowchart TD
 
 **Price Estimation:**
 - Calls `/api/price-estimation` with car details
-- Returns estimated cost based on:
-  - Category base price
-  - Car year, engine size, fuel type
-  - Transmission type, 4x4 status
-  - Market variation
+- Looks the car up in past quotes (`src/lib/price-lookup.ts`) and answers only on an exact
+  match: same category, brand and model, model year ±1, same fuel, engine cc ±150, same
+  turbo/4x4 (the engine gate is skipped for bodywork, where the form never asks for it)
+- Shows the lowest of those past prices as "Εκτιμώμενο κόστος από X€"; with no match the
+  response is `estimation: null` and no price is shown at all
 
 **Data Saved:**
 - VIN Number

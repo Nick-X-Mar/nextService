@@ -10,37 +10,24 @@ interface EstimatedCostCardProps {
 }
 
 /**
- * Reads the estimate back to the customer as what it is. When we have quoted this exact
- * model recently that is a single floor ("από 250€"); otherwise it is a range, because
- * the number came from other cars and pretending otherwise is how a 100€ estimate turns
- * into a 200€ invoice. Naming the cars it came from is the whole point — a bare number
- * invites "από πού το βγάλατε;".
+ * Reads the estimate back to the customer as a floor, never a range: the number is the
+ * lowest we have quoted for this exact car, so "από X€" is the only claim it supports.
+ * Naming the cars it came from is the whole point — a bare number invites "από πού το
+ * βγάλατε;". When the lookup finds no match the estimate is null and this card does not
+ * render at all.
  */
-/** Brands and models are stored as the spreadsheet had them ("fiesta", "VW"). */
+/** The customer types the car in lowercase as often as not ("fiesta", "toyota"). */
 const titleCase = (s: string) =>
   s.replace(/\S+/g, (w) => (w.length > 3 && w === w.toLowerCase() ? w[0].toUpperCase() + w.slice(1) : w))
 
-function basisText(estimate: PriceEstimate): string | null {
-  const { closestExamples: examples, matchLevel } = estimate
-  if (!examples.length) return null
+function basisText(estimate: PriceEstimate): string {
+  const { basedOnPastJobs, brand, model, yearFrom, yearTo } = estimate
+  const period = yearFrom === yearTo ? `${yearFrom}` : `${yearFrom}-${yearTo}`
+  const car = titleCase(`${brand} ${model || ''} ${period}`.replace(/\s+/g, ' ').trim())
 
-  if (matchLevel === 'model') {
-    const { brand, model } = examples[0]
-    const years = examples.map((e) => e.year).filter((y): y is number => y !== null)
-    const min = Math.min(...years)
-    const max = Math.max(...years)
-    const period = years.length ? ` ${min === max ? min : `${min}-${max}`}` : ''
-    const car = titleCase(`${brand} ${model}${period}`.trim())
-    return examples.length === 1
-      ? `Με βάση ${car} που έχουμε εξυπηρετήσει`
-      : `Με βάση ${examples.length} παρόμοια ${car} που έχουμε εξυπηρετήσει`
-  }
-
-  if (matchLevel === 'brand') {
-    return `Με βάση παρόμοια ${titleCase(examples[0].brand)} που έχουμε εξυπηρετήσει`
-  }
-
-  return 'Με βάση παρόμοιες εργασίες που έχουμε αναλάβει'
+  return basedOnPastJobs === 1
+    ? `Με βάση ${car} που έχουμε εξυπηρετήσει`
+    : `Με βάση ${basedOnPastJobs} αντίστοιχα ${car} που έχουμε εξυπηρετήσει`
 }
 
 export default function EstimatedCostCard({ estimate, isLoading }: EstimatedCostCardProps) {
@@ -56,26 +43,15 @@ export default function EstimatedCostCard({ estimate, isLoading }: EstimatedCost
         </div>
         <div className="flex-1">
           <p className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
-            Εκτιμωμενο Κοστος
+            Εκτιμωμενο Κοστος Απο
           </p>
           {isLoading || !estimate ? (
             <div className="flex items-center gap-2 text-primary">
               <Spinner size="sm" />
               <p className="text-sm font-medium">Υπολογισμος...</p>
             </div>
-          ) : estimate.estimatedCostMax ? (
-            // Extrapolated from other cars — quoting a single floor here is what makes the
-            // garage's real price look like a surprise, so we show the span instead.
-            <p className="text-xl font-black text-primary">
-              {estimate.estimatedCost}€
-              <span className="text-sm font-bold text-on-surface-variant/80"> – </span>
-              {estimate.estimatedCostMax}€
-            </p>
           ) : (
-            <p className="text-xl font-black text-primary">
-              <span className="text-sm font-bold text-on-surface-variant/80">από </span>
-              {estimate.estimatedCost}€
-            </p>
+            <p className="text-xl font-black text-primary">{estimate.estimatedCost}€</p>
           )}
         </div>
       </div>

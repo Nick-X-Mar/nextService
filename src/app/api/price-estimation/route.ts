@@ -56,8 +56,9 @@ async function _POST(request: NextRequest) {
 
     const match = lookupPrice(input)
 
-    // No history for this category yet (e.g. ΚΤΕΟ, ελαστικά) — say so instead of
-    // inventing a number; the client hides the estimate card when estimation is null.
+    // We have never quoted this exact car — no history for the category at all (ΚΤΕΟ,
+    // ελαστικά), or none close enough to be honest about. Say nothing rather than
+    // extrapolate; the client hides the estimate card when estimation is null.
     if (!match) {
       return NextResponse.json({ success: true, estimation: null })
     }
@@ -66,16 +67,15 @@ async function _POST(request: NextRequest) {
       success: true,
       estimation: {
         estimatedCost: match.price,
-        // Null when we have quoted this exact model recently — the client then shows the
-        // single "από X€" instead of a range.
-        estimatedCostMax: match.priceMax,
         currency: 'EUR',
-        confidence: match.confidence,
-        matchLevel: match.matchLevel,
-        basedOnSimilarCars: match.sampleSize,
-        similarCarsAvailable: match.poolSize,
-        closestExamples: match.closest,
+        basedOnPastJobs: match.sampleSize,
+        yearFrom: match.yearFrom,
+        yearTo: match.yearTo,
         category: body.category,
+        // The matched jobs are this same car, so the card names it back with the
+        // customer's own spelling rather than the sheet's ("Pegeute 206").
+        brand: body.brand,
+        model: body.model,
       },
     })
   } catch (error) {
