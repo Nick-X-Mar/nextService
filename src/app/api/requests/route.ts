@@ -78,6 +78,13 @@ async function _GET(request: NextRequest) {
             ? await generatePresignedUrls(rawUrls)
             : []
 
+          // The details screen reads its request out of this list, so the άδεια has
+          // to be presigned here too — not only on /api/requests/[requestId].
+          if (vehicleData && vehicle?.licensePhotoUrl) {
+            const [presignedLicense] = await generatePresignedUrls([vehicle.licensePhotoUrl as string])
+            ;(vehicleData as Record<string, unknown>).licensePhotoUrl = presignedLicense
+          }
+
           return {
             ...request,
             photoUrls: presignedPhotoUrls,

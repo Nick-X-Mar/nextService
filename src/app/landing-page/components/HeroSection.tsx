@@ -9,7 +9,7 @@ import { useNavigation } from '@/hooks/useNavigation'
 import { saveFormData } from '@/utils/formStorage'
 
 const categories = [
-  { icon: 'settings', label: 'Συμπλέκτης (Δίσκο-πλατό)', value: 'symplektis' },
+  { icon: 'settings', label: 'Συμπλέκτης (Δίσκος-πλατό)', value: 'symplektis' },
   { icon: 'conveyor_belt', label: 'Ιμάντας', value: 'imantas' },
   { icon: 'format_paint', label: 'Ολική Βαφή', value: 'oliki-vafi' },
   { icon: 'brush', label: 'Μερική Βαφή', value: 'meriki-vafi' },

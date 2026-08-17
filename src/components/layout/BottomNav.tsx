@@ -10,13 +10,15 @@ import { resolveActiveHref, type ActiveNavItem } from '@/utils/activeNav'
 interface NavItem extends ActiveNavItem {
   label: string
   icon: string
-  /** Unread conversations behind this destination. Hidden when 0. */
+  /** How many things wait behind this destination. Hidden when 0. */
   badge?: number
+  /** What the badge counts, for screen readers. */
+  badgeLabel?: string
 }
 
 export default function BottomNav() {
   const { userType, client, garage } = useAuth()
-  const { threads } = useNotifications()
+  const { threads, availableRequests, offersNeedingAttention } = useNotifications()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const currentTab = searchParams.get('tab')
@@ -39,10 +41,10 @@ export default function BottomNav() {
   ] : []
 
   const garageNavItems: NavItem[] = garage ? [
-    { label: 'Αιτήματα', icon: 'list_alt', href: `/garage-dashboard/${garage.id}?tab=requests`, matchTab: 'requests', matchPaths: [`/garage-dashboard/${garage.id}`] },
-    { label: 'Προσφορές', icon: 'local_offer', href: `/garage-dashboard/${garage.id}?tab=offers`, matchTab: 'offers' },
+    { label: 'Αιτήματα', icon: 'list_alt', href: `/garage-dashboard/${garage.id}?tab=requests`, matchTab: 'requests', matchPaths: [`/garage-dashboard/${garage.id}`], badge: availableRequests, badgeLabel: 'αιτήματα σε αναμονή προσφοράς' },
+    { label: 'Προσφορές', icon: 'local_offer', href: `/garage-dashboard/${garage.id}?tab=offers`, matchTab: 'offers', badge: offersNeedingAttention, badgeLabel: 'προσφορές που περιμένουν κίνηση' },
     { label: 'Ραντεβού', icon: 'calendar_today', href: `/garage-dashboard/${garage.id}?tab=appointments`, matchTab: 'appointments' },
-    { label: 'Μηνύματα', icon: 'chat', href: `/garage-dashboard/${garage.id}/chats`, matchPaths: [`/garage-dashboard/${garage.id}/chats`], badge: threads },
+    { label: 'Μηνύματα', icon: 'chat', href: `/garage-dashboard/${garage.id}/chats`, matchPaths: [`/garage-dashboard/${garage.id}/chats`], badge: threads, badgeLabel: 'συνομιλίες με νέα μηνύματα' },
     { label: 'Ρυθμίσεις', icon: 'settings', href: `/garage-dashboard/${garage.id}?tab=settings`, matchTab: 'settings' },
   ] : []
 
@@ -80,7 +82,7 @@ export default function BottomNav() {
                 <Icon name={item.icon} filled={active} />
                 {!!item.badge && item.badge > 0 && (
                   <span
-                    aria-label={`${item.badge} συνομιλίες με νέα μηνύματα`}
+                    aria-label={`${item.badge} ${item.badgeLabel ?? 'νέα'}`}
                     className="absolute -top-1 -right-2 bg-primary text-on-primary text-[9px] font-bold leading-none h-4 min-w-4 px-1 rounded-full flex items-center justify-center"
                   >
                     {item.badge > 9 ? '9+' : item.badge}

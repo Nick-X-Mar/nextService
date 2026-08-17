@@ -48,6 +48,7 @@ async function _GET(
         isActive: garage.isActive,
         activatedAt: garage.activatedAt || null,
         benefits: garage.benefits || [],
+        workdayStartTime: garage.workdayStartTime || '',
         createdAt: garage.createdAt,
         updatedAt: garage.updatedAt
       }
@@ -123,7 +124,7 @@ async function _PUT(
     const updateCommand = new UpdateCommand({
       TableName: 'Garages',
       Key: { id: garageId },
-      UpdateExpression: 'SET companyName = :companyName, email = :email, mobile = :mobile, address = :address, tin = :tin, taxAuthority = :taxAuthority, description = :description, benefits = :benefits, isActive = :isActive, updatedAt = :updatedAt',
+      UpdateExpression: 'SET companyName = :companyName, email = :email, mobile = :mobile, address = :address, tin = :tin, taxAuthority = :taxAuthority, description = :description, benefits = :benefits, workdayStartTime = :workdayStartTime, isActive = :isActive, updatedAt = :updatedAt',
       ExpressionAttributeValues: {
         ':companyName': body.companyName,
         ':email': body.email,
@@ -133,6 +134,8 @@ async function _PUT(
         ':taxAuthority': body.taxAuthority,
         ':description': body.description || '',
         ':benefits': body.benefits || [],
+        // "HH:MM", or empty when the shop hasn't said — the client UI just omits it then.
+        ':workdayStartTime': body.workdayStartTime || '',
         ':isActive': true,
         ':updatedAt': new Date().toISOString()
       },
@@ -175,6 +178,7 @@ async function _PUT(
         description: result.Attributes?.description,
         isActive: result.Attributes?.isActive,
         benefits: result.Attributes?.benefits || [],
+        workdayStartTime: result.Attributes?.workdayStartTime || '',
         createdAt: result.Attributes?.createdAt,
         updatedAt: result.Attributes?.updatedAt
       }

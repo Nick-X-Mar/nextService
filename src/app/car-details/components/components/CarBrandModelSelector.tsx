@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Icon from '@/components/ui/Icon'
 import GearSubmitButton from '@/components/GearSubmitButton'
+import PillToggle from '@/components/PillToggle'
 import { saveFormData, loadFormData, clearFormData } from '../../../../utils/formStorage'
 import { useToast } from '../../../../hooks/useToast'
 import { useAuth } from '@/contexts/AuthContext'
@@ -107,6 +108,15 @@ const carBrands = {
   'chevrolet': ['Spark', 'Aveo', 'Cruze', 'Malibu', 'Impala', 'Camaro', 'Corvette', 'Trax', 'Equinox', 'Traverse', 'Tahoe', 'Suburban', 'Silverado'],
 }
 
+/**
+ * The brand list is keyed in lowercase ('toyota', 'alfa romeo') and people type their own
+ * in lowercase too, but this is the name every later screen shows back to them — and the
+ * one that ends up on the vehicle record — so it gets capitalised here, at the source.
+ * Already-uppercase words ("BMW") are left alone.
+ */
+const titleCase = (s: string) =>
+  s.replace(/\S+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1))
+
 export default function CarBrandModelSelector() {
   const router = useRouter()
   const { success, error: showError } = useToast()
@@ -164,8 +174,10 @@ export default function CarBrandModelSelector() {
   const filteredModels = availableModels.filter(m =>
     fuzzyMatch(m, modelSearch)
   )
-  const currentBrand = isBrandOther ? customBrand : brand
-  const currentModel = (isModelOther || isBrandOther) ? customModel : model
+  const currentBrand = titleCase(isBrandOther ? customBrand : brand)
+  // Models picked from the list already read as they should ("Yaris", "e-tron GT"); only
+  // the free-text one needs fixing up.
+  const currentModel = (isModelOther || isBrandOther) ? titleCase(customModel) : model
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -559,7 +571,7 @@ export default function CarBrandModelSelector() {
                 <option value="">Νέο Όχημα</option>
                 {vehicles.map(v => (
                   <option key={v.id} value={v.id}>
-                    {v.brand.charAt(0).toUpperCase() + v.brand.slice(1)} {v.model} {v.modelYear ? `(${v.modelYear})` : ''}
+                    {titleCase(v.brand)} {v.model} {v.modelYear ? `(${v.modelYear})` : ''}
                   </option>
                 ))}
               </select>
@@ -577,7 +589,7 @@ export default function CarBrandModelSelector() {
                 className="w-full h-14 bg-surface-container-highest rounded-xl px-4 flex items-center justify-between cursor-pointer"
               >
                 <span className={`font-bold text-base ${currentBrand ? 'text-on-surface' : 'text-on-surface-variant/50'}`}>
-                  {isBrandOther ? 'Άλλο' : brand ? brand.charAt(0).toUpperCase() + brand.slice(1) : 'Επιλέξτε...'}
+                  {isBrandOther ? 'Άλλο' : brand ? titleCase(brand) : 'Επιλέξτε...'}
                 </span>
                 <Icon name={brandOpen ? 'expand_less' : 'expand_more'} className="text-on-surface-variant" />
               </div>
@@ -610,7 +622,7 @@ export default function CarBrandModelSelector() {
                       }`}
                     >
                       <span className={`text-base font-bold ${brand === b && !isBrandOther ? 'text-primary' : 'text-on-surface'}`}>
-                        {b.charAt(0).toUpperCase() + b.slice(1)}
+                        {titleCase(b)}
                       </span>
                       {brand === b && !isBrandOther && <Icon name="check" size="sm" className="text-primary" />}
                     </div>
@@ -788,7 +800,7 @@ export default function CarBrandModelSelector() {
           {/* Model Year */}
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
-              Ετος Μοντελου
+              Ετος Μοντελου <span className="text-error">*</span>
             </label>
             <div className="relative">
               <input
@@ -822,7 +834,7 @@ export default function CarBrandModelSelector() {
           {!isBodywork && (
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
-              Κυβισμος (CC)
+              Κυβισμος (CC) <span className="text-error">*</span>
             </label>
             <div className="relative">
               <input
@@ -848,137 +860,38 @@ export default function CarBrandModelSelector() {
           </div>
           )}
 
-          {/* Fuel Type - 2 button grid — hidden for bodywork */}
+          {/* Fuel + transmission, then drive + turbo — same PillToggle the client's
+              vehicle-edit modal uses. Hidden for bodywork, where the engine is irrelevant. */}
           {!isBodywork && (
           <>
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
-              Καυσιμο
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setFuelType('petrol')}
-                className={
-                  fuelType === 'petrol'
-                    ? 'h-12 rounded-xl font-bold text-xs bg-primary text-on-primary shadow-md shadow-primary/20 flex items-center justify-center gap-2 active:scale-95 transition-all'
-                    : 'h-12 rounded-xl font-bold text-xs bg-surface-container text-secondary hover:bg-surface-variant flex items-center justify-center gap-2 active:scale-95 transition-all'
-                }
-              >
-                <Icon name="local_gas_station" size="sm" />
-                Βενζινη
-              </button>
-              <button
-                type="button"
-                onClick={() => setFuelType('diesel')}
-                className={
-                  fuelType === 'diesel'
-                    ? 'h-12 rounded-xl font-bold text-xs bg-primary text-on-primary shadow-md shadow-primary/20 flex items-center justify-center gap-2 active:scale-95 transition-all'
-                    : 'h-12 rounded-xl font-bold text-xs bg-surface-container text-secondary hover:bg-surface-variant flex items-center justify-center gap-2 active:scale-95 transition-all'
-                }
-              >
-                <Icon name="oil_barrel" size="sm" />
-                Πετρελαιο
-              </button>
-            </div>
-          </div>
-
-          {/* Transmission - 2 button grid */}
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
-              Κιβωτιο
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setIsAutomatic(false)}
-                className={
-                  !isAutomatic
-                    ? 'h-12 rounded-xl font-bold text-xs bg-primary text-on-primary shadow-md shadow-primary/20 flex items-center justify-center gap-2 active:scale-95 transition-all'
-                    : 'h-12 rounded-xl font-bold text-xs bg-surface-container text-secondary hover:bg-surface-variant flex items-center justify-center gap-2 active:scale-95 transition-all'
-                }
-              >
-                <Icon name="sports_esports" size="sm" />
-                Χειροκινητο
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsAutomatic(true)}
-                className={
-                  isAutomatic
-                    ? 'h-12 rounded-xl font-bold text-xs bg-primary text-on-primary shadow-md shadow-primary/20 flex items-center justify-center gap-2 active:scale-95 transition-all'
-                    : 'h-12 rounded-xl font-bold text-xs bg-surface-container text-secondary hover:bg-surface-variant flex items-center justify-center gap-2 active:scale-95 transition-all'
-                }
-              >
-                <Icon name="auto_transmission" size="sm" />
-                Αυτοματο
-              </button>
-            </div>
-          </div>
-
-          {/* Drive + Turbo side by side as pill toggles */}
           <div className="grid grid-cols-2 gap-4">
-            {/* 4x4 Drive */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
-                Κινηση
-              </label>
-              <div className="flex bg-surface-container p-1 rounded-full">
-                <button
-                  type="button"
-                  onClick={() => setIs4x4(false)}
-                  className={
-                    !is4x4
-                      ? 'flex-1 py-2 rounded-full font-bold text-[10px] bg-primary text-on-primary shadow-sm text-center'
-                      : 'flex-1 py-2 rounded-full font-bold text-[10px] text-secondary text-center'
-                  }
-                >
-                  2WD
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIs4x4(true)}
-                  className={
-                    is4x4
-                      ? 'flex-1 py-2 rounded-full font-bold text-[10px] bg-primary text-on-primary shadow-sm text-center'
-                      : 'flex-1 py-2 rounded-full font-bold text-[10px] text-secondary text-center'
-                  }
-                >
-                  4x4
-                </button>
-              </div>
-            </div>
+            <PillToggle
+              label="Καυσιμο"
+              options={[{ value: 'petrol', label: 'Βενζινη' }, { value: 'diesel', label: 'Πετρελαιο' }]}
+              value={fuelType === 'diesel' ? 'diesel' : 'petrol'}
+              onChange={(value) => setFuelType(value)}
+            />
+            <PillToggle
+              label="Κιβωτιο"
+              options={[{ value: false, label: 'Χειροκινητο' }, { value: true, label: 'Αυτοματο' }]}
+              value={isAutomatic}
+              onChange={setIsAutomatic}
+            />
+          </div>
 
-            {/* Turbo */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
-                Turbo
-              </label>
-              <div className="flex bg-surface-container p-1 rounded-full">
-                <button
-                  type="button"
-                  onClick={() => setIsTurbo(false)}
-                  className={
-                    !isTurbo
-                      ? 'flex-1 py-2 rounded-full font-bold text-[10px] bg-primary text-on-primary shadow-sm text-center'
-                      : 'flex-1 py-2 rounded-full font-bold text-[10px] text-secondary text-center'
-                  }
-                >
-                  Οχι
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsTurbo(true)}
-                  className={
-                    isTurbo
-                      ? 'flex-1 py-2 rounded-full font-bold text-[10px] bg-primary text-on-primary shadow-sm text-center'
-                      : 'flex-1 py-2 rounded-full font-bold text-[10px] text-secondary text-center'
-                  }
-                >
-                  Ναι
-                </button>
-              </div>
-            </div>
+          <div className="grid grid-cols-2 gap-4">
+            <PillToggle
+              label="Κινηση"
+              options={[{ value: false, label: '2WD' }, { value: true, label: '4x4' }]}
+              value={is4x4}
+              onChange={setIs4x4}
+            />
+            <PillToggle
+              label="Turbo"
+              options={[{ value: false, label: 'Οχι' }, { value: true, label: 'Ναι' }]}
+              value={isTurbo}
+              onChange={setIsTurbo}
+            />
           </div>
           </>
           )}

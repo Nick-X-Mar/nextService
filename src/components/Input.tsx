@@ -4,7 +4,7 @@ import { ReactNode } from 'react'
 import { styles } from '@/styles/styles'
 
 interface InputProps {
-  type?: 'text' | 'email' | 'password' | 'number' | 'tel' | 'url' | 'search'
+  type?: 'text' | 'email' | 'password' | 'number' | 'tel' | 'url' | 'search' | 'time'
   value: string
   onChange: (value: string) => void
   onKeyPress?: (e: React.KeyboardEvent<HTMLInputElement>) => void

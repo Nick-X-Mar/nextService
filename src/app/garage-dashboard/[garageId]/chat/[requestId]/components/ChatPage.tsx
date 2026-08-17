@@ -42,7 +42,11 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const router = useRouter()
   const { refresh: refreshUnread } = useNotifications()
-  const isReadOnly = requestData?.status === ServiceRequestStatus.APPOINTMENT
+  // Read-only once the job is booked — unless this is the garage that got it, which
+  // still has an appointment to arrange with the customer.
+  const isReadOnly =
+    requestData?.status === ServiceRequestStatus.APPOINTMENT &&
+    requestData?.acceptedGarageId !== garageId
 
   // Subscription refs
   const subscriptionRef = useRef<string | null>(null)
@@ -430,7 +434,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
           <div className="max-w-3xl mx-auto px-5 md:px-8 py-3">
             <div className="flex items-center gap-2 justify-center text-sm text-secondary bg-surface-container rounded-xl px-4 py-3">
               <Icon name="lock" size="sm" className="text-secondary" />
-              <span>Η συνομιλία είναι μόνο για ανάγνωση -- έχει προγραμματιστεί ραντεβού.</span>
+              <span>Το αίτημα ανατέθηκε σε άλλο συνεργείο -- η συνομιλία είναι μόνο για ανάγνωση.</span>
             </div>
           </div>
         </div>

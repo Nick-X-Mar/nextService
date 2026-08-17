@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 // User preferences for ambient (out-of-tab) notifications about new service
 // requests. Persisted to localStorage so each garage user can opt in/out
@@ -8,16 +8,40 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 const SOUND_PREF_KEY = 'garageDashboard.newRequestSound'
 const BROWSER_NOTIF_PREF_KEY = 'garageDashboard.newRequestBrowserNotif'
 
+/**
+ * One shared AudioContext for the tab. Browsers start it suspended until the
+ * user has interacted with the page, so it is created and resumed on the first
+ * click/keypress (`primeAudio`) rather than at the moment a request lands —
+ * a context built inside the AppSync callback never gets to make a sound.
+ */
+let sharedCtx: AudioContext | null = null
+
+function getCtx(): AudioContext | null {
+  if (typeof window === 'undefined') return null
+  const AudioCtx = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+  if (!AudioCtx) return null
+  try {
+    if (!sharedCtx) sharedCtx = new AudioCtx()
+    return sharedCtx
+  } catch {
+    return null
+  }
+}
+
+function primeAudio() {
+  const ctx = getCtx()
+  if (ctx?.state === 'suspended') ctx.resume().catch(() => {})
+}
+
 // Short, low-pitched chime synthesised on the fly so we don't have to ship a
 // binary asset. Uses WebAudio with a quick attack/release envelope to avoid
 // clicks.
 function playChime() {
-  if (typeof window === 'undefined') return
-  const AudioCtx = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-  if (!AudioCtx) return
+  const ctx = getCtx()
+  if (!ctx) return
 
   try {
-    const ctx = new AudioCtx()
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {})
     const now = ctx.currentTime
     const playTone = (freq: number, start: number, duration: number) => {
       const osc = ctx.createOscillator()
@@ -33,9 +57,8 @@ function playChime() {
     }
     playTone(660, 0, 0.18)
     playTone(880, 0.12, 0.22)
-
-    // Free the context once playback ends.
-    setTimeout(() => { ctx.close().catch(() => {}) }, 600)
+    // The context is shared and stays open — closing it here would mean paying
+    // the (gesture-gated) setup cost again on the next request.
   } catch (error) {
     console.warn('[useNewRequestNotifier] Could not play chime:', error)
   }
@@ -70,12 +93,17 @@ export function useNewRequestNotifier() {
     return Notification.permission
   })
 
-  // Refs let `notify` stay referentially stable while still reading the
-  // latest preference values.
-  const soundEnabledRef = useRef(soundEnabled)
-  const browserNotifEnabledRef = useRef(browserNotifEnabled)
-  useEffect(() => { soundEnabledRef.current = soundEnabled }, [soundEnabled])
-  useEffect(() => { browserNotifEnabledRef.current = browserNotifEnabled }, [browserNotifEnabled])
+  // Arm the audio on the first interaction of the session — after that a chime
+  // can play at any moment, including while the tab sits in the background.
+  useEffect(() => {
+    const arm = () => primeAudio()
+    window.addEventListener('pointerdown', arm, { once: true })
+    window.addEventListener('keydown', arm, { once: true })
+    return () => {
+      window.removeEventListener('pointerdown', arm)
+      window.removeEventListener('keydown', arm)
+    }
+  }, [])
 
   const setSoundEnabled = useCallback((value: boolean) => {
     setSoundEnabledState(value)
@@ -103,12 +131,15 @@ export function useNewRequestNotifier() {
     writeBoolPref(BROWSER_NOTIF_PREF_KEY, value)
   }, [])
 
+  // Preferences are read from storage at call time, not from this instance's
+  // state: the header bell and the settings screen each hold their own copy of
+  // the hook, and muting in one has to silence the other.
   const notify = useCallback((details: NotifyDetails) => {
-    if (soundEnabledRef.current) {
+    if (readBoolPref(SOUND_PREF_KEY, true)) {
       playChime()
     }
 
-    if (browserNotifEnabledRef.current
+    if (readBoolPref(BROWSER_NOTIF_PREF_KEY, false)
       && typeof window !== 'undefined'
       && typeof Notification !== 'undefined'
       && Notification.permission === 'granted'

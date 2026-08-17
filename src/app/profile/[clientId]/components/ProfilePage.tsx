@@ -232,9 +232,9 @@ export default function ProfilePage({ clientId }: ProfilePageProps) {
 
         <InlineNudge
           when={!clientData.phoneNumber}
-          icon="sms"
+          icon="call"
           title="Λείπει το κινητό σου"
-          detail="Χωρίς αυτό δεν λαμβάνεις ειδοποιήσεις όταν ένα συνεργείο απαντήσει στο αίτημά σου."
+          detail="Οι ειδοποιήσεις έρχονται με email — το κινητό το χρειάζεται το συνεργείο για να επικοινωνήσει άμεσα μαζί σου."
           className="mb-6"
         />
 

@@ -410,12 +410,12 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {isEditing ? (
               <>
-                <EditableField label="VIN Number" value={formData.vinNumber || ''} onChange={(v) => handleInputChange('vinNumber', v)} placeholder="VIN Number" />
+                <EditableField label="Αριθμός Πλαισίου" value={formData.vinNumber || ''} onChange={(v) => handleInputChange('vinNumber', v)} placeholder="Αριθμός Πλαισίου" />
                 <EditableField label="Αριθμός Κινητήρα" value={formData.engineNumber || ''} onChange={(v) => handleInputChange('engineNumber', v)} placeholder="Αριθμός Κινητήρα" />
               </>
             ) : (
               <>
-                <ReadOnlyField label="VIN Number" value={currentVehicle.vinNumber || '-'} mono />
+                <ReadOnlyField label="Αριθμός Πλαισίου" value={currentVehicle.vinNumber || '-'} mono />
                 <ReadOnlyField label="Αριθμός Κινητήρα" value={currentVehicle.engineNumber || '-'} mono />
               </>
             )}

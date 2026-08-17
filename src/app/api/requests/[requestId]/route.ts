@@ -69,6 +69,12 @@ async function _GET(
       rawPhotoUrls.length > 0 ? generatePresignedUrls(rawPhotoUrls) : Promise.resolve([])
     ])
 
+    // The άδεια κυκλοφορίας lives in a private bucket, so it travels as a
+    // short-lived presigned URL like the damage photos do.
+    const licensePhotoUrl = vehicle?.licensePhotoUrl
+      ? (await generatePresignedUrls([vehicle.licensePhotoUrl as string]))[0]
+      : null
+
     // GDPR audit log: when a garage views a request that contains client
     // PII (name, phone) and vehicle PII (plate, VIN), record the access.
     // This lets us answer "who saw my data?" and detect scraping behavior.
@@ -105,6 +111,9 @@ async function _GET(
         clientAvailabilityDates: serviceRequest.clientAvailabilityDates || [],
         photoUrls: presignedPhotoUrls,
         acceptedOfferId: serviceRequest.acceptedOfferId,
+        // Which garage actually got the job — the chats use it to decide who may
+        // still write once the appointment exists.
+        acceptedGarageId: serviceRequest.acceptedGarageId ?? null,
         appointmentDate: serviceRequest.appointmentDate,
         appointmentPrice: serviceRequest.appointmentPrice,
         client: client
@@ -127,7 +136,8 @@ async function _GET(
               vinNumber: vehicle.vinNumber,
               is4x4: vehicle.is4x4,
               isAutomatic: vehicle.isAutomatic,
-              isTurbo: vehicle.isTurbo
+              isTurbo: vehicle.isTurbo,
+              licensePhotoUrl
             }
           : null
       }

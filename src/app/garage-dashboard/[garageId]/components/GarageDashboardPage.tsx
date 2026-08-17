@@ -16,9 +16,8 @@ import GarageSettings from './GarageSettings'
 import ActivationWelcome from './ActivationWelcome'
 import { useRealtimeRequests, type BroadcastRequest, type RequestUpdatePayload } from '@/hooks/useRealtimeRequests'
 import { useToast } from '@/hooks/useToast'
-import { useNewRequestNotifier } from '@/hooks/useNewRequestNotifier'
+import { useNotifications } from '@/contexts/NotificationsContext'
 import { useGarageApprovalWatch } from '@/hooks/useGarageApprovalWatch'
-import { getCategoryText } from '@/utils/categoryLabels'
 
 interface GarageDashboardPageProps {
   garageId: string
@@ -33,6 +32,7 @@ interface GarageData {
   tin: string
   taxAuthority: string
   description?: string
+  workdayStartTime?: string
   benefits?: string[]
 }
 
@@ -52,8 +52,8 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
   const [garageData, setGarageData] = useState<GarageData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [counts, setCounts] = useState({ requests: 0, offers: 0, appointments: 0 })
-  const { info, success } = useToast()
-  const { notify } = useNewRequestNotifier()
+  const { success } = useToast()
+  const { markRequestsSeen } = useNotifications()
   // Track which request ids we've already seen via realtime so the badge
   // counter and toast don't fire twice (e.g. an event arriving twice during
   // a flaky reconnect).
@@ -194,20 +194,24 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
     router.push(`/garage-dashboard/${garageId}/?tab=${tab}`)
   }
 
-  // ─── Realtime: badge counter + ambient notifications ───
+  // Sitting on the requests feed *is* reading the notifications, so the bell
+  // empties as soon as the tab is open — and again for anything that lands while
+  // the garage stays there.
+  useEffect(() => {
+    if (activeTab === 'requests') markRequestsSeen()
+  }, [activeTab, counts.requests, markRequestsSeen])
+
+  // ─── Realtime: badge counter ───
   // Lives at the dashboard level so it stays mounted across tab switches.
 
+  // Only the tab counter here — the toast, the chime and the header bell are the
+  // app shell's job (NotificationsContext), so they fire on every garage screen
+  // and don't double up when the dashboard happens to be the one open.
   const handleRealtimeNewRequest = useCallback((broadcast: BroadcastRequest) => {
     if (seenRequestIdsRef.current.has(broadcast.id)) return
     seenRequestIdsRef.current.add(broadcast.id)
-
     setCounts(prev => ({ ...prev, requests: prev.requests + 1 }))
-
-    const vehicleLabel = [broadcast.vehicle?.brand, broadcast.vehicle?.model].filter(Boolean).join(' ')
-    const categoryLabel = getCategoryText(broadcast.category)
-    info('Νεο αιτημα', `${categoryLabel}${vehicleLabel ? ` — ${vehicleLabel}` : ''}`)
-    notify({ category: categoryLabel, vehicle: vehicleLabel })
-  }, [info, notify])
+  }, [])
 
   const handleRealtimeRequestUpdate = useCallback((update: RequestUpdatePayload) => {
     if (!update.status || update.status === ServiceRequestStatus.PENDING) return

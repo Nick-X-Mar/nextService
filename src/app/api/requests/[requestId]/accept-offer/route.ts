@@ -93,6 +93,19 @@ async function _PATCH(
       )
     }
 
+    // The winning offer decides which garage keeps access to this job, so it is
+    // read before anything is written rather than inferred afterwards.
+    const acceptedOfferRes = await dynamoDB.send(
+      new GetCommand({ TableName: 'Offers', Key: { id: offerId } })
+    )
+    if (!acceptedOfferRes.Item || acceptedOfferRes.Item.serviceRequestId !== requestId) {
+      return NextResponse.json(
+        { success: false, error: 'Offer not found for this request' },
+        { status: 404 }
+      )
+    }
+    const acceptedGarageId = (acceptedOfferRes.Item.garageId as string | undefined) ?? null
+
     // Verify payment if payments are enabled
     let depositAmount: number | null = null
     let remainingAmount: number | null = null
@@ -133,6 +146,9 @@ async function _PATCH(
     const updateExpressionParts = [
       '#status = :status',
       'acceptedOfferId = :acceptedOfferId',
+      // Stored alongside the offer id so the chat endpoints can answer "is this
+      // garage still part of this job?" without reading the Offers table.
+      'acceptedGarageId = :acceptedGarageId',
       'appointmentDate = :appointmentDate',
       'appointmentPrice = :appointmentPrice',
       'updatedAt = :updatedAt'
@@ -140,6 +156,7 @@ async function _PATCH(
     const exprAttrValues: Record<string, unknown> = {
       ':status': ServiceRequestStatus.APPOINTMENT,
       ':acceptedOfferId': offerId,
+      ':acceptedGarageId': acceptedGarageId,
       ':appointmentDate': appointmentDate,
       ':appointmentPrice':
         typeof appointmentPrice === 'number' && !Number.isNaN(appointmentPrice)

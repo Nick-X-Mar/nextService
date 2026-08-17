@@ -72,9 +72,11 @@ export default function RequestCard({
     })
   }
 
-  const estimatedCost = request.status === ServiceRequestStatus.APPOINTMENT
+  const rawEstimatedCost = request.status === ServiceRequestStatus.APPOINTMENT
     ? request.appointmentPrice
     : request.estimatedCost
+  // Guarded rather than truthy-checked: a 0 renders as a literal "0" in JSX.
+  const estimatedCost = (rawEstimatedCost ?? 0) > 0 ? rawEstimatedCost : null
 
   return (
     <div

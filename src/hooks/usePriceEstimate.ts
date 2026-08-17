@@ -40,7 +40,9 @@ export interface PriceEstimate {
  */
 export function usePriceEstimate(vehicle: PriceEstimateVehicle | null) {
   const [estimate, setEstimate] = useState<PriceEstimate | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  // Starts true when there is a car to price, so the card shows the spinner instead of
+  // flashing "δεν έχουμε τιμή" in the frame before the first fetch starts.
+  const [isLoading, setIsLoading] = useState(() => Boolean(vehicle?.category && vehicle?.brand))
 
   const { category, brand, model, modelYear, engineCC, fuelType, isAutomatic, is4x4, isTurbo } = vehicle || {}
 

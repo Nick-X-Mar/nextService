@@ -13,6 +13,7 @@ import { usePriceEstimate } from '@/hooks/usePriceEstimate'
 import { getCategoryText } from '@/utils/categoryLabels'
 import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 import EstimatedCostCard from './EstimatedCostCard'
+import LicenseSample from './LicenseSample'
 
 interface CarSpecsFormProps {
   savedData: {
@@ -41,7 +42,10 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   const [engineNumber, setEngineNumber] = useState('')
   const [email, setEmail] = useState('')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
-  const [hasLicensePhoto, setHasLicensePhoto] = useState(false)
+  // The photo is the path we want people on: one shot instead of two numbers copied off
+  // the engine block. A returning visitor who already typed the numbers is switched back
+  // to the manual tab on mount.
+  const [hasLicensePhoto, setHasLicensePhoto] = useState(true)
   const [licensePhoto, setLicensePhoto] = useState<File | null>(null)
   const [existingLicensePhotoUrl, setExistingLicensePhotoUrl] = useState<string>('')
   const [mounted, setMounted] = useState(false)
@@ -84,6 +88,8 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
     if (data.originalVehicleLicensePhotoUrl) {
       setExistingLicensePhotoUrl(data.originalVehicleLicensePhotoUrl)
       setHasLicensePhoto(true)
+    } else if (data.vinNumber || data.engineNumber) {
+      setHasLicensePhoto(false)
     }
   }, [])
 
@@ -137,12 +143,16 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
     return () => clearTimeout(timer)
   }, [email, mounted, isLoggedIn, checkEmail])
 
+  const hasPhoto = licensePhoto !== null || !!existingLicensePhotoUrl
+
   const isFormValid =
     // Until the session is settled we don't know which of the two shapes below
     // this submit takes, so the button stays disabled rather than guessing.
     authSettled &&
-    vinNumber.trim() !== '' &&
-    (engineNumber.trim() !== '' || licensePhoto !== null || !!existingLicensePhotoUrl) &&
+    // The άδεια carries the πλαίσιο and the αρ. κινητήρα itself, so a photo is the whole
+    // answer — asking for the numbers on top of it (while their fields are hidden) left
+    // the submit button permanently disabled.
+    (hasPhoto || (vinNumber.trim() !== '' && engineNumber.trim() !== '')) &&
     (isLoggedIn || (isEmailValid(email) && !emailExists && isPasswordValid && acceptedTerms))
 
   const handleSubmit = async () => {
@@ -192,6 +202,26 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
         }
 
         if (result.success) {
+          // The photo goes up after the request exists: it needs the vehicle id the
+          // API just minted, and for a guest the auth cookie the same call just set.
+          // Failing here must not lose the request — the garage can still ask for
+          // the numbers — so it only warns.
+          if (licensePhoto && result.vehicleId) {
+            try {
+              const photoBody = new FormData()
+              photoBody.append('file', licensePhoto)
+              const photoResponse = await fetch(`/api/vehicles/${result.vehicleId}/license-photo/`, {
+                method: 'POST',
+                body: photoBody,
+              })
+              if (!photoResponse.ok) {
+                console.warn('License photo upload failed:', await photoResponse.text())
+              }
+            } catch (uploadError) {
+              console.warn('License photo upload failed:', uploadError)
+            }
+          }
+
           const fuelText = savedData.fuelType === 'petrol' ? 'Βενζινη' : 'Πετρελαιο'
           const transmissionText = savedData.isAutomatic ? 'Αυτοματο' : 'Χειροκινητο'
           const driveText = savedData.is4x4 ? '4x4' : '2WD'
@@ -468,7 +498,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                     : 'flex-1 py-2.5 rounded-full font-bold text-xs text-on-surface-variant hover:bg-surface-variant text-center transition-all'
                 }
               >
-                Φωτο
+                Φωτογραφια Αδειας Κυκλοφοριας
               </button>
             </div>
 
@@ -491,6 +521,13 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                   <Icon name="info" size="sm" className="text-tertiary mt-0.5 shrink-0" />
                   <p className="text-xs text-on-surface-variant">
                     Ανεβάστε μια <span className="font-bold text-on-surface">καθαρή και ευανάγνωστη</span> φωτογραφία της άδειας κυκλοφορίας. Θα αντλήσουμε αυτόματα τα στοιχεία του οχήματος (αρ. κινητήρα, πλαισίου).
+                  </p>
+                </div>
+                {/* What the document looks like and which boxes have to be readable */}
+                <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-3">
+                  <LicenseSample className="w-full h-auto" />
+                  <p className="text-xs text-on-surface-variant mt-2">
+                    Φωτογραφίστε την μπροστινή όψη. Τα <span className="font-bold text-primary">σημειωμένα πεδία</span> πρέπει να διαβάζονται καθαρά.
                   </p>
                 </div>
                 {/* Show existing license photo from vehicle */}
@@ -551,7 +588,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <label className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
-                VIN (Αριθμος Πλαισιου)
+                Αριθμος Πλαισιου
               </label>
               <div className="relative">
                 <Icon

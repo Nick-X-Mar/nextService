@@ -9,6 +9,7 @@ import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
 import { useAsyncTask } from '@/hooks/useAsyncTask'
 import { clearFormData } from '@/utils/formStorage'
+import NewRequestBell from './NewRequestBell'
 
 export default function TopHeader() {
   const { userType, client, garage, logout } = useAuth()
@@ -88,28 +89,45 @@ export default function TopHeader() {
               </Link>
             </>
           ) : (
-            <div className="flex items-center gap-3">
-              {displayName && (
-                <span className="hidden md:block text-sm font-bold text-on-surface truncate max-w-[150px]">
-                  {displayName}
-                </span>
-              )}
-              <div className="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center overflow-hidden border border-outline-variant/20">
-                {userType === 'client' && client ? (
-                  <Link href={`/profile/${client.id}/`}>
-                    <span className="text-sm font-bold text-primary">
-                      {client.firstName?.charAt(0).toUpperCase()}
+            <div className="flex items-center gap-2">
+              {/* Renders nothing for clients and for garages still under review. */}
+              <NewRequestBell />
+              {/* On the landing page this sits on a photo, where a grey circle and a
+                  grey icon disappear entirely — hence the same amber gradient as the
+                  Νέο Αίτημα button, and a red logout. The whole chip is the link, not
+                  just the initial inside it. */}
+              {userType === 'client' && client ? (
+                <Link
+                  href={`/profile/${client.id}/`}
+                  aria-label="Το προφίλ μου"
+                  className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-md active:scale-95 transition-all"
+                >
+                  <span className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                    <Icon name="person" size="sm" filled className="text-on-primary" />
+                  </span>
+                  {displayName && (
+                    <span className="hidden md:block text-sm font-bold truncate max-w-[140px]">
+                      {displayName}
                     </span>
-                  </Link>
-                ) : (
-                  <Icon name="account_circle" className="text-primary" />
-                )}
-              </div>
+                  )}
+                </Link>
+              ) : (
+                <div className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-md">
+                  <span className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                    <Icon name="person" size="sm" filled className="text-on-primary" />
+                  </span>
+                  {displayName && (
+                    <span className="hidden md:block text-sm font-bold truncate max-w-[140px]">
+                      {displayName}
+                    </span>
+                  )}
+                </div>
+              )}
               <button
                 onClick={() => run(logout)}
                 disabled={isPending()}
                 aria-label="Αποσύνδεση"
-                className="hidden md:flex items-center gap-1 text-sm text-secondary hover:text-tertiary transition-colors disabled:opacity-60"
+                className="hidden md:flex w-10 h-10 rounded-full items-center justify-center bg-tertiary text-white shadow-md hover:bg-tertiary/90 active:scale-95 transition-all disabled:opacity-60"
               >
                 {isPending() ? <Spinner size="sm" /> : <Icon name="logout" size="sm" />}
               </button>

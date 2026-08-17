@@ -72,3 +72,43 @@ test('Garage dashboard shows new request without refresh', async ({ page, reques
   // Avoid leaving a webhook registration behind — we don't have admin access
   // here so we skip cleanup. Tests are designed to be data-additive.
 })
+
+test('Header bell counts new requests away from the dashboard', async ({ page, request }) => {
+  const email = `e2e-rt-bell-${Date.now()}@test.com`
+  const reg = await registerClient(request, email, CLIENT_PASSWORD)
+  const clientLogin = await loginViaAPI(request, email, CLIENT_PASSWORD, 'client')
+
+  // The garage is anywhere but the requests feed — this is the case the
+  // dashboard-only subscription used to miss entirely.
+  await loginAsGarage(page, request)
+  await page.goto(`/garage-dashboard/${TEST_GARAGE.id}/chats/`)
+
+  const bell = page.locator('header button[aria-label="Ειδοποιήσεις"], header button[aria-label*="αίτημα"], header button[aria-label*="αιτήματα"]').first()
+  await bell.waitFor({ state: 'visible', timeout: 15_000 })
+
+  await request.post('/api/service-request', {
+    headers: { Cookie: `auth-token=${clientLogin.token}` },
+    data: {
+      clientId: reg.client.id,
+      category: 'imantas',
+      description: `Realtime bell test ${Date.now()}`,
+      brand: 'Citroen',
+      model: 'C3',
+      modelYear: '2017',
+      engineCC: '1200',
+      fuelType: 'petrol',
+      isAutomatic: false,
+      is4x4: false,
+    },
+  })
+
+  // The badge counts arrivals, so it says at least 1 without any reload.
+  await expect.poll(
+    async () => (await bell.getAttribute('aria-label')) ?? '',
+    { timeout: 10_000, message: 'Expected the header bell to count the new request' }
+  ).toMatch(/αίτημα|αιτήματα/)
+
+  // Opening it lists what came in and offers the way through to the feed.
+  await bell.click()
+  await expect(page.getByText('Δες τα αιτήματα')).toBeVisible()
+})

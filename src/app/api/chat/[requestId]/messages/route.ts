@@ -184,13 +184,25 @@ async function _POST(
       }, { status: 400 })
     }
 
-    // Prevent sending messages when the related request is in appointment status.
-    // We already loaded the request above, so just check its status.
+    // Once the job is assigned, only the two parties who are actually doing it keep
+    // talking. Everyone else — the garages whose offers were rejected — is out: they
+    // can read the history but they neither send nor receive anything more.
     if (requestResult.Item.status === ServiceRequestStatus.APPOINTMENT) {
-      return NextResponse.json(
-        { error: 'Η συνομιλία είναι μόνο για ανάγνωση επειδή έχει προγραμματιστεί ραντεβού για αυτό το αίτημα.' },
-        { status: 403 }
-      )
+      const acceptedGarageId = requestResult.Item.acceptedGarageId as string | undefined
+      const isPartOfAppointment = acceptedGarageId
+        ? effectiveGarageId === acceptedGarageId
+        : false
+
+      if (!isPartOfAppointment) {
+        return NextResponse.json(
+          {
+            error: senderType === 'garage'
+              ? 'Το αίτημα ανατέθηκε σε άλλο συνεργείο. Η συνομιλία είναι πλέον μόνο για ανάγνωση.'
+              : 'Η συνομιλία με αυτό το συνεργείο είναι μόνο για ανάγνωση — το ραντεβού κλείστηκε με άλλο συνεργείο.'
+          },
+          { status: 403 }
+        )
+      }
     }
 
     // Generate unique message ID

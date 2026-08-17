@@ -225,7 +225,7 @@ export default function ServiceVehicleCard({
         </div>
         {vehicle?.vinNumber && (
           <div className={styles.specCell}>
-            <p className={styles.specLabel}>VIN</p>
+            <p className={styles.specLabel}>Αρ. Πλαισιου</p>
             <p className={`${styles.specValue} text-[10px]`}>{vehicle.vinNumber}</p>
           </div>
         )}

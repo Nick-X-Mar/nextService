@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { ServiceVehicleCard, Spinner } from '@/components'
+import { ServiceVehicleCard, LicensePhotoCard, Spinner } from '@/components'
 import { useNavigation } from '@/hooks/useNavigation'
 import { useNotifications } from '@/contexts/NotificationsContext'
 import { styles } from '@/styles/styles'
@@ -43,6 +43,8 @@ interface Vehicle {
   is4x4?: boolean
   isAutomatic?: boolean
   isTurbo?: boolean
+  /** Presigned by the API — short-lived, never stored. */
+  licensePhotoUrl?: string | null
 }
 
 interface ServiceRequest {
@@ -612,6 +614,10 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
           showEstimatedCost={false}
         />
 
+        {/* The άδεια the customer photographed — often the only place the πλαίσιο
+            and the αρ. κινητήρα exist, since the form stops asking once it's there. */}
+        <LicensePhotoCard url={serviceRequest.vehicle.licensePhotoUrl} />
+
         {/* Photos */}
         {serviceRequest.photoUrls && serviceRequest.photoUrls.length > 0 && (
           <div className={styles.card}>
@@ -642,28 +648,11 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
             <p className={styles.labelUpper}>Προσφορά</p>
           </div>
 
+          {/* One field matters here — what you charge. The offer number is minted on
+              save and the estimate only exists for cars we have quoted before, so both
+              used to sit here as greyed-out noise ("Αυτόματα", "0 EUR"). They show only
+              when they actually say something. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Offer Number */}
-            <div>
-              <label className={`${styles.label} mb-2 block`}>Αριθμός Προσφοράς</label>
-              <input
-                value={offer.offerNumber || 'Αυτόματα'}
-                readOnly
-                className={`${styles.input} !bg-surface-container !text-secondary`}
-              />
-            </div>
-
-            {/* Estimated Cost */}
-            <div>
-              <label className={`${styles.label} mb-2 block`}>Ποσό Εκτίμησης</label>
-              <input
-                value={`${offer.estimatedCost || 0} EUR`}
-                readOnly
-                className={`${styles.input} !bg-surface-container !text-secondary`}
-              />
-            </div>
-
-            {/* Offer Amount */}
             <div>
               <label className={`${styles.label} mb-2 block`}>
                 Ποσό Προσφοράς <span className="text-tertiary">*</span>
@@ -672,23 +661,32 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
                 type="number"
                 value={offer.offerAmount || ''}
                 onChange={(e) => handleOfferAmountChange(e.target.value)}
-                placeholder="Εισάγετε ποσό"
+                placeholder="Εισάγετε ποσό σε €"
                 className={styles.input}
                 required
                 disabled={isAccepted}
               />
             </div>
 
-            {/* Date */}
-            <div>
-              <label className={`${styles.label} mb-2 block`}>Ημερομηνία</label>
-              <input
-                value={new Date().toLocaleDateString('el-GR')}
-                readOnly
-                className={`${styles.input} !bg-surface-container !text-secondary`}
-              />
-            </div>
+            {offer.offerNumber && (
+              <div>
+                <label className={`${styles.label} mb-2 block`}>Αριθμός Προσφοράς</label>
+                <input
+                  value={offer.offerNumber}
+                  readOnly
+                  className={`${styles.input} !bg-surface-container !text-secondary`}
+                />
+              </div>
+            )}
           </div>
+
+          {offer.estimatedCost > 0 && (
+            <p className="mt-4 text-xs text-on-surface-variant flex items-center gap-1">
+              <Icon name="info" size="sm" className="text-on-surface-variant/70" />
+              Ο πελάτης είδε ενδεικτική εκτίμηση από {offer.estimatedCost}€, με βάση αντίστοιχες
+              εργασίες που έχουμε αναλάβει.
+            </p>
+          )}
         </div>
 
         {/* Availability Calendar Section */}

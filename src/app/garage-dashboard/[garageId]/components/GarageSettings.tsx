@@ -18,6 +18,8 @@ interface GarageData {
   tin: string
   taxAuthority: string
   description?: string
+  /** "HH:MM" — when the shop opens, shown to clients with each available date. */
+  workdayStartTime?: string
   benefits?: string[]
 }
 
@@ -108,6 +110,9 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
     { icon: 'phone', label: 'ΤΗΛΕΦΩΝΟ', field: 'mobile' as keyof GarageData, placeholder: '+306984959044', required: true },
     { icon: 'location_on', label: 'ΔΙΕΥΘΥΝΣΗ', field: 'address' as keyof GarageData, placeholder: 'Λεωφορος Πατησιων 123, Αθηνα', required: true, fullWidth: true },
     { icon: 'account_balance', label: 'ΔΟΥ', field: 'taxAuthority' as keyof GarageData, placeholder: 'ΔΟΥ Αθηνων', required: true },
+    // Shown to the customer next to every date this shop offers, so "Τρίτη 12/9"
+    // reads as "Τρίτη 12/9, από τις 09:00".
+    { icon: 'schedule', label: 'ΩΡΑ ΕΝΑΡΞΗΣ ΕΡΓΑΣΙΩΝ', field: 'workdayStartTime' as keyof GarageData, placeholder: '09:00', required: false, type: 'time' },
     { icon: 'description', label: 'ΠΕΡΙΓΡΑΦΗ', field: 'description' as keyof GarageData, placeholder: 'Συντομη περιγραφη του συνεργειου...', required: false },
   ]
 
@@ -152,7 +157,7 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
                 </label>
               </div>
               <Input
-                type={(item.type || 'text') as 'text' | 'email' | 'tel' | 'number'}
+                type={(item.type || 'text') as 'text' | 'email' | 'tel' | 'number' | 'time'}
                 value={(formData[item.field] as string) || ''}
                 onChange={(value) => handleInputChange(item.field, value)}
                 placeholder={item.placeholder}

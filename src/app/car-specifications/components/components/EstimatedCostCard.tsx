@@ -31,7 +31,31 @@ function basisText(estimate: PriceEstimate): string {
 }
 
 export default function EstimatedCostCard({ estimate, isLoading }: EstimatedCostCardProps) {
-  if (!isLoading && !estimate) return null
+  // No matching past job. Say so plainly and point at what the customer actually came for
+  // — the real offers — instead of leaving a silent gap where a price used to be.
+  if (!isLoading && !estimate) {
+    return (
+      <div className="mt-3 bg-surface-container rounded-2xl border border-outline-variant/20 p-4">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-surface-container-highest flex items-center justify-center flex-shrink-0">
+            <Icon name="search_off" className="text-on-surface-variant" size="md" />
+          </div>
+          <div className="flex-1">
+            {/* Written without accents on purpose — the label is uppercased in CSS. */}
+            <p className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
+              Χωρις Εκτιμηση Κοστους
+            </p>
+            <p className="text-sm font-semibold text-on-surface-variant">
+              Δεν υπάρχουν επαρκή στοιχεία για εκτίμηση κόστους.
+            </p>
+          </div>
+        </div>
+        <p className="text-sm font-bold text-primary mt-2 ml-[52px]">
+          Συνεχίστε για να λάβετε προσφορές από τα συνεργεία.
+        </p>
+      </div>
+    )
+  }
 
   const basis = estimate ? basisText(estimate) : null
 

@@ -87,3 +87,90 @@ test.describe.serial('Client Profile & Vehicles', () => {
     expect(opel.model).toBe('Corsa')
   })
 })
+
+/**
+ * The άδεια κυκλοφορίας photo. The form used to send only the file *name*, so the
+ * document never left the browser and neither side ever saw it — these tests pin the
+ * whole path: upload against the vehicle, then read it back as a presigned URL from
+ * both the request detail and the requests list the details screen actually uses.
+ */
+test.describe.serial('Vehicle license photo', () => {
+  const email = `e2e-license-${Date.now()}@test.com`
+  const password = 'TestPass123'
+  // Smallest valid PNG — the endpoint validates type and size, not content.
+  const PNG = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64'
+  )
+
+  let token: string
+  let cId: string
+  let srId: string
+  let vehicleId: string
+  let uploaded = false
+
+  test('Setup: request creates the vehicle', async ({ request }) => {
+    const reg = await registerClient(request, email, password)
+    cId = reg.client.id
+    token = (await loginViaAPI(request, email, password, 'client')).token
+
+    const srResp = await request.post('/api/service-request', {
+      headers: { Cookie: `auth-token=${token}` },
+      data: {
+        clientId: cId,
+        category: 'imantas',
+        description: 'E2E license photo',
+        brand: 'Citroen',
+        model: 'C3',
+        modelYear: '2017',
+        engineCC: '1200',
+        fuelType: 'petrol',
+        isAutomatic: false,
+        is4x4: false,
+      },
+    })
+    const sr = await srResp.json()
+    srId = sr.serviceRequestId
+    vehicleId = sr.vehicleId
+    expect(vehicleId).toBeTruthy()
+  })
+
+  test('Photo uploads against the vehicle', async ({ request }) => {
+    const resp = await request.post(`/api/vehicles/${vehicleId}/license-photo`, {
+      headers: { Cookie: `auth-token=${token}` },
+      multipart: { file: { name: 'adeia.png', mimeType: 'image/png', buffer: PNG } },
+    })
+    // S3 is not wired in every environment; without it there is nothing to assert on.
+    test.skip(resp.status() === 500, 'S3 not configured in this environment')
+    expect(resp.status()).toBe(200)
+    const data = await resp.json()
+    expect(data.key).toContain(vehicleId)
+    uploaded = true
+  })
+
+  test('Someone else cannot upload against this vehicle', async ({ request }) => {
+    const resp = await request.post(`/api/vehicles/${vehicleId}/license-photo`, {
+      multipart: { file: { name: 'adeia.png', mimeType: 'image/png', buffer: PNG } },
+    })
+    expect([401, 403]).toContain(resp.status())
+  })
+
+  test('Request detail hands back a presigned URL', async ({ request }) => {
+    test.skip(!uploaded, 'Nothing was uploaded')
+    const resp = await request.get(`/api/requests/${srId}`, {
+      headers: { Cookie: `auth-token=${token}` },
+    })
+    const data = await resp.json()
+    expect(data.request.vehicle.licensePhotoUrl).toContain('X-Amz-Signature')
+  })
+
+  test('Requests list carries it too — that is what the details screen reads', async ({ request }) => {
+    test.skip(!uploaded, 'Nothing was uploaded')
+    const resp = await request.get(`/api/requests?clientId=${cId}`, {
+      headers: { Cookie: `auth-token=${token}` },
+    })
+    const data = await resp.json()
+    const ours = (data.requests || []).find((r: { id: string }) => r.id === srId)
+    expect(ours?.vehicle?.licensePhotoUrl).toContain('X-Amz-Signature')
+  })
+})

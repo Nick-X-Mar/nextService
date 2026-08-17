@@ -34,6 +34,10 @@ export interface NotificationSummary {
   /** `threads` split by request status, for the garage's two chat destinations. */
   appointmentThreads: number
   openThreads: number
+  /** Garage only: pending requests it can still bid on — the Αιτήματα badge. */
+  availableRequests: number
+  /** Garage only: own offers waiting on a move (accepted-unopened, dates proposed). */
+  offersNeedingAttention: number
   /** Everything currently waiting on this user, newest concern first. */
   alerts: Alert[]
 }
@@ -42,5 +46,7 @@ export const EMPTY_SUMMARY: NotificationSummary = {
   threads: 0,
   appointmentThreads: 0,
   openThreads: 0,
+  availableRequests: 0,
+  offersNeedingAttention: 0,
   alerts: [],
 }

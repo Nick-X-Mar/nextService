@@ -41,7 +41,7 @@ export const organizationNode = {
   },
   image: `${SITE_URL}/opengraph-image/`,
   description:
-    'Marketplace συνεργείων αυτοκινήτου στην Ελλάδα. Οι ιδιοκτήτες οχημάτων στέλνουν αίτημα service και λαμβάνουν προσφορές από επαγγελματικά συνεργεία της περιοχής τους.',
+    'Πλατφόρμα συνεργείων αυτοκινήτου. Οι ιδιοκτήτες οχημάτων στέλνουν αίτημα service και λαμβάνουν προσφορές από επαγγελματικά συνεργεία της περιοχής τους. Προς το παρόν καλύπτουμε την Αθήνα.',
   areaServed: { '@type': 'Country', name: 'GR' },
   sameAs: SOCIAL_PROFILES,
   contactPoint: {

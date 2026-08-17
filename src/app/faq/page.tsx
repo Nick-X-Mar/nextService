@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import Icon from '@/components/ui/Icon'
+import FaqAccordion from '@/components/FaqAccordion'
 import { faqCategories, allFaqs } from '@/data/faq'
 import { SITE_URL } from '@/lib/site-url'
 import { breadcrumbJsonLd, faqJsonLd, graphJsonLd, jsonLdScript } from '@/lib/seo'
@@ -88,28 +89,7 @@ export default function FaqPage() {
                   </h2>
                 </div>
 
-                <div className="space-y-3">
-                  {cat.items.map((faq) => (
-                    <details
-                      key={faq.question}
-                      className="group rounded-xl bg-surface-container-lowest border border-outline-variant/10 overflow-hidden"
-                    >
-                      <summary className="flex items-center justify-between gap-3 px-5 py-4 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                        <h3 className="font-bold text-on-surface text-sm md:text-base">
-                          {faq.question}
-                        </h3>
-                        <Icon
-                          name="expand_more"
-                          size="md"
-                          className="text-on-surface-variant transition-transform group-open:rotate-180 shrink-0"
-                        />
-                      </summary>
-                      <div className="px-5 pb-5 text-sm text-secondary leading-relaxed">
-                        {faq.answer}
-                      </div>
-                    </details>
-                  ))}
-                </div>
+                <FaqAccordion items={cat.items} />
               </section>
             ))}
           </div>

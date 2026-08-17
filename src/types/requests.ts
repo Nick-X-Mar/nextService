@@ -39,6 +39,8 @@ export interface ServiceRequest {
     licensePlate?: string
     engineNumber?: string
     vinNumber?: string
+    /** Presigned URL for the άδεια κυκλοφορίας photo — short-lived, never persisted. */
+    licensePhotoUrl?: string | null
   }
   client?: {
     firstName: string
@@ -47,6 +49,8 @@ export interface ServiceRequest {
   }
   clientAvailabilityDates?: string[]
   acceptedOfferId?: string
+  /** The garage whose offer was accepted — the only one that may still chat. */
+  acceptedGarageId?: string | null
   appointmentDate?: string
   appointmentPrice?: number
   paymentIntentId?: string

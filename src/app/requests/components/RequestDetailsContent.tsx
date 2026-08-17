@@ -7,8 +7,10 @@ import { DayPicker } from 'react-day-picker'
 import 'react-day-picker/dist/style.css'
 import { addDays, addMonths, format, isWeekend } from 'date-fns'
 import { el } from 'date-fns/locale'
-import { ServiceVehicleCard, Modal, Input, Button, Checkbox, Spinner } from '@/components'
+import { ServiceVehicleCard, LicensePhotoCard, Modal, Input, Button, PillToggle, ExpandableCard, Spinner } from '@/components'
 import PaymentModal from './PaymentModal'
+import { useAuth } from '@/contexts/AuthContext'
+import { useNavigation } from '@/hooks/useNavigation'
 import { styles } from '../../../styles/styles'
 import { ServiceRequestStatus, OfferStatus } from '../../../types/statuses'
 import type { ServiceRequest } from '../../../types/requests'
@@ -34,6 +36,9 @@ interface GarageSummary {
   id: string
   companyName?: string
   address?: string
+  mobile?: string
+  /** e.g. "09:00" — when the shop opens, so a date isn't just a bare day. */
+  workdayStartTime?: string
   benefits?: string[] | null
 }
 
@@ -113,7 +118,8 @@ const mapVehicleDetailsFromApi = (vehicle: unknown): VehicleInfo => {
     is4x4: (v.is4x4 as boolean | undefined) ?? undefined,
     isTurbo: (v.isTurbo as boolean | undefined) ?? undefined,
     vinNumber: (v.vinNumber as string) ?? '',
-    engineNumber: (v.engineNumber as string) ?? ''
+    engineNumber: (v.engineNumber as string) ?? '',
+    licensePhotoUrl: (v.licensePhotoUrl as string | null) ?? null
   }
 }
 
@@ -132,6 +138,12 @@ export default function RequestDetailsContent({
   getStatusText,
   getStatusColor
 }: RequestDetailsContentProps) {
+  const { client } = useAuth()
+  const { navigate, isNavigating } = useNavigation()
+  // Chatting about an offer happens in the request's own thread, filtered to the
+  // garage that made it.
+  const chatBaseHref = client?.id ? `/requests/${client.id}/chats/${request.id}/` : null
+
   const [vehicleDetails, setVehicleDetails] = useState<VehicleInfo>(() =>
     mapVehicleDetailsFromApi(request.vehicle)
   )
@@ -167,6 +179,11 @@ export default function RequestDetailsContent({
 
   const hasOffers =
     typeof offers !== 'undefined' && Array.isArray(offers) && offers.length > 0
+  // The shop the customer is actually going to — its phone and address are what the
+  // appointment banner offers to call and navigate to.
+  const acceptedGarage = offers.find(
+    (offer) => offer.id === request.acceptedOfferId || offer.status === OfferStatus.ACCEPTED
+  )?.garage
   const showWaitingForResponsesBanner = request.status === ServiceRequestStatus.PENDING && !hasOffers
 
   const formatAvailabilityDate = (dateString: string) => {
@@ -221,9 +238,14 @@ export default function RequestDetailsContent({
   const formatCustomDateLabel = (date: Date) =>
     format(date, 'dd/MM/yyyy (EEEE)', { locale: el })
 
+  // Opening is a click anywhere on the card; closing is only the arrow. A card that
+  // also collapsed on any click kept snapping shut while the customer was reading it
+  // — picking a date, tapping a benefit, missing a button by a few pixels.
   const handleOfferCardClick = (offerId: string) => {
-    setExpandedOfferId((prev) => (prev === offerId ? null : offerId))
+    setExpandedOfferId((prev) => (prev === offerId ? prev : offerId))
   }
+
+  const handleCollapseOffer = () => setExpandedOfferId(null)
 
   const handleSelectOfferDate = (offerId: string, date: string) => {
     setSelectedOfferDates((prev) => ({
@@ -581,6 +603,8 @@ export default function RequestDetailsContent({
                 id: garageData?.garage?.id ?? offer.garageId,
                 companyName: garageData?.garage?.companyName,
                 address: garageData?.garage?.address,
+                mobile: garageData?.garage?.mobile,
+                workdayStartTime: garageData?.garage?.workdayStartTime,
                 benefits: normalizedBenefits
               }
 
@@ -815,6 +839,9 @@ export default function RequestDetailsContent({
           onEditClick={handleOpenVehicleModal}
         />
 
+        {/* What the customer photographed at submission — the same card the garage sees. */}
+        <LicensePhotoCard url={vehicleDetails?.licensePhotoUrl} />
+
         {vehicleUpdateMessage && (
           <div className="rounded-xl bg-green-50 border border-green-100 px-4 py-3 text-sm text-green-800 flex items-center gap-2">
             <Icon name="check_circle" filled size="sm" className="text-green-600" />
@@ -909,28 +936,19 @@ export default function RequestDetailsContent({
                 const isAcceptedOffer = request.acceptedOfferId === offer.id
 
                 return (
-                  <div
+                  <ExpandableCard
                     key={offer.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleOfferCardClick(offer.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        handleOfferCardClick(offer.id)
-                      }
-                    }}
-                    className={`rounded-xl border transition-all duration-200 ${
-                      isExpanded
-                        ? 'border-primary/30 bg-surface-container-lowest shadow-md'
-                        : 'border-outline-variant/10 bg-surface-container hover:border-primary/20'
-                    } p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                    label={offer.garage?.companyName ? `Προσφορά από ${offer.garage.companyName}` : `Προσφορά ${index + 1}`}
+                    isOpen={isExpanded}
+                    onOpen={() => handleOfferCardClick(offer.id)}
+                    onClose={handleCollapseOffer}
+                    className={
                       request.status === ServiceRequestStatus.APPOINTMENT && offer.status === OfferStatus.REJECTED
                         ? 'opacity-50 pointer-events-none'
                         : ''
-                    }`}
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    }
+                    header={
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
                           Προσφορά {index + 1}
@@ -945,7 +963,8 @@ export default function RequestDetailsContent({
                           {getGarageAreaText(offer.garage?.address)}
                         </p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right flex items-start justify-end gap-2">
+                        <div>
                         <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
                           {isAcceptedOffer ? 'Τελικό ποσό' : 'Τιμή'}
                         </p>
@@ -958,16 +977,19 @@ export default function RequestDetailsContent({
                             {formatAvailabilityDate(request.appointmentDate)}
                           </p>
                         )}
-                        {offer.estimatedCost && offer.estimatedCost > 0 && (
+                        {/* `offer.estimatedCost &&` alone printed a bare "0" under the
+                            price whenever there was no estimate — JSX renders 0. */}
+                        {(offer.estimatedCost ?? 0) > 0 && (
                           <p className="text-xs text-on-surface-variant mt-1">
                             Εκτιμώμενο: {formatCurrency(offer.estimatedCost)}
                           </p>
                         )}
+                        </div>
                       </div>
                     </div>
-
-                    {isExpanded && (
-                      <div className="mt-4 space-y-4 border-t border-outline-variant/10 pt-4">
+                    }
+                  >
+                      <div className="space-y-4 border-t border-outline-variant/10 pt-4">
                         {/* Benefits */}
                         <div>
                           <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mb-2">
@@ -995,6 +1017,11 @@ export default function RequestDetailsContent({
                         <div className="flex items-center justify-between">
                           <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
                             Διαθεσιμότητα συνεργείου
+                            {offer.garage?.workdayStartTime && (
+                              <span className="normal-case tracking-normal font-semibold text-on-surface-variant/80">
+                                {' '}— από τις {offer.garage.workdayStartTime}
+                              </span>
+                            )}
                           </p>
                           {offer.offerNumber && (
                             <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
@@ -1015,7 +1042,10 @@ export default function RequestDetailsContent({
                               {availabilityDates.map((date) => {
                                 const isSelected = selectedDate === date
                                 const isAppointment = request.status === ServiceRequestStatus.APPOINTMENT
-                                const isDisabled = isAppointment || (selectedDate !== null && !isSelected)
+                                // Only a booked appointment freezes the choice. Picking a date
+                                // used to disable all the others, so a mis-tap was final until
+                                // the page was reloaded.
+                                const isDisabled = isAppointment
 
                                 return (
                                   <button
@@ -1045,7 +1075,15 @@ export default function RequestDetailsContent({
                                 Έχετε επιλέξει:{' '}
                                 <span className="font-bold text-primary">
                                   {formatAvailabilityDate(selectedDate)}
+                                  {offer.garage?.workdayStartTime
+                                    ? `, από τις ${offer.garage.workdayStartTime}`
+                                    : ''}
                                 </span>
+                                {request.status !== ServiceRequestStatus.APPOINTMENT && (
+                                  <span className="text-xs text-on-surface-variant">
+                                    (μπορείτε να αλλάξετε επιλογή)
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1198,9 +1236,10 @@ export default function RequestDetailsContent({
                           </>
                         )}
 
-                        {/* Accept offer button */}
-                        {request.status !== ServiceRequestStatus.APPOINTMENT && offer.status !== OfferStatus.ACCEPTED && (
-                          <div className="flex flex-wrap gap-3 pt-2">
+                        {/* Accept, or ask first — accepting is a commitment, and a customer
+                            with a question had nowhere to put it before. */}
+                        <div className="flex flex-wrap gap-3 pt-2">
+                          {request.status !== ServiceRequestStatus.APPOINTMENT && offer.status !== OfferStatus.ACCEPTED && (
                             <button
                               type="button"
                               onClick={(event) => {
@@ -1219,11 +1258,26 @@ export default function RequestDetailsContent({
                                 : <Icon name="check_circle" size="sm" />}
                               {acceptingOfferId === offer.id ? 'Αποδοχή...' : 'Αποδοχή προσφοράς'}
                             </button>
-                          </div>
-                        )}
+                          )}
+                          {offer.garageId && chatBaseHref && (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                navigate(`${chatBaseHref}?garageId=${offer.garageId}`)
+                              }}
+                              disabled={isNavigating(`${chatBaseHref}?garageId=${offer.garageId}`)}
+                              className={styles.btnOutline}
+                            >
+                              {isNavigating(`${chatBaseHref}?garageId=${offer.garageId}`)
+                                ? <Spinner size="sm" />
+                                : <Icon name="chat" size="sm" />}
+                              Ρωτήστε το συνεργείο
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
+                  </ExpandableCard>
                 )
               })}
             </div>
@@ -1234,21 +1288,36 @@ export default function RequestDetailsContent({
         {request.status === ServiceRequestStatus.APPOINTMENT && (
           <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
             <div className="flex items-start gap-3">
-              <Icon name="event" filled className="text-blue-600 flex-shrink-0 mt-0.5" size="md" />
+              <Icon name="event_available" filled className="text-blue-600 flex-shrink-0 mt-0.5" size="md" />
               <div>
-                <h4 className="font-bold text-blue-900 mb-1">Ραντεβού Προγραμματισμένο</h4>
+                <h4 className="font-bold text-blue-900 mb-1">Το ραντεβού σας έχει επιβεβαιωθεί</h4>
                 <p className="text-sm text-blue-800 mb-3">
-                  Έχετε προγραμματίσει ραντεβού για αυτή την υπηρεσία. Θα επικοινωνήσουμε μαζί σας σύντομα.
+                  {acceptedGarage?.companyName
+                    ? `${acceptedGarage.companyName} σας περιμένει`
+                    : 'Το συνεργείο σας περιμένει'}
+                  {request.appointmentDate ? ` στις ${formatAvailabilityDate(request.appointmentDate)}` : ''}
+                  {acceptedGarage?.workdayStartTime ? `, από τις ${acceptedGarage.workdayStartTime}` : ''}.
+                  {' '}Θα λάβετε και email με όλα τα στοιχεία.
                 </p>
-                <div className="flex gap-2">
-                  <button className={`${styles.btnPrimary} text-sm`}>
-                    <Icon name="phone" size="sm" />
-                    Επικοινωνία
-                  </button>
-                  <button className={`${styles.btnOutline} text-sm`}>
-                    <Icon name="location_on" size="sm" />
-                    Τοποθεσία
-                  </button>
+                {/* These two used to be buttons with no onClick at all. */}
+                <div className="flex flex-wrap gap-2">
+                  {acceptedGarage?.mobile && (
+                    <a href={`tel:${acceptedGarage.mobile}`} className={`${styles.btnPrimary} text-sm`}>
+                      <Icon name="phone" size="sm" />
+                      Επικοινωνία
+                    </a>
+                  )}
+                  {acceptedGarage?.address && (
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(acceptedGarage.address)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`${styles.btnOutline} text-sm`}
+                    >
+                      <Icon name="location_on" size="sm" />
+                      Οδηγίες
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
@@ -1380,7 +1449,7 @@ export default function RequestDetailsContent({
               </select>
             </div>
             <Input
-              label="VIN"
+              label="Αριθμός Πλαισίου"
               value={vehicleForm.vinNumber}
               onChange={(value) => handleVehicleFieldChange('vinNumber', value)}
             />
@@ -1391,27 +1460,26 @@ export default function RequestDetailsContent({
             />
           </div>
 
+          {/* Same pill controls as the request form — a car is manual *or* automatic,
+              and a checkbox hides the half that isn't ticked. */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Checkbox
-              checked={vehicleForm.isAutomatic === 'true'}
-              onChange={(checked) =>
-                handleVehicleFieldChange('isAutomatic', checked ? 'true' : 'false')
-              }
-              label="Αυτόματο κιβώτιο"
+            <PillToggle
+              label="Κιβώτιο"
+              options={[{ value: 'false', label: 'Χειροκίνητο' }, { value: 'true', label: 'Αυτόματο' }]}
+              value={vehicleForm.isAutomatic}
+              onChange={(value) => handleVehicleFieldChange('isAutomatic', value)}
             />
-            <Checkbox
-              checked={vehicleForm.is4x4 === 'true'}
-              onChange={(checked) =>
-                handleVehicleFieldChange('is4x4', checked ? 'true' : 'false')
-              }
-              label="4x4"
+            <PillToggle
+              label="Κίνηση"
+              options={[{ value: 'false', label: '2WD' }, { value: 'true', label: '4x4' }]}
+              value={vehicleForm.is4x4}
+              onChange={(value) => handleVehicleFieldChange('is4x4', value)}
             />
-            <Checkbox
-              checked={vehicleForm.isTurbo === 'true'}
-              onChange={(checked) =>
-                handleVehicleFieldChange('isTurbo', checked ? 'true' : 'false')
-              }
+            <PillToggle
               label="Turbo"
+              options={[{ value: 'false', label: 'Όχι' }, { value: 'true', label: 'Ναι' }]}
+              value={vehicleForm.isTurbo}
+              onChange={(value) => handleVehicleFieldChange('isTurbo', value)}
             />
           </div>
         </div>

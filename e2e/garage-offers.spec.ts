@@ -139,3 +139,116 @@ test.describe.serial('Garage Offers flow', () => {
     expect(found).toBeFalsy()
   })
 })
+
+/**
+ * Once a client accepts an offer the job belongs to one garage: the request leaves the
+ * open market, the winner keeps talking to the client, and every other garage's thread
+ * goes read-only. Payments may be enabled in this environment, in which case accepting
+ * needs a Stripe intent we cannot mint here — the suite then skips the assertions that
+ * depend on an actual acceptance rather than reporting a false pass.
+ */
+test.describe.serial('Accepted offer locks the request down', () => {
+  const email = `e2e-accept-${Date.now()}@test.com`
+  const password = 'TestPass123'
+  const OTHER_GARAGE_ID = 'garage-e2e-not-involved'
+
+  let cId: string
+  let srId: string
+  let oId: string
+  let cToken: string
+  let gToken: string
+  let accepted = false
+
+  test('Setup: request + offer', async ({ request }) => {
+    const reg = await registerClient(request, email, password)
+    cId = reg.client.id
+    cToken = (await loginViaAPI(request, email, password, 'client')).token
+    gToken = (await loginViaAPI(request, TEST_GARAGE.email, TEST_GARAGE.password, 'garage')).token
+
+    const srResp = await request.post('/api/service-request', {
+      headers: { Cookie: `auth-token=${cToken}` },
+      data: {
+        clientId: cId,
+        category: 'symplektis',
+        description: 'E2E accept lockdown',
+        brand: 'Seat',
+        model: 'Ibiza',
+        modelYear: '2015',
+        engineCC: '1400',
+        fuelType: 'petrol',
+        isAutomatic: false,
+        is4x4: false,
+      },
+    })
+    srId = (await srResp.json()).serviceRequestId
+
+    const offerResp = await request.post('/api/offers', {
+      headers: { Cookie: `auth-token=${gToken}` },
+      data: {
+        serviceRequestId: srId,
+        garageId: TEST_GARAGE.id,
+        offerAmount: 260,
+        benefits: ['Δωρεάν έλεγχος'],
+        availabilityDates: ['2026-09-14', '2026-09-15'],
+      },
+    })
+    oId = (await offerResp.json()).offer.id
+    expect(oId).toBeTruthy()
+  })
+
+  test('Client accepts the offer', async ({ request }) => {
+    const resp = await request.patch(`/api/requests/${srId}/accept-offer`, {
+      headers: { Cookie: `auth-token=${cToken}` },
+      data: { offerId: oId, clientId: cId, appointmentDate: '2026-09-15', appointmentPrice: 260 },
+    })
+    const data = await resp.json()
+    accepted = resp.status() === 200 && data.success === true
+    test.skip(!accepted, 'Payments enabled — acceptance needs a Stripe intent this suite cannot create')
+    expect(data.request.status).toBe('appointment')
+  })
+
+  test('Request records which garage won it', async ({ request }) => {
+    test.skip(!accepted, 'No acceptance happened')
+    const resp = await request.get(`/api/requests/${srId}`, {
+      headers: { Cookie: `auth-token=${cToken}` },
+    })
+    const data = await resp.json()
+    expect(data.request.acceptedGarageId).toBe(TEST_GARAGE.id)
+  })
+
+  test('Request is gone from the open-requests feed', async ({ request }) => {
+    test.skip(!accepted, 'No acceptance happened')
+    const resp = await request.get(`/api/garage/available-requests?garageId=${TEST_GARAGE.id}&countOnly=1`, {
+      headers: { Cookie: `auth-token=${gToken}` },
+    })
+    const data = await resp.json()
+    expect(data.requestIds).not.toContain(srId)
+  })
+
+  test('The garage that won can still write', async ({ request }) => {
+    test.skip(!accepted, 'No acceptance happened')
+    const resp = await request.post(`/api/chat/${srId}/messages`, {
+      headers: { Cookie: `auth-token=${gToken}` },
+      data: { message: 'Σας περιμένουμε τη Δευτέρα', senderType: 'garage', senderId: TEST_GARAGE.id },
+    })
+    expect(resp.status()).toBe(200)
+  })
+
+  test('Any other garage thread is read-only', async ({ request }) => {
+    test.skip(!accepted, 'No acceptance happened')
+    const resp = await request.post(`/api/chat/${srId}/messages`, {
+      headers: { Cookie: `auth-token=${cToken}` },
+      data: { message: 'Ερώτηση', senderType: 'client', senderId: cId, garageId: OTHER_GARAGE_ID },
+    })
+    expect(resp.status()).toBe(403)
+  })
+
+  test('Client can still write to the garage it chose', async ({ request }) => {
+    test.skip(!accepted, 'No acceptance happened')
+    const resp = await request.post(`/api/chat/${srId}/messages`, {
+      headers: { Cookie: `auth-token=${cToken}` },
+      data: { message: 'Ευχαριστώ!', senderType: 'client', senderId: cId, garageId: TEST_GARAGE.id },
+    })
+    expect(resp.status()).toBe(200)
+  })
+})

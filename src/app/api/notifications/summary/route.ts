@@ -5,6 +5,7 @@ import { requireAuth } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
 import { unreadCache, unreadCacheKey } from '@/utils/unreadCache'
 import { fetchGarageMessages } from '@/utils/garageMessages'
+import { collectAll } from '@/utils/pagination'
 import { ServiceRequestStatus, OfferStatus } from '@/types/statuses'
 import { EMPTY_SUMMARY, type Alert, type NotificationSummary } from '@/types/alerts'
 
@@ -193,11 +194,19 @@ async function computeForClient(clientId: string): Promise<NotificationSummary> 
     }
   }
 
-  return { threads, appointmentThreads, openThreads: threads - appointmentThreads, alerts }
+  return {
+    threads,
+    appointmentThreads,
+    openThreads: threads - appointmentThreads,
+    // Garage-only counters; a client has no market feed and no offers of its own.
+    availableRequests: 0,
+    offersNeedingAttention: 0,
+    alerts,
+  }
 }
 
 async function computeForGarage(garageId: string): Promise<NotificationSummary> {
-  const [messages, offersResult] = await Promise.all([
+  const [messages, offersResult, pendingRows] = await Promise.all([
     fetchGarageMessages(garageId),
     dynamoDB.send(new QueryCommand({
       TableName: 'Offers',
@@ -205,15 +214,36 @@ async function computeForGarage(garageId: string): Promise<NotificationSummary> 
       KeyConditionExpression: 'garageId = :garageId',
       ExpressionAttributeValues: { ':garageId': garageId },
     })),
+    // Every open request in the market. Ids only — this is a badge, and the same
+    // number the requests feed shows once opened.
+    collectAll<{ id?: string }>(
+      (startKey) =>
+        dynamoDB.send(new QueryCommand({
+          TableName: 'ServiceRequests',
+          IndexName: 'StatusIndex',
+          KeyConditionExpression: '#status = :status',
+          ExpressionAttributeNames: { '#status': 'status' },
+          ExpressionAttributeValues: { ':status': ServiceRequestStatus.PENDING },
+          ProjectionExpression: 'id',
+          ExclusiveStartKey: startKey,
+        })),
+      `notifications summary pending requests for ${garageId}`
+    ),
   ])
 
   const offers = offersResult.Items ?? []
+
+  // Requests this garage has already answered drop out of the badge, exactly as
+  // they drop out of the feed.
+  const answered = new Set(offers.map((o) => o.serviceRequestId as string))
+  const availableRequests = pendingRows.filter((r) => r.id && !answered.has(r.id)).length
+
   const requestIds = [...new Set([
     ...messages.map((m) => m.requestId),
     ...offers.map((o) => o.serviceRequestId as string),
   ])].filter(Boolean)
 
-  if (requestIds.length === 0) return EMPTY_SUMMARY
+  if (requestIds.length === 0) return { ...EMPTY_SUMMARY, availableRequests }
 
   const requestRows = await Promise.all(requestIds.map((id) =>
     dynamoDB.send(new GetCommand({
@@ -324,7 +354,14 @@ async function computeForGarage(garageId: string): Promise<NotificationSummary> 
     })
   }
 
-  return { threads, appointmentThreads, openThreads: threads - appointmentThreads, alerts }
+  return {
+    threads,
+    appointmentThreads,
+    openThreads: threads - appointmentThreads,
+    availableRequests,
+    offersNeedingAttention: freshlyAccepted.length + awaitingDates.length,
+    alerts,
+  }
 }
 
 async function _GET(request: NextRequest) {

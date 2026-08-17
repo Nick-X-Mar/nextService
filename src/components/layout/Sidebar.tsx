@@ -13,14 +13,16 @@ import { resolveActiveHref, type ActiveNavItem } from '@/utils/activeNav'
 interface NavItem extends ActiveNavItem {
   label: string
   icon: string
-  /** Unread conversations behind this destination. Hidden when 0. */
+  /** How many things wait behind this destination. Hidden when 0. */
   badge?: number
+  /** What the badge counts, for screen readers. */
+  badgeLabel?: string
 }
 
 export default function Sidebar() {
   const { userType, client, garage, logout } = useAuth()
   const { run, isPending } = useAsyncTask()
-  const { threads, openThreads, appointmentThreads } = useNotifications()
+  const { threads, openThreads, appointmentThreads, availableRequests, offersNeedingAttention } = useNotifications()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const currentTab = searchParams.get('tab')
@@ -41,11 +43,11 @@ export default function Sidebar() {
   ] : []
 
   const garageNavItems: NavItem[] = garage ? [
-    { label: 'Νέα Αιτήματα', icon: 'list_alt', href: `/garage-dashboard/${garage.id}?tab=requests`, matchTab: 'requests' },
-    { label: 'Προσφορές', icon: 'local_offer', href: `/garage-dashboard/${garage.id}?tab=offers`, matchTab: 'offers' },
+    { label: 'Νέα Αιτήματα', icon: 'list_alt', href: `/garage-dashboard/${garage.id}?tab=requests`, matchTab: 'requests', badge: availableRequests, badgeLabel: 'αιτήματα σε αναμονή προσφοράς' },
+    { label: 'Προσφορές', icon: 'local_offer', href: `/garage-dashboard/${garage.id}?tab=offers`, matchTab: 'offers', badge: offersNeedingAttention, badgeLabel: 'προσφορές που περιμένουν κίνηση' },
     { label: 'Ραντεβού', icon: 'calendar_today', href: `/garage-dashboard/${garage.id}?tab=appointments`, matchTab: 'appointments' },
-    { label: 'Ανοιχτές Συνομιλίες', icon: 'chat', href: `/garage-dashboard/${garage.id}/chats`, badge: openThreads },
-    { label: 'Συνομιλίες Ραντεβού', icon: 'forum', href: `/garage-dashboard/${garage.id}/chats/appointments`, badge: appointmentThreads },
+    { label: 'Ανοιχτές Συνομιλίες', icon: 'chat', href: `/garage-dashboard/${garage.id}/chats`, badge: openThreads, badgeLabel: 'συνομιλίες με νέα μηνύματα' },
+    { label: 'Συνομιλίες Ραντεβού', icon: 'forum', href: `/garage-dashboard/${garage.id}/chats/appointments`, badge: appointmentThreads, badgeLabel: 'συνομιλίες με νέα μηνύματα' },
     { label: 'Ρυθμίσεις', icon: 'settings', href: `/garage-dashboard/${garage.id}?tab=settings`, matchTab: 'settings' },
   ] : []
 
@@ -104,7 +106,7 @@ export default function Sidebar() {
               <span className="text-xs flex-1">{item.label}</span>
               {!!item.badge && item.badge > 0 && (
                 <span
-                  aria-label={`${item.badge} συνομιλίες με νέα μηνύματα`}
+                  aria-label={`${item.badge} ${item.badgeLabel ?? 'νέα'}`}
                   className="bg-primary text-on-primary text-[10px] font-bold leading-none h-5 min-w-5 px-1.5 rounded-full flex items-center justify-center"
                 >
                   {item.badge > 9 ? '9+' : item.badge}

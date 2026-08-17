@@ -57,7 +57,11 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [requestDetails, setRequestDetails] = useState<ServiceRequest | null>(null)
-  const isReadOnly = requestDetails?.status === ServiceRequestStatus.APPOINTMENT
+  // With an appointment booked, only the thread with the chosen garage stays open —
+  // the rest of the conversations are history for both sides.
+  const isReadOnly =
+    requestDetails?.status === ServiceRequestStatus.APPOINTMENT &&
+    (!requestDetails?.acceptedGarageId || selectedGarage?.id !== requestDetails.acceptedGarageId)
 
   const subscriptionRef = useRef<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -599,7 +603,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                       <div className="rounded-xl bg-surface-container px-4 py-3 flex items-center gap-3">
                         <Icon name="lock" size="sm" className="text-secondary" />
                         <p className="text-xs text-secondary">
-                          Η συνομιλία είναι μόνο για ανάγνωση επειδή έχει προγραμματιστεί ραντεβού για αυτό το αίτημα.
+                          Το ραντεβού κλείστηκε με άλλο συνεργείο, οπότε αυτή η συνομιλία είναι πλέον μόνο για ανάγνωση.
                         </p>
                       </div>
                     </div>

@@ -65,7 +65,7 @@ export default async function Image() {
             </div>
           )}
           <div style={{ fontSize: 24, fontWeight: 600, opacity: 0.92, display: 'flex' }}>
-            Car service marketplace · Ελλάδα
+            Πλατφόρμα συνεργείων αυτοκινήτου · Αθήνα
           </div>
         </div>
 

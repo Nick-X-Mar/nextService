@@ -61,7 +61,14 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       <main className={`${isLanding ? '' : noShellPadding ? 'pt-0' : 'pt-14'} ${noShellPadding ? 'pb-0' : 'pb-24'} md:pb-0 ${showSidebar ? 'md:ml-64' : ''}`}>
         {children}
       </main>
-      {isPublicContentPage && <Footer />}
+      {/* The sidebar is fixed at the left edge, so the footer needs main's offset too —
+          without it a signed-in visitor on /terms or /faq found the footer sitting
+          underneath the sidebar. */}
+      {isPublicContentPage && (
+        <div className={showSidebar ? 'md:ml-64' : ''}>
+          <Footer />
+        </div>
+      )}
       <Suspense fallback={null}>
         <BottomNav />
       </Suspense>

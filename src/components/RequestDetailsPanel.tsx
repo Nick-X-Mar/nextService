@@ -110,9 +110,19 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
   return (
     <div className="bg-surface-container-lowest rounded-xl shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10 overflow-hidden">
       {/* Header - Always visible */}
+      {/* Same rule as every other card in the app: the row opens it, the arrow closes it. */}
       <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
         className="flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-surface-container-low transition-colors"
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={() => { if (!isExpanded) setIsExpanded(true) }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            setIsExpanded(!isExpanded)
+          }
+        }}
       >
         <div className="flex items-center gap-3 min-w-0">
           <Icon name="assignment" size="sm" className="text-primary flex-shrink-0" filled />
@@ -139,11 +149,17 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
               <Icon name="edit" size="sm" className="text-on-surface-variant" />
             </button>
           )}
-          <Icon
-            name={isExpanded ? 'expand_less' : 'expand_more'}
-            size="sm"
-            className="text-on-surface-variant"
-          />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setIsExpanded(!isExpanded)
+            }}
+            aria-label={isExpanded ? 'Κλείσιμο' : 'Άνοιγμα'}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors active:scale-95"
+          >
+            <Icon name={isExpanded ? 'expand_less' : 'expand_more'} size="md" />
+          </button>
         </div>
       </div>
 
@@ -296,7 +312,7 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
 
               {/* VIN Number */}
               <div>
-                <label className={styles.label}>VIN</label>
+                <label className={styles.label}>Αριθμός Πλαισίου</label>
                 {isEditing && allowEdit ? (
                   <input
                     type="text"
