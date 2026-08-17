@@ -9,7 +9,10 @@ import LoginModal from '@/components/LoginModal'
 import { saveFormData, loadFormData } from '../../../../utils/formStorage'
 import { useToast } from '../../../../hooks/useToast'
 import { useAuth } from '@/contexts/AuthContext'
+import { usePriceEstimate } from '@/hooks/usePriceEstimate'
+import { getCategoryText } from '@/utils/categoryLabels'
 import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
+import EstimatedCostCard from './EstimatedCostCard'
 
 interface CarSpecsFormProps {
   savedData: {
@@ -25,6 +28,7 @@ interface CarSpecsFormProps {
     fuelType: string
     isAutomatic: boolean
     is4x4: boolean
+    isTurbo: boolean
     estimatedPrice: number | null
   }
 }
@@ -43,8 +47,6 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   const [mounted, setMounted] = useState(false)
   const [showVinInfo, setShowVinInfo] = useState(false)
   const [showEngineInfo, setShowEngineInfo] = useState(false)
-  const [estimatedPrice, setEstimatedPrice] = useState<number | null>(null)
-  const [isEstimatingPrice, setIsEstimatingPrice] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [password, setPassword] = useState('')
@@ -64,53 +66,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
     }).catch(() => {})
   }, [])
 
-  interface PriceEstimateInput {
-    category: string
-    brand: string
-    model: string
-    modelYear?: string | number
-    engineCC?: string | number
-    fuelType?: string
-    isAutomatic?: boolean
-    is4x4?: boolean
-  }
-
-  // Function to estimate price
-  const estimatePrice = useCallback(async (data: PriceEstimateInput) => {
-    setIsEstimatingPrice(true)
-    try {
-      const response = await fetch('/api/price-estimation/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          category: data.category,
-          brand: data.brand,
-          model: data.model,
-          modelYear: data.modelYear,
-          engineCC: data.engineCC,
-          fuelType: data.fuelType,
-          isAutomatic: data.isAutomatic,
-          is4x4: data.is4x4
-        })
-      })
-
-      const result = await response.json()
-
-      if (result.success && result.estimation) {
-        setEstimatedPrice(result.estimation.estimatedCost)
-        // Save estimated price to form data
-        saveFormData({
-          estimatedPrice: result.estimation.estimatedCost
-        })
-      }
-    } catch (error) {
-      console.error('Price estimation error:', error)
-    } finally {
-      setIsEstimatingPrice(false)
-    }
-  }, [])
+  const { estimate, isLoading: isEstimatingPrice } = usePriceEstimate(savedData)
 
   // Load saved data on component mount
   useEffect(() => {
@@ -123,14 +79,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
       setExistingLicensePhotoUrl(data.originalVehicleLicensePhotoUrl)
       setHasLicensePhoto(true)
     }
-
-    // Estimate price when component mounts if not already estimated
-    if (!data.estimatedPrice && data.brand && data.model && data.modelYear && data.engineCC && data.fuelType) {
-      estimatePrice(data)
-    } else if (data.estimatedPrice) {
-      setEstimatedPrice(data.estimatedPrice)
-    }
-  }, [estimatePrice])
+  }, [])
 
   // Save data whenever it changes
   useEffect(() => {
@@ -207,6 +156,9 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
         ...savedData,
         vinNumber,
         engineNumber,
+        // The API stores this as `estimatedCost`; savedData carries it as `estimatedPrice`,
+        // so without this line the estimate the customer saw is never persisted.
+        ...(estimate && { estimatedCost: estimate.estimatedCost }),
         licensePhoto: licensePhoto?.name || null,
         // Include original vehicle tracking data if present
         ...(latestFormData.originalVehicleId && { originalVehicleId: latestFormData.originalVehicleId }),
@@ -308,7 +260,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                 {savedData.brand} {savedData.model} ({savedData.modelYear})
               </p>
               <p className="text-xs text-on-surface-variant">
-                {savedData.engineCC}cc &middot; {savedData.category}
+                {savedData.engineCC}cc &middot; {getCategoryText(savedData.category)}
               </p>
               {savedData.description && (
                 <p className="text-xs text-on-surface-variant mt-1 italic">
@@ -320,31 +272,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
         </div>
 
         {/* Estimated cost card */}
-        {(estimatedPrice || isEstimatingPrice) && (
-          <div className="mt-3 bg-primary/5 rounded-2xl border border-primary/10 p-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <Icon name="payments" className="text-primary" size="md" />
-              </div>
-              <div className="flex-1">
-                <p className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
-                  Εκτιμωμενο Κοστος
-                </p>
-                {isEstimatingPrice ? (
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                    <p className="text-sm text-primary font-medium">Υπολογισμος...</p>
-                  </div>
-                ) : (
-                  <p className="text-xl font-black text-primary">{estimatedPrice}EUR</p>
-                )}
-              </div>
-            </div>
-            <p className="text-xs font-semibold text-tertiary mt-3 ml-[52px]">
-              Ενδεικτική εκτίμηση — συμπληρώστε τα στοιχεία σας για να λάβετε πραγματικές προσφορές από συνεργεία
-            </p>
-          </div>
-        )}
+        <EstimatedCostCard estimate={estimate} isLoading={isEstimatingPrice} />
 
         {/* Main form card */}
         <div className="mt-6 space-y-6">

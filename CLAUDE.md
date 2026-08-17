@@ -24,6 +24,8 @@ Seed / maintenance scripts (run against local DynamoDB by default):
 - `npx tsx scripts/seed-admin.ts` — create the admin user (`admin@nextservice.gr` / `admin123` defaults)
 - `npx tsx scripts/seed-hot-deals.ts` — seed landing-page hot deals
 - `npx tsx scripts/fix-seo-slugs.ts` — backfill SEO slugs
+- `npx tsx scripts/build-price-examples.ts [--report] [--dump]` — rebuild `src/data/price-examples.json` from the two offers spreadsheets at repo root (`NextService - Προσφορές Last.csv`, structured columns; `NextService - Φύλλο37.csv`, one free-text cell per car). Both are read, parsed and deduped on phone + category; no DynamoDB involved.
+- `npx tsx scripts/validate-price-lookup.ts` — leave-one-out accuracy check of the price lookup
 
 Node 20 (`.nvmrc`). Java is required for DynamoDB Local.
 
@@ -50,7 +52,7 @@ Testing: Playwright E2E only (`e2e/*.spec.ts`). There is no unit-test framework 
 - `upload-photos/`, `upload/` — S3 photo uploads
 - `garage/`, `clients/`, `vehicles/` — entity CRUD
 - `payments/`, `wallet/`, `webhooks/stripe` — Stripe deposits, saved cards, wallet balance/transactions
-- `price-estimation/`, `hot-deals/`, `track/` — public endpoints
+- `price-estimation/`, `hot-deals/`, `track/` — public endpoints. Price estimation is a nearest-neighbour lookup over past quotes (`src/lib/price-lookup.ts` + `src/data/price-examples.json`), not a formula: it finds the closest cars we have quoted before and returns the lowest of those prices.
 - `account/export`, `account/delete` — GDPR
 - `admin/**` — the whole admin surface (users, requests, payments, commissions, emails, errors, funnel, performance, hot-deals, custom vehicles, settings, tests)
 

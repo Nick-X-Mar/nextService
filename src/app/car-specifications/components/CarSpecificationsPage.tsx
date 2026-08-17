@@ -19,6 +19,7 @@ export default function CarSpecificationsPage() {
     fuelType: '',
     isAutomatic: false,
     is4x4: false,
+    isTurbo: false,
     estimatedPrice: null as number | null
   })
   const [isLoading, setIsLoading] = useState(true)
@@ -39,6 +40,7 @@ export default function CarSpecificationsPage() {
       fuelType: data.fuelType || '',
       isAutomatic: data.isAutomatic || false,
       is4x4: data.is4x4 || false,
+      isTurbo: data.isTurbo || false,
       estimatedPrice: data.estimatedPrice || null
     })
     setIsLoading(false)

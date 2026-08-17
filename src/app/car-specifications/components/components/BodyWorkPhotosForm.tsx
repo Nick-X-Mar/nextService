@@ -6,6 +6,8 @@ import Icon from '@/components/ui/Icon'
 import GearSubmitButton from '@/components/GearSubmitButton'
 import { useToast } from '../../../../hooks/useToast'
 import { loadFormData } from '../../../../utils/formStorage'
+import { usePriceEstimate } from '@/hooks/usePriceEstimate'
+import EstimatedCostCard from './EstimatedCostCard'
 import Image from 'next/image'
 
 interface BodyWorkPhotosFormProps {
@@ -29,6 +31,7 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
   // Stays true through the redirect so the button doesn't flick back to idle
   // while the requests page is still loading.
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const { estimate, isLoading: isEstimatingPrice } = usePriceEstimate(savedData)
 
   // Track form funnel
   useEffect(() => {
@@ -93,6 +96,8 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
         const serviceRequestData = {
           ...savedData,
           photos: photos.map(p => ({ name: p.name, size: p.size, type: p.type })),
+          // Persist the estimate the customer was shown (the API field is estimatedCost)
+          ...(estimate && { estimatedCost: estimate.estimatedCost }),
           // Include original vehicle tracking data if present
           ...(latestFormData.originalVehicleId && { originalVehicleId: latestFormData.originalVehicleId }),
           ...(latestFormData.originalVehicleData && { originalVehicleData: latestFormData.originalVehicleData }),
@@ -208,6 +213,9 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
             </div>
           </div>
         </div>
+
+        {/* Estimated cost card */}
+        <EstimatedCostCard estimate={estimate} isLoading={isEstimatingPrice} />
 
         {/* Main form area */}
         <div className="mt-6 space-y-6">
