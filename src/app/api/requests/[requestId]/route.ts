@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { getByIdOrNull } from '@/utils/getById'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { requireAuth, requireOwner } from '@/utils/requireAuth'
 import { generatePresignedUrls } from '@/utils/s3Service'
 import { withMetrics } from '@/utils/withMetrics'
+import { ServiceRequestStatus } from '@/types/statuses'
 
 async function _GET(
   request: NextRequest,
@@ -57,6 +58,35 @@ async function _GET(
         { error: 'Δεν έχετε πρόσβαση σε αυτόν τον πόρο' },
         { status: 403 }
       )
+    }
+
+    // Authorization: a garage may read a request while it is on the open market (the
+    // feed shows every pending request to every active garage), or afterwards only if
+    // it is actually involved — it bid, or it won. Until this check existed, matching
+    // the viewerGarageId to yourself was the *whole* test, so any garage could pull the
+    // client's name, phone, plate, VIN and άδεια photo for any request id it had ever
+    // seen — including long after the job went to a competitor.
+    if (auth.userType === 'garage') {
+      const isOpenMarket = serviceRequest.status === ServiceRequestStatus.PENDING
+      const isWinner = serviceRequest.acceptedGarageId === auth.userId
+
+      if (!isOpenMarket && !isWinner) {
+        const offersOnRequest = await dynamoDB.send(new QueryCommand({
+          TableName: 'Offers',
+          IndexName: 'ServiceRequestOffersIndex',
+          KeyConditionExpression: 'serviceRequestId = :requestId',
+          ExpressionAttributeValues: { ':requestId': requestId },
+          ProjectionExpression: 'garageId',
+        }))
+        const hasOwnOffer = (offersOnRequest.Items ?? []).some((o) => o.garageId === auth.userId)
+
+        if (!hasOwnOffer) {
+          return NextResponse.json(
+            { error: 'Δεν έχετε πρόσβαση σε αυτόν τον πόρο' },
+            { status: 403 }
+          )
+        }
+      }
     }
 
     // Fetch client + vehicle + presigned photo URLs in parallel — they're independent.

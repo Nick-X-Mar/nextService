@@ -75,6 +75,26 @@ function applySlidingCookie(response: NextResponse, token: string): void {
   })
 }
 
+/**
+ * Identity headers are minted here and nowhere else.
+ *
+ * `requireAuth`/`getAuth` downstream read `x-user-id` and `x-user-type` and trust them
+ * completely — which is correct only if a caller can never set them. The public-route
+ * branch below forwards the request untouched when there is no cookie, so before this
+ * existed a plain `curl -H "x-user-id: client-<someone>" /api/service-request` created a
+ * service request inside that person's account with no credential at all. Anything
+ * arriving from outside is stripped first; the verified values are set afterwards.
+ */
+function withoutClientIdentity(request: NextRequest): Headers {
+  const headers = new Headers(request.headers)
+  headers.delete('x-user-id')
+  headers.delete('x-user-type')
+  headers.delete('x-admin-id')
+  headers.delete('x-admin-email')
+  headers.delete('x-admin-role')
+  return headers
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
@@ -89,7 +109,7 @@ export async function middleware(request: NextRequest) {
     // without trailing slash since trailingSlash: true is enabled in next.config)
     const normalized = pathname.replace(/\/$/, '')
     if (normalized === '/admin/login' || normalized === '/api/admin/auth/login') {
-      return NextResponse.next()
+      return NextResponse.next({ request: { headers: withoutClientIdentity(request) } })
     }
 
     const adminToken = request.cookies.get(ADMIN_COOKIE)?.value
@@ -109,7 +129,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/admin/login/', request.url))
     }
 
-    const adminHeaders = new Headers(request.headers)
+    const adminHeaders = withoutClientIdentity(request)
     adminHeaders.set('x-admin-id', admin.adminId)
     adminHeaders.set('x-admin-email', admin.email)
     adminHeaders.set('x-admin-role', admin.role)
@@ -190,7 +210,7 @@ export async function middleware(request: NextRequest) {
         const userId = payload.userId as string
         const userType = payload.userType as string
         if (userId && userType) {
-          const requestHeaders = new Headers(request.headers)
+          const requestHeaders = withoutClientIdentity(request)
           requestHeaders.set('x-user-id', userId)
           requestHeaders.set('x-user-type', userType)
           const response = NextResponse.next({ request: { headers: requestHeaders } })
@@ -204,7 +224,8 @@ export async function middleware(request: NextRequest) {
         // Token invalid/expired — proceed as unauthenticated
       }
     }
-    return NextResponse.next()
+    // No usable cookie: the caller is anonymous, and must reach the route that way.
+    return NextResponse.next({ request: { headers: withoutClientIdentity(request) } })
   }
 
   // Allow GET on garage profile (public data) and photo routes.
@@ -214,7 +235,7 @@ export async function middleware(request: NextRequest) {
     (pathname.match(/^\/api\/garage\/garage-[^/]+\/?$/) && request.method === 'GET') ||
     pathname.startsWith('/api/photos/')
   ) {
-    return NextResponse.next()
+    return NextResponse.next({ request: { headers: withoutClientIdentity(request) } })
   }
 
   // Verify JWT token
@@ -240,7 +261,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // Inject verified identity into request headers for downstream routes
-    const requestHeaders = new Headers(request.headers)
+    const requestHeaders = withoutClientIdentity(request)
     requestHeaders.set('x-user-id', userId)
     requestHeaders.set('x-user-type', userType)
 

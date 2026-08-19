@@ -15,6 +15,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}))
     const testFile = body.testFile || '' // Optional: run specific test file
 
+    // The file name lands in a shell command, so it is matched against a strict
+    // pattern rather than interpolated as sent. Anything else — a semicolon, a
+    // backtick, a path segment — was arbitrary command execution on the server,
+    // running as the app with its environment: an admin session was effectively a
+    // shell. Names only, from the e2e directory, nothing clever.
+    if (testFile && !/^[a-zA-Z0-9_-]+\.spec\.ts$/.test(testFile)) {
+      return NextResponse.json(
+        { error: 'Invalid test file name' },
+        { status: 400 }
+      )
+    }
+
     const cmd = testFile
       ? `npx playwright test e2e/${testFile} --reporter=json 2>&1`
       : `npx playwright test --reporter=json 2>&1`
