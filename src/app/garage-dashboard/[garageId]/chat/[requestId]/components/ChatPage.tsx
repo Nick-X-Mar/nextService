@@ -12,6 +12,7 @@ import { LoadMoreButton, Spinner } from '@/components'
 import '@/lib/amplify-config'
 import appSyncService from '@/lib/appsync-service'
 import { useNotifications } from '@/contexts/NotificationsContext'
+import { useToast } from '@/hooks/useToast'
 import { getCategoryText } from '@/utils/categoryLabels'
 
 interface Message {
@@ -42,6 +43,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const router = useRouter()
   const { refresh: refreshUnread } = useNotifications()
+  const { showToast } = useToast()
   // Read-only once the job is booked — unless this is the garage that got it, which
   // still has an appointment to arrange with the customer.
   const isReadOnly =
@@ -69,12 +71,9 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     console.log(`[Garage] Subscribing to AppSync channel: ${channelName}`)
 
     try {
-      // Connect to AppSync if not already connected
-      if (!appSyncService.getConnectionStatus()) {
-        await appSyncService.connect()
-      }
-
-      // Subscribe to the channel
+      // subscribe() opens the socket itself and replays the channel once it is
+      // up, so there is nothing to await. Awaiting the handshake here is what
+      // used to wedge the page: Safari never times a stalled one out.
       appSyncService.subscribe(channelName, (newMessage: Message) => {
         console.log('[Garage] Real-time message received:', newMessage)
 
@@ -137,6 +136,36 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     }
   }, [olderCursor, loadingOlder, requestId, garageId])
 
+  /**
+   * Re-pulls the latest page and merges in anything new.
+   *
+   * Used after the connection comes back: messages published while the socket
+   * was down never reached the subscription callback. On Safari the socket
+   * dies every time the tab is backgrounded, so this is the normal path rather
+   * than an edge case.
+   */
+  const refreshMessages = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/chat/${requestId}/messages/?garageId=${garageId}`)
+      if (!res.ok) return
+      const result = await res.json()
+      if (!result.success) return
+      const fresh: Message[] = (result.messages || []).filter(
+        (msg: Message) => msg.timestamp && !isNaN(new Date(msg.timestamp).getTime())
+      )
+      setMessages(prev => {
+        const seen = new Set(prev.map(m => m.id))
+        const added = fresh.filter(m => !seen.has(m.id))
+        if (added.length === 0) return prev
+        return [...prev, ...added].sort((a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        )
+      })
+    } catch (error) {
+      console.error('Error refreshing messages:', error)
+    }
+  }, [requestId, garageId])
+
   const loadChatData = useCallback(async () => {
     try {
       setIsLoading(true)
@@ -172,9 +201,10 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
         }
       }
 
-      // Start AppSync subscription after loading initial data
+      // Fire-and-forget: real-time is an enhancement on top of the messages we
+      // just fetched, never a preconditon for showing them.
       console.log('[Garage] Starting AppSync subscription...')
-      await subscribeToMessages()
+      void subscribeToMessages()
     } catch (error) {
       console.error('Error loading chat data:', error)
     } finally {
@@ -214,6 +244,9 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Fill the gap left by any outage as soon as the socket is back.
+  useEffect(() => appSyncService.onReconnect(refreshMessages), [refreshMessages])
+
   useEffect(() => {
     scrollToBottom()
   }, [messages])
@@ -240,12 +273,29 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
       if (response.ok) {
         const result = await response.json()
         if (result.success) {
-          // Don't manually add the message - real-time subscription will handle it
+          // Render it immediately from the API's own copy of the row. Waiting
+          // for the real-time echo instead meant that whenever the socket was
+          // down the message you had just sent simply vanished until you
+          // refreshed. The subscription de-dupes on id, so the echo is a no-op
+          // when it does arrive.
+          const sent: Message | undefined = result.message
+          if (sent?.id) {
+            setMessages(prev =>
+              prev.some(m => m.id === sent.id)
+                ? prev
+                : [...prev, sent].sort((a, b) =>
+                    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+                  )
+            )
+          }
           setNewMessage('')
           if (textareaRef.current) {
             textareaRef.current.style.height = 'auto'
           }
         }
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast({ type: 'error', title: err.error || 'Δεν στάλθηκε το μήνυμα. Δοκιμάστε ξανά.' })
       }
     } catch (error) {
       console.error('Error sending message:', error)

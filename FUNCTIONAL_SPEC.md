@@ -256,7 +256,7 @@ Sticky top navigation (visible on all client pages):
 |-----|-------|----------------|
 | 1 | Αιτήματα (Open Requests) | PENDING + IN_PROGRESS |
 | 2 | Ραντεβού (Appointments) | APPOINTMENT (future dates first) |
-| 3 | Κλειστά (Closed) | COMPLETED + CANCELLED |
+| 3 | Ολοκληρωμένα (Completed) | COMPLETED + CANCELLED + past APPOINTMENT |
 
 **Request Card — fields displayed:**
 

@@ -457,7 +457,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
   const tabs = [
     { key: 'open' as const, label: 'Αιτήματα', count: openRequests.length, icon: 'pending_actions' },
     { key: 'appointment' as const, label: 'Ραντεβού', count: appointmentRequests.length, icon: 'event' },
-    { key: 'closed' as const, label: 'Κλειστά', count: closedRequests.length, icon: 'task_alt' }
+    { key: 'closed' as const, label: 'Ολοκληρωμένα', count: closedRequests.length, icon: 'task_alt' }
   ]
 
   const currentRequests =
@@ -860,7 +860,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                 <p className="text-sm text-on-surface-variant">
                   {activeTab === 'open' && 'Δεν υπάρχουν ανοιχτά αιτήματα'}
                   {activeTab === 'appointment' && 'Δεν υπάρχουν ενεργά ραντεβού'}
-                  {activeTab === 'closed' && 'Δεν υπάρχουν κλειστά αιτήματα'}
+                  {activeTab === 'closed' && 'Δεν υπάρχουν ολοκληρωμένα αιτήματα'}
                 </p>
               </div>
             )

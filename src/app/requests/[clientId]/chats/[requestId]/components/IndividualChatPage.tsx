@@ -171,12 +171,9 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
     console.log(`[Client] Subscribing to AppSync channel: ${channelName}`)
 
     try {
-      // Connect to AppSync if not already connected
-      if (!appSyncService.getConnectionStatus()) {
-        await appSyncService.connect()
-      }
-
-      // Subscribe to the channel
+      // subscribe() opens the socket itself and replays the channel once it is
+      // up, so there is nothing to await. Awaiting the handshake here would
+      // stall on Safari, which never times a failed one out.
       appSyncService.subscribe(channelName, (newMessage: ChatMessage) => {
         console.log('[Client] Real-time message received:', newMessage)
 
@@ -198,9 +195,8 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       subscriptionRef.current = channelName
     } catch (error) {
       console.error('[Client] Error subscribing to AppSync:', error)
-      showToast({ type: 'error', title: 'Σφάλμα στη σύνδεση για πραγματικό χρόνο' })
     }
-  }, [requestId, showToast])
+  }, [requestId])
 
   // Stop subscription
   const stopSubscription = () => {
@@ -342,6 +338,15 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       stopSubscription()
     }
   }, [])
+
+  // Refetch once the connection is back: anything published during the outage
+  // never reached the subscription callback. Safari drops the socket every
+  // time the tab is backgrounded, so this is the normal path, not an edge case.
+  useEffect(() => {
+    if (!selectedGarage) return
+    const garageId = selectedGarage.id
+    return appSyncService.onReconnect(() => { fetchMessages(garageId) })
+  }, [selectedGarage, fetchMessages])
 
   // Scroll to bottom when messages change
   useEffect(() => {

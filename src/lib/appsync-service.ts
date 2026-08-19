@@ -94,6 +94,12 @@ function buildAuthorization(): Record<string, string | undefined> {
   return { 'x-api-key': process.env.NEXT_PUBLIC_APPSYNC_API_KEY, host }
 }
 
+// Safari never gives up on a stalled WebSocket handshake by itself — the socket
+// just sits in CONNECTING and no event ever fires. Anything awaiting connect()
+// hangs with it, which is how the chat page ended up stuck on its spinner.
+const CONNECT_TIMEOUT_MS = 8000
+const MAX_RECONNECT_DELAY_MS = 30000
+
 class AppSyncService {
   private ws: WebSocket | null = null
   // Multiple components can listen on the same channel (e.g. the dashboard
@@ -102,16 +108,86 @@ class AppSyncService {
   private subscriptions: Map<string, Set<AppSyncCallback>> = new Map()
   private reconnectListeners: Set<ReconnectListener> = new Set()
   private reconnectAttempts = 0
-  private maxReconnectAttempts = 5
+  private maxReconnectAttempts = 10
   private reconnectDelay = 1000
   private isConnected = false
   private hasEverConnected = false
+  // Concurrent callers (a chat page and the dashboard hook mounting together)
+  // must share one socket. Without this each opened its own, the later
+  // assignment orphaned the earlier one, and the orphan's close handler then
+  // fought the live socket over reconnects.
+  private connectPromise: Promise<void> | null = null
+  // Set by disconnect() so a deliberate teardown isn't mistaken for an outage.
+  private intentionalClose = false
+  private wakeListenersBound = false
 
+  constructor() {
+    this.bindWakeListeners()
+  }
+
+  /**
+   * Reopens the socket when the browser comes back to life.
+   *
+   * iOS Safari suspends WebSockets whenever the tab is backgrounded or the
+   * screen locks, and it does not tell the page: the socket is simply dead on
+   * return. Without these handlers the only way back was a manual refresh,
+   * which is exactly what users were having to do.
+   */
+  private bindWakeListeners() {
+    if (typeof window === 'undefined' || this.wakeListenersBound) return
+    this.wakeListenersBound = true
+
+    const wake = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      // Nothing is listening — opening a socket now would just be a leak.
+      if (this.subscriptions.size === 0) return
+      if (this.isConnected && this.ws?.readyState === WebSocket.OPEN) return
+      // A live user gesture is better evidence than the backoff counter.
+      this.reconnectAttempts = 0
+      this.connect().catch(() => { /* handleReconnect keeps trying */ })
+    }
+
+    document.addEventListener('visibilitychange', wake)
+    window.addEventListener('online', wake)
+    window.addEventListener('pageshow', wake)
+    window.addEventListener('focus', wake)
+  }
+
+  /**
+   * Opens the socket, or joins the existing / in-flight connection.
+   */
   async connect(): Promise<void> {
+    if (this.isConnected && this.ws?.readyState === WebSocket.OPEN) return
+    if (this.connectPromise) return this.connectPromise
+
+    this.intentionalClose = false
+    this.connectPromise = this.openSocket().finally(() => {
+      this.connectPromise = null
+    })
+    return this.connectPromise
+  }
+
+  private async openSocket(): Promise<void> {
     // Obtained before opening the socket: the authorizer rejects the
     // connection without it.
     const realtimeAuth = await getRealtimeToken()
     return new Promise((resolve, reject) => {
+      // The handshake can end in onopen, onerror, onclose or the timeout below,
+      // and on Safari more than one of those fires. Settle exactly once.
+      let settled = false
+      let timeoutId: ReturnType<typeof setTimeout> | undefined
+      const succeed = () => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeoutId)
+        resolve()
+      }
+      const fail = (err: unknown) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeoutId)
+        reject(err)
+      }
       try {
         const endpoint = process.env.NEXT_PUBLIC_APPSYNC_WEBSOCKET_ENDPOINT
         const apiKey = process.env.NEXT_PUBLIC_APPSYNC_API_KEY
@@ -161,24 +237,41 @@ class AppSyncService {
           ])
         }
         
+        // Every handler below belongs to *this* socket. A replaced socket can
+        // still emit close/error afterwards, and without this guard that stale
+        // event would mark the live connection as down.
+        const socket = this.ws
+        const isCurrent = () => this.ws === socket
+
+        timeoutId = setTimeout(() => {
+          console.warn('⏱️ AppSync WebSocket handshake timed out — giving up on this attempt')
+          try { socket.close() } catch { /* already gone */ }
+          fail(new Error('AppSync WebSocket connection timed out'))
+        }, CONNECT_TIMEOUT_MS)
+
         this.ws.onopen = () => {
+          if (!isCurrent()) return
           console.log('✅ AppSync Events WebSocket connected')
-          const isReconnect = this.hasEverConnected
+          // `reconnectAttempts > 0` covers the case where the very first
+          // handshake failed and a retry succeeded: subscribers still need the
+          // gap-filling refetch even though this is technically the first open.
+          const isReconnect = this.hasEverConnected || this.reconnectAttempts > 0
           this.reconnectAttempts = 0
           this.isConnected = true
           this.hasEverConnected = true
-          // Resubscribe to any channels the app had registered before the
-          // disconnect, so subscribers don't have to manually re-bind.
+          // Replay every registered channel, not only on reconnect. A
+          // subscribe() that landed while the socket was down or mid-handshake
+          // never got its wire frame sent, and used to stay silently dead for
+          // the rest of the page's life.
+          this.subscriptions.forEach((_callbacks, channelName) => {
+            this.sendSubscribeMessage(channelName)
+          })
           if (isReconnect) {
-            const channels = Array.from(this.subscriptions.keys())
-            channels.forEach(channelName => {
-              this.sendSubscribeMessage(channelName)
-            })
             this.reconnectListeners.forEach(listener => {
               try { listener() } catch (e) { console.error('Reconnect listener error:', e) }
             })
           }
-          resolve()
+          succeed()
         }
         
         this.ws.onmessage = (event) => {
@@ -192,22 +285,28 @@ class AppSyncService {
         
         this.ws.onclose = (event) => {
           console.log('🔌 AppSync Events WebSocket disconnected:', event.code, event.reason)
+          if (!isCurrent()) return
           this.isConnected = false
-          // Don't auto-reconnect on connection errors to avoid loops
-          if (event.code !== 1000 && event.code !== 1006) {
+          fail(new Error(`AppSync WebSocket closed before opening (${event.code})`))
+          // 1006 (abnormal closure) is what every real network drop looks like,
+          // and it is what Safari reports after suspending a backgrounded tab.
+          // Excluding it meant the one case that always needs recovery was the
+          // one case that never got it.
+          if (!this.intentionalClose && event.code !== 1000 && this.subscriptions.size > 0) {
             this.handleReconnect()
           }
         }
         
         this.ws.onerror = (error) => {
           console.error('❌ AppSync Events WebSocket error:', error)
+          if (!isCurrent()) return
           this.isConnected = false
-          reject(error)
+          fail(error)
         }
         
       } catch (error) {
         console.error('Error connecting to AppSync Events WebSocket:', error)
-        reject(error)
+        fail(error)
       }
     })
   }
@@ -310,18 +409,27 @@ class AppSyncService {
   }
 
   private handleReconnect() {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++
-      console.log(`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`)
-      
-      setTimeout(() => {
-        this.connect().catch(error => {
-          console.error('Reconnection failed:', error)
-        })
-      }, this.reconnectDelay * this.reconnectAttempts)
-    } else {
-      console.error('❌ Max reconnection attempts reached')
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      // Not fatal: the wake listeners reset the counter and try again the next
+      // time the tab is focused or the network comes back.
+      console.error('❌ Max reconnection attempts reached — waiting for focus/online to retry')
+      return
     }
+    this.reconnectAttempts++
+    // Exponential with a cap, plus jitter so every open tab doesn't stampede
+    // the endpoint at the same instant after a network blip.
+    const backoff = Math.min(
+      this.reconnectDelay * 2 ** (this.reconnectAttempts - 1),
+      MAX_RECONNECT_DELAY_MS
+    )
+    const delay = backoff + Math.random() * 500
+    console.log(`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${Math.round(delay)}ms...`)
+
+    setTimeout(() => {
+      this.connect().catch(error => {
+        console.error('Reconnection failed:', error)
+      })
+    }, delay)
   }
 
   subscribe(channelName: string, callback: AppSyncCallback): () => void {
@@ -337,7 +445,14 @@ class AppSyncService {
     // Only send the wire-level subscribe once per channel. Multiple local
     // subscribers share a single server-side subscription.
     if (isFirstSubscriber) {
-      this.sendSubscribeMessage(channelName)
+      if (this.isConnected && this.ws?.readyState === WebSocket.OPEN) {
+        this.sendSubscribeMessage(channelName)
+      } else {
+        // Not up yet: connect and let onopen replay this channel. Callers no
+        // longer need to await connect() before subscribing, so a slow or
+        // failed handshake can never block the UI that depends on them.
+        this.connect().catch(err => console.error('Subscribe connect failed:', err))
+      }
     }
 
     return () => this.unsubscribeCallback(channelName, callback)
@@ -463,8 +578,9 @@ class AppSyncService {
   }
 
   disconnect() {
+    this.intentionalClose = true
     if (this.ws) {
-      this.ws.close()
+      this.ws.close(1000, 'client disconnect')
       this.ws = null
     }
     this.subscriptions.clear()
@@ -472,8 +588,11 @@ class AppSyncService {
     console.log('🔌 AppSync WebSocket disconnected')
   }
 
+  // Reports the socket's real state, not just what the last event said. Safari
+  // can leave a suspended socket behind without ever firing onclose, so the
+  // flag alone would claim a connection that no longer carries traffic.
   getConnectionStatus(): boolean {
-    return this.isConnected
+    return this.isConnected && this.ws?.readyState === WebSocket.OPEN
   }
 }
 
