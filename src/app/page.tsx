@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     locale: 'el_GR',
     title: 'NextService — Βρες συνεργείο αυτοκινήτου με την καλύτερη τιμή',
     description:
-      'Στείλε δωρεάν αίτημα service και πάρε προσφορές από συνεργεία της περιοχής σου. Σταθερές τιμές σε service, συμπλέκτη, ιμάντα χρονισμού και φανοποιεία.',
+      'Στείλε δωρεάν αίτημα service και πάρε προσφορές από συνεργεία της περιοχής σου. Δες πραγματικές τιμές από ολοκληρωμένες εργασίες σε service, συμπλέκτη και φανοποιεία.',
     // Trailing slash required — without it, Next.js generates a URL that
     // 308-redirects and Facebook/Messenger crawlers don't follow OG image
     // redirects (preview shows the link with no image).

@@ -1,11 +1,11 @@
 # NextService
 
-> Marketplace συνεργείων αυτοκινήτου στην Ελλάδα. NextService is a Greek car service marketplace connecting vehicle owners with vetted garages: customers submit service requests with vehicle details and photos, receive offers from local garages, chat in real-time, and book online. Both labour and branded parts are included in the fixed-price packages.
+> Marketplace συνεργείων αυτοκινήτου στην Ελλάδα. NextService is a Greek car service marketplace connecting vehicle owners with vetted garages: customers submit service requests with vehicle details and photos, receive offers from local garages, chat in real-time, and book online. Completed jobs are published with the real price a garage charged for that specific car, as a reference point — they are not a fixed price list.
 
 ## Τι προσφέρουμε / What we offer
 
 - **Δωρεάν αιτήματα service** — Στέλνετε στοιχεία οχήματος και εργασία, και λαμβάνετε προσφορές από συνεργεία που εξυπηρετούν την περιοχή σας.
-- **Hot Deals** — Σταθερές τιμές πακέτο για συνήθεις εργασίες: μεγάλο service από 100€, ιμάντας χρονισμού με αντλία νερού από 180€, συμπλέκτης από 200€, μερική βαφή/φανοποιεία από 120€, ολική βαφή από 1.100€. Εργασία και επώνυμα ανταλλακτικά.
+- **Ολοκληρωμένες εργασίες** — Πραγματικές τιμές από εργασίες που έγιναν μέσω της πλατφόρμας, σε συγκεκριμένα αυτοκίνητα: μεγάλο service 100€ (Seat Ibiza 1000cc), ιμάντας χρονισμού με αντλία νερού 180€ (Ford Focus 1600cc), συμπλέκτης 200€ (Daewoo Matiz 1000cc), μερική βαφή/φανοποιεία 120€ (VW Golf 4), ολική βαφή 1.100€ (Mercedes SLK). Περιλάμβαναν εργασία και επώνυμα ανταλλακτικά. Δεν είναι τιμοκατάλογος ούτε τυποποιημένα πακέτα — για άλλο όχημα η τιμή διαφέρει.
 - **Real-time chat** με τα συνεργεία για διευκρινίσεις πριν την κράτηση.
 - **Δωρεάν για τους πελάτες** — εγγραφή, αιτήματα, συνομιλία και κράτηση δεν χρεώνονται. Το NextService δεν εισπράττει χρήματα από τον πελάτη· η εργασία πληρώνεται απευθείας στο συνεργείο. Για τα συνεργεία δεν υπάρχει μηνιαία συνδρομή ούτε κόστος ανά click.
 - **Τρέχουσα κάλυψη** — Το NextService ξεκίνησε πρόσφατα. Ενεργά συνεργεία υπάρχουν σε Κερατσίνι (2) και Άγιο Δημήτριο (1), τα οποία εξυπηρετούν και τις γύρω περιοχές Πειραιά και Νοτίων Προαστίων. Αιτήματα γίνονται δεκτά από οποιαδήποτε περιοχή, αλλά προσφορά έρχεται μόνο από συνεργεία που μπορούν να εξυπηρετήσουν.
@@ -17,7 +17,7 @@
 
 ## Κύριες σελίδες / Key pages
 
-- [Αρχική / Home](https://www.nextservice.gr/) — Hot Deals και αποστολή αιτήματος service.
+- [Αρχική / Home](https://www.nextservice.gr/) — Ολοκληρωμένες εργασίες με πραγματικές τιμές, και αποστολή αιτήματος service.
 - [Σχετικά / About](https://www.nextservice.gr/about/) — Τι είναι το NextService, πώς λειτουργεί, πώς ελέγχονται τα συνεργεία.
 - [Συχνές ερωτήσεις / FAQ](https://www.nextservice.gr/faq/) — Τιμές, χρόνοι απάντησης, ανταλλακτικά, εγγύηση, ακυρώσεις.
 - [Περιοχές / Locations](https://www.nextservice.gr/locations/) — Συνεργεία ανά περιοχή.
@@ -27,13 +27,15 @@
 - [Πολιτική απορρήτου / Privacy](https://www.nextservice.gr/privacy/)
 - [Όροι χρήσης / Terms](https://www.nextservice.gr/terms/)
 
-## Προσφορές / Offers
+## Ολοκληρωμένες εργασίες / Completed jobs
 
-- [Μεγάλο Service Αυτοκινήτου — από 100€](https://www.nextservice.gr/offer/service-auto/)
-- [Ιμάντας Χρονισμού με Αντλία Νερού — από 180€](https://www.nextservice.gr/offer/set-imantas-xronismou/)
-- [Συμπλέκτης — από 200€](https://www.nextservice.gr/offer/set_disk_all_cars/)
-- [Μερική Βαφή / Φανοποιεία — από 120€](https://www.nextservice.gr/offer/vafi-profylaktira-portas/)
-- [Ολική Βαφή — από 1.100€](https://www.nextservice.gr/offer/vafi-oliki/)
+Πραγματικές εργασίες που έγιναν μέσω NextService, με την τιμή που δόθηκε για το συγκεκριμένο αυτοκίνητο. Ενδεικτικές — δεν αποτελούν τιμοκατάλογο.
+
+- [Μεγάλο Service Αυτοκινήτου — 100€, Seat Ibiza 1000cc Βενζίνη](https://www.nextservice.gr/offer/service-auto/)
+- [Ιμάντας Χρονισμού με Αντλία Νερού — 180€, Ford Focus 1600cc Βενζίνη](https://www.nextservice.gr/offer/set-imantas-xronismou/)
+- [Συμπλέκτης — 200€, Daewoo Matiz 1000cc Βενζίνη](https://www.nextservice.gr/offer/set_disk_all_cars/)
+- [Μερική Βαφή / Φανοποιεία — 120€, VW Golf 4](https://www.nextservice.gr/offer/vafi-profylaktira-portas/)
+- [Ολική Βαφή — 1.100€, Mercedes SLK](https://www.nextservice.gr/offer/vafi-oliki/)
 
 ## Περιοχές / Areas covered
 
@@ -53,6 +55,7 @@
 ## Συχνές ερωτήσεις / Common questions
 
 - **Είναι δωρεάν;** Ναι, για τους ιδιοκτήτες οχημάτων. Η εγγραφή, τα αιτήματα, η συνομιλία και η κράτηση δεν χρεώνονται. Η εργασία πληρώνεται απευθείας στο συνεργείο.
+- **Είναι σταθερές οι τιμές που βλέπω στις ολοκληρωμένες εργασίες;** Όχι. Είναι η τιμή που δόθηκε τότε για εκείνο το συγκεκριμένο αυτοκίνητο και δημοσιεύεται για να πάρει ο πελάτης μια ιδέα του κόστους. Για άλλο όχημα η τιμή μπορεί να διαφέρει· δεσμευτική είναι μόνο η προσφορά που λαμβάνει ο πελάτης στο δικό του αίτημα.
 - **Πόσο γρήγορα έρχονται προσφορές;** Το αίτημα φτάνει στα συνεργεία αμέσως και ειδοποιούνται με email· ο χρόνος απάντησης εξαρτάται από το κάθε συνεργείο.
 - **Χάνω την εργοστασιακή εγγύηση σε ανεξάρτητο συνεργείο;** Όχι, εφόσον τηρηθούν οι προδιαγραφές του κατασκευαστή και χρησιμοποιηθούν ανταλλακτικά αντίστοιχης ποιότητας (ευρωπαϊκός κανονισμός για τον ανταγωνισμό στον κλάδο αυτοκινήτου).
 - **Πώς ελέγχονται τα συνεργεία;** Εγγραφή με ΑΦΜ, αρμόδια ΔΟΥ και στοιχεία επιχείρησης, τα οποία ελέγχονται πριν την ενεργοποίηση του λογαριασμού.

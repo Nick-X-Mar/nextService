@@ -28,17 +28,19 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!offer) {
     return {
-      title: 'Η προσφορά δεν βρέθηκε',
+      title: 'Η εργασία δεν βρέθηκε',
       robots: { index: false, follow: true },
     }
   }
 
   const url = `${SITE_URL}/offer/${offer.slug}/`
-  // Title ≤ 60 chars for Google SERP. The car model is shown in the OG image visual.
-  const title = `${offer.title} από ${offer.price}`
+  // Title ≤ 60 chars for Google SERP. The car is part of the claim — the price
+  // only means something next to it — so it goes in the title whenever it fits.
+  const titleWithCar = `${offer.title} ${offer.subtitle} — ${offer.price}`
+  const title = titleWithCar.length <= 60 ? titleWithCar : `${offer.title} — ${offer.price}`
   const ogTitle = `${title} | NextService`
   // Description 110-160 chars.
-  const description = `${offer.title} ${offer.subtitle} από ${offer.price}. ${offer.details.slice(0, 2).join(' · ')}. Διάρκεια: ${offer.duration}.`
+  const description = `${offer.title} σε ${offer.subtitle}: ${offer.price}. Πραγματική τιμή από εργασία που έγινε μέσω NextService. ${offer.details.slice(0, 2).join(' · ')}.`
 
   // Explicit OG image URL WITH trailing slash. Without this, Next.js generates
   // /opengraph-image (no slash) which 308-redirects under trailingSlash:true,
@@ -73,46 +75,51 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
+/**
+ * These pages document a job that was actually done, at the price the garage
+ * charged for that one car. They are not a purchasable listing.
+ *
+ * They used to be marked up as Product + Offer, with `price`, `InStock` and a
+ * `priceValidUntil` invented as "today + 1 year" — a promise of a price nobody
+ * can honour, and a Google structured-data violation the moment the page text
+ * says the price may differ. The node is now a plain Service: no price, no
+ * availability, nothing a visitor could hold us to. The real figure still
+ * reaches search and AI assistants through the FAQ text below, which is
+ * rendered on the page.
+ */
 function buildOfferJsonLd(offer: Offer) {
   const url = `${SITE_URL}/offer/${offer.slug}/`
-  const image = absoluteImage(offer.image)
-  // Offer price is valid for one year from now — required for Product rich
-  // results eligibility in Google Search.
-  const priceValidUntil = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10)
 
   return {
-    '@type': 'Product',
-    '@id': `${url}#product`,
-    name: offer.title,
-    description: `${offer.title} — ${offer.subtitle}. ${offer.description}`,
-    image,
-    brand: {
-      '@type': 'Brand',
-      name: 'NextService',
-    },
+    '@type': 'Service',
+    '@id': `${url}#service`,
+    name: `${offer.title} — ${offer.subtitle}`,
+    serviceType: offer.workType,
+    description: `${offer.title} σε ${offer.subtitle}, ολοκληρωμένη εργασία μέσω NextService. ${offer.description}`,
+    image: absoluteImage(offer.image),
     category: offer.category === 'fanopeia' ? 'Φανοποιεία' : 'Service αυτοκινήτου',
-    // Recency signal — AI search engines weight it heavily when choosing which
-    // of several competing sources to cite.
+    provider: { '@id': ORGANIZATION_ID },
+    areaServed: { '@type': 'Country', name: 'GR' },
+  }
+}
+
+/**
+ * Carries the recency signal that used to sit on the Product node — AI search
+ * engines weight it heavily when choosing between competing sources. `Service`
+ * is a Thing, not a CreativeWork, so the dates belong on a WebPage instead.
+ */
+function buildOfferPageJsonLd(offer: Offer) {
+  const url = `${SITE_URL}/offer/${offer.slug}/`
+
+  return {
+    '@type': 'WebPage',
+    '@id': `${url}#webpage`,
+    url,
+    name: `${offer.title} — ${offer.subtitle}`,
+    inLanguage: 'el-GR',
+    about: { '@id': `${url}#service` },
     ...(offer.updatedAt ? { dateModified: offer.updatedAt } : {}),
     ...(offer.createdAt ? { datePublished: offer.createdAt } : {}),
-    offers: {
-      '@type': 'Offer',
-      url,
-      price: offer.priceNum,
-      priceCurrency: 'EUR',
-      availability: 'https://schema.org/InStock',
-      priceValidUntil,
-      seller: { '@id': ORGANIZATION_ID },
-      areaServed: { '@type': 'Country', name: 'GR' },
-      itemOffered: {
-        '@type': 'Service',
-        name: offer.workType,
-        description: offer.description,
-        provider: { '@id': ORGANIZATION_ID },
-      },
-    },
   }
 }
 
@@ -128,19 +135,19 @@ function buildOfferFaqs(offer: Offer) {
   return [
     {
       question: `Πόσο κοστίζει ${offer.title.toLowerCase()};`,
-      answer: `${offer.title} στο NextService ξεκινάει από ${offer.price}, με εργασία και επώνυμα ανταλλακτικά. Η τελική τιμή για το δικό σου όχημα επιβεβαιώνεται από το συνεργείο πριν κλείσεις ραντεβού.`,
+      answer: `${offer.title} σε ${offer.subtitle} κόστισε ${offer.price}, με την εργασία και τα επώνυμα ανταλλακτικά μέσα στην τιμή. Είναι πραγματική εργασία που έγινε μέσω NextService, όχι τυποποιημένο πακέτο ούτε τιμοκατάλογος — για το δικό σου αυτοκίνητο η τιμή μπορεί να είναι διαφορετική. Στείλε αίτημα και θα λάβεις τη δική σου προσφορά από συνεργεία της περιοχής σου.`,
     },
     {
       question: `Πόση ώρα χρειάζεται ${offer.title.toLowerCase()};`,
       answer: `Η εκτιμώμενη διάρκεια είναι ${offer.duration}. Το συνεργείο θα σου επιβεβαιώσει τον ακριβή χρόνο ανάλογα με το μοντέλο και την κατάσταση του οχήματος.`,
     },
     {
-      question: 'Τι περιλαμβάνει η τιμή;',
-      answer: `${offer.details.join('. ')}. Δεν υπάρχουν κρυφές χρεώσεις — αν κατά τον έλεγχο προκύψει κάτι επιπλέον, το συνεργείο οφείλει να σε ενημερώσει και να πάρει τη συγκατάθεσή σου πριν προχωρήσει.`,
+      question: 'Τι περιλάμβανε η τιμή;',
+      answer: `${offer.details.join('. ')}. Σε κάθε προσφορά που λαμβάνεις, το συνεργείο αναφέρει ρητά τι περιλαμβάνεται και δεν υπάρχουν κρυφές χρεώσεις — αν κατά τον έλεγχο προκύψει κάτι επιπλέον, οφείλει να σε ενημερώσει και να πάρει τη συγκατάθεσή σου πριν προχωρήσει.`,
     },
     {
       question: 'Ισχύει για το δικό μου αυτοκίνητο;',
-      answer: `Η τιμή αφορά τα περισσότερα επιβατικά οχήματα. Στείλε αίτημα με μάρκα, μοντέλο και έτος και θα λάβεις επιβεβαίωση ή προσαρμοσμένη προσφορά από συνεργεία της περιοχής σου.`,
+      answer: `Η εργασία αυτή έγινε σε ${offer.subtitle}, οπότε η τιμή δεν ισχύει αυτούσια για κάθε αυτοκίνητο — λειτουργεί σαν ένδειξη κόστους. Στείλε αίτημα με μάρκα, μοντέλο και έτος και θα λάβεις τη δική σου προσφορά από συνεργεία της περιοχής σου.`,
     },
   ]
 }
@@ -158,14 +165,21 @@ export default async function OfferPage({ params }: PageProps) {
   const faqs = buildOfferFaqs(offer)
   const crumbs = breadcrumbJsonLd([
     { name: 'Αρχική', url: `${SITE_URL}/` },
-    { name: 'Προσφορές', url: `${SITE_URL}/` },
+    { name: 'Ολοκληρωμένες εργασίες', url: `${SITE_URL}/` },
     { name: offer.title, url },
   ])
 
   return (
     <>
       <script
-        {...jsonLdScript(graphJsonLd([buildOfferJsonLd(offer), crumbs, faqJsonLd(faqs)]))}
+        {...jsonLdScript(
+          graphJsonLd([
+            buildOfferJsonLd(offer),
+            buildOfferPageJsonLd(offer),
+            crumbs,
+            faqJsonLd(faqs),
+          ])
+        )}
       />
 
       <OfferDetailPage slug={decodedSlug} initialOffer={offer} />

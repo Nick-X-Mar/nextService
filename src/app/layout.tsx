@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     template: "%s | NextService",
   },
   description:
-    "Στείλε δωρεάν αίτημα service και πάρε προσφορές από συνεργεία που εξυπηρετούν την περιοχή σου. Σταθερές τιμές σε service, συμπλέκτη, ιμάντα χρονισμού και φανοποιεία — εργασία και επώνυμα ανταλλακτικά.",
+    "Στείλε δωρεάν αίτημα service και πάρε προσφορές από συνεργεία που εξυπηρετούν την περιοχή σου. Δες πραγματικές τιμές από ολοκληρωμένες εργασίες σε service, συμπλέκτη, ιμάντα χρονισμού και φανοποιεία.",
   applicationName: "NextService",
   icons: {
     icon: "/favicon.ico",
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     url: SITE_URL,
     title: "NextService — Βρες συνεργείο αυτοκινήτου με την καλύτερη τιμή",
     description:
-      "Στείλε δωρεάν αίτημα service και πάρε προσφορές από συνεργεία της περιοχής σου. Σταθερές τιμές σε service, συμπλέκτη, ιμάντα χρονισμού και φανοποιεία.",
+      "Στείλε δωρεάν αίτημα service και πάρε προσφορές από συνεργεία της περιοχής σου. Δες πραγματικές τιμές από ολοκληρωμένες εργασίες σε service, συμπλέκτη και φανοποιεία.",
     // Explicit URL WITH trailing slash — without it, Next.js generates a URL
     // that 308-redirects under trailingSlash:true, which Facebook/Messenger
     // crawlers don't follow for OG images.

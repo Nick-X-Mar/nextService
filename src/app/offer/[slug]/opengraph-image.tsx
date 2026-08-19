@@ -204,7 +204,7 @@ export default async function Image({ params }: Params) {
             {price && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <div style={{ fontSize: 22, fontWeight: 600, opacity: 0.8, textTransform: 'uppercase', letterSpacing: 2 }}>
-                  Από
+                  Κόστισε
                 </div>
                 <div style={{ fontSize: 108, fontWeight: 900, color: '#ff9900', lineHeight: 1, letterSpacing: -3 }}>
                   {price}

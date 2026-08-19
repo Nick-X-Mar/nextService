@@ -82,7 +82,7 @@ export default async function Image() {
             Βρες συνεργείο με την καλύτερη τιμή.
           </div>
           <div style={{ fontSize: 30, fontWeight: 500, opacity: 0.95, maxWidth: 900 }}>
-            Hot deals σε service, συμπλέκτη, ιμάντα χρονισμού & φανοποιεία — εργασία και επώνυμα ανταλλακτικά.
+            Πραγματικές τιμές από ολοκληρωμένες εργασίες σε service, συμπλέκτη, ιμάντα χρονισμού & φανοποιεία.
           </div>
         </div>
 

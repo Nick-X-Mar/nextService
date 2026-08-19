@@ -51,7 +51,7 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
     const url = `${window.location.origin}/offer/${offer.slug}`
     const shareData = {
       title: `${offer.title} - ${offer.price} | NextService`,
-      text: `${offer.title} από ${offer.price}. ${offer.description}`,
+      text: `${offer.title} σε ${offer.subtitle}: ${offer.price}. Πραγματική τιμή από εργασία που έγινε μέσω NextService.`,
       url,
     }
 
@@ -72,7 +72,7 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
     return (
       <div className="min-h-screen bg-surface flex flex-col items-center justify-center gap-4">
         <Icon name="search_off" size="lg" className="text-on-surface-variant/30" />
-        <p className="text-on-surface-variant">Η προσφορά δεν βρέθηκε</p>
+        <p className="text-on-surface-variant">Η εργασία δεν βρέθηκε</p>
         <button
           onClick={() => router.push('/')}
           className="text-primary font-bold text-sm"
@@ -136,10 +136,15 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
 
         {/* Content */}
         <div className="mt-6 space-y-4">
-          {/* Category badge */}
-          <Badge className="rounded-full bg-primary-container/30 text-primary border-primary/20 text-xs font-bold uppercase tracking-wider">
-            {offer.category === 'fanopeia' ? 'Φανοποιεία' : 'Service'}
-          </Badge>
+          {/* Category + what this listing actually is */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="rounded-full bg-primary-container/30 text-primary border-primary/20 text-xs font-bold uppercase tracking-wider">
+              {offer.category === 'fanopeia' ? 'Φανοποιεία' : 'Service'}
+            </Badge>
+            <Badge className="rounded-full bg-surface-container-high text-on-surface-variant border-outline-variant/20 text-xs font-bold uppercase tracking-wider">
+              Ολοκληρωμένη εργασία
+            </Badge>
+          </div>
 
           {/* Title */}
           <h1 className="text-3xl font-black tracking-tight text-on-surface">
@@ -156,11 +161,26 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
             </span>
           </div>
 
+          {/* The price is a past fact, not an offer — say so right under it,
+              before the visitor reads it as a price list. */}
+          <div className="flex items-start gap-2 rounded-xl bg-surface-container-low p-3">
+            <Icon
+              name="info"
+              size="sm"
+              className="text-on-surface-variant mt-0.5 shrink-0"
+            />
+            <p className="text-sm text-on-surface-variant leading-relaxed">
+              Είναι η τιμή που δόθηκε για το συγκεκριμένο αυτοκίνητο, όχι σταθερό
+              πακέτο. Για το δικό σου όχημα μπορεί να διαφέρει — στείλε αίτημα για
+              τη δική σου προσφορά.
+            </p>
+          </div>
+
           {/* Includes */}
           <div className="flex items-center gap-2 text-on-surface-variant">
             <Icon name="verified" size="sm" className="text-green-600" />
             <span className="text-sm font-medium">
-              Περιλαμβάνεται εργασία και επώνυμα ανταλλακτικά
+              Περιλάμβανε εργασία και επώνυμα ανταλλακτικά
             </span>
           </div>
 
@@ -173,7 +193,7 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
           {/* Details */}
           <div className="mt-6 p-5 rounded-2xl bg-surface-container-lowest border border-outline-variant/15 space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-              Τι περιλαμβάνει
+              Τι περιλάμβανε η εργασία
             </h3>
             <div className="space-y-2">
               {offer.details.map((detail) => (

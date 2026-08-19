@@ -241,15 +241,16 @@ export default async function LocationPage({ params }: PageProps) {
             </ul>
           </section>
 
-          {/* Hot deals — real internal links into the offer pages */}
+          {/* Completed jobs — real internal links into the offer pages */}
           {offers.length > 0 && (
             <section className="mb-10">
               <h2 className="text-2xl font-bold tracking-tight text-on-surface mb-1">
-                Πακέτα με σταθερή τιμή
+                Ολοκληρωμένες εργασίες
               </h2>
               <p className="text-sm text-on-surface-variant mb-4">
-                Τιμές εκκίνησης για τις πιο συνηθισμένες εργασίες, με εργασία και επώνυμα
-                ανταλλακτικά. Η τελική τιμή επιβεβαιώνεται από το συνεργείο.
+                Πραγματικές τιμές από εργασίες που έγιναν μέσω NextService, με εργασία και
+                επώνυμα ανταλλακτικά. Αφορούν το αυτοκίνητο κάθε καταχώρισης — για το δικό
+                σας η τιμή μπορεί να διαφέρει.
               </p>
               <ul className="grid gap-3 sm:grid-cols-2">
                 {offers.map((o) => (

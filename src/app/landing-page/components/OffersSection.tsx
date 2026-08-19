@@ -169,10 +169,10 @@ export default function OffersSection() {
       {/* Header */}
       <div className="px-8 text-center mb-8">
         <h2 className="text-2xl md:text-3xl font-black italic tracking-tighter text-white drop-shadow-lg">
-          Hot Deals
+          Ολοκληρωμένες εργασίες
         </h2>
         <p className="text-white/70 text-sm mt-1 drop-shadow">
-          Εργασία & επώνυμα ανταλλακτικά
+          Πραγματικές τιμές από εργασίες που έγιναν — η δική σου μπορεί να διαφέρει
         </p>
       </div>
 
@@ -275,7 +275,7 @@ export default function OffersSection() {
                   >
                     <div className="space-y-2">
                       <h3 className="text-xs font-bold uppercase tracking-wider text-white/70">
-                        Τι περιλαμβάνει
+                        Τι περιλάμβανε
                       </h3>
                       <div className="flex flex-wrap gap-2">
                         {offer.details.map((detail) => (
@@ -299,7 +299,7 @@ export default function OffersSection() {
                       className="flex items-center justify-center gap-2 w-full py-3 rounded-xl machined-gradient text-on-primary font-bold text-sm shadow-lg shadow-primary/20 active:scale-95 transition-transform"
                     >
                       <Icon name="build" size="sm" className="text-on-primary" />
-                      Δες Προσφορά
+                      Δες την εργασία
                     </Link>
                   </div>
                 </div>

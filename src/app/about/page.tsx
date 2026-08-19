@@ -186,7 +186,7 @@ export default function AboutPage() {
               className="inline-flex border border-outline-variant/30 bg-surface-container-lowest text-on-surface hover:bg-surface-container px-4 py-2.5 rounded-lg text-sm font-bold transition-colors duration-200 items-center gap-2"
             >
               <Icon name="build" size="sm" />
-              Είμαι συνεργείο
+              Έχω συνεργείο
             </Link>
           </div>
         </div>
