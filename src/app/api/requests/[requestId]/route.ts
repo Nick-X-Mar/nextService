@@ -145,6 +145,7 @@ async function _GET(
         // still write once the appointment exists.
         acceptedGarageId: serviceRequest.acceptedGarageId ?? null,
         appointmentDate: serviceRequest.appointmentDate,
+        appointmentTime: serviceRequest.appointmentTime ?? null,
         appointmentPrice: serviceRequest.appointmentPrice,
         client: client
           ? {
@@ -317,6 +318,7 @@ async function _PATCH(
         updatedAt: updatedRequest.updatedAt,
         clientAvailabilityDates: updatedRequest.clientAvailabilityDates || [],
         photoUrls: presignedPatchPhotoUrls,
+        appointmentTime: updatedRequest.appointmentTime ?? null,
         client: client ? {
           firstName: client.firstName,
           lastName: client.lastName,

@@ -9,6 +9,7 @@ import { EventName, EmailTemplate } from '@/types/events'
 import { requireAuth, requireGarage } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { sanitizeSlots } from '@/utils/availabilitySlots'
 import { randomUUID } from 'crypto'
 
 const checkOfferRate = createRateLimiter('offer-create', 10, 3600000)
@@ -41,6 +42,7 @@ async function _POST(request: NextRequest) {
       status,
       benefits,
       availabilityDates,
+      availabilitySlots,
       serviceRequestId,
     } = body
 
@@ -65,6 +67,9 @@ async function _POST(request: NextRequest) {
       status: status || OfferStatus.PENDING,
       benefits: benefits || [],
       availabilityDates: availabilityDates || [],
+      // Hourly slots keyed by date. Sanitised against availabilityDates so a
+      // caller cannot record hours for a day this offer never included.
+      availabilitySlots: sanitizeSlots(availabilitySlots, availabilityDates || []),
       clientAvailabilityDates: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -222,6 +227,7 @@ async function _PUT(request: NextRequest) {
       offerAmount,
       benefits,
       availabilityDates,
+      availabilitySlots,
       status
     } = body
 
@@ -248,7 +254,7 @@ async function _PUT(request: NextRequest) {
       Key: {
         id: offerId
       },
-      UpdateExpression: 'SET offerAmount = :offerAmount, benefits = :benefits, availabilityDates = :availabilityDates, #status = :status, updatedAt = :updatedAt',
+      UpdateExpression: 'SET offerAmount = :offerAmount, benefits = :benefits, availabilityDates = :availabilityDates, availabilitySlots = :availabilitySlots, #status = :status, updatedAt = :updatedAt',
       ExpressionAttributeNames: {
         '#status': 'status'
       },
@@ -256,6 +262,7 @@ async function _PUT(request: NextRequest) {
         ':offerAmount': offerAmount,
         ':benefits': benefits || [],
         ':availabilityDates': availabilityDates || [],
+        ':availabilitySlots': sanitizeSlots(availabilitySlots, availabilityDates || []),
         ':status': status || OfferStatus.PENDING,
         ':updatedAt': new Date().toISOString()
       },

@@ -1,13 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Image from 'next/image'
 import Icon from '@/components/ui/Icon'
 import { DayPicker } from 'react-day-picker'
 import 'react-day-picker/dist/style.css'
 import { addDays, addMonths, format, isWeekend } from 'date-fns'
 import { el } from 'date-fns/locale'
-import { ServiceVehicleCard, LicensePhotoCard, Modal, Input, Button, PillToggle, ExpandableCard, Spinner } from '@/components'
+import { ServiceVehicleCard, LicensePhotoCard, Modal, Input, Button, PillToggle, ExpandableCard, Spinner, RequestPhotosCard, ReviewPanel } from '@/components'
 import PaymentModal from './PaymentModal'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNavigation } from '@/hooks/useNavigation'
@@ -15,12 +14,15 @@ import { styles } from '../../../styles/styles'
 import { ServiceRequestStatus, OfferStatus } from '../../../types/statuses'
 import type { ServiceRequest } from '../../../types/requests'
 import type { SavedCard } from '@/types/payments'
+import { slotsForDate, type AvailabilitySlots } from '@/utils/availabilitySlots'
 
 interface Offer {
   id: string
   offerAmount: number
   estimatedCost?: number
   availabilityDates?: string[]
+  /** Per-date hourly slots. Absent on offers made before slots existed. */
+  availabilitySlots?: AvailabilitySlots
   garageId?: string
   offerNumber?: string
   status?: OfferStatus
@@ -155,6 +157,9 @@ export default function RequestDetailsContent({
   const [offersError, setOffersError] = useState<string | null>(null)
   const [expandedOfferId, setExpandedOfferId] = useState<string | null>(null)
   const [selectedOfferDates, setSelectedOfferDates] = useState<Record<string, string | null>>({})
+  // Chosen hour per offer. Only meaningful when the offer carries slots — an
+  // older offer has none and books at day granularity, as before.
+  const [selectedOfferTimes, setSelectedOfferTimes] = useState<Record<string, string | null>>({})
   const [customPickerOpen, setCustomPickerOpen] = useState<Record<string, boolean>>({})
   const [customDatesByOffer, setCustomDatesByOffer] = useState<Record<string, Date[]>>({})
   const [customDateErrors, setCustomDateErrors] = useState<Record<string, string | null>>({})
@@ -252,6 +257,13 @@ export default function RequestDetailsContent({
       ...prev,
       [offerId]: date
     }))
+    // The hours belong to the previous date — keeping one selected would book
+    // a time the garage never offered on the new day.
+    setSelectedOfferTimes((prev) => ({ ...prev, [offerId]: null }))
+  }
+
+  const handleSelectOfferTime = (offerId: string, time: string) => {
+    setSelectedOfferTimes((prev) => ({ ...prev, [offerId]: time }))
   }
 
   const handleToggleCustomPicker = (offerId: string) => {
@@ -430,6 +442,7 @@ export default function RequestDetailsContent({
 
   const executeAcceptOffer = async (offer: OfferWithGarage, paymentIntentId?: string) => {
     const selectedDate = selectedOfferDates[offer.id]
+    const selectedTime = selectedOfferTimes[offer.id]
 
     try {
       setAcceptError(null)
@@ -439,6 +452,11 @@ export default function RequestDetailsContent({
         offerId: offer.id,
         appointmentDate: selectedDate,
         appointmentPrice: offer.offerAmount
+      }
+      // Omitted entirely for offers with no published hours, so the route can
+      // tell "day-granularity offer" from "client skipped the hour".
+      if (selectedTime) {
+        payload.appointmentTime = selectedTime
       }
       if (paymentIntentId) {
         payload.paymentIntentId = paymentIntentId
@@ -497,11 +515,36 @@ export default function RequestDetailsContent({
     }
   }
 
+  /**
+   * Re-read the request after its photos change.
+   *
+   * A refetch rather than a local splice: `photoUrls` comes back as presigned
+   * URLs minted by the API, so the freshly uploaded keys are only renderable
+   * once the server has signed them.
+   */
+  const refreshRequest = async () => {
+    try {
+      const response = await fetch(`/api/requests/${request.id}/`)
+      if (!response.ok) return
+      const data = await response.json()
+      const updated = data.request || data
+      if (updated?.id && onRequestUpdate) onRequestUpdate(updated)
+    } catch (error) {
+      console.error('Error refreshing request after photo upload:', error)
+    }
+  }
+
   const handleAcceptOffer = async (offer: OfferWithGarage) => {
     const selectedDate = selectedOfferDates[offer.id]
 
     if (!selectedDate) {
       setAcceptError('Επιλέξτε ημερομηνία για το ραντεβού πριν αποδεχτείτε την προσφορά.')
+      return
+    }
+
+    const hoursForDate = slotsForDate(offer.availabilitySlots, selectedDate)
+    if (hoursForDate !== null && hoursForDate.length > 0 && !selectedOfferTimes[offer.id]) {
+      setAcceptError('Επιλέξτε ώρα για το ραντεβού πριν αποδεχτείτε την προσφορά.')
       return
     }
 
@@ -856,30 +899,16 @@ export default function RequestDetailsContent({
           </div>
         )}
 
-        {/* Photos */}
-        {(request.photoUrls?.length ?? 0) > 0 && (
-          <div className="bg-surface-container-lowest rounded-xl p-5 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10">
-            <h3 className="text-lg font-bold text-on-surface mb-3 flex items-center gap-2">
-              <Icon name="photo_library" size="md" className="text-on-surface-variant" />
-              Φωτογραφίες ({request.photoUrls?.length ?? 0})
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {(request.photoUrls ?? []).map((url, index) => (
-                <div key={index} className="relative aspect-square bg-surface-container rounded-xl overflow-hidden">
-                  <Image
-                    src={url}
-                    alt={`Φωτογραφία ${index + 1}`}
-                    fill
-                    className="object-cover"
-                    onError={(e) => {
-                      e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NzM4NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkZvdG9ncmFwaGlhPC90ZXh0Pjwvc3ZnPg=='
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Photos on the request itself — visible to every garage bidding on it.
+            Photos sent inside a chat stay with that one garage instead. */}
+        <RequestPhotosCard
+          requestId={request.id}
+          photoUrls={request.photoUrls ?? []}
+          canAdd={request.status !== ServiceRequestStatus.APPOINTMENT &&
+                  request.status !== ServiceRequestStatus.COMPLETED &&
+                  request.status !== ServiceRequestStatus.CANCELLED}
+          onPhotosAdded={refreshRequest}
+        />
 
         {/* Accept error */}
         {acceptError && (
@@ -916,9 +945,18 @@ export default function RequestDetailsContent({
                 const availabilityDates = offer.availabilityDates || []
                 const hasAvailability = availabilityDates.length > 0
                 const selectedDate = selectedOfferDates[offer.id] || null
+                const selectedTime = selectedOfferTimes[offer.id] || null
+                // null => this offer has no slot data at all (made before the
+                // feature); [] => the garage closed every hour that day.
+                const offerHours = selectedDate
+                  ? slotsForDate(offer.availabilitySlots, selectedDate)
+                  : null
+                // Only demand an hour when the offer actually publishes hours.
+                const needsTime = offerHours !== null && offerHours.length > 0
                 const canAcceptOffer =
                   hasAvailability &&
                   Boolean(selectedDate) &&
+                  (!needsTime || Boolean(selectedTime)) &&
                   request.status !== ServiceRequestStatus.APPOINTMENT &&
                   offer.status !== OfferStatus.ACCEPTED &&
                   offer.status !== OfferStatus.REJECTED
@@ -975,6 +1013,7 @@ export default function RequestDetailsContent({
                           <p className="text-xs font-bold text-green-700 mt-1 flex items-center gap-1 justify-end">
                             <Icon name="event_available" size="sm" className="text-green-600" />
                             {formatAvailabilityDate(request.appointmentDate)}
+                            {request.appointmentTime ? `, ${request.appointmentTime}` : ''}
                           </p>
                         )}
                         {/* `offer.estimatedCost &&` alone printed a bare "0" under the
@@ -1069,15 +1108,63 @@ export default function RequestDetailsContent({
                                 )
                               })}
                             </div>
+                            {/* Hours the garage left open on that date. Null
+                                means the offer predates slots, so we keep the
+                                old "from HH:MM" wording instead of showing an
+                                empty hour list. */}
+                            {selectedDate && offerHours !== null && (
+                              <div className="space-y-2">
+                                <p className="text-sm text-on-surface-variant">
+                                  {request.status === ServiceRequestStatus.APPOINTMENT
+                                    ? 'Ώρα ραντεβού:'
+                                    : 'Επιλέξτε ώρα παραλαβής:'}
+                                </p>
+                                {offerHours.length === 0 ? (
+                                  <p className="text-sm text-on-surface-variant">
+                                    Το συνεργείο δεν έχει διαθέσιμες ώρες αυτή την ημέρα.
+                                  </p>
+                                ) : (
+                                  <div className="flex flex-wrap gap-2">
+                                    {offerHours.map((time) => {
+                                      const isTimeSelected = selectedTime === time
+                                      const isAppointment = request.status === ServiceRequestStatus.APPOINTMENT
+                                      return (
+                                        <button
+                                          key={time}
+                                          type="button"
+                                          disabled={isAppointment}
+                                          onClick={(event) => {
+                                            event.stopPropagation()
+                                            handleSelectOfferTime(offer.id, time)
+                                          }}
+                                          className={`px-4 py-2 rounded-xl text-sm font-bold transition-all duration-200 ${
+                                            isTimeSelected
+                                              ? 'bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-lg shadow-primary/20'
+                                              : isAppointment
+                                                ? 'bg-surface-container border border-outline-variant/10 text-on-surface-variant/40 cursor-not-allowed'
+                                                : 'bg-surface-container border border-outline-variant/20 text-on-surface hover:border-primary/30'
+                                          }`}
+                                        >
+                                          {time}
+                                        </button>
+                                      )
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
                             {selectedDate && (
-                              <div className="mt-2 p-3 bg-primary/5 border border-primary/10 rounded-xl text-sm text-on-surface flex items-center gap-2">
+                              <div className="mt-2 p-3 bg-primary/5 border border-primary/10 rounded-xl text-sm text-on-surface flex items-center gap-2 flex-wrap">
                                 <Icon name="event_available" filled size="sm" className="text-primary" />
                                 Έχετε επιλέξει:{' '}
                                 <span className="font-bold text-primary">
                                   {formatAvailabilityDate(selectedDate)}
-                                  {offer.garage?.workdayStartTime
-                                    ? `, από τις ${offer.garage.workdayStartTime}`
-                                    : ''}
+                                  {selectedTime
+                                    ? `, στις ${selectedTime}`
+                                    : offerHours === null && offer.garage?.workdayStartTime
+                                      ? `, από τις ${offer.garage.workdayStartTime}`
+                                      : ''}
                                 </span>
                                 {request.status !== ServiceRequestStatus.APPOINTMENT && (
                                   <span className="text-xs text-on-surface-variant">
@@ -1296,7 +1383,11 @@ export default function RequestDetailsContent({
                     ? `${acceptedGarage.companyName} σας περιμένει`
                     : 'Το συνεργείο σας περιμένει'}
                   {request.appointmentDate ? ` στις ${formatAvailabilityDate(request.appointmentDate)}` : ''}
-                  {acceptedGarage?.workdayStartTime ? `, από τις ${acceptedGarage.workdayStartTime}` : ''}.
+                  {request.appointmentTime
+                    ? `, στις ${request.appointmentTime}`
+                    : acceptedGarage?.workdayStartTime
+                      ? `, από τις ${acceptedGarage.workdayStartTime}`
+                      : ''}.
                   {' '}Θα λάβετε και email με όλα τα στοιχεία.
                 </p>
                 {/* These two used to be buttons with no onClick at all. */}
@@ -1353,17 +1444,27 @@ export default function RequestDetailsContent({
         )}
 
         {request.status === ServiceRequestStatus.COMPLETED && (
-          <div className="bg-green-50 rounded-xl p-4 border border-green-100">
-            <div className="flex items-start gap-3">
-              <Icon name="check_circle" filled className="text-green-600 flex-shrink-0 mt-0.5" size="md" />
-              <div>
-                <h4 className="font-bold text-green-900 mb-1">Ολοκληρώθηκε</h4>
-                <p className="text-sm text-green-800">
-                  Η εργασία έχει ολοκληρωθεί επιτυχώς. Ευχαριστούμε που επιλέξατε τις υπηρεσίες μας!
-                </p>
+          <>
+            <div className="bg-green-50 rounded-xl p-4 border border-green-100">
+              <div className="flex items-start gap-3">
+                <Icon name="check_circle" filled className="text-green-600 flex-shrink-0 mt-0.5" size="md" />
+                <div>
+                  <h4 className="font-bold text-green-900 mb-1">Ολοκληρώθηκε</h4>
+                  <p className="text-sm text-green-800">
+                    {request.finalAmounts
+                      ? `Το συνεργείο δήλωσε ${request.finalAmounts.gross.toFixed(2)}€ (με ΦΠΑ ${request.finalAmounts.vatRate}%).`
+                      : 'Η εργασία έχει ολοκληρωθεί. Ευχαριστούμε που επιλέξατε τις υπηρεσίες μας!'}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+
+            <ReviewPanel
+              requestId={request.id}
+              counterpartyLabel="το συνεργείο"
+              counterpartyName={acceptedGarage?.companyName}
+            />
+          </>
         )}
 
         {request.status === ServiceRequestStatus.CANCELLED && (

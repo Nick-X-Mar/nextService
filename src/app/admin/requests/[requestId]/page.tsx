@@ -21,8 +21,15 @@ interface RequestDetail {
   clientAvailabilityDates: string[]
   acceptedOfferId?: string
   appointmentDate?: string
+  appointmentTime?: string | null
   appointmentPrice?: number
   cancelledAt?: string
+  completedAt?: string
+  completedBy?: 'garage' | 'admin'
+  completionOutcome?: 'completed' | 'no_show' | 'not_done'
+  completionNotes?: string
+  completionPromptedAt?: string
+  finalAmounts?: { gross: number; net: number; vat: number; vatRate: number }
   photoUrls: string[]
   client: {
     id: string
@@ -245,6 +252,72 @@ export default function RequestDetailPage() {
           </div>
         </div>
 
+        {/* Completion — what the garage declared after the appointment. The
+            quote and the declared amount are shown together because they can
+            legitimately differ, and the net figure is what commission uses. */}
+        {data.completedAt && (
+          <div className="mt-5 p-4 rounded-lg border border-green-200 bg-green-50">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <p className="text-sm font-bold text-green-900">
+                {data.completionOutcome === 'no_show'
+                  ? 'Ο πελάτης δεν εμφανίστηκε'
+                  : data.completionOutcome === 'not_done'
+                    ? 'Ήρθε, δεν έγινε η εργασία'
+                    : 'Η εργασία ολοκληρώθηκε'}
+              </p>
+              <p className="text-xs text-green-800">
+                {new Date(data.completedAt).toLocaleString('el-GR')}
+                {data.completedBy ? ` · ${data.completedBy === 'admin' ? 'admin' : 'συνεργείο'}` : ''}
+              </p>
+            </div>
+
+            {data.finalAmounts ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <p className="text-xs text-green-800/70">Καθαρή αξία</p>
+                  <p className="text-sm font-bold text-green-900">
+                    {data.finalAmounts.net.toFixed(2)}€
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-green-800/70">ΦΠΑ {data.finalAmounts.vatRate}%</p>
+                  <p className="text-sm text-green-900">{data.finalAmounts.vat.toFixed(2)}€</p>
+                </div>
+                <div>
+                  <p className="text-xs text-green-800/70">Σύνολο</p>
+                  <p className="text-sm font-bold text-green-900">
+                    {data.finalAmounts.gross.toFixed(2)}€
+                  </p>
+                </div>
+                {data.appointmentPrice != null && (
+                  <div>
+                    <p className="text-xs text-green-800/70">Προσφορά</p>
+                    <p className="text-sm text-green-900">
+                      {data.appointmentPrice}€
+                      {data.finalAmounts.gross !== data.appointmentPrice && (
+                        <span className="ml-1 text-[11px] font-bold text-amber-700">
+                          ({data.finalAmounts.gross > data.appointmentPrice ? '+' : ''}
+                          {(data.finalAmounts.gross - data.appointmentPrice).toFixed(2)}€)
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-green-800">
+                Δεν δηλώθηκε ποσό — η προμήθεια υπολογίζεται στην τιμή της προσφοράς.
+              </p>
+            )}
+
+            {data.completionNotes && (
+              <p className="text-sm text-green-900 mt-3 whitespace-pre-wrap">
+                {data.completionNotes}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Description */}
         <div className="mt-5 p-4 bg-surface-container rounded-lg">
           <p className="text-xs text-on-surface/50 mb-1">Περιγραφή</p>
@@ -256,7 +329,10 @@ export default function RequestDetailPage() {
           <div className="mt-4 grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-on-surface/50">Ημ/νία Ραντεβού</p>
-              <p className="text-sm text-on-surface">{new Date(data.appointmentDate).toLocaleDateString('el-GR')}</p>
+              <p className="text-sm text-on-surface">
+                {new Date(data.appointmentDate).toLocaleDateString('el-GR')}
+                {data.appointmentTime ? `, ${data.appointmentTime}` : ''}
+              </p>
             </div>
             {data.appointmentPrice != null && (
               <div>

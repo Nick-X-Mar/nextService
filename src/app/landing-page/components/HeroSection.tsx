@@ -63,6 +63,10 @@ export default function HeroSection() {
     setIsOpen(!isOpen)
   }
 
+  const scrollTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   const selectCategory = (value: string) => {
     if (pendingCategory) return
     setSelectedCategory(value)
@@ -155,11 +159,48 @@ export default function HeroSection() {
 
       </div>
 
-      {/* Scroll down arrow — desktop only */}
-      <div className="hidden md:flex absolute bottom-8 left-1/2 -translate-x-1/2 z-10 animate-bounce">
-        <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center">
-          <Icon name="keyboard_arrow_down" size="md" className="text-white/70" />
+      {/* Scroll cue — the only signal that the completed-jobs carousel and the FAQ
+          exist below the fold. Sits above BottomNav on mobile, and fades out while
+          the category menu is open so it never collides with it on short screens. */}
+      <div
+        className={`absolute bottom-32 md:bottom-16 inset-x-0 z-10 flex flex-col items-center gap-2 transition-opacity duration-300 ${
+          isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}
+      >
+        <div className="flex flex-wrap items-center justify-center gap-2 px-4">
+          <button
+            type="button"
+            onClick={() => scrollTo('offers')}
+            className="flex items-center gap-1.5 md:gap-2 rounded-full bg-black/45 hover:bg-black/60 backdrop-blur-md border border-white/25 px-3 md:px-4 py-2.5 shadow-lg active:scale-95 transition-all"
+          >
+            <Icon name="receipt_long" size="sm" className="text-primary-container" />
+            <span className="text-xs md:text-sm font-bold text-white whitespace-nowrap">
+              Ολοκληρωμένες εργασίες
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollTo('faq')}
+            className="flex items-center gap-1.5 md:gap-2 rounded-full bg-black/45 hover:bg-black/60 backdrop-blur-md border border-white/25 px-3 md:px-4 py-2.5 shadow-lg active:scale-95 transition-all"
+          >
+            <Icon name="help" size="sm" className="text-primary-container" />
+            <span className="text-xs md:text-sm font-bold text-white whitespace-nowrap">
+              {/* The full label doesn't fit beside the offers pill on a phone row */}
+              <span className="md:hidden">Ερωτήσεις</span>
+              <span className="hidden md:inline">Συχνές ερωτήσεις</span>
+            </span>
+          </button>
         </div>
+        <button
+          type="button"
+          onClick={() => scrollTo('offers')}
+          aria-label="Δες τι υπάρχει πιο κάτω"
+          className="w-20 h-10 rounded-full machined-gradient shadow-lg shadow-primary/30 flex items-center justify-center active:scale-95 transition-transform"
+        >
+          {/* The chevron bounces, not the button — a moving hit area makes the
+              tap easy to miss on a phone. */}
+          <Icon name="keyboard_arrow_down" size="lg" className="text-on-primary animate-bounce" />
+        </button>
       </div>
     </section>
   )

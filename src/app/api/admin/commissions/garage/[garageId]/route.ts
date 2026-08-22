@@ -4,6 +4,8 @@ import { GetCommand, QueryCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb
 import { withMetrics } from '@/utils/withMetrics'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { DEPOSIT_PERCENT } from '@/lib/stripe-server'
+import { commissionBasis } from '@/lib/commission-basis'
+import type { CompletionAmounts } from '@/types/reviews'
 
 interface AppointmentRow {
   requestId: string
@@ -11,7 +13,15 @@ interface AppointmentRow {
   clientName: string
   vehicleLabel: string
   category: string
+  /** What the garage quoted when the client booked. */
   appointmentPrice: number
+  /** What it declared it actually charged, net of VAT. Null when never declared. */
+  declaredNet: number | null
+  /** Gross and VAT alongside, so the admin can reconcile against a receipt. */
+  declaredGross: number | null
+  declaredVat: number | null
+  /** Which of the two the commission below was calculated on. */
+  basis: 'declared' | 'quoted'
   commission: number
 }
 
@@ -155,8 +165,12 @@ async function _GET(
     const factor = DEPOSIT_PERCENT / 100
 
     const appointments: AppointmentRow[] = garageRequests.map((r) => {
-      const price = typeof r.appointmentPrice === 'number' ? r.appointmentPrice : 0
-      const commission = Math.round(price * factor * 100) / 100
+      const quoted = typeof r.appointmentPrice === 'number' ? r.appointmentPrice : 0
+      // Commission is charged on what the garage says it actually took, net of
+      // VAT — see src/lib/commission-basis.ts.
+      const basis = commissionBasis(r as Parameters<typeof commissionBasis>[0])
+      const declared = (r as { finalAmounts?: CompletionAmounts }).finalAmounts
+      const commission = Math.round(basis.amount * factor * 100) / 100
       const clientId = typeof r.clientId === 'string' ? r.clientId : ''
       const vehicleId = typeof r.vehicleId === 'string' ? r.vehicleId : ''
       return {
@@ -167,14 +181,21 @@ async function _GET(
         category: typeof r.serviceCategory === 'string'
           ? r.serviceCategory
           : (typeof r.category === 'string' ? r.category : '-'),
-        appointmentPrice: Math.round(price * 100) / 100,
+        appointmentPrice: Math.round(quoted * 100) / 100,
+        declaredNet: declared?.net ?? null,
+        declaredGross: declared?.gross ?? null,
+        declaredVat: declared?.vat ?? null,
+        basis: basis.source,
         commission,
       }
     })
 
     appointments.sort((a, b) => a.appointmentDate.localeCompare(b.appointmentDate))
 
-    const totalRevenue = appointments.reduce((s, a) => s + a.appointmentPrice, 0)
+    const totalRevenue = appointments.reduce(
+      (s, a) => s + (a.declaredNet ?? a.appointmentPrice),
+      0
+    )
     const totalCommission = appointments.reduce((s, a) => s + a.commission, 0)
 
     const response: GarageCommissionsResponse = {

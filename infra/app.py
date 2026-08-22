@@ -142,6 +142,9 @@ amplify.add_dependency(dynamo)
 notifications = NotificationsStack(
     app, "NextService-Notifications",
     service_requests_stream_arn=dynamo.service_requests_table.table_stream_arn,
+    # The completion sweeper queries StatusIndex and stamps the row, so it
+    # needs the table itself, not just the stream.
+    service_requests_table_arn=dynamo.service_requests_table.table_arn,
     garages_table_arn=dynamo.garages_table.table_arn,
     alert_topic=monitoring.alert_topic,
     app_url=app_url,

@@ -8,8 +8,8 @@ import { ServiceRequestStatus } from '@/types/statuses'
 import type { ServiceRequest } from '@/types/requests'
 import { useAuth } from '@/contexts/AuthContext'
 import Icon from '@/components/ui/Icon'
-import { LoadMoreButton, Spinner } from '@/components'
-import '@/lib/amplify-config'
+import { LoadMoreButton, Spinner, ChatAttachments, AttachmentPreviewStrip, type ChatAttachmentView } from '@/components'
+import { useChatAttachments, MAX_CHAT_ATTACHMENTS } from '@/hooks/useChatAttachments'
 import appSyncService from '@/lib/appsync-service'
 import { useNotifications } from '@/contexts/NotificationsContext'
 import { useToast } from '@/hooks/useToast'
@@ -22,6 +22,9 @@ interface Message {
   message: string
   timestamp: string
   senderName: string
+  // Photos in this thread only. The API scopes them to this garage, so a
+  // photo the client sent to a competitor is never in this list.
+  attachments?: ChatAttachmentView[]
 }
 
 interface ChatPageProps {
@@ -41,6 +44,9 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
   const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const attachments = useChatAttachments()
   const router = useRouter()
   const { refresh: refreshUnread } = useNotifications()
   const { showToast } = useToast()
@@ -77,8 +83,11 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
       appSyncService.subscribe(channelName, (newMessage: Message) => {
         console.log('[Garage] Real-time message received:', newMessage)
 
-        // Ignore subscription system events (e.g. {status: "subscribed"})
-        if (!newMessage.id || !newMessage.timestamp || !newMessage.message) return
+        // Ignore subscription system events (e.g. {status: "subscribed"}).
+        // A photo-only message still carries a caption, but accept anything
+        // with attachments regardless so a future empty-caption send survives.
+        const hasBody = !!newMessage.message || (newMessage.attachments?.length ?? 0) > 0
+        if (!newMessage.id || !newMessage.timestamp || !hasBody) return
 
         setMessages(prev => {
           // Prevent duplicate messages
@@ -166,12 +175,24 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     }
   }, [requestId, garageId])
 
+  const authGarageId = authGarage?.id
+
   const loadChatData = useCallback(async () => {
     try {
       setIsLoading(true)
 
-      // Load request data — pass viewerGarageId for the GDPR audit log
-      const requestResponse = await fetch(`/api/requests/${requestId}/?viewerGarageId=${garageId}`)
+      // These three are independent. Awaiting them one after another made
+      // opening a conversation cost the sum of all three round-trips, which is
+      // most of the "the chat takes ages to load" complaint on slower
+      // connections.
+      const [requestResponse, garageResponse, messagesResponse] = await Promise.all([
+        // viewerGarageId is passed for the GDPR audit log
+        fetch(`/api/requests/${requestId}/?viewerGarageId=${garageId}`),
+        fetch(`/api/garage/${garageId}/`),
+        // messages are filtered by garageId for security
+        fetch(`/api/chat/${requestId}/messages/?garageId=${garageId}`, { cache: 'no-store' }),
+      ])
+
       if (requestResponse.ok) {
         const requestResult = await requestResponse.json()
         // Some endpoints return { success, request }, others may return just { request }
@@ -179,8 +200,6 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
         setRequestData(request)
       }
 
-      // Load garage data
-      const garageResponse = await fetch(`/api/garage/${garageId}/`)
       if (garageResponse.ok) {
         const garageResult = await garageResponse.json()
         if (garageResult.success) {
@@ -188,8 +207,6 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
         }
       }
 
-      // Load chat messages (filtered by garageId for security)
-      const messagesResponse = await fetch(`/api/chat/${requestId}/messages/?garageId=${garageId}`)
       if (messagesResponse.ok) {
         const messagesResult = await messagesResponse.json()
         if (messagesResult.success) {
@@ -219,7 +236,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     }
 
     // Check if user is authenticated as a garage
-    if (userType !== 'garage' || !authGarage || authGarage.id !== garageId) {
+    if (userType !== 'garage' || authGarageId !== garageId) {
       // User is not authenticated as this garage or is a client
       console.warn('Unauthorized access attempt to garage chat')
       router.push('/login/')
@@ -234,7 +251,15 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     fetch(`/api/chat/${requestId}/mark-read/`, { method: 'POST' })
       .then(() => refreshUnread())
       .catch(() => { /* a stale badge is not worth interrupting the chat for */ })
-  }, [garageId, requestId, router, userType, authGarage, authLoading, loadChatData, refreshUnread])
+    // `authGarage.id`, not `authGarage`. AuthContext swaps in a brand new
+    // object once /api/auth/me resolves, and useGarageApprovalWatch mints
+    // another on every 30s tick and every focus/visibilitychange while a
+    // garage is pending. Depending on the object meant each of those re-ran
+    // the whole loader: the spinner came back, three fetches went out, and the
+    // message list was replaced — deleting anything just sent. Safari and iOS
+    // fire those events far more often than desktop Chrome, which is exactly
+    // why this looked browser-specific.
+  }, [garageId, requestId, router, userType, authGarageId, authLoading, loadChatData, refreshUnread])
 
   // Cleanup subscription on unmount
   useEffect(() => {
@@ -251,8 +276,54 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     scrollToBottom()
   }, [messages])
 
+  const handleFilesPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    attachments.addFiles(e.target.files)
+    // Reset so picking the same file twice in a row still fires onChange.
+    e.target.value = ''
+  }
+
+  const appendMessage = (sent: Message | undefined) => {
+    if (!sent?.id) return
+    setMessages(prev =>
+      prev.some(m => m.id === sent.id)
+        ? prev
+        : [...prev, sent].sort((a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          )
+    )
+  }
+
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || isSending || isReadOnly) return
+    const text = newMessage.trim()
+    if ((!text && !attachments.hasPending) || isSending || isReadOnly) return
+
+    // Photos take the attachments endpoint, which uploads and creates the
+    // message in one call. The typed text rides along as the caption.
+    if (attachments.hasPending) {
+      try {
+        setIsSending(true)
+        const result = await attachments.upload({ requestId, garageId, caption: text })
+        if (!result.ok) {
+          showToast({ type: 'error', title: result.error })
+          return
+        }
+        if (result.rejected.length > 0) {
+          showToast({
+            type: 'warning',
+            title: 'Κάποιες φωτογραφίες δεν στάλθηκαν',
+            message: result.rejected.join('\n'),
+          })
+        }
+        appendMessage(result.message as Message | undefined)
+        setNewMessage('')
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto'
+        }
+      } finally {
+        setIsSending(false)
+      }
+      return
+    }
 
     try {
       setIsSending(true)
@@ -278,16 +349,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
           // down the message you had just sent simply vanished until you
           // refreshed. The subscription de-dupes on id, so the echo is a no-op
           // when it does arrive.
-          const sent: Message | undefined = result.message
-          if (sent?.id) {
-            setMessages(prev =>
-              prev.some(m => m.id === sent.id)
-                ? prev
-                : [...prev, sent].sort((a, b) =>
-                    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-                  )
-            )
-          }
+          appendMessage(result.message as Message | undefined)
           setNewMessage('')
           if (textareaRef.current) {
             textareaRef.current.style.height = 'auto'
@@ -461,7 +523,17 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
                         {!isGarage && (
                           <p className="text-[10px] font-bold text-primary mb-0.5">{message.senderName}</p>
                         )}
-                        <p className="text-sm leading-relaxed">{message.message}</p>
+                        {(message.attachments?.length ?? 0) > 0 && (
+                          <div className="mb-1.5 -mx-1">
+                            <ChatAttachments
+                              attachments={message.attachments ?? []}
+                              onOwnBubble={isGarage}
+                            />
+                          </div>
+                        )}
+                        {message.message && (
+                          <p className="text-sm leading-relaxed">{message.message}</p>
+                        )}
                         <p className={`text-[10px] mt-1 ${
                           isGarage ? 'text-white/60' : 'text-secondary'
                         }`}>
@@ -491,21 +563,64 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
       ) : (
         <div className="flex-shrink-0 border-t border-outline-variant/10 bg-surface-container-lowest/80 backdrop-blur-xl">
           <div className="max-w-3xl mx-auto px-5 md:px-8 py-3">
+            <AttachmentPreviewStrip
+              files={attachments.pending}
+              onRemove={attachments.removeFile}
+              disabled={isSending}
+            />
             <div className="flex items-end gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleFilesPicked}
+                className="hidden"
+              />
+              {/* `capture` opens the camera straight away. Mobile only: on
+                  desktop it degrades to a second file picker. */}
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFilesPicked}
+                className="hidden"
+              />
+              <button
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={isSending || attachments.isFull}
+                title="Λήψη φωτογραφίας"
+                className="md:hidden w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors flex-shrink-0 mb-0.5 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+              >
+                <Icon name="photo_camera" size="md" filled className="text-on-surface-variant" />
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isSending || attachments.isFull}
+                title={
+                  attachments.isFull
+                    ? `Έως ${MAX_CHAT_ATTACHMENTS} φωτογραφίες ανά μήνυμα`
+                    : 'Επισύναψη φωτογραφίας'
+                }
+                className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors flex-shrink-0 mb-0.5 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+              >
+                <Icon name="add_a_photo" size="md" className="text-on-surface-variant" />
+              </button>
               <textarea
                 ref={textareaRef}
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyDown={handleKeyPress}
                 onInput={handleTextareaInput}
-                placeholder="Γράψτε μήνυμα..."
+                placeholder={attachments.hasPending ? 'Προσθέστε λεζάντα (προαιρετικά)...' : 'Γράψτε μήνυμα...'}
                 className="flex-1 bg-surface-container-highest border-0 rounded-xl px-4 py-3 text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all resize-none max-h-[120px]"
                 rows={1}
                 disabled={isSending}
               />
               <button
                 onClick={handleSendMessage}
-                disabled={!newMessage.trim() || isSending}
+                disabled={(!newMessage.trim() && !attachments.hasPending) || isSending}
                 className="w-10 h-10 rounded-full machined-gradient flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95 shadow-lg shadow-primary/20 flex-shrink-0 mb-0.5"
               >
                 {isSending ? (

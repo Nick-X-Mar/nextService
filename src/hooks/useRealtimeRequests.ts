@@ -43,9 +43,17 @@ export interface RequestUpdatePayload {
   reason?: string
 }
 
+// Photos land after the request itself, so they arrive as their own event on
+// the updates channel rather than as part of the new-request payload.
+export interface RequestPhotosPayload {
+  requestId: string
+  photoUrls: string[]
+}
+
 interface UseRealtimeRequestsOptions {
   onNewRequest?: (request: BroadcastRequest) => void
   onRequestUpdate?: (update: RequestUpdatePayload) => void
+  onRequestPhotos?: (payload: RequestPhotosPayload) => void
   // Fires when the connection drops and is restored — callers should refetch
   // their list to fill any gap of events that occurred while disconnected.
   onReconnect?: () => void
@@ -58,6 +66,7 @@ interface UseRealtimeRequestsOptions {
 export function useRealtimeRequests({
   onNewRequest,
   onRequestUpdate,
+  onRequestPhotos,
   onReconnect,
   enabled = true,
 }: UseRealtimeRequestsOptions) {
@@ -68,10 +77,12 @@ export function useRealtimeRequests({
   // closures.
   const onNewRequestRef = useRef(onNewRequest)
   const onRequestUpdateRef = useRef(onRequestUpdate)
+  const onRequestPhotosRef = useRef(onRequestPhotos)
   const onReconnectRef = useRef(onReconnect)
 
   useEffect(() => { onNewRequestRef.current = onNewRequest }, [onNewRequest])
   useEffect(() => { onRequestUpdateRef.current = onRequestUpdate }, [onRequestUpdate])
+  useEffect(() => { onRequestPhotosRef.current = onRequestPhotos }, [onRequestPhotos])
   useEffect(() => { onReconnectRef.current = onReconnect }, [onReconnect])
 
   useEffect(() => {
@@ -96,7 +107,15 @@ export function useRealtimeRequests({
         })
 
         disposeUpdate = appSyncService.subscribe(REQUEST_UPDATES_CHANNEL, (payload) => {
-          if (!payload || payload.__type !== 'request-update' || !payload.requestId) return
+          if (!payload || !payload.requestId) return
+          if (payload.__type === 'request-photos') {
+            onRequestPhotosRef.current?.({
+              requestId: payload.requestId,
+              photoUrls: Array.isArray(payload.photoUrls) ? payload.photoUrls : [],
+            })
+            return
+          }
+          if (payload.__type !== 'request-update') return
           onRequestUpdateRef.current?.({
             requestId: payload.requestId,
             status: payload.status,

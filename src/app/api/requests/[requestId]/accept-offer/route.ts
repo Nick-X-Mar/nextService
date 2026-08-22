@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { isValidTime, isSlotAvailable, slotsForDate, type AvailabilitySlots } from '@/utils/availabilitySlots'
 import { ServiceRequestStatus, OfferStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { sendEmail } from '@/utils/emailService'
@@ -29,7 +30,7 @@ async function _PATCH(
     }
 
     const body = await request.json()
-    const { offerId, appointmentDate, appointmentPrice, paymentIntentId } = body || {}
+    const { offerId, appointmentDate, appointmentTime, appointmentPrice, paymentIntentId } = body || {}
 
     const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === 'true'
 
@@ -59,6 +60,13 @@ async function _PATCH(
     if (Number.isNaN(parsed.getTime())) {
       return NextResponse.json(
         { success: false, error: 'appointmentDate is not a valid date' },
+        { status: 400 }
+      )
+    }
+
+    if (appointmentTime !== undefined && !isValidTime(appointmentTime)) {
+      return NextResponse.json(
+        { success: false, error: 'appointmentTime must be in format HH:MM' },
         { status: 400 }
       )
     }
@@ -106,6 +114,35 @@ async function _PATCH(
     }
     const acceptedGarageId = (acceptedOfferRes.Item.garageId as string | undefined) ?? null
 
+    // The date and hour have to be ones this garage actually offered. Without
+    // this the client controls the appointment entirely and could book a day
+    // or a time the shop is closed.
+    const offeredDates = (acceptedOfferRes.Item.availabilityDates as string[] | undefined) ?? []
+    if (offeredDates.length > 0 && !offeredDates.includes(appointmentDate)) {
+      return NextResponse.json(
+        { success: false, error: 'Η ημερομηνία δεν είναι διαθέσιμη σε αυτή την προσφορά' },
+        { status: 400 }
+      )
+    }
+
+    const offeredSlots = acceptedOfferRes.Item.availabilitySlots as AvailabilitySlots | undefined
+    const hoursForDate = slotsForDate(offeredSlots, appointmentDate)
+    // hoursForDate === null means the offer predates slots and books by day.
+    if (hoursForDate !== null && hoursForDate.length > 0) {
+      if (!appointmentTime) {
+        return NextResponse.json(
+          { success: false, error: 'Επιλέξτε ώρα για το ραντεβού' },
+          { status: 400 }
+        )
+      }
+      if (!isSlotAvailable(offeredSlots, appointmentDate, appointmentTime)) {
+        return NextResponse.json(
+          { success: false, error: 'Η ώρα δεν είναι διαθέσιμη σε αυτή την προσφορά' },
+          { status: 400 }
+        )
+      }
+    }
+
     // Verify payment if payments are enabled
     let depositAmount: number | null = null
     let remainingAmount: number | null = null
@@ -150,6 +187,7 @@ async function _PATCH(
       // garage still part of this job?" without reading the Offers table.
       'acceptedGarageId = :acceptedGarageId',
       'appointmentDate = :appointmentDate',
+      'appointmentTime = :appointmentTime',
       'appointmentPrice = :appointmentPrice',
       'updatedAt = :updatedAt'
     ]
@@ -158,6 +196,7 @@ async function _PATCH(
       ':acceptedOfferId': offerId,
       ':acceptedGarageId': acceptedGarageId,
       ':appointmentDate': appointmentDate,
+      ':appointmentTime': appointmentTime ?? null,
       ':appointmentPrice':
         typeof appointmentPrice === 'number' && !Number.isNaN(appointmentPrice)
           ? appointmentPrice
@@ -227,9 +266,11 @@ async function _PATCH(
       if (isAccepted) {
         updateExpressionParts.push(
           'appointmentDate = :appointmentDate',
+          'appointmentTime = :appointmentTime',
           'appointmentPrice = :appointmentPrice'
         )
         expressionAttributeValues[':appointmentDate'] = appointmentDate
+        expressionAttributeValues[':appointmentTime'] = appointmentTime ?? null
         expressionAttributeValues[':appointmentPrice'] =
           typeof appointmentPrice === 'number' && !Number.isNaN(appointmentPrice)
             ? appointmentPrice
@@ -305,6 +346,7 @@ async function _PATCH(
       requestId,
       offerId,
       appointmentDate,
+      appointmentTime: appointmentTime ?? undefined,
       appointmentPrice: typeof appointmentPrice === 'number' ? appointmentPrice : undefined,
       depositAmount: depositAmount ?? undefined,
       remainingAmount: remainingAmount ?? undefined
@@ -331,6 +373,7 @@ async function _PATCH(
         clientAvailabilityDates: updatedRequest.clientAvailabilityDates || [],
         acceptedOfferId: updatedRequest.acceptedOfferId,
         appointmentDate: updatedRequest.appointmentDate,
+        appointmentTime: updatedRequest.appointmentTime ?? null,
         appointmentPrice: updatedRequest.appointmentPrice
       }
     })
@@ -353,6 +396,7 @@ async function notifyAcceptanceParticipants(args: {
   requestId: string
   offerId: string
   appointmentDate: string
+  appointmentTime?: string
   appointmentPrice?: number
   depositAmount?: number
   remainingAmount?: number
@@ -364,6 +408,13 @@ async function notifyAcceptanceParticipants(args: {
         ? dynamoDB.send(new GetCommand({ TableName: 'Garages', Key: { id: args.garageId } }))
         : Promise.resolve({ Item: undefined as Record<string, unknown> | undefined })
     ])
+
+    // The templates take a single `appointmentDate` variable, so the hour is
+    // folded into it rather than adding a variable every template would have
+    // to learn about.
+    const appointmentLabel = args.appointmentTime
+      ? `${args.appointmentDate}, ${args.appointmentTime}`
+      : args.appointmentDate
 
     const clientEmail = clientRes.Item?.email as string | undefined
     const garageEmail = garageRes.Item?.email as string | undefined
@@ -377,7 +428,7 @@ async function notifyAcceptanceParticipants(args: {
           clientId: args.clientId,
           requestId: args.requestId,
           garageName,
-          appointmentDate: args.appointmentDate,
+          appointmentDate: appointmentLabel,
           appointmentPrice: args.appointmentPrice !== undefined ? String(args.appointmentPrice) : ''
         },
         triggerEvent: EventName.OfferAccepted,
@@ -396,7 +447,7 @@ async function notifyAcceptanceParticipants(args: {
           clientId: args.clientId,
           requestId: args.requestId,
           garageName,
-          appointmentDate: args.appointmentDate,
+          appointmentDate: appointmentLabel,
           depositAmount: String(args.depositAmount),
           remainingAmount: String(args.remainingAmount ?? '')
         },
@@ -413,7 +464,7 @@ async function notifyAcceptanceParticipants(args: {
         templateName: EmailTemplate.OfferAcceptedGarage,
         variables: {
           garageId: args.garageId,
-          appointmentDate: args.appointmentDate,
+          appointmentDate: appointmentLabel,
           offerAmount: args.appointmentPrice !== undefined ? String(args.appointmentPrice) : ''
         },
         triggerEvent: EventName.OfferAccepted,

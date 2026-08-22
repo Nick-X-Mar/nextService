@@ -33,6 +33,8 @@ from aws_cdk import (
     Duration,
     aws_lambda as lambda_,
     aws_lambda_event_sources as lambda_events,
+    aws_events as events,
+    aws_events_targets as events_targets,
     aws_iam as iam,
     aws_sqs as sqs,
     aws_cloudwatch as cw,
@@ -59,6 +61,7 @@ class NotificationsStack(Stack):
         construct_id: str,
         *,
         service_requests_stream_arn: str,
+        service_requests_table_arn: str,
         garages_table_arn: str,
         alert_topic: sns.ITopic,
         app_url: str,
@@ -317,6 +320,108 @@ class NotificationsStack(Stack):
 
         # Error-rate alarm on the Lambda itself (catches all-throws, not just
         # DLQ drops which only fire after retries are exhausted). Threshold 0
+        # ── Appointment completion sweeper ──────────────────────
+        # The only thing in the platform triggered by the *absence* of an
+        # action: an appointment whose slot has passed with nobody saying
+        # whether the work happened. No HTTP request can observe that, so it
+        # needs a schedule.
+        #
+        # The garage dashboard also shows an in-app prompt for the same
+        # condition, computed live — that one needs no schedule and is the
+        # primary channel. This Lambda is the out-of-band nudge, and it is what
+        # stamps `completionPromptedAt` so the email goes out exactly once.
+        self.completion_sweeper_fn = lambda_.Function(
+            self, "CompletionSweeperFn",
+            function_name="nextservice-appointment-completion-sweeper",
+            description="Asks garages to confirm appointments whose slot has passed",
+            runtime=lambda_.Runtime.NODEJS_20_X,
+            handler="index.handler",
+            code=lambda_.Code.from_asset("lambdas/appointment-completion-sweeper"),
+            memory_size=256,
+            timeout=Duration.minutes(5),
+            environment={
+                "SES_FROM_ADDRESS": ses_from_address,
+                "SES_CONFIG_SET": SES_CONFIG_SET_NAME,
+                "APP_URL": app_url,
+                "SERVICE_REQUESTS_TABLE": "ServiceRequests",
+                "GARAGES_TABLE": "Garages",
+                "EMAIL_LOGS_TABLE": "EmailLogs",
+                "NOTIFICATIONS_ENABLED": str(notifications_enabled).lower(),
+                # Keep in step with COMPLETION_GRACE_HOURS in
+                # src/types/reviews.ts — the in-app prompt uses that constant,
+                # and the two must agree or the email arrives before the badge.
+                "COMPLETION_GRACE_HOURS": "4",
+                "COMPLETION_MAX_AGE_DAYS": "30",
+            },
+        )
+
+        # Query StatusIndex, read the request, stamp completionPromptedAt.
+        self.completion_sweeper_fn.add_to_role_policy(
+            iam.PolicyStatement(
+                sid="ReadAndStampServiceRequests",
+                actions=["dynamodb:Query", "dynamodb:GetItem", "dynamodb:UpdateItem"],
+                resources=[
+                    service_requests_table_arn,
+                    f"{service_requests_table_arn}/index/*",
+                ],
+            )
+        )
+        self.completion_sweeper_fn.add_to_role_policy(
+            iam.PolicyStatement(
+                sid="ReadGaragesForCompletionPrompt",
+                actions=["dynamodb:GetItem"],
+                resources=[garages_table_arn],
+            )
+        )
+        self.completion_sweeper_fn.add_to_role_policy(
+            iam.PolicyStatement(
+                sid="WriteCompletionEmailLogs",
+                actions=["dynamodb:PutItem", "dynamodb:UpdateItem"],
+                resources=[
+                    f"arn:aws:dynamodb:{self.region}:{self.account}:table/EmailLogs"
+                ],
+            )
+        )
+        # SES rejects the send unless BOTH the identity and the configuration
+        # set are granted — same pairing as the broadcast Lambda above.
+        self.completion_sweeper_fn.add_to_role_policy(
+            iam.PolicyStatement(
+                sid="SendCompletionPrompts",
+                actions=["ses:SendRawEmail", "ses:SendEmail"],
+                resources=[
+                    f"arn:aws:ses:{self.region}:{self.account}:identity/*",
+                    f"arn:aws:ses:{self.region}:{self.account}:configuration-set/{SES_CONFIG_SET_NAME}",
+                ],
+            )
+        )
+
+        # Hourly. The grace period is measured in hours, so anything finer just
+        # re-reads the same rows; anything coarser delays the prompt past the
+        # point where the garage still remembers the job.
+        events.Rule(
+            self, "CompletionSweeperSchedule",
+            rule_name="nextservice-appointment-completion-sweeper",
+            description="Hourly sweep for appointments awaiting the garage's confirmation",
+            schedule=events.Schedule.rate(Duration.hours(1)),
+            targets=[events_targets.LambdaFunction(self.completion_sweeper_fn)],
+        )
+
+        sweeper_error_alarm = cw.Alarm(
+            self, "CompletionSweeperErrorsAlarm",
+            alarm_name="NextService-CompletionSweeper-Errors",
+            alarm_description="Completion sweeper Lambda threw at least once in 1h",
+            metric=self.completion_sweeper_fn.metric_errors(
+                period=Duration.hours(1),
+                statistic="Sum",
+            ),
+            threshold=0,
+            evaluation_periods=1,
+            comparison_operator=cw.ComparisonOperator.GREATER_THAN_THRESHOLD,
+            treat_missing_data=cw.TreatMissingData.NOT_BREACHING,
+        )
+        sweeper_error_alarm.add_alarm_action(cw_actions.SnsAction(alert_topic))
+        sweeper_error_alarm.add_ok_action(cw_actions.SnsAction(alert_topic))
+
         # — any single error fires the alarm, since email broadcasts are
         # business-critical and silent partial failures shouldn't go unnoticed.
         error_alarm = cw.Alarm(

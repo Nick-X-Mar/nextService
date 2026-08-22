@@ -9,10 +9,10 @@ import { useNotifications } from '@/contexts/NotificationsContext'
 import { styles } from '../../../../../../styles/styles'
 import { useToast } from '../../../../../../hooks/useToast'
 // Navigation handled by AppShell
-import { RequestDetailsPanel, LoadMoreButton, Spinner } from '../../../../../../components'
+import { RequestDetailsPanel, LoadMoreButton, Spinner, ChatAttachments, AttachmentPreviewStrip, type ChatAttachmentView } from '../../../../../../components'
+import { useChatAttachments, MAX_CHAT_ATTACHMENTS } from '@/hooks/useChatAttachments'
 import { ServiceRequestStatus } from '../../../../../../types/statuses'
 import type { ServiceRequest } from '../../../../../../types/requests'
-import '@/lib/amplify-config'
 import appSyncService from '@/lib/appsync-service'
 
 interface ChatMessage {
@@ -23,6 +23,9 @@ interface ChatMessage {
   senderName: string
   message: string
   timestamp: string
+  // Photos sent in this thread. Present only on messages that carry them, and
+  // scoped by the API to the garage this conversation is with.
+  attachments?: ChatAttachmentView[]
 }
 
 interface Garage {
@@ -65,6 +68,9 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
 
   const subscriptionRef = useRef<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const attachments = useChatAttachments()
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -137,18 +143,41 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
     }
   }, [olderCursor, selectedGarage, loadingOlder, requestId])
 
-  // Fetch the most recent page of messages for the selected garage. Older
-  // history is pulled in on demand by loadOlderMessages().
-  const fetchMessages = useCallback(async (garageId: string) => {
+  /**
+   * Fetch the most recent page of messages for the selected garage. Older
+   * history is pulled in on demand by loadOlderMessages().
+   *
+   * `mode` matters. Opening a thread replaces whatever was on screen, but a
+   * gap-filling refetch must MERGE: the list is read from a GSI, which
+   * DynamoDB does not serve consistently, and the page is `Limit`ed before the
+   * per-garage filter is applied. A replace therefore routinely dropped
+   * messages that were genuinely there — including the one the user had just
+   * sent — until the next reload.
+   */
+  const fetchMessages = useCallback(async (
+    garageId: string,
+    mode: 'replace' | 'merge' = 'replace'
+  ) => {
     try {
-      const response = await fetch(`/api/chat/${requestId}/messages/?garageId=${garageId}`)
+      const response = await fetch(
+        `/api/chat/${requestId}/messages/?garageId=${garageId}`,
+        { cache: 'no-store' }
+      )
       if (response.ok) {
         const data = await response.json()
-        const validMessages = (data.messages || []).filter(
+        const validMessages: ChatMessage[] = (data.messages || []).filter(
           (msg: ChatMessage) => msg.timestamp && !isNaN(new Date(msg.timestamp).getTime())
         )
         setOlderCursor(data.nextCursor ?? null)
-        setMessages(validMessages)
+        setMessages((prev) => {
+          if (mode === 'replace') return validMessages
+          const seen = new Set(prev.map((m) => m.id))
+          const additions = validMessages.filter((m) => !seen.has(m.id))
+          if (additions.length === 0) return prev
+          return [...prev, ...additions].sort(
+            (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          )
+        })
         // Scroll to bottom after messages are loaded
         setTimeout(() => {
           scrollToBottom()
@@ -159,6 +188,24 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       showToast({ type: 'error', title: 'Σφάλμα κατά τη φόρτωση των μηνυμάτων' })
     }
   }, [requestId, showToast])
+
+  /**
+   * Show a message we just sent straight away, from the API's own copy of the
+   * created row. The subscription de-dupes on id, so the real-time echo is a
+   * no-op when it arrives — and when the socket is down this is the only thing
+   * that puts the message on screen at all.
+   */
+  const appendMessage = useCallback((sent: ChatMessage | undefined) => {
+    if (!sent?.id || !sent.timestamp) return
+    setMessages((prev) =>
+      prev.some((m) => m.id === sent.id)
+        ? prev
+        : [...prev, sent].sort(
+            (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          )
+    )
+    setTimeout(() => scrollToBottom(), 50)
+  }, [])
 
   // Subscribe to real-time messages using AWS AppSync
   const subscribeToMessages = useCallback(async (garageId: string) => {
@@ -177,8 +224,11 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       appSyncService.subscribe(channelName, (newMessage: ChatMessage) => {
         console.log('[Client] Real-time message received:', newMessage)
 
-        // Ignore subscription system events (e.g. {status: "subscribed"})
-        if (!newMessage.id || !newMessage.timestamp || !newMessage.message) return
+        // Ignore subscription system events (e.g. {status: "subscribed"}).
+        // A photo-only message still carries a caption, but accept anything
+        // with attachments regardless so a future empty-caption send survives.
+        const hasBody = !!newMessage.message || (newMessage.attachments?.length ?? 0) > 0
+        if (!newMessage.id || !newMessage.timestamp || !hasBody) return
 
         setMessages(prev => {
           // Prevent duplicate messages
@@ -207,36 +257,67 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
     }
   }
 
-  // Send new message
+  const handleFilesPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    attachments.addFiles(e.target.files)
+    // Reset so picking the same file twice in a row still fires onChange.
+    e.target.value = ''
+  }
+
+  /**
+   * Sends whatever is staged: photos (with the typed text as their caption),
+   * plain text, or both.
+   *
+   * Photos go through the attachments endpoint, which uploads and creates the
+   * message in one call, so there is no window where a photo exists in S3
+   * without a message pointing at it.
+   */
   const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedGarage || sending || isReadOnly) return
+    const text = newMessage.trim()
+    if ((!text && !attachments.hasPending) || !selectedGarage || sending || isReadOnly) return
 
     setSending(true)
     try {
-      const response = await fetch(`/api/chat/${requestId}/messages/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: newMessage.trim(),
-          senderId: clientId,
-          senderType: 'client',
-          garageId: selectedGarage.id
-        }),
-      })
-
-      if (response.ok) {
+      if (attachments.hasPending) {
+        const result = await attachments.upload({
+          requestId,
+          garageId: selectedGarage.id,
+          caption: text,
+        })
+        if (!result.ok) {
+          showToast({ type: 'error', title: result.error })
+          return
+        }
+        if (result.rejected.length > 0) {
+          showToast({
+            type: 'warning',
+            title: 'Κάποιες φωτογραφίες δεν στάλθηκαν',
+            message: result.rejected.join('\n'),
+          })
+        }
+        appendMessage(result.message as ChatMessage | undefined)
         setNewMessage('')
-        // Refresh messages
-        await fetchMessages(selectedGarage.id)
-        // Scroll to bottom after sending message
-        setTimeout(() => {
-          scrollToBottom()
-        }, 100)
       } else {
-        const error = await response.json()
-        showToast({ type: 'error', title: error.error || 'Σφάλμα κατά την αποστολή του μηνύματος' })
+        const response = await fetch(`/api/chat/${requestId}/messages/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: text,
+            senderId: clientId,
+            senderType: 'client',
+            garageId: selectedGarage.id
+          }),
+        })
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}))
+          showToast({ type: 'error', title: error.error || 'Σφάλμα κατά την αποστολή του μηνύματος' })
+          return
+        }
+        const result = await response.json().catch(() => ({}))
+        appendMessage(result.message as ChatMessage | undefined)
+        setNewMessage('')
       }
     } catch (error) {
       console.error('Error sending message:', error)
@@ -345,7 +426,10 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   useEffect(() => {
     if (!selectedGarage) return
     const garageId = selectedGarage.id
-    return appSyncService.onReconnect(() => { fetchMessages(garageId) })
+    // Merge, never replace: Safari drops the socket every time the tab is
+    // backgrounded, so this fires constantly, and replacing here made the
+    // conversation flicker away and come back short.
+    return appSyncService.onReconnect(() => { fetchMessages(garageId, 'merge') })
   }, [selectedGarage, fetchMessages])
 
   // Scroll to bottom when messages change
@@ -556,9 +640,6 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                       </div>
                     ) : (
                       messages.map((message, index) => {
-                        // Debug: Log message data to identify key issues
-                        console.log(`[IndividualChatPage] Message ${index}:`, { id: message.id, timestamp: message.timestamp, senderType: message.senderType })
-
                         const isClient = message.senderType === 'client'
                         const showDate = index === 0 ||
                           formatDate(message.timestamp) !== formatDate(messages[index - 1].timestamp)
@@ -581,7 +662,17 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                                   ? 'machined-gradient text-white rounded-xl rounded-tr-none'
                                   : 'bg-surface-container-low text-on-surface rounded-xl rounded-tl-none'
                               }`}>
-                                <p className="text-sm leading-relaxed">{message.message}</p>
+                                {(message.attachments?.length ?? 0) > 0 && (
+                                  <div className="mb-1.5 -mx-1">
+                                    <ChatAttachments
+                                      attachments={message.attachments ?? []}
+                                      onOwnBubble={isClient}
+                                    />
+                                  </div>
+                                )}
+                                {message.message && (
+                                  <p className="text-sm leading-relaxed">{message.message}</p>
+                                )}
                                 <div className={`flex items-center gap-1 mt-1 ${isClient ? 'justify-end' : 'justify-start'}`}>
                                   <p className={`text-[10px] ${
                                     isClient ? 'text-white/70' : 'text-secondary'
@@ -614,10 +705,50 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                     </div>
                   ) : (
                     <div className="px-4 py-3 border-t border-outline-variant/10 bg-surface-container-lowest/80 backdrop-blur-sm">
+                      <AttachmentPreviewStrip
+                        files={attachments.pending}
+                        onRemove={attachments.removeFile}
+                        disabled={sending}
+                      />
                       <div className="flex items-end gap-2">
-                        {/* Attachment button */}
-                        <button className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors flex-shrink-0 mb-0.5">
-                          <Icon name="add" size="md" className="text-on-surface-variant" />
+                        {/* Attach photos */}
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleFilesPicked}
+                          className="hidden"
+                        />
+                        {/* `capture` opens the camera straight away. Mobile only:
+                            on desktop it degrades to a second file picker. */}
+                        <input
+                          ref={cameraInputRef}
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          onChange={handleFilesPicked}
+                          className="hidden"
+                        />
+                        <button
+                          onClick={() => cameraInputRef.current?.click()}
+                          disabled={sending || attachments.isFull}
+                          title="Λήψη φωτογραφίας"
+                          className="md:hidden w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors flex-shrink-0 mb-0.5 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+                        >
+                          <Icon name="photo_camera" size="md" filled className="text-on-surface-variant" />
+                        </button>
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={sending || attachments.isFull}
+                          title={
+                            attachments.isFull
+                              ? `Έως ${MAX_CHAT_ATTACHMENTS} φωτογραφίες ανά μήνυμα`
+                              : 'Επισύναψη φωτογραφίας'
+                          }
+                          className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-high transition-colors flex-shrink-0 mb-0.5 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+                        >
+                          <Icon name="add_a_photo" size="md" className="text-on-surface-variant" />
                         </button>
 
                         {/* Text input */}
@@ -631,7 +762,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                                 sendMessage()
                               }
                             }}
-                            placeholder="Γράψτε μήνυμα..."
+                            placeholder={attachments.hasPending ? 'Προσθέστε λεζάντα (προαιρετικά)...' : 'Γράψτε μήνυμα...'}
                             rows={1}
                             className="w-full bg-surface-container-low border-0 rounded-2xl px-4 py-2.5 text-sm font-medium text-on-surface placeholder:text-outline focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all resize-none max-h-24"
                             disabled={sending}
@@ -641,7 +772,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                         {/* Send button */}
                         <button
                           onClick={sendMessage}
-                          disabled={!newMessage.trim() || sending}
+                          disabled={(!newMessage.trim() && !attachments.hasPending) || sending}
                           className="w-10 h-10 rounded-full machined-gradient flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95 shadow-lg shadow-primary/20 flex-shrink-0 mb-0.5"
                         >
                           {sending ? (

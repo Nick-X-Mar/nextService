@@ -7,6 +7,8 @@ import GearSubmitButton from '@/components/GearSubmitButton'
 import { useToast } from '../../../../hooks/useToast'
 import { loadFormData } from '../../../../utils/formStorage'
 import { usePriceEstimate } from '@/hooks/usePriceEstimate'
+import { compressImages } from '@/utils/imageCompression'
+import { useFileDrop } from '@/hooks/useFileDrop'
 import EstimatedCostCard from './EstimatedCostCard'
 import Image from 'next/image'
 
@@ -26,7 +28,6 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
   const router = useRouter()
   const { success, error } = useToast()
   const [photos, setPhotos] = useState<File[]>([])
-  const [dragActive, setDragActive] = useState(false)
   // Covers the whole submit: create the request, then push the photos to S3.
   // Stays true through the redirect so the button doesn't flick back to idle
   // while the requests page is still loading.
@@ -46,6 +47,9 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     addPhotos(files)
+    // Reset so re-picking the same file still fires onChange — and so the
+    // camera input can be used twice in a row.
+    e.target.value = ''
   }
 
   const addPhotos = (newFiles: File[]) => {
@@ -61,24 +65,12 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
     setPhotos(prev => prev.filter((_, i) => i !== index))
   }
 
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true)
-    } else if (e.type === 'dragleave') {
-      setDragActive(false)
-    }
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
-
-    const files = Array.from(e.dataTransfer.files)
-    addPhotos(files)
-  }
+  // Whole-window drop. Dropping just outside the dashed box used to make the
+  // browser open the photo as a page, losing the half-filled form.
+  const { dragActive } = useFileDrop(addPhotos, {
+    disabled: photos.length >= 3,
+    accept: (file) => file.type.startsWith('image/'),
+  })
 
   const isFormValid = photos.length >= 1
 
@@ -122,44 +114,55 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
           return
         }
 
-        // Now upload photos to S3
+        // Scaled down and re-encoded to JPEG first. Straight off a phone these
+        // are 3-8MB each and often HEIC, which the API rejected — and because
+        // one bad file used to fail the whole batch, people ended up with a
+        // request carrying no photos at all.
+        const compressed = await compressImages(photos)
+
         const formData = new FormData()
-        photos.forEach(file => {
+        compressed.forEach(file => {
           formData.append('files', file)
         })
         formData.append('serviceRequestId', serviceResult.serviceRequestId)
-        formData.append('vehicleId', serviceResult.vehicleId)
 
         const uploadResponse = await fetch('/api/upload-photos/', {
           method: 'POST',
           body: formData,
         })
 
-        if (!uploadResponse.ok) {
-          throw new Error('Photo upload failed')
+        const uploadResult = await uploadResponse.json().catch(() => ({}))
+
+        // The request itself already exists at this point. Failing the whole
+        // submission here is what produced the duplicate requests in the data:
+        // people saw an error, went back and submitted the same job again.
+        // Take them to the request either way and be honest about the photos —
+        // they can add them from the request page.
+        if (!uploadResponse.ok || !uploadResult.success) {
+          error(
+            'Οι φωτογραφίες δεν στάλθηκαν',
+            'Το αίτημά σου καταχωρήθηκε κανονικά. Μπορείς να προσθέσεις τις φωτογραφίες από τη σελίδα του αιτήματος.'
+          )
+        } else if ((uploadResult.rejected?.length ?? 0) > 0) {
+          success(
+            'Το αίτημα στάλθηκε',
+            `Στάλθηκαν ${uploadResult.photoData?.length ?? 0} από ${photos.length} φωτογραφίες. Μπορείς να προσθέσεις κι άλλες από τη σελίδα του αιτήματος.`
+          )
+        } else {
+          success(
+            'Επιτυχία!',
+            `Στάλθηκαν ${photos.length} φωτογραφίες και ειδοποιήθηκαν ${serviceResult.notificationsSent} συνεργεία.`
+          )
         }
 
-        const uploadResult = await uploadResponse.json()
-
-        if (uploadResult.success) {
-          success(
-            'Επιτυχια!',
-            `Σταλθηκαν ${photos.length} φωτογραφιες για αξιολογηση της ζημιας\n\nΣταλθηκε ειδοποιηση σε ${serviceResult.notificationsSent} συνεργεια μεσω SMS!\n\nΦωτογραφιες αποθηκευτηκαν στο S3: ${uploadResult.s3Folder}\n\nΑνακατευθυνση στη σελιδα αιτηματων...`
-          )
-
-          // Redirect to requests page with clientId
-          if (serviceResult.clientId) {
-            router.push(`/requests/${serviceResult.clientId}/`)
-          } else {
-            router.push('/requests/')
-          }
+        if (serviceResult.clientId) {
+          router.push(`/requests/${serviceResult.clientId}/`)
         } else {
-          error('Σφαλμα', uploadResult.error || 'Αγνωστο σφαλμα')
-          setIsSubmitting(false)
+          router.push('/requests/')
         }
       } catch (err) {
         console.error('Error submitting service request:', err)
-        error('Σφαλμα', 'Σφαλμα κατα την αποστολη. Παρακαλω δοκιμαστε ξανα.')
+        error('Σφάλμα', 'Σφάλμα κατά την αποστολή. Παρακαλώ δοκίμασε ξανά.')
         setIsSubmitting(false)
       }
     }
@@ -224,17 +227,9 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
             </label>
 
             {photos.length < 3 && (
-              <div
-                className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-200 ${
-                  dragActive
-                    ? 'border-primary bg-primary/5'
-                    : 'border-outline-variant/30 hover:border-primary'
-                }`}
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-              >
+              <>
+                {/* Both inputs are always in the DOM; `capture` is what makes a
+                    phone open the camera directly instead of the gallery. */}
                 <input
                   type="file"
                   id="damage-photos"
@@ -243,19 +238,56 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
                   onChange={handleFileChange}
                   className="hidden"
                 />
-                <label htmlFor="damage-photos" className="cursor-pointer">
-                  <Icon name="cloud_upload" size="xl" className="mx-auto mb-3 text-on-surface-variant/40" />
-                  <p className="text-sm font-bold text-on-surface">
-                    Κανε κλικ η συρε φωτογραφιες εδω
-                  </p>
-                  <p className="text-xs text-on-surface-variant mt-1">
-                    JPG, PNG μεχρι 10MB ανα φωτογραφια
-                  </p>
-                  <p className="text-[10px] text-on-surface-variant/50 mt-1">
-                    Μεχρι {3 - photos.length} ακομα φωτογραφι{3 - photos.length === 1 ? 'α' : 'ες'}
-                  </p>
-                </label>
-              </div>
+                <input
+                  type="file"
+                  id="damage-photos-camera"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+
+                {/* Phones: shoot or pick, no drag-and-drop to speak of. */}
+                <div className="grid grid-cols-2 gap-3 md:hidden">
+                  <label
+                    htmlFor="damage-photos-camera"
+                    className="flex flex-col items-center justify-center gap-2 rounded-2xl machined-gradient text-white py-5 cursor-pointer active:scale-95 transition-transform shadow-lg shadow-primary/20"
+                  >
+                    <Icon name="photo_camera" size="lg" filled />
+                    <span className="text-sm font-bold">Καμερα</span>
+                  </label>
+                  <label
+                    htmlFor="damage-photos"
+                    className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-surface-container-highest text-on-surface py-5 cursor-pointer active:scale-95 transition-transform"
+                  >
+                    <Icon name="photo_library" size="lg" filled className="text-on-surface-variant" />
+                    <span className="text-sm font-bold">Συλλογη</span>
+                  </label>
+                </div>
+
+                {/* Desktop: the drop target is the whole window (see useFileDrop),
+                    this box is just where we say so. */}
+                <div
+                  className={`hidden md:block border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-200 ${
+                    dragActive
+                      ? 'border-primary bg-primary/5'
+                      : 'border-outline-variant/30 hover:border-primary'
+                  }`}
+                >
+                  <label htmlFor="damage-photos" className="cursor-pointer">
+                    <Icon name="cloud_upload" size="xl" className="mx-auto mb-3 text-on-surface-variant/40" />
+                    <p className="text-sm font-bold text-on-surface">
+                      {dragActive ? 'Αφησε τις φωτογραφιες' : 'Κανε κλικ η συρε φωτογραφιες εδω'}
+                    </p>
+                    <p className="text-xs text-on-surface-variant mt-1">
+                      JPG, PNG μεχρι 10MB ανα φωτογραφια
+                    </p>
+                    <p className="text-[10px] text-on-surface-variant/50 mt-1">
+                      Μεχρι {3 - photos.length} ακομα φωτογραφι{3 - photos.length === 1 ? 'α' : 'ες'}
+                    </p>
+                  </label>
+                </div>
+              </>
             )}
 
             {/* Photo Preview Grid */}

@@ -55,6 +55,28 @@ console.log('🔧 S3 Environment:', {
 const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'nextservice-uploads-staging'
 const BUCKET_REGION = process.env.REGION || 'eu-central-1'
 
+/**
+ * MIME types accepted for any user-uploaded image.
+ *
+ * The pickers in the UI all filter on `image/*`, so this list has to cover what
+ * phones actually produce, not just what a desktop browser exports: iOS shoots
+ * HEIC/HEIF, and images forwarded through Viber/WhatsApp arrive as WebP. Those
+ * used to be accepted by the browser and then rejected here, which — because
+ * validation failed the whole batch — silently cost the user every photo they
+ * had attached.
+ *
+ * Uploads are normalised to JPEG client-side (`utils/imageCompression.ts`);
+ * this list is the server-side backstop for anything that skipped it.
+ */
+export const ACCEPTED_IMAGE_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+]
+
 export interface UploadResult {
   success: boolean
   url?: string
@@ -215,7 +237,7 @@ export const extractS3KeyFromUrl = (url: string): string => {
 export const validateFile = (
   file: File,
   maxSizeMB: number = 10,
-  allowedTypes: string[] = ['image/jpeg', 'image/png', 'image/jpg']
+  allowedTypes: string[] = ACCEPTED_IMAGE_TYPES
 ): { valid: boolean; error?: string } => {
   // Check file size
   const maxSizeBytes = maxSizeMB * 1024 * 1024

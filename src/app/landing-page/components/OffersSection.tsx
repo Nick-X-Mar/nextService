@@ -165,7 +165,7 @@ export default function OffersSection() {
   }, [cardW, animateTo, navigate])
 
   return (
-    <section className="py-14 relative overflow-hidden">
+    <section id="offers" className="scroll-mt-4 py-14 relative overflow-hidden">
       {/* Header */}
       <div className="px-8 text-center mb-8">
         <h2 className="text-2xl md:text-3xl font-black italic tracking-tighter text-white drop-shadow-lg">

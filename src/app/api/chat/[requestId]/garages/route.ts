@@ -3,6 +3,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { requireClient } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
+import { collectAll } from '@/utils/pagination'
 
 interface ChatMessageItem {
   id: string
@@ -42,23 +43,35 @@ async function _GET(
 
     const clientReadAt = (requestResult.Item.clientReadAt || {}) as Record<string, string>
 
-    // Get all messages for this request via the RequestMessagesIndex GSI
-    const result = await dynamoDB.send(new QueryCommand({
-      TableName: 'ChatMessages',
-      IndexName: 'RequestMessagesIndex',
-      KeyConditionExpression: 'requestId = :requestId',
-      ExpressionAttributeValues: { ':requestId': requestId }
-    }))
+    // Every message on the request, but only the five attributes this endpoint
+    // actually reads.
+    //
+    // This used to be an unprojected Query with no Limit and no pagination,
+    // which is two bugs at once: it pulled whole message bodies and attachment
+    // arrays across the wire — and it is what the client chat's loading
+    // spinner waits on — while also silently stopping at DynamoDB's 1MB page,
+    // so a long thread quietly lost the garages further back in its history.
+    const messages = (await collectAll<Record<string, unknown>>(
+      (startKey) => dynamoDB.send(new QueryCommand({
+        TableName: 'ChatMessages',
+        IndexName: 'RequestMessagesIndex',
+        KeyConditionExpression: 'requestId = :requestId',
+        ExpressionAttributeValues: { ':requestId': requestId },
+        // `timestamp` is a DynamoDB reserved word.
+        ProjectionExpression: 'id, senderId, senderType, #msg, #ts',
+        ExpressionAttributeNames: { '#ts': 'timestamp', '#msg': 'message' },
+        ExclusiveStartKey: startKey,
+      })),
+      `chat-garages:${requestId}`
+    )) as unknown as ChatMessageItem[]
 
-    if (!result.Items || result.Items.length === 0) {
+    if (messages.length === 0) {
       return NextResponse.json({
         success: true,
         garages: []
       })
     }
 
-    // Get unique garage IDs from messages
-    const messages = result.Items as ChatMessageItem[]
     const garageIds = [...new Set(
       messages
         .filter((item) => item.senderType === 'garage')
@@ -133,6 +146,8 @@ async function _GET(
     return NextResponse.json({
       success: true,
       garages
+    }, {
+      headers: { 'Cache-Control': 'no-store, private' },
     })
 
   } catch (error) {

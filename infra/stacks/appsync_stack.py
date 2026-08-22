@@ -94,6 +94,11 @@ class AppSyncStack(Stack):
             timeout=Duration.seconds(10),
             environment={
                 "SERVICE_REQUESTS_TABLE": "ServiceRequests",
+                # Read when a garage subscribes to the `new-requests` /
+                # `request-updates` fan-out: those channels carry client names,
+                # phone numbers and presigned photo URLs, so only an approved
+                # garage may join them.
+                "GARAGES_TABLE": "Garages",
                 # Must match the value the Next.js app signs with. Read from the
                 # deploy environment so it never lands in source control, and
                 # required rather than defaulted: silently deploying an empty
@@ -112,7 +117,8 @@ class AppSyncStack(Stack):
             iam.PolicyStatement(
                 actions=["dynamodb:GetItem"],
                 resources=[
-                    f"arn:aws:dynamodb:{self.region}:{self.account}:table/ServiceRequests"
+                    f"arn:aws:dynamodb:{self.region}:{self.account}:table/ServiceRequests",
+                    f"arn:aws:dynamodb:{self.region}:{self.account}:table/Garages",
                 ],
             )
         )

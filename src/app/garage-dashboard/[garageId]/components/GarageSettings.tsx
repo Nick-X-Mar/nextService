@@ -20,6 +20,7 @@ interface GarageData {
   description?: string
   /** "HH:MM" — when the shop opens, shown to clients with each available date. */
   workdayStartTime?: string
+  workdayEndTime?: string
   benefits?: string[]
 }
 
@@ -110,9 +111,11 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
     { icon: 'phone', label: 'ΤΗΛΕΦΩΝΟ', field: 'mobile' as keyof GarageData, placeholder: '+306984959044', required: true },
     { icon: 'location_on', label: 'ΔΙΕΥΘΥΝΣΗ', field: 'address' as keyof GarageData, placeholder: 'Λεωφορος Πατησιων 123, Αθηνα', required: true, fullWidth: true },
     { icon: 'account_balance', label: 'ΔΟΥ', field: 'taxAuthority' as keyof GarageData, placeholder: 'ΔΟΥ Αθηνων', required: true },
-    // Shown to the customer next to every date this shop offers, so "Τρίτη 12/9"
-    // reads as "Τρίτη 12/9, από τις 09:00".
+    // These two drive the hourly availability grid on every offer: the rows of
+    // that grid are the hours between them. Shown to the customer too, so
+    // "Τρίτη 12/9" reads as "Τρίτη 12/9, από τις 09:00".
     { icon: 'schedule', label: 'ΩΡΑ ΕΝΑΡΞΗΣ ΕΡΓΑΣΙΩΝ', field: 'workdayStartTime' as keyof GarageData, placeholder: '09:00', required: false, type: 'time' },
+    { icon: 'schedule', label: 'ΩΡΑ ΛΗΞΗΣ ΕΡΓΑΣΙΩΝ', field: 'workdayEndTime' as keyof GarageData, placeholder: '18:00', required: false, type: 'time' },
     { icon: 'description', label: 'ΠΕΡΙΓΡΑΦΗ', field: 'description' as keyof GarageData, placeholder: 'Συντομη περιγραφη του συνεργειου...', required: false },
   ]
 

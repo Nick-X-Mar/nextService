@@ -61,6 +61,12 @@ async function _GET(request: NextRequest) {
             id: serviceRequest.id,
             description: serviceRequest.description,
             category: serviceRequest.category,
+            // The dashboard needs these to tell an appointment still waiting on
+            // the garage's confirmation from one that has already been closed.
+            status: serviceRequest.status,
+            completedAt: serviceRequest.completedAt,
+            completionOutcome: serviceRequest.completionOutcome,
+            finalAmounts: serviceRequest.finalAmounts,
             client: client
               ? {
                   firstName: client.firstName,

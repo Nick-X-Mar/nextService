@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { PutCommand, GetCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
-import appSyncService from '@/lib/appsync-service'
-import { ServiceRequestStatus } from '@/types/statuses'
-import { logEvent } from '@/utils/eventLogger'
-import { EventName, EmailTemplate } from '@/types/events'
+import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { requireAuth } from '@/utils/requireAuth'
 import { decodeCursor, encodeCursor, parseLimit } from '@/utils/pagination'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
-import { sendEmail } from '@/utils/emailService'
-import { randomUUID } from 'crypto'
+import { createChatMessage, resolveThread, isChatPermissionError } from '@/utils/chatService'
+import { presignChatAttachments } from '@/utils/chatAttachments'
 
 const checkMessageRate = createRateLimiter('chat-message', 60, 3600000)
 
@@ -49,6 +45,7 @@ async function _GET(
     // so the garage thread is separated by filter alone. That makes the filter
     // a security boundary, not a convenience: a garage must never be able to
     // choose someone else's thread, nor opt out of filtering and read them all.
+    // It is also what scopes a photo sent in chat to a single garage.
     let garageId = requestedGarageId
     if (auth.userType === 'garage') {
       if (requestedGarageId && requestedGarageId !== auth.userId) {
@@ -58,8 +55,7 @@ async function _GET(
     }
 
     // Query messages by requestId via the RequestMessagesIndex GSI.
-    // FilterExpression still narrows to a specific garage thread when requested
-    // — Filter is applied AFTER the index read, so it stays cheap.
+    // FilterExpression still narrows to a specific garage thread when requested.
     const expressionValues: Record<string, unknown> = { ':requestId': requestId }
     let filterExpression: string | undefined
 
@@ -78,19 +74,60 @@ async function _GET(
     // limit it returned a partial history with no indication anything was
     // missing.
     const limit = parseLimit(searchParams.get('limit'), 50)
-    const result = await dynamoDB.send(new QueryCommand({
-      TableName: 'ChatMessages',
-      IndexName: 'RequestMessagesIndex',
-      KeyConditionExpression: 'requestId = :requestId',
-      ExpressionAttributeValues: expressionValues,
-      ...(filterExpression ? { FilterExpression: filterExpression } : {}),
-      ScanIndexForward: false,
-      Limit: limit,
-      ExclusiveStartKey: decodeCursor(searchParams.get('cursor')),
-    }))
+
+    // `Limit` bounds the rows DynamoDB READS from the index, not the rows that
+    // survive `FilterExpression`. Every garage competing on a request shares
+    // one `requestId` partition, so on a busy request a single 50-row page
+    // could come back with a handful of messages — or none — while still
+    // reporting more to come. That is what "the chat won't load" looked like.
+    //
+    // So: read wider pages when filtering, and keep reading until we actually
+    // have a full page of this thread's messages. MAX_INDEX_PAGES caps the
+    // worst case so a pathological thread can't turn one request into an
+    // unbounded scan.
+    const MAX_INDEX_PAGES = 5
+    const pageSize = filterExpression ? Math.min(limit * 4, 200) : limit
+
+    type ChatRow = Record<string, unknown> & { id?: string; timestamp?: string }
+    const collected: ChatRow[] = []
+    let startKey = decodeCursor(searchParams.get('cursor'))
+    let lastEvaluatedKey: Record<string, unknown> | undefined
+    let pages = 0
+
+    do {
+      const page = await dynamoDB.send(new QueryCommand({
+        TableName: 'ChatMessages',
+        IndexName: 'RequestMessagesIndex',
+        KeyConditionExpression: 'requestId = :requestId',
+        ExpressionAttributeValues: expressionValues,
+        ...(filterExpression ? { FilterExpression: filterExpression } : {}),
+        ScanIndexForward: false,
+        Limit: pageSize,
+        ExclusiveStartKey: startKey,
+      }))
+      collected.push(...((page.Items || []) as ChatRow[]))
+      lastEvaluatedKey = page.LastEvaluatedKey
+      startKey = lastEvaluatedKey
+      pages++
+    } while (lastEvaluatedKey && collected.length < limit && pages < MAX_INDEX_PAGES)
+
+    // Trim to the page the caller asked for. When we overshot, the resume
+    // point is the last row we are actually returning — `LastEvaluatedKey`
+    // points past it and would skip everything in between. The index is
+    // (requestId, timestamp) over a table keyed by `id`, so those three
+    // attributes are the whole key.
+    const overshot = collected.length > limit
+    const kept = overshot ? collected.slice(0, limit) : collected
+    const boundary = kept[kept.length - 1]
+    const nextCursorKey = overshot && boundary
+      ? { requestId, timestamp: boundary.timestamp, id: boundary.id }
+      : lastEvaluatedKey
 
     // Back to chronological order for rendering.
-    const messages = [...(result.Items || [])].reverse()
+    const ordered = [...kept].reverse()
+    // Attachments are stored as S3 keys against a private bucket; the viewer
+    // gets a short-lived signed URL minted here.
+    const messages = await presignChatAttachments(ordered)
 
     // How far this viewer has read the thread, so callers can mark messages
     // unread without a second round trip. ChatMessages rows carry a `read`
@@ -106,7 +143,13 @@ async function _GET(
       success: true,
       messages,
       lastReadAt,
-      nextCursor: encodeCursor(result.LastEvaluatedKey),
+      nextCursor: encodeCursor(nextCursorKey),
+    }, {
+      // Private, and never reusable. Safari is markedly more willing than
+      // Chrome to serve a directive-less fetch() GET from its disk cache, and
+      // a cached message list is indistinguishable from "my message didn't
+      // send". The presigned attachment URLs in the body expire, too.
+      headers: { 'Cache-Control': 'no-store, private' },
     })
 
   } catch (error) {
@@ -145,7 +188,6 @@ async function _POST(
       }, { status: 400 })
     }
 
-    // Verify the user has access to this request
     const requestResult = await dynamoDB.send(new GetCommand({
       TableName: 'ServiceRequests',
       Key: { id: requestId }
@@ -153,141 +195,27 @@ async function _POST(
     if (!requestResult.Item) {
       return NextResponse.json({ error: 'Request not found' }, { status: 404 })
     }
-    if (auth.userType === 'client' && requestResult.Item.clientId !== auth.userId) {
-      return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
-    }
 
     const { message, garageId } = body
-    // Use authenticated user as sender instead of trusting body
-    const senderId = auth.userId
-    const senderType = auth.userType
 
-    // The thread a message lands in — and the realtime channel it is published
-    // to — is decided by garageId. Taking it from the body unchecked would let
-    // one garage write into a competitor's conversation and have it appear live
-    // in the client's chat with that competitor. A garage always writes to its
-    // own thread; only a client (who owns the request) may address a garage.
-    if (senderType === 'garage' && garageId && garageId !== auth.userId) {
-      return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
-    }
-    const effectiveGarageId = senderType === 'garage' ? senderId : (garageId || null)
-
-    if (!message || !senderId || !senderType) {
-      return NextResponse.json({ 
-        error: 'Message, senderId, and senderType are required' 
-      }, { status: 400 })
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return NextResponse.json({ error: 'Message is required' }, { status: 400 })
     }
 
-    if (!['garage', 'client'].includes(senderType)) {
-      return NextResponse.json({ 
-        error: 'Invalid senderType. Must be "garage" or "client"' 
-      }, { status: 400 })
+    // Ownership, thread selection and the post-appointment read-only rule all
+    // live in one place, shared with the attachments route.
+    const thread = resolveThread(auth, requestResult.Item, garageId)
+    if (isChatPermissionError(thread)) {
+      return NextResponse.json({ error: thread.error }, { status: thread.status })
     }
 
-    // Once the job is assigned, only the two parties who are actually doing it keep
-    // talking. Everyone else — the garages whose offers were rejected — is out: they
-    // can read the history but they neither send nor receive anything more.
-    if (requestResult.Item.status === ServiceRequestStatus.APPOINTMENT) {
-      const acceptedGarageId = requestResult.Item.acceptedGarageId as string | undefined
-      const isPartOfAppointment = acceptedGarageId
-        ? effectiveGarageId === acceptedGarageId
-        : false
-
-      if (!isPartOfAppointment) {
-        return NextResponse.json(
-          {
-            error: senderType === 'garage'
-              ? 'Το αίτημα ανατέθηκε σε άλλο συνεργείο. Η συνομιλία είναι πλέον μόνο για ανάγνωση.'
-              : 'Η συνομιλία με αυτό το συνεργείο είναι μόνο για ανάγνωση — το ραντεβού κλείστηκε με άλλο συνεργείο.'
-          },
-          { status: 403 }
-        )
-      }
-    }
-
-    // Generate unique message ID
-    const messageId = `msg-${randomUUID()}`
-
-    // Get sender name based on type
-    let senderName = 'Unknown'
-    if (senderType === 'garage') {
-      const garageResult = await dynamoDB.send(new GetCommand({
-        TableName: 'Garages',
-        Key: { id: senderId }
-      }))
-      if (garageResult.Item) {
-        senderName = garageResult.Item.companyName
-      }
-    } else {
-      const clientResult = await dynamoDB.send(new GetCommand({
-        TableName: 'Clients',
-        Key: { id: senderId }
-      }))
-      if (clientResult.Item) {
-        const client = clientResult.Item
-        senderName = `${client.firstName} ${client.lastName || ''}`.trim()
-      }
-    }
-
-    // Create message
-    const messageData = {
-      id: messageId,
-      requestId: requestId,
-      senderId: senderId,
-      senderType: senderType,
-      senderName: senderName,
-      message: message.trim(),
-      timestamp: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      ...(effectiveGarageId && { garageId: effectiveGarageId })
-    }
-
-    const putCommand = new PutCommand({
-      TableName: 'ChatMessages',
-      Item: messageData
-    })
-
-    await dynamoDB.send(putCommand)
-
-    logEvent({
-      eventName: EventName.ChatMessageSent,
-      actorType: senderType === 'garage' ? 'garage' : 'client',
-      actorId: senderId,
-      ...(senderType === 'client' ? { clientId: senderId } : {}),
-      ...(effectiveGarageId ? { garageId: effectiveGarageId } : {}),
-      requestId,
-      source: 'api/chat/[requestId]/messages',
-      metadata: { messageId, senderName, length: messageData.message.length }
-    })
-
-    // Email the other side — but only if they are actually missing it.
-    //
-    // This was deferred for a good reason: mailing on every message would spam
-    // people mid-conversation. Two gates make it safe without needing presence
-    // detection. First, we skip anyone whose read marker for this thread is
-    // newer than the previous message — if they are reading, they don't need an
-    // email. Second, a cooldown per (request, recipient) means a burst of five
-    // messages sends one mail, not five.
-    notifyByEmail({
+    const messageData = await createChatMessage({
       requestId,
       request: requestResult.Item,
-      senderType,
-      senderName,
-      garageId: effectiveGarageId,
-    }).catch((err) => console.error('[chat] notify failed:', err))
-
-            // Publish message to AppSync Events for real-time updates
-            if (effectiveGarageId) {
-              const channelName = `request-${requestId}-garage-${effectiveGarageId}`
-              try {
-                // Publish the message to AppSync Events
-                await appSyncService.publishEvent(channelName, messageData)
-                console.log(`[API] Message published to AppSync Events channel: ${channelName}`)
-              } catch (error) {
-                console.error('[API] Error publishing to AppSync Events:', error)
-                // Don't fail the request if AppSync publishing fails
-              }
-            }
+      auth,
+      message,
+      garageId: thread.garageId,
+    })
 
     return NextResponse.json({
       success: true,
@@ -307,77 +235,4 @@ async function _POST(
 }
 
 export const GET = withMetrics(_GET)
-
-const CHAT_EMAIL_COOLDOWN_MS = 15 * 60 * 1000
-
-/**
- * Fire-and-forget "you have a new message" mail to whoever did not send it.
- *
- * Never awaited by the request path: a slow SES call must not delay the message
- * appearing in the sender's own chat window.
- */
-async function notifyByEmail(args: {
-  requestId: string
-  request: Record<string, unknown>
-  senderType: 'client' | 'garage'
-  senderName: string
-  garageId: string | null
-}): Promise<void> {
-  const { requestId, request, senderType, senderName, garageId } = args
-  if (!garageId) return
-
-  const recipientKey = senderType === 'garage' ? 'client' : garageId
-  const notifiedAt = (request.chatNotifiedAt || {}) as Record<string, string>
-  const lastNotified = notifiedAt[recipientKey]
-  if (lastNotified && Date.now() - new Date(lastNotified).getTime() < CHAT_EMAIL_COOLDOWN_MS) {
-    return
-  }
-
-  // If the recipient has read this thread more recently than we last mailed
-  // them, they are engaged — no mail.
-  const readMap = (senderType === 'garage' ? request.clientReadAt : request.garageReadAt) as
-    | Record<string, string>
-    | undefined
-  const lastRead = readMap?.[garageId]
-  if (lastRead && Date.now() - new Date(lastRead).getTime() < CHAT_EMAIL_COOLDOWN_MS) {
-    return
-  }
-
-  const clientId = request.clientId as string | undefined
-  const table = senderType === 'garage' ? 'Clients' : 'Garages'
-  const recipientId = senderType === 'garage' ? clientId : garageId
-  if (!recipientId) return
-
-  const recipient = await dynamoDB.send(new GetCommand({ TableName: table, Key: { id: recipientId } }))
-  const email = recipient.Item?.email as string | undefined
-  if (!email) return
-
-  const chatUrl =
-    senderType === 'garage'
-      ? `/requests/${clientId}/chats/${requestId}/?garageId=${garageId}`
-      : `/garage-dashboard/${garageId}/chat/${requestId}/`
-
-  sendEmail({
-    to: email,
-    templateName: EmailTemplate.NewChatMessage,
-    variables: { senderName, chatUrl },
-    triggerEvent: EventName.ChatMessageSent,
-    ...(senderType === 'garage' ? { clientId } : { garageId }),
-  })
-
-  await dynamoDB.send(new UpdateCommand({
-    TableName: 'ServiceRequests',
-    Key: { id: requestId },
-    UpdateExpression: 'SET chatNotifiedAt = if_not_exists(chatNotifiedAt, :empty)',
-    ExpressionAttributeValues: { ':empty': {} },
-  }))
-  await dynamoDB.send(new UpdateCommand({
-    TableName: 'ServiceRequests',
-    Key: { id: requestId },
-    UpdateExpression: 'SET chatNotifiedAt.#k = :now',
-    ExpressionAttributeNames: { '#k': recipientKey },
-    ExpressionAttributeValues: { ':now': new Date().toISOString() },
-  }))
-}
-
 export const POST = withMetrics(_POST)

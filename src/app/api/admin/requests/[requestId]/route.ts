@@ -84,8 +84,18 @@ async function _GET(
       clientAvailabilityDates: sr.clientAvailabilityDates || [],
       acceptedOfferId: sr.acceptedOfferId,
       appointmentDate: sr.appointmentDate,
+      appointmentTime: sr.appointmentTime ?? null,
       appointmentPrice: sr.appointmentPrice,
       cancelledAt: sr.cancelledAt,
+      // Completion: what the garage said happened and what it says it charged.
+      // `finalAmounts.net` is the figure commission is calculated on, so admin
+      // needs to see it next to the quote it may differ from.
+      completedAt: sr.completedAt,
+      completedBy: sr.completedBy,
+      completionOutcome: sr.completionOutcome,
+      completionNotes: sr.completionNotes,
+      completionPromptedAt: sr.completionPromptedAt,
+      finalAmounts: sr.finalAmounts,
       photoUrls,
       client: client
         ? {

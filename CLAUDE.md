@@ -54,7 +54,7 @@ Testing: Playwright E2E only (`e2e/*.spec.ts`). There is no unit-test framework 
 - `payments/`, `wallet/`, `webhooks/stripe` — Stripe deposits, saved cards, wallet balance/transactions
 - `price-estimation/`, `hot-deals/`, `track/` — public endpoints. Price estimation is a strict lookup over past quotes (`src/lib/price-lookup.ts` + `src/data/price-examples.json`), not a formula: it answers only when the same car is already in the dataset — same category, brand and model, model year ±1, same fuel, engine cc ±150 and same turbo/4x4 (that engine gate is skipped for bodywork, where the form never collects those) — and returns the lowest of those past prices, shown as "Εκτιμώμενο κόστος από X€". No match ⇒ `estimation: null` and the UI shows nothing. Leave-one-out coverage is ~20%, so most requests legitimately get no estimate.
 - `account/export`, `account/delete` — GDPR
-- `admin/**` — the whole admin surface (users, requests, payments, commissions, emails, errors, funnel, performance, hot-deals, custom vehicles, settings, tests)
+- `admin/**` — the whole admin surface (users, requests, payments, commissions, emails, errors, funnel, performance, hot-deals, custom vehicles, **content**, **reviews**, settings, tests)
 
 Most routes are wrapped in `withMetrics(...)` (`src/utils/withMetrics.ts`) which fire-and-forget records latency/status into the `PerformanceMetrics` table.
 
@@ -76,7 +76,7 @@ Key routes:
 - `/requests/[clientId]` — client requests, `details/[requestId]`, `chats/[requestId]`
 - `/garage-dashboard/[garageId]` — garage portal + `offers/[requestId]`, `chats/`, `chats/appointments`, `chat/[requestId]`
 - `/register-professional`, `/profile/[clientId]`, `/offer`, `/privacy`, `/terms`
-- `/admin/**` — dashboard, users, requests, payments, commissions, emails, errors, funnel, performance, hot-deals, custom-vehicles, settings, tests
+- `/admin/**` — dashboard, users, requests, payments, commissions, emails, errors, funnel, performance, hot-deals, custom-vehicles, **content** (edit the public pages' copy), **reviews** (moderation), settings, tests
 
 SEO: `sitemap.ts`, `robots.ts`, `opengraph-image.tsx`, canonical URLs from `src/lib/site-url.ts` (`SITE_URL`). `trailingSlash: true` is enabled — URLs without a trailing slash 308-redirect.
 
@@ -86,15 +86,17 @@ SEO: `sitemap.ts`, `robots.ts`, `opengraph-image.tsx`, canonical URLs from `src/
 - `src/contexts/AuthContext.tsx` — auth state (client vs garage), persisted to localStorage
 - `src/contexts/UserContext.tsx` — user-level state
 - `src/utils/dynamoService.ts` — DynamoDB client factory (local endpoint vs explicit creds vs `.aws/` profile vs IAM role)
-- `src/utils/ensure*Table.ts` — runtime table auto-creation for the newer tables (Admin, HotDeals, Payments/Wallet, Events, EmailLogs, Performance, ErrorResolutions)
+- `src/utils/ensure*Table.ts` — runtime table auto-creation for the newer tables (Admin, HotDeals, Payments/Wallet, Events, EmailLogs, Performance, ErrorResolutions, SiteContent, Reviews)
 - `src/utils/eventLogger.ts` — fire-and-forget funnel events → `EventLogs` (365-day TTL)
 - `src/utils/performanceService.ts`, `withMetrics.ts` — API latency metrics
 - `src/utils/errorFingerprint.ts`, `errorGroups.ts` — admin error grouping
 - `src/utils/emailService.ts`, `notificationService.ts`, `src/lib/email-templates/` — SES emails
 - `src/utils/s3Service.ts`, `formStorage.ts`, `rateLimit.ts`, `requireAuth.ts`, `ttlCache.ts`, `requestBroadcast.ts`
-- `src/lib/` — `amplify-config.ts`, `appsync-service.ts`, `stripe-client.ts`, `stripe-server.ts`, `offers.ts`, `site-url.ts`
+- `src/lib/` — `appsync-service.ts` (browser socket), `appsync-publish.ts` (server-side HTTP publish — API routes never publish over the socket), `site-content.ts` + `content-validation.ts` (the page CMS), `commission-basis.ts`, `stripe-client.ts`, `stripe-server.ts`, `offers.ts`, `site-url.ts`
 - `src/hooks/` — `useRealtimeRequests`, `useNewRequestNotifier`, `useToast`
 - Real-time chat goes through `appSyncService` directly from the chat page components — there is no shared chat hook. (The old `websocket-service.ts` / `useRealtimeChat.ts` pair was deleted; it subscribed to a `chat-{id}-{garageId}` channel the API no longer publishes.)
+- **Real-time is an enhancement, never the delivery mechanism.** Both chat pages render a sent message from the POST response and de-dupe the echo on `id`. Never refetch-and-replace after a write: the message list is read from a GSI, which DynamoDB does not serve consistently, so a read moments after the write can legitimately miss the row. Gap-filling refetches (`onReconnect`) must merge.
+- Server-side AppSync publishing goes over HTTP (`src/lib/appsync-publish.ts`), not the browser socket singleton — that singleton carries reconnect backoff and an 8s handshake built for a long-lived tab, not for a request handler that may be frozen the moment it responds.
 - `src/types/` — `index.ts`, `statuses.ts` (`ServiceRequestStatus`, `OfferStatus`), `requests.ts`, `payments.ts`, `events.ts`, `hotDeals.ts`
 
 ### Two User Types (+ admin)
@@ -115,7 +117,9 @@ Dual approach: REST routes persist to DynamoDB, AppSync Events pushes real-time.
 
 ## Data (DynamoDB)
 
-Single-region (`eu-central-1`), table names are literal (no stage prefix). CDK-managed tables: **Clients, Garages, Vehicles, ServiceRequests, Offers, ChatMessages, AdminUsers, ErrorResolutions**. Created at runtime by `ensure*Table.ts` helpers: **EventLogs, EmailLogs, HotDeals, Payments, WalletTransactions, PerformanceMetrics**.
+Single-region (`eu-central-1`), table names are literal (no stage prefix). CDK-managed tables: **Clients, Garages, Vehicles, ServiceRequests, Offers, ChatMessages, AdminUsers, ErrorResolutions**. Created at runtime by `ensure*Table.ts` helpers: **EventLogs, EmailLogs, HotDeals, Payments, WalletTransactions, PerformanceMetrics, SiteContent, Reviews**.
+
+`Reviews` GSIs: `GarageReviewsIndex`, `ClientReviewsIndex`, `RequestReviewsIndex`. Its partition key is `<requestId>#<direction>`, which is what makes one review per job per side structurally impossible rather than merely checked. Rating aggregates live on the `Garages`/`Clients` rows as `ratingCount` + `ratingSum` only — the average is derived on read (`ratingAverage()` in `src/types/reviews.ts`).
 
 Notable GSIs: `Clients.EmailIndex/PhoneIndex`, `Garages.TINIndex/MobileIndex`, `Vehicles.ClientVehiclesIndex/VINIndex`, `ServiceRequests.ClientRequestsIndex/VehicleRequestsIndex/StatusIndex`, `Offers.ServiceRequestOffersIndex/GarageOffersIndex/StatusIndex`, `ChatMessages.RequestMessagesIndex/SenderMessagesIndex`.
 
@@ -170,3 +174,5 @@ Loading states: every button that fires a request or a navigation shows a spinne
 - Use existing shared components from `src/components/` rather than creating duplicates.
 - Follow the page structure convention: `src/app/<page-name>/page.tsx` + `components/` subfolder.
 - UI text is in Greek (the app targets the Greek market).
+- The copy on `/about`, `/faq`, `/locations`, `/location/[slug]`, `/terms`, `/privacy`, `/contact` and the landing-page FAQ is **admin-editable** via `/admin/content`. `src/data/content/pages.ts` and `src/data/locations.ts` hold the copy the build ships with; a DynamoDB row only ever overrides it, so those files stay the fallback and must never be emptied. Editing copy there is still fine — it is what a fresh environment renders.
+- Admin-authored text is rendered through `src/components/content/RichText.tsx`, which parses a tiny markup subset (`**bold**`, `*italic*`, `[text](href)`) into React elements. **Never** introduce `dangerouslySetInnerHTML` for it, and never widen the href allowlist beyond relative / `https:` / `mailto:` / `tel:`.

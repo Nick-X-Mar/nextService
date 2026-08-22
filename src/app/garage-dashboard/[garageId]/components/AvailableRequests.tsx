@@ -165,9 +165,21 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
     }
   }, [])
 
+  // The client uploads photos on a second call, after the request row exists,
+  // so a card broadcast live always arrives with an empty photo set. This
+  // fills it in rather than leaving the card claiming there are no photos
+  // until the garage reloads.
+  const handleRequestPhotos = useCallback((payload: { requestId: string; photoUrls: string[] }) => {
+    if (payload.photoUrls.length === 0) return
+    setRequests(prev =>
+      prev.map(r => (r.id === payload.requestId ? { ...r, photoUrls: payload.photoUrls } : r))
+    )
+  }, [])
+
   useRealtimeRequests({
     onNewRequest: handleNewRequest,
     onRequestUpdate: handleRequestUpdate,
+    onRequestPhotos: handleRequestPhotos,
     // After a reconnect we may have missed events — refetch to catch up.
     onReconnect: loadAvailableRequests,
   })

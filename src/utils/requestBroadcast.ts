@@ -25,6 +25,15 @@ type RequestUpdateEvent = {
   reason?: string
 }
 
+// Photos arrive on a second HTTP call, after the request row (and therefore
+// the new-request broadcast) already exists. This event carries the completed
+// set so a dashboard that is already showing the card can fill it in.
+type RequestPhotosEvent = {
+  __type: 'request-photos'
+  requestId: string
+  photoUrls: string[]
+}
+
 interface BroadcastRequest {
   id: string
   description?: string
@@ -124,6 +133,35 @@ export async function broadcastNewRequest(serviceRequestId: string): Promise<voi
     console.log(`[requestBroadcast] Broadcasted new request ${serviceRequestId}`)
   } catch (error) {
     console.error('[requestBroadcast] Error broadcasting new request:', error)
+  }
+}
+
+/**
+ * Push the current photo set for a request to every listening dashboard.
+ *
+ * The submission flow creates the request first and uploads the photos second,
+ * so `broadcastNewRequest` necessarily fires while `photoUrls` is still empty.
+ * Without this follow-up the live card claimed the request had no photos until
+ * the garage happened to reload the page — which is most of why garages
+ * reported never seeing them.
+ */
+export async function broadcastRequestPhotos(serviceRequestId: string): Promise<void> {
+  try {
+    const request = await loadById('ServiceRequests', serviceRequestId)
+    if (!request) return
+
+    const rawUrls: string[] = request.photoUrls || []
+    if (rawUrls.length === 0) return
+
+    const event: RequestPhotosEvent = {
+      __type: 'request-photos',
+      requestId: serviceRequestId,
+      photoUrls: await generatePresignedUrls(rawUrls),
+    }
+    await appSyncService.publishEvent(REQUEST_UPDATES_CHANNEL, event)
+    console.log(`[requestBroadcast] Broadcasted ${rawUrls.length} photo(s) for ${serviceRequestId}`)
+  } catch (error) {
+    console.error('[requestBroadcast] Error broadcasting request photos:', error)
   }
 }
 

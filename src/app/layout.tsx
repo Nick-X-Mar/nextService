@@ -14,7 +14,6 @@ import InAppBrowserEscape from "@/components/InAppBrowserEscape";
 import { UserProvider } from "@/contexts/UserContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SITE_URL } from "@/lib/site-url";
-import "@/lib/amplify-config"; // Initialize Amplify
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

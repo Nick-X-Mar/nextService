@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { ServiceVehicleCard, LicensePhotoCard, Spinner } from '@/components'
+import { ServiceVehicleCard, LicensePhotoCard, Spinner, AvailabilityGrid } from '@/components'
+import { buildDayHours, sanitizeSlots, datesWithNoHours, type AvailabilitySlots } from '@/utils/availabilitySlots'
 import { useNavigation } from '@/hooks/useNavigation'
 import { useNotifications } from '@/contexts/NotificationsContext'
 import { styles } from '@/styles/styles'
@@ -105,6 +106,27 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
     availabilityDates: string[]
   } | null>(null)
   const [selectedDates, setSelectedDates] = useState<Date[]>([])
+  // Per-date hourly availability. A date with no entry means "untouched",
+  // which the grid renders as fully available.
+  const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlots>({})
+  // The garage's own working hours drive the grid rows.
+  const [workdayHours, setWorkdayHours] = useState<{ start?: string; end?: string }>({})
+
+  // Sorted so the grid columns read left-to-right in date order.
+  const selectedDateStrings = useMemo(
+    () => selectedDates.map(d => format(d, 'yyyy-MM-dd')).sort(),
+    [selectedDates]
+  )
+  const dayHours = useMemo(
+    () => buildDayHours(workdayHours.start, workdayHours.end),
+    [workdayHours]
+  )
+  // Drop slots for dates that are no longer selected — deselecting a day and
+  // reselecting it should bring back a clean, fully-available column.
+  const cleanSlots = useMemo(
+    () => sanitizeSlots(availabilitySlots, selectedDateStrings),
+    [availabilitySlots, selectedDateStrings]
+  )
   const [clientAvailabilityDates, setClientAvailabilityDates] = useState<string[]>([])
   const [addingClientDate, setAddingClientDate] = useState<string | null>(null)
   const router = useRouter()
@@ -162,6 +184,10 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
         const garageData = await garageResponse.json()
         if (garageData.success) {
           setGarage(garageData.garage)
+          setWorkdayHours({
+            start: garageData.garage.workdayStartTime,
+            end: garageData.garage.workdayEndTime,
+          })
           // Set all benefits as selected by default
           if (garageData.garage.benefits && garageData.garage.benefits.length > 0) {
             setSelectedBenefits(garageData.garage.benefits)
@@ -197,6 +223,10 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
             benefits: latestOffer.benefits || [],
             availabilityDates: latestOffer.availabilityDates || []
           })
+
+          if (latestOffer.availabilitySlots) {
+            setAvailabilitySlots(latestOffer.availabilitySlots)
+          }
 
           // Set selected benefits from existing offer
           if (latestOffer.benefits && latestOffer.benefits.length > 0) {
@@ -346,6 +376,20 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
       return
     }
 
+    // A day with every hour closed would reach the customer as a bookable date
+    // with nothing to book. Make the garage either reopen an hour or drop the
+    // day, rather than silently sending a dead option.
+    const emptyDates = datesWithNoHours(cleanSlots, selectedDateStrings)
+    if (emptyDates.length > 0) {
+      showToast({
+        type: 'error',
+        title: 'Ημέρα χωρίς ώρες',
+        message: `Έκλεισες όλες τις ώρες σε ${emptyDates.length === 1 ? 'μία ημερομηνία' : `${emptyDates.length} ημερομηνίες`}. Άνοιξε τουλάχιστον μία ώρα ή αφαίρεσε την ημερομηνία.`,
+        duration: 5000
+      })
+      return
+    }
+
     try {
       setIsSubmitting(true)
 
@@ -356,7 +400,8 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
           offerId: existingOffer.id,
           offerAmount: offer.offerAmount,
           benefits: selectedBenefits,
-          availabilityDates: selectedDates.map(d => format(d, 'yyyy-MM-dd')),
+          availabilityDates: selectedDateStrings,
+          availabilitySlots: cleanSlots,
           status: OfferStatus.PENDING
         }
 
@@ -413,7 +458,8 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
           estimatedCost: offer.estimatedCost,
           offerAmount: offer.offerAmount,
           benefits: selectedBenefits,
-          availabilityDates: selectedDates.map(d => format(d, 'yyyy-MM-dd')),
+          availabilityDates: selectedDateStrings,
+          availabilitySlots: cleanSlots,
           status: OfferStatus.PENDING,
           serviceRequestId: requestId,
           garageId: garageId
@@ -750,6 +796,39 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
                     </span>
                   ))}
               </div>
+            </div>
+          )}
+
+          {/* Hourly availability. Only worth showing once there are days to
+              spread the hours across. */}
+          {selectedDates.length > 0 && (
+            <div className={`mt-5 pt-5 border-t border-outline-variant/10 ${isAccepted ? 'opacity-50 pointer-events-none' : ''}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <Icon name="schedule" size="md" className="text-primary" filled />
+                <p className={styles.labelUpper}>Ώρες παραλαβής</p>
+              </div>
+              <p className="text-xs text-secondary mb-4">
+                Ο πελάτης θα διαλέξει μία από τις διαθέσιμες ώρες.{' '}
+                {workdayHours.start || workdayHours.end ? (
+                  <>Βάσει του ωραρίου σου ({dayHours[0]} - {workdayHours.end || '18:00'}).</>
+                ) : (
+                  <>
+                    Όρισε το ωράριό σου στις{' '}
+                    <a href={`/garage-dashboard/${garageId}/#settings`} className="font-bold text-primary hover:underline">
+                      Ρυθμίσεις
+                    </a>{' '}
+                    για να προσαρμοστούν οι ώρες.
+                  </>
+                )}
+              </p>
+
+              <AvailabilityGrid
+                dates={selectedDateStrings}
+                hours={dayHours}
+                value={cleanSlots}
+                onChange={setAvailabilitySlots}
+                disabled={isAccepted}
+              />
             </div>
           )}
         </div>

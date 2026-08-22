@@ -2,7 +2,10 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
-import { ACTIVE_GARAGE_LOCATIONS, areas, getArea, type Area } from '@/data/locations'
+import { ACTIVE_GARAGE_LOCATIONS } from '@/data/locations'
+import { getAllAreas, getAreaContent } from '@/lib/site-content'
+import { RichLine } from '@/components/content/RichText'
+import type { AreaContent as Area } from '@/types/siteContent'
 import { getAllOffers } from '@/lib/offers'
 import { SITE_URL } from '@/lib/site-url'
 import {
@@ -17,13 +20,22 @@ interface PageProps {
   params: Promise<{ slug: string }>
 }
 
-export function generateStaticParams() {
+/**
+ * Area copy is admin-editable, but the set of slugs is not — they are
+ * inherited from the WordPress site and are the targets of the legacy 301 map
+ * in next.config.ts. This still enumerates every one of them at build time so
+ * the pages stay statically rendered.
+ */
+export const revalidate = 300
+
+export async function generateStaticParams() {
+  const areas = await getAllAreas()
   return areas.map((a) => ({ slug: a.slug }))
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
-  const area = getArea(slug)
+  const area = await getAreaContent(slug)
   if (!area) {
     return { title: 'Η περιοχή δεν βρέθηκε', robots: { index: false, follow: true } }
   }
@@ -107,10 +119,11 @@ function buildAreaJsonLd(area: Area) {
 
 export default async function LocationPage({ params }: PageProps) {
   const { slug } = await params
-  const area = getArea(slug)
+  const area = await getAreaContent(slug)
   if (!area) notFound()
 
-  const offers = await getAllOffers()
+  // Both independent reads; the cross-links at the bottom need the full set.
+  const [offers, otherAreas] = await Promise.all([getAllOffers(), getAllAreas()])
   const url = `${SITE_URL}/location/${area.slug}/`
 
   const crumbs = breadcrumbJsonLd([
@@ -297,7 +310,7 @@ export default async function LocationPage({ params }: PageProps) {
                     />
                   </summary>
                   <div className="px-5 pb-5 text-sm text-secondary leading-relaxed">
-                    {faq.answer}
+                    <RichLine text={faq.answer} />
                   </div>
                 </details>
               ))}
@@ -310,7 +323,7 @@ export default async function LocationPage({ params }: PageProps) {
               Άλλες περιοχές
             </h2>
             <ul className="flex flex-wrap gap-2">
-              {areas
+              {otherAreas
                 .filter((a) => a.slug !== area.slug)
                 .map((a) => (
                   <li key={a.slug}>

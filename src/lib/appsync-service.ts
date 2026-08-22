@@ -32,7 +32,14 @@ async function getRealtimeToken(): Promise<string | null> {
     return mintSystemToken()
   }
   try {
-    const res = await fetch('/api/realtime/token/', { credentials: 'include' })
+    // Bounded on purpose. This runs before the socket exists, so it is not
+    // covered by CONNECT_TIMEOUT_MS; a fetch that never settles used to leave
+    // `connectPromise` pending forever, and every later connect() joined that
+    // same dead promise for the life of the page.
+    const res = await fetch('/api/realtime/token/', {
+      credentials: 'include',
+      signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS),
+    })
     if (!res.ok) return null
     const data = await res.json()
     if (!data?.token) return null
@@ -98,7 +105,30 @@ function buildAuthorization(): Record<string, string | undefined> {
 // just sits in CONNECTING and no event ever fires. Anything awaiting connect()
 // hangs with it, which is how the chat page ended up stuck on its spinner.
 const CONNECT_TIMEOUT_MS = 8000
+const TOKEN_TIMEOUT_MS = 5000
 const MAX_RECONNECT_DELAY_MS = 30000
+
+/**
+ * Whether we are talking to the local mock (`local-appsync-server.js`) rather
+ * than real AppSync. The two speak different frame formats.
+ *
+ * This used to be decided two incompatible ways: the wire protocol keyed off
+ * the endpoint, while the frame format keyed off `NODE_ENV === 'development'`.
+ * Running `next dev` against real AppSync therefore opened the socket with the
+ * AWS subprotocol and then sent mock-shaped frames — AppSync never registered
+ * the subscription and only logged `subscribe_error`.
+ */
+function isMockEndpoint(): boolean {
+  return (process.env.NEXT_PUBLIC_APPSYNC_WEBSOCKET_ENDPOINT || '').includes('localhost:3002')
+}
+
+/**
+ * Frame-level logging is deafening on a busy chat page and costs real time in
+ * the browsers that are slowest here. Opt in with
+ * NEXT_PUBLIC_APPSYNC_DEBUG=true; warnings and errors always print.
+ */
+const DEBUG = process.env.NEXT_PUBLIC_APPSYNC_DEBUG === 'true'
+const debug = (...args: unknown[]) => { if (DEBUG) debug(...args) }
 
 class AppSyncService {
   private ws: WebSocket | null = null
@@ -106,6 +136,12 @@ class AppSyncService {
   // page tracks the badge while the AvailableRequests tab tracks the list).
   // A Set per channel lets each subscriber be removed independently.
   private subscriptions: Map<string, Set<AppSyncCallback>> = new Map()
+  // AppSync's unsubscribe frame references the id of the subscribe frame that
+  // opened it, so that id has to survive. Without it `unsubscribe()` sent
+  // nothing at all outside local dev, and every chat thread a user opened left
+  // another live server-side subscription on the shared socket until it hit
+  // AppSync's per-connection cap and started refusing new ones.
+  private subscriptionIds: Map<string, string> = new Map()
   private reconnectListeners: Set<ReconnectListener> = new Set()
   private reconnectAttempts = 0
   private maxReconnectAttempts = 10
@@ -193,16 +229,16 @@ class AppSyncService {
         const apiKey = process.env.NEXT_PUBLIC_APPSYNC_API_KEY
         const graphqlEndpoint = process.env.NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT
         
-        console.log('🔌 AppSync Environment Variables:')
-        console.log('  WEBSOCKET_ENDPOINT:', endpoint)
-        console.log('  API_KEY:', apiKey ? 'SET' : 'NOT SET')
-        console.log('  GRAPHQL_ENDPOINT:', graphqlEndpoint)
+        debug('🔌 AppSync Environment Variables:')
+        debug('  WEBSOCKET_ENDPOINT:', endpoint)
+        debug('  API_KEY:', apiKey ? 'SET' : 'NOT SET')
+        debug('  GRAPHQL_ENDPOINT:', graphqlEndpoint)
         
         if (!endpoint || !apiKey || !graphqlEndpoint) {
           throw new Error('AppSync configuration missing')
         }
 
-        console.log('🔌 Connecting to AppSync Events WebSocket:', endpoint)
+        debug('🔌 Connecting to AppSync Events WebSocket:', endpoint)
         
         // Authorization for AppSync Events. The Lambda authorizer reads the
         // bearer token; `x-api-key` is kept for the local mock server only,
@@ -221,9 +257,9 @@ class AppSyncService {
         }
         
         // Use AppSync Events WebSocket endpoint with proper protocol
-        const isLocal = endpoint.includes('localhost:3002')
+        const isLocal = isMockEndpoint()
         const wsUrl = isLocal ? endpoint : `${endpoint}/event/realtime`
-        console.log('🔌 AppSync Events WebSocket URL:', wsUrl)
+        debug('🔌 AppSync Events WebSocket URL:', wsUrl)
         
         // Use the correct WebSocket protocol based on server type
         if (isLocal) {
@@ -251,7 +287,7 @@ class AppSyncService {
 
         this.ws.onopen = () => {
           if (!isCurrent()) return
-          console.log('✅ AppSync Events WebSocket connected')
+          debug('✅ AppSync Events WebSocket connected')
           // `reconnectAttempts > 0` covers the case where the very first
           // handshake failed and a retry succeeded: subscribers still need the
           // gap-filling refetch even though this is technically the first open.
@@ -284,7 +320,7 @@ class AppSyncService {
         }
         
         this.ws.onclose = (event) => {
-          console.log('🔌 AppSync Events WebSocket disconnected:', event.code, event.reason)
+          debug('🔌 AppSync Events WebSocket disconnected:', event.code, event.reason)
           if (!isCurrent()) return
           this.isConnected = false
           fail(new Error(`AppSync WebSocket closed before opening (${event.code})`))
@@ -312,7 +348,7 @@ class AppSyncService {
   }
 
   private handleMessage(raw: unknown) {
-    console.log('📨 AppSync Events WebSocket message received:', raw)
+    debug('📨 AppSync Events WebSocket message received:', raw)
 
     // The wire format varies by `type`; narrow once and treat as a loose
     // shape afterwards instead of sprinkling `any` casts.
@@ -324,7 +360,7 @@ class AppSyncService {
     }
 
     if (data.type === 'ack') {
-      console.log('✅ AppSync Events message acknowledged')
+      debug('✅ AppSync Events message acknowledged')
       return
     }
 
@@ -338,7 +374,7 @@ class AppSyncService {
       try {
         const eventData = (data.payload.data?.subscribe || data.payload.data) as AppSyncEvent | undefined
         const channelName: string | undefined = data.payload.channelName
-        console.log('📨 Received local event:', eventData, 'on channel:', channelName)
+        debug('📨 Received local event:', eventData, 'on channel:', channelName)
 
         if (eventData) {
           this.dispatchEvent(eventData, channelName)
@@ -360,7 +396,7 @@ class AppSyncService {
           }
           return undefined
         })()
-        console.log('📨 Received AWS event:', eventData, 'on channel:', channelName)
+        debug('📨 Received AWS event:', eventData, 'on channel:', channelName)
 
         this.dispatchEvent(eventData, channelName)
       } catch (error) {
@@ -369,7 +405,7 @@ class AppSyncService {
     }
     
     if (data.type === 'subscribe_success') {
-      console.log('✅ Subscription successful:', data)
+      debug('✅ Subscription successful:', data)
     }
 
     if (data.type === 'subscribe_error') {
@@ -392,12 +428,21 @@ class AppSyncService {
       })
     }
 
-    if (channelName && this.subscriptions.has(channelName)) {
-      fire(this.subscriptions.get(channelName)!, channelName)
+    if (channelName) {
+      const callbacks = this.subscriptions.get(channelName)
+      if (callbacks) fire(callbacks, channelName)
       return
     }
 
-    this.subscriptions.forEach((callbacks, cn) => fire(callbacks, cn))
+    // The frame did not say which channel it belongs to. Broadcasting to every
+    // subscriber — the old behaviour — pushes chat messages into the
+    // request-updates handler and request broadcasts into open conversations,
+    // so only fall back when there is exactly one possible destination.
+    if (this.subscriptions.size === 1) {
+      this.subscriptions.forEach((callbacks, cn) => fire(callbacks, cn))
+      return
+    }
+    console.warn('[appsync] dropped an event that carried no channel')
   }
 
   private send(message: unknown) {
@@ -423,7 +468,7 @@ class AppSyncService {
       MAX_RECONNECT_DELAY_MS
     )
     const delay = backoff + Math.random() * 500
-    console.log(`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${Math.round(delay)}ms...`)
+    debug(`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${Math.round(delay)}ms...`)
 
     setTimeout(() => {
       this.connect().catch(error => {
@@ -433,7 +478,7 @@ class AppSyncService {
   }
 
   subscribe(channelName: string, callback: AppSyncCallback): () => void {
-    console.log(`📡 Subscribing to channel: ${channelName}`)
+    debug(`📡 Subscribing to channel: ${channelName}`)
 
     const isFirstSubscriber = !this.subscriptions.has(channelName)
     if (isFirstSubscriber) {
@@ -475,12 +520,14 @@ class AppSyncService {
   // callbacks map.
   private sendSubscribeMessage(channelName: string) {
     const defaultChannelName = `/default/${channelName}`
-    const isLocal = process.env.NODE_ENV === 'development'
+    const isLocal = isMockEndpoint()
     const messageType = isLocal ? 'start' : 'subscribe'
 
     if (this.isConnected && this.ws) {
+      const subscriptionId = `sub-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
+      this.subscriptionIds.set(channelName, subscriptionId)
       const subscribeMessage = {
-        id: `sub-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: subscriptionId,
         type: messageType,
         ...(isLocal ? {
           payload: {
@@ -492,7 +539,7 @@ class AppSyncService {
         })
       }
 
-      console.log('📡 Sending subscription message:', subscribeMessage)
+      debug('📡 Sending subscription message:', subscribeMessage)
       this.send(subscribeMessage)
     }
   }
@@ -512,31 +559,46 @@ class AppSyncService {
   // disposer returned by `subscribe()` so individual components don't accidentally
   // unsubscribe each other; this method is kept for legacy chat callsites.
   unsubscribe(channelName: string) {
-    console.log(`📡 Unsubscribing from channel: ${channelName}`)
+    debug(`📡 Unsubscribing from channel: ${channelName}`)
     this.subscriptions.delete(channelName)
     this.sendUnsubscribeMessage(channelName)
   }
 
   private sendUnsubscribeMessage(channelName: string) {
-    const isLocal = process.env.NODE_ENV === 'development'
-    if (isLocal && this.isConnected && this.ws) {
-      const unsubscribeMessage = {
-        id: `unsub-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    const id = this.subscriptionIds.get(channelName)
+    this.subscriptionIds.delete(channelName)
+    if (!this.isConnected || !this.ws) return
+
+    if (isMockEndpoint()) {
+      this.send({
+        id: id ?? `unsub-${Date.now()}`,
         type: 'stop',
-        payload: {
-          data: channelName
-        }
-      }
-      console.log('📡 Sending unsubscribe message:', unsubscribeMessage)
-      this.send(unsubscribeMessage)
+        payload: { data: channelName },
+      })
+      return
     }
+
+    // AppSync Events keys the teardown off the subscribe frame's id. Without
+    // one there is nothing meaningful to send.
+    if (!id) return
+    this.send({ id, type: 'unsubscribe' })
   }
 
   // Publish an event to a channel using AppSync Events
   async publishEvent(channelName: string, message: AppSyncEvent): Promise<void> {
+    // Server-side publishing goes over HTTP, never this socket: everything
+    // below is built for a long-lived browser tab, not a request handler that
+    // may be frozen the moment it responds. See src/lib/appsync-publish.ts.
+    // The import is dynamic so `jose` and the publish path stay out of the
+    // client bundle.
+    if (typeof window === 'undefined') {
+      const { publishOverHttp } = await import('./appsync-publish')
+      await publishOverHttp(channelName, message as Record<string, unknown>)
+      return
+    }
+
     // Try to connect if not already connected
     if (!this.isConnected || !this.ws) {
-      console.log('📡 WebSocket not connected, attempting to connect...')
       try {
         await this.connect()
       } catch (error) {
@@ -546,7 +608,7 @@ class AppSyncService {
     }
 
     // Use the actual channel name for proper message routing
-    const isLocal = process.env.NODE_ENV === 'development'
+    const isLocal = isMockEndpoint()
     const publishMessage = {
       id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       type: 'publish',
@@ -560,20 +622,20 @@ class AppSyncService {
       })
     }
 
-    console.log('📤 Publishing event to AppSync Events:', publishMessage)
+    debug('📤 Publishing event to AppSync Events:', publishMessage)
     this.send(publishMessage)
   }
 
   // Simulate receiving a message (for testing)
   simulateMessage(channelName: string, message: AppSyncEvent) {
-    console.log(`📨 Simulating message for channel: ${channelName}`)
+    debug(`📨 Simulating message for channel: ${channelName}`)
     const callbacks = this.subscriptions.get(channelName)
     if (callbacks && callbacks.size > 0) {
-      console.log(`📨 Firing ${callbacks.size} callback(s) for channel: ${channelName}`)
+      debug(`📨 Firing ${callbacks.size} callback(s) for channel: ${channelName}`)
       callbacks.forEach(cb => cb(message))
     } else {
-      console.log(`📨 No callbacks found for channel: ${channelName}`)
-      console.log(`📨 Available subscriptions:`, Array.from(this.subscriptions.keys()))
+      debug(`📨 No callbacks found for channel: ${channelName}`)
+      debug(`📨 Available subscriptions:`, Array.from(this.subscriptions.keys()))
     }
   }
 
@@ -584,8 +646,9 @@ class AppSyncService {
       this.ws = null
     }
     this.subscriptions.clear()
+    this.subscriptionIds.clear()
     this.isConnected = false
-    console.log('🔌 AppSync WebSocket disconnected')
+    debug('🔌 AppSync WebSocket disconnected')
   }
 
   // Reports the socket's real state, not just what the last event said. Safari

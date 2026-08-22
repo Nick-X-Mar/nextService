@@ -437,7 +437,15 @@ Shows all offers made by this garage.
 
 ### 6.4 Tab 3: Appointments (Ραντεβού)
 
-Shows accepted offers with confirmed appointment dates (today or future only).
+Two sections.
+
+**Περιμένουν ολοκλήρωση** — appointments whose slot has passed with nobody
+saying what happened, shown above the upcoming list because they are the only
+thing on this screen actually waiting on the garage. Each row has a "Δήλωσε το"
+button opening the completion modal (§6.7). Appears from 4 hours after the
+appointment's end time (`COMPLETION_GRACE_HOURS`).
+
+**Upcoming** — accepted offers with confirmed appointment dates, today or later.
 
 **Per Appointment Card — fields displayed:**
 
@@ -456,6 +464,26 @@ Shows accepted offers with confirmed appointment dates (today or future only).
 Sorted by appointment date (earliest first).
 
 **Action:** "Άνοιγμα Συνομιλίας" (Open Chat) button on each card.
+
+### 6.7 Completion Modal (Ολοκλήρωση εργασίας)
+
+Opened from the "Περιμένουν ολοκλήρωση" section. One form, three questions —
+splitting them across two prompts means the second one never gets answered.
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| Έγινε η επισκευή; | Yes | `completed` / `not_done` (came but no work) / `no_show` |
+| Ποσό που χρέωσες | Yes, when `completed` | The figure on the receipt |
+| Με ΦΠΑ / Χωρίς ΦΠΑ | Yes, when `completed` | Whether the amount above is gross or net |
+| Σημειώσεις | No | Free text, what was done |
+| Αξιολόγηση πελάτη | No | 1–5 stars, optional tags and comment |
+
+The net / ΦΠΑ / total split is shown live as the amount is typed, because the
+**net** figure is what commission is calculated on and it should never be a
+surprise on a later statement. Default VAT rate 24%, stored per record.
+
+Submitting moves the request to `COMPLETED`. See
+`docs/flows/state-diagram.md` §6 for the full transition and its preconditions.
 
 ### 6.5 Tab 4: Garage Settings (Ρυθμίσεις Συνεργείου)
 
@@ -691,6 +719,33 @@ Real-time messaging between clients and garages. Uses REST API for persistence (
 | description | string (e.g., "Damage photo 1") |
 | uploadedAt | ISO string |
 
+### 8.4b Completion & Reviews
+
+Written onto the Service Request when the garage closes the job:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| completedAt | ISO string | |
+| completedBy | `garage` \| `admin` | |
+| completionOutcome | `completed` \| `no_show` \| `not_done` | |
+| completionNotes | string | |
+| completionPromptedAt | ISO string | Stamped by the sweeper Lambda; keeps the reminder email to exactly one |
+| finalAmounts | `{ gross, net, vat, vatRate }` | What was actually charged. Distinct from `appointmentPrice`, which is only the quote. Commission uses `net`. |
+
+**Review** (own table, PK `<requestId>#<direction>`):
+
+| Field | Type | Notes |
+|-------|------|-------|
+| direction | `client_to_garage` \| `garage_to_client` | |
+| rating | 1–5 | |
+| comment | string | Optional |
+| tags | string[] | Closed set, validated server-side |
+| status | `published` \| `hidden` | Hidden by admin; also reverses the rating aggregate |
+| revealAt | ISO string | Neither side sees the other's review before this |
+
+Aggregates on Garage / Client: `ratingCount`, `ratingSum`. The average is
+derived on read, never stored.
+
 ### 8.5 Offer
 
 | Field | Type | Required | Notes |
@@ -733,9 +788,9 @@ Real-time messaging between clients and garages. Uses REST API for persistence (
 | Status | Value | Greek Label | Badge Color | Meaning |
 |--------|-------|-------------|-------------|---------|
 | PENDING | `pending` | Εκκρεμές | Yellow | Request created, awaiting garage offers |
-| IN_PROGRESS | `in-progress` | Σε Εξέλιξη | Blue | Service work has begun |
+| IN_PROGRESS | `in-progress` | Σε Εξέλιξη | Blue | Declared in the enum but never written by any code path |
 | APPOINTMENT | `appointment` | Ραντεβού | Blue | Client accepted offer, appointment scheduled |
-| COMPLETED | `completed` | Ολοκληρωμένο | Green | Service work completed |
+| COMPLETED | `completed` | Ολοκληρωμένο | Green | The garage confirmed the job after the appointment (§6.7) |
 | CANCELLED | `cancelled` | Ακυρωμένο | Red | Request cancelled |
 
 ### Offer Statuses

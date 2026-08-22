@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import ExpandableCard from '@/components/ExpandableCard'
+import { RichLine } from '@/components/content/RichText'
 
 interface FaqItem {
   question: string
@@ -23,9 +24,11 @@ export default function FaqAccordion({
 
   return (
     <div className="space-y-3">
-      {items.map((faq) => (
+      {items.map((faq, index) => (
         <ExpandableCard
-          key={faq.question}
+          // Questions come from the admin content editor and are not guaranteed
+          // unique, so the index has to be part of the key.
+          key={`${index}-${faq.question}`}
           tone={tone}
           label={faq.question}
           isOpen={openQuestion === faq.question}
@@ -51,7 +54,7 @@ export default function FaqAccordion({
                 : 'text-sm text-secondary leading-relaxed'
             }
           >
-            {faq.answer}
+            <RichLine text={faq.answer} />
           </p>
         </ExpandableCard>
       ))}

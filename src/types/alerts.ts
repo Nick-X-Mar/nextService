@@ -18,6 +18,10 @@ export interface Alert {
     | 'offer-accepted'
     | 'client-dates'
     | 'profile-incomplete'
+    /** Garage: an appointment has passed and nobody has said what happened. */
+    | 'completion-due'
+    /** Either side: the job is closed and their review is still missing. */
+    | 'review-due'
   /** Drives colour only: info reads calm, action asks for a decision, urgent is time-boxed. */
   severity: 'info' | 'action' | 'urgent'
   /** Material Symbols glyph name. */

@@ -28,6 +28,7 @@ import { DynamoDBDocumentClient, GetCommand } from '@aws-sdk/lib-dynamodb'
 
 const REGION = process.env.AWS_REGION || 'eu-central-1'
 const REQUESTS_TABLE = process.env.SERVICE_REQUESTS_TABLE || 'ServiceRequests'
+const GARAGES_TABLE = process.env.GARAGES_TABLE || 'Garages'
 const SECRET = process.env.REALTIME_JWT_SECRET
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }))
@@ -118,6 +119,39 @@ async function requestOwner(requestId) {
   return clientId
 }
 
+/**
+ * Fan-out channels that are not tied to a single request.
+ *
+ * `new-requests` carries the client's name, phone number, vehicle and
+ * presigned photo URLs, so it is garage-only — a client token must never be
+ * able to subscribe to it. `request-updates` carries request ids, statuses and
+ * photo sets for the same audience.
+ *
+ * Before this existed `parseChannel` returned null for both and every
+ * subscribe was denied, which is why garage dashboards never received a live
+ * request.
+ */
+const BROADCAST_CHANNELS = new Set(['new-requests', 'request-updates'])
+
+const activeGarageCache = new Map()
+
+/** Only an approved garage may receive the broadcast fan-out. */
+async function isActiveGarage(garageId) {
+  const cached = activeGarageCache.get(garageId)
+  if (cached && cached.at > Date.now() - OWNER_TTL_MS) return cached.active
+
+  const res = await ddb.send(
+    new GetCommand({
+      TableName: GARAGES_TABLE,
+      Key: { id: garageId },
+      ProjectionExpression: 'isActive',
+    })
+  )
+  const active = res.Item?.isActive === true
+  activeGarageCache.set(garageId, { active, at: Date.now() })
+  return active
+}
+
 function extractToken(event) {
   const auth = event?.authorization || event?.request?.headers || event?.headers || {}
   const raw =
@@ -152,18 +186,23 @@ export const handler = async (event) => {
       return { isAuthorized: true, ttlOverride: 300 }
     }
 
+    // The application server publishes on behalf of users it has already
+    // authorized through the REST layer. Checked before the channel is parsed
+    // so `system` covers the broadcast channels too.
+    if (claims.userType === 'system') {
+      return { isAuthorized: true, ttlOverride: 60 }
+    }
+
+    const bare = String(channel).split('/').filter(Boolean).pop() || ''
+    if (BROADCAST_CHANNELS.has(bare)) {
+      if (claims.userType !== 'garage') return { isAuthorized: false }
+      return { isAuthorized: await isActiveGarage(claims.userId), ttlOverride: 300 }
+    }
+
     const parsed = parseChannel(channel)
     if (!parsed) {
       console.warn('[authorizer] unrecognised channel', JSON.stringify({ channel }))
       return { isAuthorized: false }
-    }
-
-    // The application server publishes chat messages and request broadcasts on
-    // behalf of users it has already authorized through the REST layer. It
-    // holds the signing secret, so a valid 'system' token can only have come
-    // from our own backend.
-    if (claims.userType === 'system') {
-      return { isAuthorized: true, ttlOverride: 60 }
     }
 
     if (claims.userType === 'garage') {

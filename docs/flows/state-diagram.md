@@ -150,17 +150,63 @@ stateDiagram-v2
 - Offers may be reset to pending
 - Chat may be re-enabled
 
-### 6. in-progress → completed
+### 6. appointment → completed
 
-**Trigger:** Garage completes service work
+**Trigger:** The garage confirms what happened, once the appointment slot has
+passed. `POST /api/requests/{id}/complete`.
 
-**Current Implementation:** Manual database update (no API endpoint yet)
+**Current Implementation:** Built. This is the only path into `completed` —
+nothing else in the app writes that status.
+
+**Preconditions (all enforced server-side):**
+- The caller is the garage the job was assigned to (`acceptedGarageId`, falling
+  back to the accepted offer for rows written before that field existed).
+- The request is still `appointment` — re-checked as a DynamoDB
+  `ConditionExpression` at write time, so a retry or a second tab cannot close
+  the same job twice.
+- The appointment has actually finished: `appointmentEndsAt` + a
+  `COMPLETION_GRACE_HOURS` (4h) grace period. A job cannot be closed before its
+  own slot is over.
+
+**What the garage declares:**
+- `outcome`: `completed` | `no_show` | `not_done`
+- The amount actually charged, entered as gross or net, split into
+  `finalAmounts { gross, net, vat, vatRate }`. This is a different figure from
+  `appointmentPrice`, which is only the quote.
+- Optionally, a 1–5 rating of the client, submitted in the same request.
 
 **Side Effects:**
-- Service finished
-- Request moved to "Closed" tab
-- Chat may be disabled
-- Client can review/rate (if implemented)
+- `status = completed`, `completedAt`, `completedBy`, `completionOutcome`
+- `EventName.ServiceCompleted` is emitted — this is what finally populates the
+  admin funnel's last stage and the request timeline's `task_alt` row.
+- `broadcastRequestUpdate(..., 'garage_completed')`
+- Both parties' notification summaries are invalidated: the garage's "έγινε η
+  επισκευή;" prompt clears and the client's review prompt opens.
+- Commission is charged on `finalAmounts.net` (see `src/lib/commission-basis.ts`),
+  falling back to `appointmentPrice` for jobs closed without a declared amount.
+
+**Who asks:** the garage dashboard's Appointments tab shows a "Περιμένουν
+ολοκλήρωση" section computed live — no schedule involved. The hourly
+`appointment-completion-sweeper` Lambda is the out-of-band email nudge and is
+what stamps `completionPromptedAt` so that email is sent exactly once.
+
+### 6b. Reviews
+
+Both sides may review once the job is `completed`, within
+`REVIEW_WINDOW_DAYS` (30). `POST /api/requests/{id}/review`.
+
+Reviews are **double-blind**: neither party sees the other's until both have
+written, or until `REVIEW_REVEAL_DAYS` (14) passes. Publishing the first one
+immediately would let whoever writes second answer the review they can already
+read.
+
+One review per job per direction is structural rather than checked — the row's
+partition key is `<requestId>#<direction>`, so a duplicate collides and a
+conditional write rejects it.
+
+Ratings roll up onto the `Garages` / `Clients` row as `ratingCount` +
+`ratingSum` via an atomic `ADD`. Hiding a review from `/admin/reviews` reverses
+that contribution, so a moderated review stops counting toward the average.
 
 ### 7. in-progress → cancelled
 

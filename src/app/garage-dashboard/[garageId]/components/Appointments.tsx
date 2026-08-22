@@ -7,6 +7,9 @@ import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
 import { useNavigation } from '@/hooks/useNavigation'
 import { getCategoryText } from '@/utils/categoryLabels'
+import { ServiceRequestStatus } from '@/types/statuses'
+import { isCompletionDue } from '@/types/reviews'
+import CompletionModal from './CompletionModal'
 
 interface Offer {
   id: string
@@ -17,11 +20,16 @@ interface Offer {
   status: OfferStatus
   createdAt: string
   appointmentDate?: string
+  appointmentTime?: string | null
   appointmentPrice?: number
   serviceRequest: {
     id: string
     description: string
     category: string
+    status?: string
+    completedAt?: string
+    completionOutcome?: string
+    finalAmounts?: { gross: number; net: number; vat: number; vatRate: number }
     client: {
       firstName: string
       lastName: string
@@ -43,6 +51,7 @@ export default function Appointments({ garageId }: AppointmentsProps) {
   const { navigate, isNavigating } = useNavigation()
   const [appointments, setAppointments] = useState<Offer[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [completing, setCompleting] = useState<Offer | null>(null)
 
   const loadAppointments = useCallback(async () => {
     try {
@@ -63,6 +72,7 @@ export default function Appointments({ garageId }: AppointmentsProps) {
               id: offer.id,
               status: offer.status,
               appointmentDate: offer.appointmentDate,
+              appointmentTime: offer.appointmentTime ?? null,
               serviceRequestId: offer.serviceRequestId
             })
           }
@@ -143,20 +153,24 @@ export default function Appointments({ garageId }: AppointmentsProps) {
     navigate(`/garage-dashboard/${garageId}/offers/${offer.serviceRequestId}/`)
   }
 
-  // Filter to show only today and future appointments
-  const upcomingAppointments = appointments.filter(offer => {
-    if (!offer.appointmentDate) return false
-    const isUpcoming = isAppointmentTodayOrFuture(offer.appointmentDate)
-    if (!isUpcoming) {
-      console.log('Filtered out past appointment:', {
-        id: offer.id,
-        appointmentDate: offer.appointmentDate
-      })
-    }
-    return isUpcoming
-  })
+  const upcomingAppointments = appointments.filter(
+    (offer) => offer.appointmentDate && isAppointmentTodayOrFuture(offer.appointmentDate)
+  )
 
-  console.log('Upcoming appointments count:', upcomingAppointments.length, 'out of', appointments.length)
+  /**
+   * Appointments whose slot has passed and that nobody has closed.
+   *
+   * These used to be dropped on the floor — the tab showed "today or later"
+   * only, so a garage could not see yesterday's job at all, and there was no
+   * surface anywhere in the app for confirming that work had happened. That is
+   * why no request ever reached COMPLETED and the admin's commission report was
+   * permanently empty.
+   */
+  const awaitingCompletion = appointments.filter((offer) => {
+    if (!offer.appointmentDate) return false
+    if (offer.serviceRequest.status !== ServiceRequestStatus.APPOINTMENT) return false
+    return isCompletionDue(offer.appointmentDate, offer.appointmentTime ?? null)
+  })
 
   if (isLoading) {
     return (
@@ -172,12 +186,54 @@ export default function Appointments({ garageId }: AppointmentsProps) {
       {/* Header */}
       <div>
         <h2 className="text-3xl font-bold tracking-tight text-on-surface">
-          Ραντεβου
+          Ραντεβού
         </h2>
         <p className="text-base text-secondary leading-relaxed mt-1">
-          {upcomingAppointments.length} προγραμματισμενα ραντεβου
+          {upcomingAppointments.length} προγραμματισμένα ραντεβού
         </p>
       </div>
+
+      {/* Jobs whose slot has passed and that nobody has closed yet. Kept above
+          the upcoming list because it is the only thing here that is actually
+          waiting on the garage. */}
+      {awaitingCompletion.length > 0 && (
+        <section className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Icon name="task_alt" size="md" className="text-primary" />
+            <h3 className="text-lg font-bold text-on-surface">Περιμένουν ολοκλήρωση</h3>
+          </div>
+          <p className="text-sm text-secondary mb-4">
+            Πες μας αν έγινε η επισκευή και τι χρέωσες. Χρειάζεται για την εκκαθάριση.
+          </p>
+          <div className="space-y-3">
+            {awaitingCompletion.map((offer) => (
+              <div
+                key={offer.id}
+                className="flex flex-wrap items-center gap-3 rounded-lg bg-surface-container-lowest p-3 border border-outline-variant/10"
+              >
+                <div className="flex-1 min-w-[160px]">
+                  <p className="text-sm font-bold text-on-surface">
+                    {offer.serviceRequest.vehicle?.brand} {offer.serviceRequest.vehicle?.model}
+                  </p>
+                  <p className="text-xs text-on-surface-variant">
+                    {offer.appointmentDate && formatAppointmentDate(offer.appointmentDate)}
+                    {offer.appointmentTime ? `, ${offer.appointmentTime}` : ''}
+                    {' · '}
+                    {offer.serviceRequest.client?.firstName} {offer.serviceRequest.client?.lastName}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setCompleting(offer)}
+                  className="bg-gradient-to-br from-primary to-primary-container text-on-primary px-4 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 active:scale-95 shadow-lg shadow-primary/20 flex items-center gap-2"
+                >
+                  <Icon name="check_circle" size="sm" />
+                  Δήλωσε το
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Appointments List */}
       {upcomingAppointments.length === 0 ? (
@@ -212,6 +268,7 @@ export default function Appointments({ garageId }: AppointmentsProps) {
                     <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-primary">Ημερομηνια Ραντεβου</p>
                     <p className="text-base font-bold text-on-surface">
                       {formatAppointmentDate(offer.appointmentDate)}
+                      {offer.appointmentTime ? `, ${offer.appointmentTime}` : ''}
                     </p>
                   </div>
                 </div>
@@ -288,6 +345,26 @@ export default function Appointments({ garageId }: AppointmentsProps) {
             </article>
           ))}
         </div>
+      )}
+
+      {completing && (
+        <CompletionModal
+          isOpen
+          onClose={() => setCompleting(null)}
+          requestId={completing.serviceRequestId}
+          vehicleLabel={[
+            completing.serviceRequest.vehicle?.brand,
+            completing.serviceRequest.vehicle?.model,
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          quotedPrice={
+            typeof completing.appointmentPrice === 'number'
+              ? completing.appointmentPrice
+              : completing.price
+          }
+          onCompleted={loadAppointments}
+        />
       )}
     </div>
   )

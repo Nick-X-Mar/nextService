@@ -8,11 +8,13 @@ import { usePathname } from 'next/navigation'
 const navItems = [
   { icon: 'dashboard', label: 'Dashboard', href: '/admin/dashboard' },
   { icon: 'local_offer', label: 'Hot Deals', href: '/admin/hot-deals' },
+  { icon: 'article', label: 'Content', href: '/admin/content' },
   { icon: 'mail', label: 'Emails', href: '/admin/emails' },
   { icon: 'error', label: 'Errors', href: '/admin/errors' },
   { icon: 'people', label: 'Users', href: '/admin/users' },
   { icon: 'garage', label: 'Garages', href: '/admin/garages', badgeKey: 'pendingGarages' as const },
   { icon: 'build', label: 'Requests', href: '/admin/requests' },
+  { icon: 'star', label: 'Reviews', href: '/admin/reviews' },
   { icon: 'new_releases', label: 'Custom Vehicles', href: '/admin/custom-vehicles', badgeKey: 'customVehicles' as const },
   { icon: 'payments', label: 'Payments', href: '/admin/payments' },
   { icon: 'account_balance_wallet', label: 'Commissions', href: '/admin/commissions' },

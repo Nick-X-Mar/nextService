@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { BatchGetCommand, GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { requireAuth } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
 import { unreadCache, unreadCacheKey } from '@/utils/unreadCache'
@@ -8,6 +8,8 @@ import { fetchGarageMessages } from '@/utils/garageMessages'
 import { collectAll } from '@/utils/pagination'
 import { ServiceRequestStatus, OfferStatus } from '@/types/statuses'
 import { EMPTY_SUMMARY, type Alert, type NotificationSummary } from '@/types/alerts'
+import { ensureReviewsTable, REVIEWS_TABLE_NAME } from '@/utils/ensureReviewsTable'
+import { isCompletionDue, REVIEW_WINDOW_DAYS } from '@/types/reviews'
 
 /**
  * Everything currently waiting on the signed-in user, in one call.
@@ -65,6 +67,51 @@ function plural(n: number, one: string, many: string): string {
   return n === 1 ? one : many
 }
 
+/** Reviews are only invited for a while after the job closes. */
+function withinReviewWindow(completedAt: string): boolean {
+  const at = new Date(completedAt).getTime()
+  return !isNaN(at) && Date.now() - at < REVIEW_WINDOW_DAYS * DAY_MS
+}
+
+/**
+ * Which of these requests already carry a review in the given direction.
+ *
+ * Reviews are keyed `<requestId>#<direction>`, so this is a batch of point
+ * lookups rather than a query per request — it runs on every notification
+ * poll, for every open tab.
+ */
+async function reviewedRequestIds(
+  requestIds: string[],
+  direction: 'client_to_garage' | 'garage_to_client'
+): Promise<Set<string>> {
+  if (requestIds.length === 0) return new Set()
+  try {
+    await ensureReviewsTable()
+    const found = new Set<string>()
+    // BatchGet caps at 100 keys per call.
+    for (let i = 0; i < requestIds.length; i += 100) {
+      const chunk = requestIds.slice(i, i + 100)
+      const res = await dynamoDB.send(new BatchGetCommand({
+        RequestItems: {
+          [REVIEWS_TABLE_NAME]: {
+            Keys: chunk.map((id) => ({ reviewId: `${id}#${direction}` })),
+            ProjectionExpression: 'requestId',
+          },
+        },
+      }))
+      for (const item of res.Responses?.[REVIEWS_TABLE_NAME] ?? []) {
+        if (typeof item.requestId === 'string') found.add(item.requestId)
+      }
+    }
+    return found
+  } catch (err) {
+    // A failure here should suppress the nudge, not the whole summary — an
+    // extra prompt is worse than a missing one.
+    console.error('[notifications] review lookup failed:', err)
+    return new Set(requestIds)
+  }
+}
+
 async function computeForClient(clientId: string): Promise<NotificationSummary> {
   const requestsResult = await dynamoDB.send(new QueryCommand({
     TableName: 'ServiceRequests',
@@ -72,7 +119,7 @@ async function computeForClient(clientId: string): Promise<NotificationSummary> 
     KeyConditionExpression: 'clientId = :clientId',
     ExpressionAttributeValues: { ':clientId': clientId },
     ProjectionExpression:
-      'id, clientReadAt, clientOffersSeenAt, vehicle, #s, appointmentDate, depositPaidAt',
+      'id, clientReadAt, clientOffersSeenAt, vehicle, #s, appointmentDate, depositPaidAt, completedAt',
     ExpressionAttributeNames: { '#s': 'status' },
   }))
 
@@ -115,6 +162,7 @@ async function computeForClient(clientId: string): Promise<NotificationSummary> 
       vehicle: vehicleLabel(req.vehicle),
       appointmentDate: req.appointmentDate as string | undefined,
       depositPaidAt: req.depositPaidAt as string | undefined,
+      completedAt: req.completedAt as string | undefined,
       unreadGarages,
       newOffers: newOffers.length,
     }
@@ -194,6 +242,37 @@ async function computeForClient(clientId: string): Promise<NotificationSummary> 
     }
   }
 
+  // The garage has closed the job; the client's side of the review is missing.
+  // This is the primary prompt, not the email: NOTIFICATIONS_ENABLED is off in
+  // production, so an in-app alert is the only thing the client reliably sees.
+  const completedNeedingReview = perRequest.filter(
+    (req) =>
+      req.status === ServiceRequestStatus.COMPLETED &&
+      req.completedAt &&
+      withinReviewWindow(req.completedAt)
+  )
+  if (completedNeedingReview.length > 0) {
+    const reviewed = await reviewedRequestIds(
+      completedNeedingReview.map((r) => r.requestId),
+      'client_to_garage'
+    )
+    for (const req of completedNeedingReview) {
+      if (reviewed.has(req.requestId)) continue
+      alerts.push({
+        id: `client-review-${req.requestId}`,
+        kind: 'review-due',
+        severity: 'action',
+        icon: 'star',
+        title: 'Πώς πήγε η επισκευή;',
+        detail: req.vehicle
+          ? `${req.vehicle} — αξιολόγησε το συνεργείο`
+          : 'Αξιολόγησε το συνεργείο',
+        href: `${base}/details/${req.requestId}/`,
+        cta: 'Αξιολόγηση',
+      })
+    }
+  }
+
   return {
     threads,
     appointmentThreads,
@@ -249,7 +328,7 @@ async function computeForGarage(garageId: string): Promise<NotificationSummary> 
     dynamoDB.send(new GetCommand({
       TableName: 'ServiceRequests',
       Key: { id },
-      ProjectionExpression: 'id, garageReadAt, vehicle, #s, appointmentDate, clientAvailabilityDates',
+      ProjectionExpression: 'id, garageReadAt, vehicle, #s, appointmentDate, appointmentTime, clientAvailabilityDates, completedAt',
       ExpressionAttributeNames: { '#s': 'status' },
     }))
   ))
@@ -328,6 +407,68 @@ async function computeForGarage(garageId: string): Promise<NotificationSummary> 
       href: `${base}/chats/appointments/`,
       cta: 'Δες το',
     })
+  }
+
+  // An appointment whose slot has passed and that nobody has closed. This is
+  // the prompt the whole completion flow hangs off: it is what asks the garage
+  // to say the job happened, declare what it charged, and rate the client.
+  // Deliberately in-app rather than email-only — NOTIFICATIONS_ENABLED is off
+  // in production, so email cannot be the only channel.
+  const awaitingCompletion = offers.filter((offer) => {
+    if (offer.status !== OfferStatus.ACCEPTED) return false
+    const req = requestById.get(offer.serviceRequestId as string)
+    if (req?.status !== ServiceRequestStatus.APPOINTMENT) return false
+    // Read the date off the request, not the offer: both carry it, but the
+    // request is the row the booking and rescheduling paths actually write.
+    if (typeof req.appointmentDate !== 'string') return false
+    return isCompletionDue(
+      req.appointmentDate,
+      (req.appointmentTime as string | null) ?? null
+    )
+  })
+  for (const offer of awaitingCompletion) {
+    const requestId = offer.serviceRequestId as string
+    const req = requestById.get(requestId)
+    alerts.push({
+      id: `garage-completion-${requestId}`,
+      kind: 'completion-due',
+      severity: 'action',
+      icon: 'task_alt',
+      title: 'Έγινε η επισκευή;',
+      detail: vehicleLabel(req?.vehicle),
+      href: `${base}/?tab=appointments`,
+      cta: 'Δήλωσε το',
+    })
+  }
+
+  // Jobs this garage closed but has not rated the client on.
+  const closedByThisGarage = offers
+    .filter((offer) => {
+      if (offer.status !== OfferStatus.ACCEPTED) return false
+      const req = requestById.get(offer.serviceRequestId as string)
+      return (
+        req?.status === ServiceRequestStatus.COMPLETED &&
+        typeof req?.completedAt === 'string' &&
+        withinReviewWindow(req.completedAt as string)
+      )
+    })
+    .map((offer) => offer.serviceRequestId as string)
+
+  if (closedByThisGarage.length > 0) {
+    const reviewed = await reviewedRequestIds(closedByThisGarage, 'garage_to_client')
+    const pendingReview = closedByThisGarage.filter((id) => !reviewed.has(id))
+    if (pendingReview.length > 0) {
+      alerts.push({
+        id: 'garage-review-due',
+        kind: 'review-due',
+        severity: 'info',
+        icon: 'star',
+        title: `${pendingReview.length} ${plural(pendingReview.length, 'πελάτης περιμένει', 'πελάτες περιμένουν')} αξιολόγηση`,
+        detail: vehicleLabel(requestById.get(pendingReview[0])?.vehicle),
+        href: `${base}/?tab=appointments`,
+        cta: 'Αξιολόγησε',
+      })
+    }
   }
 
   // The client proposed dates on a request this garage has bid on, and no

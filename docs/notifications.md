@@ -98,10 +98,22 @@
 
 ### Emails που δεν στέλνουμε ακόμα (Phase 2)
 
-- **Touchpoints 5, 6, 13 (appointment reminders)** — χρειάζεται scheduled job (EventBridge + Lambda ή cron) που σαρώνει τα ραντεβού της επόμενης ημέρας/ώρας.
+- **Touchpoints 5, 6, 13 (appointment reminders)** — χρειάζεται scheduled job. Η υποδομή υπάρχει πλέον: `infra/lambdas/appointment-completion-sweeper` + το EventBridge rule στο `notifications_stack.py` είναι το πρότυπο.
 - **Touchpoints 7, 14 (chat messages με debounce)** — χρειάζεται presence detection + ουρά.
 - **Touchpoint 16 (weekly digest)** — χρειάζεται scheduled job.
-- **Completion follow-up / review request** — χρειάζεται `service_completed` endpoint.
+
+### Completion follow-up — υλοποιήθηκε
+
+Το `appointment-completion-sweeper` Lambda τρέχει ωριαία, βρίσκει ραντεβού που
+πέρασαν χωρίς να δηλωθεί τι έγινε (4 ώρες grace) και ζητά από το συνεργείο να
+δηλώσει την ολοκλήρωση, το ποσό και την αξιολόγηση του πελάτη.
+
+**Το email δεν είναι ο κύριος δίαυλος.** Το `NOTIFICATIONS_ENABLED` είναι
+`false` στο production, οπότε το πραγματικό prompt είναι in-app: το
+`/api/notifications/summary` επιστρέφει alerts `completion-due` (συνεργείο) και
+`review-due` (και οι δύο πλευρές), τα οποία υπολογίζονται live χωρίς schedule.
+Το Lambda είναι η out-of-band υπενθύμιση και είναι αυτό που γράφει το
+`completionPromptedAt`, ώστε το email να φύγει ακριβώς μία φορά.
 
 ---
 

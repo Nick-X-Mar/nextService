@@ -14,6 +14,7 @@ import { getCategoryText } from '@/utils/categoryLabels'
 import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 import EstimatedCostCard from './EstimatedCostCard'
 import LicenseSample from './LicenseSample'
+import { useFileDrop } from '@/hooks/useFileDrop'
 
 interface CarSpecsFormProps {
   savedData: {
@@ -103,14 +104,30 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
     }
   }, [vinNumber, engineNumber, mounted])
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+  const acceptLicensePhoto = (files: File[]) => {
+    const file = files[0]
     if (file) {
       setLicensePhoto(file)
-      // For now, just store file info since File objects can't be serialized to localStorage
-      // In a real app, you'd upload to a server or convert to base64
+      // Only the name is persisted to localStorage — a File can't be
+      // serialised. The upload itself happens on submit, once the vehicle id
+      // exists to key it against.
+      setHasLicensePhoto(true)
     }
   }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    acceptLicensePhoto(Array.from(e.target.files || []))
+    // Reset so re-picking the same file still fires onChange, and so the
+    // camera can be reopened straight after a retake.
+    e.target.value = ''
+  }
+
+  // The dashed box below looked like a drop target but had no drop handling at
+  // all, so a dropped photo made the browser navigate to it and wiped the
+  // half-filled form. The whole window is the target now.
+  const { dragActive } = useFileDrop(acceptLicensePhoto, {
+    accept: (file) => file.type.startsWith('image/'),
+  })
 
   const isEmailValid = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
   const isPasswordValid = password.length >= MIN_PASSWORD_LENGTH && password === confirmPassword
@@ -553,6 +570,8 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                     </div>
                   </div>
                 )}
+                {/* `capture` is what opens the phone camera straight away —
+                    photographing the άδεια in hand is the normal case here. */}
                 <input
                   type="file"
                   id="license-photo"
@@ -560,24 +579,64 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                   onChange={handleFileChange}
                   className="hidden"
                 />
+                <input
+                  type="file"
+                  id="license-photo-camera"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
                 {(!existingLicensePhotoUrl || licensePhoto) && (
-                  <div className="border-2 border-dashed border-outline-variant/30 rounded-2xl p-8 text-center hover:border-primary transition-colors">
-                    <label htmlFor="license-photo" className="cursor-pointer">
-                      {licensePhoto ? (
-                        <div className="text-green-600">
-                          <Icon name="photo" size="lg" className="mx-auto mb-2" />
-                          <p className="text-sm font-bold">{licensePhoto.name}</p>
-                          <p className="text-xs text-on-surface-variant">Κανε κλικ για αλλαγη</p>
-                        </div>
-                      ) : (
-                        <div className="text-on-surface-variant">
-                          <Icon name="cloud_upload" size="lg" className="mx-auto mb-2" />
-                          <p className="text-sm font-bold">Κανε κλικ για ανεβασμα</p>
-                          <p className="text-xs text-on-surface-variant">JPG, PNG μεχρι 10MB</p>
-                        </div>
-                      )}
-                    </label>
-                  </div>
+                  <>
+                    <div className="grid grid-cols-2 gap-3 md:hidden">
+                      <label
+                        htmlFor="license-photo-camera"
+                        className="flex flex-col items-center justify-center gap-2 rounded-2xl machined-gradient text-white py-5 cursor-pointer active:scale-95 transition-transform shadow-lg shadow-primary/20"
+                      >
+                        <Icon name="photo_camera" size="lg" filled />
+                        <span className="text-sm font-bold">Καμερα</span>
+                      </label>
+                      <label
+                        htmlFor="license-photo"
+                        className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-surface-container-highest text-on-surface py-5 cursor-pointer active:scale-95 transition-transform"
+                      >
+                        <Icon name="photo_library" size="lg" filled className="text-on-surface-variant" />
+                        <span className="text-sm font-bold">Συλλογη</span>
+                      </label>
+                    </div>
+
+                    <div className={`hidden md:block border-2 border-dashed rounded-2xl p-8 text-center transition-colors ${
+                      dragActive ? 'border-primary bg-primary/5' : 'border-outline-variant/30 hover:border-primary'
+                    }`}>
+                      <label htmlFor="license-photo" className="cursor-pointer">
+                        {licensePhoto ? (
+                          <div className="text-green-600">
+                            <Icon name="photo" size="lg" className="mx-auto mb-2" />
+                            <p className="text-sm font-bold">{licensePhoto.name}</p>
+                            <p className="text-xs text-on-surface-variant">Κανε κλικ για αλλαγη</p>
+                          </div>
+                        ) : (
+                          <div className="text-on-surface-variant">
+                            <Icon name="cloud_upload" size="lg" className="mx-auto mb-2" />
+                            <p className="text-sm font-bold">
+                              {dragActive ? 'Αφησε τη φωτογραφια' : 'Κανε κλικ η συρε τη φωτογραφια εδω'}
+                            </p>
+                            <p className="text-xs text-on-surface-variant">JPG, PNG μεχρι 10MB</p>
+                          </div>
+                        )}
+                      </label>
+                    </div>
+
+                    {/* On mobile the two buttons above replace the box, so the
+                        chosen file needs its own confirmation line. */}
+                    {licensePhoto && (
+                      <div className="md:hidden flex items-center gap-2 rounded-xl bg-green-50 border border-green-100 px-4 py-3">
+                        <Icon name="check_circle" filled size="sm" className="text-green-600" />
+                        <p className="text-xs font-bold text-green-700 truncate">{licensePhoto.name}</p>
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}

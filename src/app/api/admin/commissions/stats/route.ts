@@ -4,6 +4,7 @@ import { QueryCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb'
 import { withMetrics } from '@/utils/withMetrics'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { DEPOSIT_PERCENT } from '@/lib/stripe-server'
+import { commissionBasis } from '@/lib/commission-basis'
 
 interface GarageBreakdown {
   garageId: string
@@ -11,6 +12,12 @@ interface GarageBreakdown {
   appointmentCount: number
   totalRevenue: number
   commission: number
+  /**
+   * How many of `appointmentCount` carry an amount the garage actually
+   * declared. The rest fall back to the quoted price, so a month where this is
+   * well below the count is reporting estimates, not settled figures.
+   */
+  declaredCount: number
 }
 
 interface CommissionsStatsResponse {
@@ -83,20 +90,30 @@ async function _GET(request: NextRequest) {
       }
     }
 
-    // Aggregate per garage
-    const aggregateByGarage = new Map<string, { appointmentCount: number; totalRevenue: number }>()
+    // Aggregate per garage.
+    //
+    // Revenue is what the garage declared it actually charged, net of VAT —
+    // not the price it quoted. See src/lib/commission-basis.ts. `declaredCount`
+    // is surfaced so the admin can see how much of a month's figure rests on
+    // real declarations rather than on the fallback.
+    const aggregateByGarage = new Map<
+      string,
+      { appointmentCount: number; totalRevenue: number; declaredCount: number }
+    >()
 
     for (const r of completedItems) {
       const offerId = typeof r.acceptedOfferId === 'string' ? r.acceptedOfferId : null
       if (!offerId) continue
       const garageId = offerToGarage[offerId]
       if (!garageId) continue
-      const price = typeof r.appointmentPrice === 'number' ? r.appointmentPrice : 0
-      if (price <= 0) continue
+      const basis = commissionBasis(r as Parameters<typeof commissionBasis>[0])
+      if (basis.amount <= 0) continue
 
-      const entry = aggregateByGarage.get(garageId) ?? { appointmentCount: 0, totalRevenue: 0 }
+      const entry =
+        aggregateByGarage.get(garageId) ?? { appointmentCount: 0, totalRevenue: 0, declaredCount: 0 }
       entry.appointmentCount += 1
-      entry.totalRevenue += price
+      entry.totalRevenue += basis.amount
+      if (basis.source === 'declared') entry.declaredCount += 1
       aggregateByGarage.set(garageId, entry)
     }
 
@@ -131,6 +148,7 @@ async function _GET(request: NextRequest) {
         appointmentCount: agg.appointmentCount,
         totalRevenue,
         commission,
+        declaredCount: agg.declaredCount,
       }
     })
 

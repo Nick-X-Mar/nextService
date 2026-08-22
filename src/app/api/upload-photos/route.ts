@@ -1,15 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { uploadMultipleFilesToS3, validateFile, isS3Configured } from '@/utils/s3Service'
+import {
+  uploadMultipleFilesToS3,
+  validateFile,
+  isS3Configured,
+  ACCEPTED_IMAGE_TYPES,
+} from '@/utils/s3Service'
 import { dynamoDB } from '@/utils/dynamoService'
-import { UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { requireAuth } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { broadcastRequestPhotos } from '@/utils/requestBroadcast'
 import { randomUUID } from 'crypto'
 
-const checkUploadRate = createRateLimiter('photo-upload', 20, 3600000)
+const checkUploadRate = createRateLimiter('photo-upload', 60, 3600000)
+
+const MAX_SIZE_MB = 15
+// Upper bound on how many photos one request can carry. Generous enough that
+// nobody hits it honestly, low enough that the presigning fan-out on every
+// read of the request stays cheap.
+const MAX_PHOTOS_PER_REQUEST = 12
+
+interface PhotoRecord {
+  id: string
+  s3Url: string
+  s3Key: string
+  originalName: string
+  fileSize: number
+  contentType: string
+  description: string
+  uploadedAt: string
+}
 
 async function _POST(request: NextRequest) {
   try {
@@ -23,7 +46,6 @@ async function _POST(request: NextRequest) {
       )
     }
 
-    // Check if S3 service is configured
     if (!isS3Configured()) {
       return NextResponse.json(
         { error: 'S3 service not configured. Please set AWS credentials.' },
@@ -34,100 +56,122 @@ async function _POST(request: NextRequest) {
     const formData = await request.formData()
     const files = formData.getAll('files') as File[]
     const serviceRequestId = formData.get('serviceRequestId') as string
-    const vehicleId = formData.get('vehicleId') as string
 
-    // Validate inputs
     if (!files || files.length === 0) {
+      return NextResponse.json({ error: 'Δεν στάλθηκε καμία φωτογραφία' }, { status: 400 })
+    }
+
+    if (!serviceRequestId) {
+      return NextResponse.json({ error: 'serviceRequestId is required' }, { status: 400 })
+    }
+
+    // The request row is the authority for both ownership and the vehicle id.
+    // `vehicleId` used to arrive in the form body and was written into the S3
+    // key unchecked, so the caller chose where their upload landed and could
+    // attach photos to a request belonging to somebody else.
+    const existing = await dynamoDB.send(new GetCommand({
+      TableName: 'ServiceRequests',
+      Key: { id: serviceRequestId },
+    }))
+    if (!existing.Item) {
+      return NextResponse.json({ error: 'Το αίτημα δεν βρέθηκε' }, { status: 404 })
+    }
+    if (auth.userType !== 'client' || existing.Item.clientId !== auth.userId) {
       return NextResponse.json(
-        { error: 'No files provided' },
-        { status: 400 }
+        { error: 'Δεν έχετε πρόσβαση σε αυτόν τον πόρο' },
+        { status: 403 }
       )
     }
 
-    if (!serviceRequestId || !vehicleId) {
+    const vehicleId = existing.Item.vehicleId as string | undefined
+    if (!vehicleId) {
       return NextResponse.json(
-        { error: 'serviceRequestId and vehicleId are required' },
-        { status: 400 }
+        { error: 'Το αίτημα δεν έχει συνδεδεμένο όχημα' },
+        { status: 409 }
       )
     }
 
-    // Validate each file
-    const validationErrors: string[] = []
-    const maxSizeMB = 10
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg']
+    const currentPhotos = (existing.Item.photos as PhotoRecord[] | undefined) ?? []
+    const remainingSlots = MAX_PHOTOS_PER_REQUEST - currentPhotos.length
+    if (remainingSlots <= 0) {
+      return NextResponse.json(
+        { error: `Το αίτημα έχει ήδη τις μέγιστες ${MAX_PHOTOS_PER_REQUEST} φωτογραφίες` },
+        { status: 409 }
+      )
+    }
 
-    for (const file of files) {
-      const validation = validateFile(file, maxSizeMB, allowedTypes)
-      if (!validation.valid) {
-        validationErrors.push(`${file.name}: ${validation.error}`)
+    // Validation is per-file and no longer fatal for the batch. Rejecting all
+    // three photos because one was a 12MB HEIC is how people ended up with
+    // requests that had no photos at all and no idea why.
+    const accepted: File[] = []
+    const rejected: string[] = []
+    for (const file of files.slice(0, remainingSlots)) {
+      const validation = validateFile(file, MAX_SIZE_MB, ACCEPTED_IMAGE_TYPES)
+      if (validation.valid) {
+        accepted.push(file)
+      } else {
+        rejected.push(`${file.name}: ${validation.error}`)
       }
     }
+    if (files.length > remainingSlots) {
+      rejected.push(`Αποθηκεύτηκαν οι πρώτες ${remainingSlots} φωτογραφίες (όριο ${MAX_PHOTOS_PER_REQUEST}).`)
+    }
 
-    if (validationErrors.length > 0) {
+    if (accepted.length === 0) {
       return NextResponse.json(
-        { error: 'File validation failed', details: validationErrors },
+        { error: 'Καμία φωτογραφία δεν ήταν έγκυρη', details: rejected },
         { status: 400 }
       )
     }
 
-    // Create S3 folder structure: Requests/{vehicleId}/
     const folder = `Requests/${vehicleId}`
-    
-    // Upload files to S3
-    const uploadResults = await uploadMultipleFilesToS3(files, folder)
+    const uploadResults = await uploadMultipleFilesToS3(accepted, folder)
 
-    // Check for upload failures
-    const failedUploads = uploadResults.filter(result => !result.success)
-    if (failedUploads.length > 0) {
-      return NextResponse.json(
-        { 
-          error: 'Some files failed to upload', 
-          details: failedUploads.map(result => result.error),
-          successful: uploadResults.filter(result => result.success)
-        },
-        { status: 207 } // Multi-Status
-      )
-    }
-
-    // All uploads successful - prepare photo data for ServiceRequests table
-    const photoData: Array<{
-      id: string;
-      s3Url: string;
-      s3Key: string;
-      originalName: string;
-      fileSize: number;
-      contentType: string;
-      description: string;
-      uploadedAt: string;
-    }> = []
-    for (let i = 0; i < uploadResults.length; i++) {
-      const result = uploadResults[i]
-      const file = files[i]
-      
-      const photoRecord = {
+    // Keep whatever made it. A partial batch used to return 207 and write
+    // nothing, so files that were already sitting in S3 were never recorded
+    // against the request and became invisible orphans.
+    const photoData: PhotoRecord[] = []
+    uploadResults.forEach((result, i) => {
+      const file = accepted[i]
+      if (!result.success || !result.key || !result.url) {
+        rejected.push(`${file.name}: ${result.error || 'upload failed'}`)
+        return
+      }
+      photoData.push({
         id: `photo-${randomUUID()}`,
-        s3Url: result.url!,
-        s3Key: result.key!,
+        s3Url: result.url,
+        s3Key: result.key,
         originalName: file.name,
         fileSize: file.size,
         contentType: file.type,
-        description: `Damage photo ${i + 1}`,
-        uploadedAt: new Date().toISOString()
-      }
-      
-      photoData.push(photoRecord)
+        description: `Damage photo ${currentPhotos.length + photoData.length + 1}`,
+        uploadedAt: new Date().toISOString(),
+      })
+    })
+
+    if (photoData.length === 0) {
+      return NextResponse.json(
+        { error: 'Η αποστολή των φωτογραφιών απέτυχε', details: rejected },
+        { status: 502 }
+      )
     }
 
-    // Update ServiceRequests table with photo data
+    // Append, never replace. This endpoint is now called from the submission
+    // wizard *and* from the request page afterwards, so a second call must add
+    // to the set rather than wipe what the first one stored.
     await dynamoDB.send(new UpdateCommand({
       TableName: 'ServiceRequests',
       Key: { id: serviceRequestId },
-      UpdateExpression: 'SET photos = :photos, photoUrls = :photoUrls, updatedAt = :updatedAt',
+      UpdateExpression:
+        'SET photos = list_append(if_not_exists(photos, :empty), :photos), ' +
+        'photoUrls = list_append(if_not_exists(photoUrls, :empty), :photoUrls), ' +
+        'updatedAt = :updatedAt',
       ExpressionAttributeValues: {
         ':photos': photoData,
         ':photoUrls': photoData.map(p => p.s3Key),
-        ':updatedAt': new Date().toISOString()
-      }
+        ':empty': [],
+        ':updatedAt': new Date().toISOString(),
+      },
     }))
 
     logEvent({
@@ -135,23 +179,28 @@ async function _POST(request: NextRequest) {
       actorType: 'client',
       requestId: serviceRequestId,
       source: 'api/upload-photos',
-      metadata: { vehicleId, photoCount: photoData.length }
+      metadata: { vehicleId, photoCount: photoData.length, rejectedCount: rejected.length }
     })
 
-    // Return successful uploads with photo records
-    const successfulUploads = uploadResults.map((result, index) => ({
-      url: result.url,
-      key: result.key,
-      originalName: files[index].name,
-      photoId: photoData[index].id
-    }))
+    // Garage dashboards render the request card the moment it is created,
+    // which is before these photos exist. Push the now-complete photo set so
+    // the open dashboards stop showing a photoless card until someone reloads.
+    void broadcastRequestPhotos(serviceRequestId)
 
     return NextResponse.json({
       success: true,
-      message: `Successfully uploaded ${successfulUploads.length} photo(s)`,
-      uploads: successfulUploads,
-      photoData: photoData,
-      s3Folder: folder
+      message: `Successfully uploaded ${photoData.length} photo(s)`,
+      uploads: photoData.map(p => ({
+        url: p.s3Url,
+        key: p.s3Key,
+        originalName: p.originalName,
+        photoId: p.id,
+      })),
+      photoData,
+      // Non-empty when some files were dropped. The caller surfaces this
+      // instead of treating the whole submission as failed.
+      rejected,
+      s3Folder: folder,
     })
 
   } catch (error) {

@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { getAllOffers } from '@/lib/offers'
-import { areas } from '@/data/locations'
+import { getAllAreas } from '@/lib/site-content'
 import { SITE_URL } from '@/lib/site-url'
 
 /**
@@ -39,6 +39,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // `/login/` is intentionally absent — it's a utility page carrying `noindex`.
 
+  // Read from the same place the pages do. Reading the static module instead
+  // would silently drop any area the CMS knows about but the bundle does not.
+  const areas = await getAllAreas()
   const areaRoutes: MetadataRoute.Sitemap = areas.map((a) => ({
     url: `${SITE_URL}/location/${a.slug}/`,
     lastModified: CONTENT_LAST_MODIFIED,
