@@ -11,7 +11,7 @@ import { broadcastRequestUpdate } from '@/utils/requestBroadcast'
 import { invalidateUnread } from '@/utils/unreadCache'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { createReview, DuplicateReviewError } from '@/utils/reviewService'
-import { DECLARABLE_VAT_RATES } from '@/lib/commission-basis'
+import { DECLARABLE_VAT_RATES, garageCommissionPercent } from '@/lib/commission-basis'
 import {
   DEFAULT_VAT_RATE,
   isCompletionDue,
@@ -160,6 +160,14 @@ async function _POST(
     const now = new Date().toISOString()
     const notes = typeof body.notes === 'string' ? body.notes.slice(0, 2000).trim() : ''
 
+    // The rate is frozen on the job as it closes: the garage's agreed rate
+    // today, or the default. Changing that rate later must not re-price a
+    // month that has already been invoiced.
+    const garageRow = (await dynamoDB.send(
+      new GetCommand({ TableName: 'Garages', Key: { id: garageId }, ProjectionExpression: 'commissionPercent' })
+    )).Item
+    const commissionPercent = garageCommissionPercent(garageRow)
+
     try {
       await dynamoDB.send(
         new UpdateCommand({
@@ -169,7 +177,7 @@ async function _POST(
             'SET #status = :completed, completedAt = :now, completedBy = :by, ' +
             // Backfill on the way past, so the row stops needing the fallback.
             'acceptedGarageId = :garage, ' +
-            'completionOutcome = :outcome, updatedAt = :now' +
+            'completionOutcome = :outcome, commissionPercent = :rate, updatedAt = :now' +
             (amounts ? ', finalAmounts = :amounts' : '') +
             (notes ? ', completionNotes = :notes' : ''),
           // Re-checked at write time: two tabs, or a retry after a slow
@@ -183,6 +191,7 @@ async function _POST(
             ':by': 'garage',
             ':garage': garageId,
             ':outcome': outcome,
+            ':rate': commissionPercent,
             ...(amounts ? { ':amounts': amounts } : {}),
             ...(notes ? { ':notes': notes } : {}),
           },

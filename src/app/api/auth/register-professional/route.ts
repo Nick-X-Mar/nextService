@@ -11,12 +11,9 @@ import { signToken, setAuthCookie } from '@/utils/auth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
 import { randomUUID } from 'crypto'
+import { TERMS_VERSION } from '@/lib/legal'
 
 const checkRateLimit = createRateLimiter('register-pro', 3, 3600000)
-
-// Bumped whenever the legal text changes — every signup record has the
-// version it agreed to so we can prove what they accepted at the time.
-const CURRENT_TERMS_VERSION = '1.0'
 
 /** Free-text chips from the form: strings only, trimmed, a sane number of them. */
 function stringList(raw: unknown, max = 20, maxLength = 200): string[] {
@@ -189,7 +186,7 @@ async function _POST(request: NextRequest) {
       benefits: stringList(benefits),
       services: stringList(services),
       acceptedTermsAt: nowIso,
-      acceptedTermsVersion: CURRENT_TERMS_VERSION,
+      acceptedTermsVersion: TERMS_VERSION,
       createdAt: nowIso,
       updatedAt: nowIso
     }

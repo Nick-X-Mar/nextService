@@ -108,7 +108,7 @@ export default function AccountDangerZone({ userId, userType }: AccountDangerZon
         return
       }
 
-      success('Ο λογαριασμός διαγράφηκε', 'Όλα τα δεδομένα σου έχουν διαγραφεί οριστικά')
+      success('Ο λογαριασμός διαγράφηκε', 'Τα προσωπικά σου στοιχεία διαγράφηκαν οριστικά')
       closeDelete()
       logout()
       router.push('/')
@@ -155,7 +155,7 @@ export default function AccountDangerZone({ userId, userType }: AccountDangerZon
             <div className="flex-1">
               <p className="text-sm font-bold text-error">Διαγραφή λογαριασμού</p>
               <p className="text-xs text-on-surface-variant">
-                Διαγράφει οριστικά όλα τα δεδομένα σου
+                Κλείνει τον λογαριασμό και διαγράφει τα προσωπικά σου στοιχεία
               </p>
             </div>
             <Icon name="chevron_right" className="text-on-surface-variant/50" />
@@ -209,25 +209,32 @@ export default function AccountDangerZone({ userId, userType }: AccountDangerZon
               <h3 className="text-lg font-bold text-error">Διαγραφή λογαριασμού</h3>
             </div>
             <p className="text-sm text-on-surface mb-3">
-              <strong>Η ενέργεια είναι μη αναστρέψιμη.</strong> Θα διαγραφούν οριστικά:
+              <strong>Η ενέργεια είναι μη αναστρέψιμη.</strong> Ο λογαριασμός κλείνει και δεν μπορείς να συνδεθείς ξανά.
+              Διαγράφονται οριστικά:
             </p>
-            <ul className="text-xs text-on-surface-variant space-y-1 mb-4 pl-4 list-disc">
-              <li>Ο λογαριασμός σου και τα στοιχεία επικοινωνίας</li>
+            {/* What /api/account/delete actually does: it anonymizes, it does not
+                delete the job history. Keep this list in step with that route. */}
+            <ul className="text-xs text-on-surface-variant space-y-1 mb-3 pl-4 list-disc">
               {userType === 'client' ? (
                 <>
-                  <li>Όλα τα οχήματά σου</li>
-                  <li>Όλα τα αιτήματα service και οι φωτογραφίες</li>
-                  <li>Οι συνομιλίες με συνεργεία</li>
-                  <li>Οι προσφορές που έλαβες</li>
+                  <li>Τα στοιχεία σου: email, όνομα, κινητό, διεύθυνση</li>
+                  <li>Η πινακίδα, ο αριθμός πλαισίου και κινητήρα και η άδεια κυκλοφορίας των οχημάτων σου</li>
+                  <li>Οι περιγραφές και οι φωτογραφίες των αιτημάτων σου</li>
+                  <li>Τα μηνύματα και οι φωτογραφίες που έστειλες στα συνεργεία</li>
                 </>
               ) : (
                 <>
-                  <li>Όλες οι προσφορές που έστειλες</li>
-                  <li>Οι συνομιλίες με πελάτες</li>
+                  <li>Τα στοιχεία σύνδεσης και του υπευθύνου επικοινωνίας: email, όνομα, κινητό</li>
+                  <li>Η περιγραφή και οι παροχές του συνεργείου</li>
                 </>
               )}
-              <li>Το ιστορικό ενεργειών και emails</li>
             </ul>
+            <p className="text-xs text-on-surface-variant mb-4">
+              {userType === 'client'
+                ? 'Τα αιτήματα που περιμένουν προσφορά ακυρώνονται. Το ιστορικό των εργασιών (κατηγορία, μάρκα και μοντέλο, ποσά, αξιολογήσεις) διατηρείται ανώνυμο, χωρίς τίποτα που να σε ταυτοποιεί.'
+                : 'Οι προσφορές που περιμένουν απάντηση αποσύρονται. Τα στοιχεία της επιχείρησης (επωνυμία, ΑΦΜ, ΔΟΥ, διεύθυνση) και το ιστορικό των εργασιών διατηρούνται, όπως απαιτεί η φορολογική νομοθεσία.'}
+              {' '}Αν έχεις κλεισμένο ραντεβού που δεν έχει γίνει, ακύρωσέ το πρώτα.
+            </p>
 
             <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-1">
               Κωδικός

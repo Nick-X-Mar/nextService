@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { GetCommand, QueryCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb'
+import { BatchGetCommand } from '@aws-sdk/lib-dynamodb'
 import { withMetrics } from '@/utils/withMetrics'
-import { ServiceRequestStatus } from '@/types/statuses'
-import { DEPOSIT_PERCENT } from '@/lib/stripe-server'
-import { commissionLine, roundCents, sumCents, type CommissionLine } from '@/lib/commission-basis'
+import {
+  DEFAULT_COMMISSION_PERCENT,
+  garageCommissionPercent,
+  parseCommissionPercent,
+  roundCents,
+  sumCents,
+  type CommissionRateSource,
+} from '@/lib/commission-basis'
 import { athensToday } from '@/utils/athensTime'
 import type { CompletionAmounts } from '@/types/reviews'
+import { billedJobsForMonth } from '../../billedJobs'
 
 interface AppointmentRow {
   requestId: string
@@ -26,13 +32,21 @@ interface AppointmentRow {
   /** The net figure the commission was taken from — the declared net, or the quote's net. */
   basisAmount: number
   commission: number
+  /** The rate this job was billed at: frozen at completion, else the garage's rate, else the default. */
+  commissionPercent: number
+  rateSource: CommissionRateSource
 }
 
 interface GarageCommissionsResponse {
   month: string
   garageId: string
   garageName: string
+  /** The garage's rate today — what a job it completes now is frozen at. */
   commissionPercent: number
+  hasCustomRate: boolean
+  defaultCommissionPercent: number
+  rateSetAt?: string
+  rateSetBy?: string
   totals: {
     appointmentCount: number
     totalRevenue: number
@@ -63,70 +77,11 @@ async function _GET(
     const { searchParams } = new URL(request.url)
     const monthParam = searchParams.get('month')
     const month = isValidMonth(monthParam) ? monthParam : currentMonth()
-    const monthPrefix = `${month}-`
 
-    // Fetch garage profile
-    const garageRes = await dynamoDB.send(new GetCommand({
-      TableName: 'Garages',
-      Key: { id: garageId },
-    }))
-    const garage = garageRes.Item
-    const garageName = garage?.companyName || garage?.email || garageId
-
-    // Pull all completed requests for the month
-    const completedItems: Record<string, unknown>[] = []
-    let lastKey: Record<string, unknown> | undefined
-
-    do {
-      const result = await dynamoDB.send(new QueryCommand({
-        TableName: 'ServiceRequests',
-        IndexName: 'StatusIndex',
-        KeyConditionExpression: '#status = :status',
-        FilterExpression:
-          'begins_with(appointmentDate, :monthPrefix) AND ' +
-          '(attribute_exists(appointmentPrice) OR attribute_exists(finalAmounts))',
-        ExpressionAttributeNames: { '#status': 'status' },
-        ExpressionAttributeValues: {
-          ':status': ServiceRequestStatus.COMPLETED,
-          ':monthPrefix': monthPrefix,
-        },
-        ExclusiveStartKey: lastKey,
-      }))
-      if (result.Items) completedItems.push(...result.Items)
-      lastKey = result.LastEvaluatedKey
-    } while (lastKey)
-
-    // Filter to those whose accepted offer belongs to this garage
-    const offerIds = Array.from(new Set(
-      completedItems.map((r) => r.acceptedOfferId).filter((v): v is string => typeof v === 'string')
-    ))
-
-    const offerToGarage: Record<string, string> = {}
-    for (let i = 0; i < offerIds.length; i += 100) {
-      const batch = offerIds.slice(i, i + 100)
-      const offersRes = await dynamoDB.send(new BatchGetCommand({
-        RequestItems: {
-          Offers: {
-            Keys: batch.map((id) => ({ id })),
-            ProjectionExpression: 'id, garageId',
-          },
-        },
-      }))
-      for (const offer of offersRes.Responses?.Offers || []) {
-        if (offer.garageId) offerToGarage[offer.id] = offer.garageId
-      }
-    }
-
-    // The same per-job lines the overview sums (src/lib/commission-basis.ts):
-    // no-shows, work not done and jobs with no usable amount bill nothing and
-    // are left out of both.
-    const garageRequests: { r: Record<string, unknown>; line: CommissionLine }[] = []
-    for (const r of completedItems) {
-      const offerId = typeof r.acceptedOfferId === 'string' ? r.acceptedOfferId : null
-      if (!offerId || offerToGarage[offerId] !== garageId) continue
-      const line = commissionLine(r as Parameters<typeof commissionLine>[0], DEPOSIT_PERCENT)
-      if (line) garageRequests.push({ r, line })
-    }
+    const { jobs, garages } = await billedJobsForMonth(month, garageId)
+    const garage = garages.get(garageId)
+    const garageName = (garage?.companyName as string) || (garage?.email as string) || garageId
+    const garageRequests = jobs.map((job) => ({ r: job.request, line: job.line, percent: job.percent, rateSource: job.rateSource }))
 
     // Resolve client names + vehicle info
     const clientIds = Array.from(new Set(
@@ -143,13 +98,14 @@ async function _GET(
         RequestItems: {
           Clients: {
             Keys: batch.map((id) => ({ id })),
-            ProjectionExpression: 'id, firstName, lastName, email',
+            ProjectionExpression: 'id, firstName, lastName, email, anonymizedAt',
           },
         },
       }))
       for (const c of res.Responses?.Clients || []) {
         const name = [c.firstName, c.lastName].filter(Boolean).join(' ').trim()
-        clientNames[c.id] = name || c.email || c.id
+        // A closed account keeps its jobs, not its name.
+        clientNames[c.id] = c.anonymizedAt ? 'Διαγραμμένος πελάτης' : (name || c.email || c.id)
       }
     }
 
@@ -172,7 +128,7 @@ async function _GET(
       }
     }
 
-    const appointments: AppointmentRow[] = garageRequests.map(({ r, line }) => {
+    const appointments: AppointmentRow[] = garageRequests.map(({ r, line, percent, rateSource }) => {
       const quoted = typeof r.appointmentPrice === 'number' ? r.appointmentPrice : 0
       const declared = (r as { finalAmounts?: CompletionAmounts }).finalAmounts
       const clientId = typeof r.clientId === 'string' ? r.clientId : ''
@@ -192,6 +148,8 @@ async function _GET(
         basis: line.source,
         basisAmount: line.basisAmount,
         commission: line.commission,
+        commissionPercent: percent,
+        rateSource,
       }
     })
 
@@ -206,7 +164,11 @@ async function _GET(
       month,
       garageId,
       garageName,
-      commissionPercent: DEPOSIT_PERCENT,
+      commissionPercent: garageCommissionPercent(garage),
+      hasCustomRate: parseCommissionPercent(garage?.commissionPercent) !== null,
+      defaultCommissionPercent: DEFAULT_COMMISSION_PERCENT,
+      ...(typeof garage?.commissionPercentSetAt === 'string' ? { rateSetAt: garage.commissionPercentSetAt } : {}),
+      ...(typeof garage?.commissionPercentSetBy === 'string' ? { rateSetBy: garage.commissionPercentSetBy } : {}),
       totals: {
         appointmentCount: appointments.length,
         totalRevenue,

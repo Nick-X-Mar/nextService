@@ -17,12 +17,11 @@ import { estimateFor } from '@/app/api/price-estimation/estimate'
 import { isValidEngineCC, normalizeEngineCC } from '@/app/api/vehicles/engineCC'
 import { GUEST_PLACEHOLDER_NAME } from '@/types/clients'
 import { randomUUID } from 'crypto'
+import { TERMS_VERSION } from '@/lib/legal'
 
 // Same budget as /api/auth/register: this route registers guests inline, so
 // without its own limit it was the unthrottled way to mint accounts.
 const checkGuestSignupRate = createRateLimiter('service-request-signup', 5, 3600000)
-
-const CURRENT_TERMS_VERSION = '1.0'
 
 // The form never asks for engine details on these; the price lookup ignores them too.
 const BODYWORK_CATEGORIES = new Set(['oliki-vafi', 'meriki-vafi', 'fanopeia'])
@@ -38,7 +37,7 @@ const digits = (value: unknown): string =>
   typeof value === 'number' && Number.isFinite(value) ? String(value) : text(value)
 
 /** The session's own row may still file a request: it exists, and it has not been folded into another account. */
-const OWNER_CAN_FILE = 'attribute_exists(id) AND attribute_not_exists(mergedInto) AND attribute_not_exists(mergingInto)'
+const OWNER_CAN_FILE = 'attribute_exists(id) AND attribute_not_exists(mergedInto) AND attribute_not_exists(mergingInto) AND attribute_not_exists(anonymizedAt)'
 
 /**
  * Why the session's Clients row cannot take a new request, or null if it can. A JWT
@@ -49,7 +48,8 @@ const OWNER_CAN_FILE = 'attribute_exists(id) AND attribute_not_exists(mergedInto
  * can see it.
  */
 function ownerRefusal(row: Record<string, unknown> | undefined): NextResponse | null {
-  if (!row || row.mergedInto) {
+  // A closed (anonymized) account is gone too, whatever cookie still names it.
+  if (!row || row.mergedInto || row.anonymizedAt) {
     return NextResponse.json(
       { error: 'Η σύνδεσή σας έληξε. Συνδεθείτε ξανά για να στείλετε το αίτημα.' },
       { status: 401 }
@@ -242,7 +242,7 @@ async function _POST(request: NextRequest) {
       const owner = await dynamoDB.send(new GetCommand({
         TableName: 'Clients',
         Key: { id: existingClientId },
-        ProjectionExpression: 'id, mergedInto, mergingInto',
+        ProjectionExpression: 'id, mergedInto, mergingInto, anonymizedAt',
         ConsistentRead: true,
       }))
       const refusal = ownerRefusal(owner.Item)
@@ -326,7 +326,7 @@ async function _POST(request: NextRequest) {
         passwordHash: await hashPassword(password),
         isActive: true,
         acceptedTermsAt: nowIso,
-        acceptedTermsVersion: CURRENT_TERMS_VERSION,
+        acceptedTermsVersion: TERMS_VERSION,
         createdAt: nowIso,
         updatedAt: nowIso,
       }

@@ -25,8 +25,9 @@ async function _POST(
         TableName: 'Garages',
         Key: { id: garageId },
         UpdateExpression: 'SET isActive = :active, activatedAt = :now, updatedAt = :now REMOVE deactivatedAt',
-        // Without the condition an unknown id would create a bare garage row.
-        ConditionExpression: 'attribute_exists(id)',
+        // Without the condition an unknown id would create a bare garage row. A
+        // garage that closed its account is anonymized for good — not reopenable.
+        ConditionExpression: 'attribute_exists(id) AND attribute_not_exists(anonymizedAt)',
         ExpressionAttributeValues: { ':active': true, ':now': now },
         ReturnValues: 'ALL_OLD'
       }))

@@ -18,11 +18,10 @@ import {
   publicClient,
   requireGuestSession,
 } from '../_lib/guestMerge'
+import { TERMS_VERSION } from '@/lib/legal'
 
 const checkIpRate = createRateLimiter('register-requests', 10, 3600000)
 const checkGuestRate = createRateLimiter('register-requests-guest', 10, 3600000)
-
-const CURRENT_TERMS_VERSION = '1.0'
 
 function optionalText(value: unknown, max: number): string | undefined {
   if (typeof value !== 'string') return undefined
@@ -107,7 +106,7 @@ async function _POST(request: NextRequest) {
       ':email': email,
       ':passwordHash': passwordHash,
       ':termsAt': now,
-      ':termsVersion': CURRENT_TERMS_VERSION,
+      ':termsVersion': TERMS_VERSION,
       ':now': now,
     }
     const sets = [

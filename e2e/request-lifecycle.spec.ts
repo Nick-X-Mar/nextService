@@ -26,6 +26,7 @@ import {
   makeLegacyCompletion,
   makeUnpricedCompletion,
   putOffer,
+  unfreezeCommissionRate,
 } from './dynamo-helpers'
 import { newGarage, summary } from './E-helpers'
 import { athensToday } from '../src/utils/athensTime'
@@ -520,6 +521,115 @@ test.describe('Commission totals', () => {
     expect(line.appointmentCount).toBe(detail.totals.appointmentCount)
     expect(line.totalRevenue).toBe(detail.totals.totalRevenue)
     expect(line.commission).toBe(detail.totals.commission)
+  })
+})
+
+test.describe('Commission rates', () => {
+  test('each garage is billed at its agreed rate or the 15% default, and a rate change never re-prices a closed job', async ({ request }) => {
+    test.slow()
+    const c = await client(request)
+    const admin = await adminCookie(request)
+    const custom = await newGarage(request, { prefix: 'rate-custom' })
+    const plain = await newGarage(request, { prefix: 'rate-default' })
+
+    const setRate = (garageId: string, commissionPercent: unknown, cookie = admin) =>
+      request.put(`/api/admin/commissions/garage/${garageId}/rate/`, {
+        headers: { Cookie: cookie },
+        data: { commissionPercent },
+      })
+    const book = async (garageToken: string, description: string) => {
+      const date = athensDatePlus(30)
+      const requestId = await createRequest(request, c, description)
+      const offerId = await createOffer(request, garageToken, requestId, 124, [date])
+      const accept = await acceptOffer(request, c, requestId, { offerId, appointmentDate: date, appointmentTime: '10:00' })
+      expect(accept.status(), await accept.text()).toBe(200)
+      return requestId
+    }
+    /** Closes a job two days back (or `daysAgo`) declaring a net of 100. Returns its month. */
+    const close = async (garageToken: string, requestId: string, daysAgo = 2) => {
+      const month = (await ageAppointment(requestId, daysAgo)).slice(0, 7)
+      const done = await complete(request, garageToken, requestId, { outcome: 'completed', amount: 100, vatIncluded: false })
+      expect(done.status(), await done.text()).toBe(200)
+      return month
+    }
+    const stats = async (month: string) => {
+      const resp = await request.get(`/api/admin/commissions/stats/?month=${month}`, { headers: { Cookie: admin } })
+      expect(resp.status()).toBe(200)
+      return resp.json()
+    }
+    const detail = async (garageId: string, month: string) => {
+      const resp = await request.get(`/api/admin/commissions/garage/${garageId}/?month=${month}`, { headers: { Cookie: admin } })
+      expect(resp.status()).toBe(200)
+      return resp.json()
+    }
+
+    // Only an admin sets a rate, and only a real one.
+    expect((await setRate(custom.id, 10, `auth-token=${custom.token}`)).status()).toBe(401)
+    for (const bad of [-1, 101, '10', 'δέκα', true]) {
+      expect((await setRate(custom.id, bad)).status(), JSON.stringify(bad)).toBe(400)
+    }
+    expect((await setRate('garage-does-not-exist', 10)).status()).toBe(404)
+    const agreed = await setRate(custom.id, 10)
+    expect(agreed.status(), await agreed.text()).toBe(200)
+    expect(await agreed.json()).toMatchObject({ commissionPercent: 10, hasCustomRate: true })
+
+    // At 10%: one job. At the default: one job.
+    const atTen = await book(custom.token, 'E2E rate: custom at 10%')
+    const month = await close(custom.token, atTen)
+    const atDefault = await book(plain.token, 'E2E rate: default')
+    expect(await close(plain.token, atDefault)).toBe(month)
+    expect((await getServiceRequest(atTen))?.commissionPercent).toBe(10)
+    expect((await getServiceRequest(atDefault))?.commissionPercent).toBe(15)
+
+    // The rate goes up mid-month. The job already closed keeps its 10%.
+    expect((await setRate(custom.id, 20)).status()).toBe(200)
+    const atTwenty = await book(custom.token, 'E2E rate: custom at 20%')
+    expect(await close(custom.token, atTwenty)).toBe(month)
+
+    // A job closed before rates were frozen is billed at the garage's rate today.
+    const legacy = await book(custom.token, 'E2E rate: legacy, no frozen rate')
+    expect(await close(custom.token, legacy)).toBe(month)
+    await unfreezeCommissionRate(legacy)
+
+    // A job in another month stays out of this one.
+    const earlier = await book(custom.token, 'E2E rate: an earlier month')
+    const earlierMonth = await close(custom.token, earlier, 40)
+    expect(earlierMonth).not.toBe(month)
+
+    const overview = await stats(month)
+    const customLine = overview.byGarage.find((g: { garageId: string }) => g.garageId === custom.id)
+    const plainLine = overview.byGarage.find((g: { garageId: string }) => g.garageId === plain.id)
+    expect(overview.defaultCommissionPercent).toBe(15)
+    // 100 × 10% + 100 × 20% + 100 × 20% (legacy, today's rate)
+    expect(customLine).toMatchObject({
+      appointmentCount: 3, totalRevenue: 300, commission: 50,
+      commissionPercent: 20, hasCustomRate: true, effectivePercent: 16.67,
+    })
+    expect(plainLine).toMatchObject({
+      appointmentCount: 1, totalRevenue: 100, commission: 15,
+      commissionPercent: 15, hasCustomRate: false, effectivePercent: 15,
+    })
+
+    // The detail page lists the same jobs at the same rates and sums to the overview's line.
+    const page = await detail(custom.id, month)
+    const byId = Object.fromEntries(page.appointments.map((a: { requestId: string }) => [a.requestId, a]))
+    expect(byId[atTen]).toMatchObject({ commissionPercent: 10, rateSource: 'job', commission: 10 })
+    expect(byId[atTwenty]).toMatchObject({ commissionPercent: 20, rateSource: 'job', commission: 20 })
+    expect(byId[legacy]).toMatchObject({ commissionPercent: 20, rateSource: 'garage', commission: 20 })
+    expect(byId[earlier]).toBeUndefined()
+    expect(page.totals).toMatchObject({ appointmentCount: 3, totalRevenue: 300, commission: 50 })
+    expect(page).toMatchObject({ commissionPercent: 20, hasCustomRate: true, defaultCommissionPercent: 15 })
+
+    const before = await detail(custom.id, earlierMonth)
+    expect(before.appointments.map((a: { requestId: string }) => a.requestId)).toEqual([earlier])
+    expect(before.totals.commission).toBe(20)
+
+    // Back to the default: the rows already billed do not move.
+    const reset = await setRate(custom.id, null)
+    expect(await reset.json()).toMatchObject({ commissionPercent: 15, hasCustomRate: false })
+    const afterReset = await detail(custom.id, month)
+    expect(afterReset.totals.commission).toBe(10 + 20 + 15) // the legacy job follows today's rate
+    expect(afterReset.hasCustomRate).toBe(false)
   })
 })
 

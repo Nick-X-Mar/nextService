@@ -30,11 +30,12 @@ async function _GET(request: NextRequest) {
     }))
 
     const user = result.Item
-    // A guest folded into an account survives only as a tombstone. Its session
-    // has nothing left behind it, so end it rather than keep a ghost signed in.
-    if (!user || user.mergedInto) {
+    // A guest folded into an account survives only as a tombstone, and a
+    // closed account as an anonymized row. Neither session has anything left
+    // behind it, so end it rather than keep a ghost signed in.
+    if (!user || user.mergedInto || user.anonymizedAt) {
       const response = NextResponse.json({ authenticated: false }, { status: 401 })
-      if (user?.mergedInto) clearAuthCookie(response)
+      if (user?.mergedInto || user?.anonymizedAt) clearAuthCookie(response)
       return response
     }
 

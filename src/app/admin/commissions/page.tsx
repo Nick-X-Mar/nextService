@@ -18,11 +18,16 @@ interface GarageBreakdown {
   commission: number
   /** How many of `appointmentCount` rest on a declared amount rather than the quote. */
   declaredCount: number
+  /** The garage's rate today. */
+  commissionPercent: number
+  hasCustomRate: boolean
+  /** Commission over revenue for the month — differs when the rate changed mid-month. */
+  effectivePercent: number
 }
 
 interface CommissionsStats {
   month: string
-  commissionPercent: number
+  defaultCommissionPercent: number
   totals: {
     appointmentCount: number
     totalRevenue: number
@@ -51,6 +56,10 @@ function lastNMonths(n: number): { value: string; label: string }[] {
     out.push({ value, label })
   }
   return out
+}
+
+function formatPercent(value: number): string {
+  return value.toLocaleString('el-GR', { maximumFractionDigits: 2 }) + '%'
 }
 
 function formatEUR(amount: number): string {
@@ -127,8 +136,24 @@ export default function CommissionsPage() {
       render: (item) => formatEUR(item.totalRevenue),
     },
     {
+      key: 'commissionPercent',
+      header: 'Ποσοστό',
+      sortable: true,
+      render: (item) => (
+        <div>
+          <span>{formatPercent(item.commissionPercent)}</span>
+          <p className="text-[11px] text-on-surface/50">
+            {item.hasCustomRate ? 'συμφωνημένο' : 'προεπιλογή'}
+            {/* Each job keeps the rate it was completed at, so a mid-month
+                change shows up as a blended figure. */}
+            {Math.abs(item.effectivePercent - item.commissionPercent) >= 0.01 && ` · μήνας ${formatPercent(item.effectivePercent)}`}
+          </p>
+        </div>
+      ),
+    },
+    {
       key: 'commission',
-      header: `Προμήθεια (${data?.commissionPercent ?? 15}%)`,
+      header: 'Προμήθεια',
       sortable: true,
       render: (item) => (
         <span className="font-semibold text-primary">{formatEUR(item.commission)}</span>
@@ -157,9 +182,10 @@ export default function CommissionsPage() {
         <div>
           <h1 className="text-2xl font-bold font-headline text-on-surface">Προμήθειες Συνεργείων</h1>
           <p className="text-sm text-on-surface/60 mt-1">
-            Υπολογισμός {data?.commissionPercent ?? 15}% επί της καθαρής αξίας (χωρίς ΦΠΑ) των ολοκληρωμένων
-            εργασιών — οφειλές προς εξόφληση στο τέλος του μήνα. Δεν χρεώνονται ραντεβού όπου ο πελάτης δεν ήρθε
-            ή η εργασία δεν έγινε.
+            Προμήθεια επί της καθαρής αξίας (χωρίς ΦΠΑ) των ολοκληρωμένων εργασιών, με το συμφωνημένο ποσοστό
+            κάθε συνεργείου ή την προεπιλογή {formatPercent(data?.defaultCommissionPercent ?? 15)}. Κάθε εργασία
+            κρατά το ποσοστό που ίσχυε όταν ολοκληρώθηκε. Δεν χρεώνονται ραντεβού όπου ο πελάτης δεν ήρθε ή η
+            εργασία δεν έγινε.
           </p>
         </div>
         <select
@@ -188,7 +214,7 @@ export default function CommissionsPage() {
         />
         <StatCard
           icon="account_balance_wallet"
-          label={`Προμήθεια (${data?.commissionPercent ?? 15}%)`}
+          label="Προμήθεια"
           value={loading ? '...' : formatEUR(data?.totals.commission ?? 0)}
           color="tertiary"
         />

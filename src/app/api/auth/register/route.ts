@@ -10,12 +10,9 @@ import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
 import { randomUUID } from 'crypto'
 import { GUEST_PLACEHOLDER_NAME } from '../_lib/guestMerge'
+import { TERMS_VERSION } from '@/lib/legal'
 
 const checkRegisterRate = createRateLimiter('register', 3, 3600000)
-
-// Bumped whenever the legal text changes — every signup record has the
-// version it agreed to so we can prove what they accepted at the time.
-const CURRENT_TERMS_VERSION = '1.0'
 
 async function _POST(request: NextRequest) {
   try {
@@ -83,7 +80,7 @@ async function _POST(request: NextRequest) {
       passwordHash,
       isActive: true,
       acceptedTermsAt: nowIso,
-      acceptedTermsVersion: CURRENT_TERMS_VERSION,
+      acceptedTermsVersion: TERMS_VERSION,
       createdAt: nowIso,
       updatedAt: nowIso
     }

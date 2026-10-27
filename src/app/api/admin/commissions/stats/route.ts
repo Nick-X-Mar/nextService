@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { dynamoDB } from '@/utils/dynamoService'
-import { QueryCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb'
 import { withMetrics } from '@/utils/withMetrics'
-import { ServiceRequestStatus } from '@/types/statuses'
-import { DEPOSIT_PERCENT } from '@/lib/stripe-server'
-import { commissionLine, sumCents } from '@/lib/commission-basis'
+import {
+  DEFAULT_COMMISSION_PERCENT,
+  garageCommissionPercent,
+  parseCommissionPercent,
+  sumCents,
+} from '@/lib/commission-basis'
 import { athensToday } from '@/utils/athensTime'
+import { billedJobsForMonth } from '../billedJobs'
 
 interface GarageBreakdown {
   garageId: string
@@ -19,11 +21,21 @@ interface GarageBreakdown {
    * well below the count is reporting estimates, not settled figures.
    */
   declaredCount: number
+  /** The garage's rate today — what a job it completes now is billed at. */
+  commissionPercent: number
+  /** True when that rate is an agreed one, not the default. */
+  hasCustomRate: boolean
+  /**
+   * Commission over revenue for this month's jobs. Differs from
+   * `commissionPercent` when the rate changed during the month: each job keeps
+   * the rate it was completed at.
+   */
+  effectivePercent: number
 }
 
 interface CommissionsStatsResponse {
   month: string
-  commissionPercent: number
+  defaultCommissionPercent: number
   totals: {
     appointmentCount: number
     totalRevenue: number
@@ -47,115 +59,41 @@ async function _GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const monthParam = searchParams.get('month')
     const month = isValidMonth(monthParam) ? monthParam : currentMonth()
-    const monthPrefix = `${month}-`
 
-    // Query all completed requests via StatusIndex, paginated
-    const completedItems: Record<string, unknown>[] = []
-    let lastKey: Record<string, unknown> | undefined
+    const { jobs, garages } = await billedJobsForMonth(month)
 
-    do {
-      const result = await dynamoDB.send(new QueryCommand({
-        TableName: 'ServiceRequests',
-        IndexName: 'StatusIndex',
-        KeyConditionExpression: '#status = :status',
-        FilterExpression:
-          'begins_with(appointmentDate, :monthPrefix) AND ' +
-          '(attribute_exists(appointmentPrice) OR attribute_exists(finalAmounts))',
-        ExpressionAttributeNames: { '#status': 'status' },
-        ExpressionAttributeValues: {
-          ':status': ServiceRequestStatus.COMPLETED,
-          ':monthPrefix': monthPrefix,
-        },
-        ExclusiveStartKey: lastKey,
-      }))
-      if (result.Items) completedItems.push(...result.Items)
-      lastKey = result.LastEvaluatedKey
-    } while (lastKey)
-
-    // Resolve garageId per request via the accepted offer
-    const offerIds = Array.from(new Set(
-      completedItems.map((r) => r.acceptedOfferId).filter((v): v is string => typeof v === 'string')
-    ))
-
-    const offerToGarage: Record<string, string> = {}
-    for (let i = 0; i < offerIds.length; i += 100) {
-      const batch = offerIds.slice(i, i + 100)
-      const offersRes = await dynamoDB.send(new BatchGetCommand({
-        RequestItems: {
-          Offers: {
-            Keys: batch.map((id) => ({ id })),
-            ProjectionExpression: 'id, garageId',
-          },
-        },
-      }))
-      for (const offer of offersRes.Responses?.Offers || []) {
-        if (offer.garageId) offerToGarage[offer.id] = offer.garageId
-      }
+    // Summed from the same per-job lines a garage's detail page lists, so the
+    // two always agree. Revenue is the net the commission was taken from.
+    const byGarageId = new Map<string, { revenues: number[]; commissions: number[]; declaredCount: number }>()
+    for (const job of jobs) {
+      const entry = byGarageId.get(job.garageId) ?? { revenues: [], commissions: [], declaredCount: 0 }
+      entry.revenues.push(job.line.basisAmount)
+      entry.commissions.push(job.line.commission)
+      if (job.line.source === 'declared') entry.declaredCount += 1
+      byGarageId.set(job.garageId, entry)
     }
 
-    // Aggregate per garage, from the same per-job lines the garage's detail
-    // page lists (src/lib/commission-basis.ts), so the two always agree.
-    //
-    // Revenue is what the garage declared it actually charged, net of VAT —
-    // not the price it quoted. `declaredCount` is surfaced so the admin can see
-    // how much of a month's figure rests on real declarations rather than on
-    // the fallback.
-    const aggregateByGarage = new Map<
-      string,
-      { revenues: number[]; commissions: number[]; declaredCount: number }
-    >()
-
-    for (const r of completedItems) {
-      const offerId = typeof r.acceptedOfferId === 'string' ? r.acceptedOfferId : null
-      if (!offerId) continue
-      const garageId = offerToGarage[offerId]
-      if (!garageId) continue
-      const line = commissionLine(r as Parameters<typeof commissionLine>[0], DEPOSIT_PERCENT)
-      if (!line) continue
-
-      const entry = aggregateByGarage.get(garageId) ?? { revenues: [], commissions: [], declaredCount: 0 }
-      entry.revenues.push(line.basisAmount)
-      entry.commissions.push(line.commission)
-      if (line.source === 'declared') entry.declaredCount += 1
-      aggregateByGarage.set(garageId, entry)
-    }
-
-    // Resolve garage names
-    const garageIds = Array.from(aggregateByGarage.keys())
-    const garageNames: Record<string, string> = {}
-
-    for (let i = 0; i < garageIds.length; i += 100) {
-      const batch = garageIds.slice(i, i + 100)
-      const garagesRes = await dynamoDB.send(new BatchGetCommand({
-        RequestItems: {
-          Garages: {
-            Keys: batch.map((id) => ({ id })),
-            ProjectionExpression: 'id, companyName, email',
-          },
-        },
-      }))
-      for (const g of garagesRes.Responses?.Garages || []) {
-        garageNames[g.id] = g.companyName || g.email || g.id
-      }
-    }
-
-    const byGarage: GarageBreakdown[] = garageIds.map((garageId) => {
-      const agg = aggregateByGarage.get(garageId)!
+    const byGarage: GarageBreakdown[] = Array.from(byGarageId, ([garageId, agg]) => {
+      const garage = garages.get(garageId)
+      const totalRevenue = sumCents(agg.revenues)
+      const commission = sumCents(agg.commissions)
       return {
         garageId,
-        garageName: garageNames[garageId] || garageId,
+        garageName: (garage?.companyName as string) || (garage?.email as string) || garageId,
         appointmentCount: agg.revenues.length,
-        totalRevenue: sumCents(agg.revenues),
-        commission: sumCents(agg.commissions),
+        totalRevenue,
+        commission,
         declaredCount: agg.declaredCount,
+        commissionPercent: garageCommissionPercent(garage),
+        hasCustomRate: parseCommissionPercent(garage?.commissionPercent) !== null,
+        effectivePercent: totalRevenue > 0 ? Math.round((commission / totalRevenue) * 10000) / 100 : 0,
       }
     })
-
     byGarage.sort((a, b) => b.commission - a.commission)
 
     const response: CommissionsStatsResponse = {
       month,
-      commissionPercent: DEPOSIT_PERCENT,
+      defaultCommissionPercent: DEFAULT_COMMISSION_PERCENT,
       totals: {
         appointmentCount: byGarage.reduce((n, g) => n + g.appointmentCount, 0),
         totalRevenue: sumCents(byGarage.map((g) => g.totalRevenue)),

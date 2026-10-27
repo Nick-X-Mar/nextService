@@ -60,6 +60,49 @@ export function commissionBasis(request: {
   }
 }
 
+/**
+ * The platform's share of a completed job's net when the garage has no agreed
+ * rate of its own. Deliberately not DEPOSIT_PERCENT: that is what a *client*
+ * pays up front when card payments are on, and changing it must not re-price
+ * every garage's commission.
+ */
+export const DEFAULT_COMMISSION_PERCENT = 15
+
+/** A stored or submitted rate when it is a usable one (0–100, at most two decimals), else null. */
+export function parseCommissionPercent(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null
+  if (value < 0 || value > 100) return null
+  return Math.round(value * 100) / 100
+}
+
+export type CommissionRateSource = 'job' | 'garage' | 'default'
+
+/**
+ * The rate a job is billed at.
+ *
+ * 1. `job` — the rate frozen on the row when the garage completed it
+ *    (POST /api/requests/[id]/complete). Changing a garage's rate later must
+ *    not re-price months that are already invoiced.
+ * 2. `garage` — the garage's agreed rate now, for jobs closed before rates
+ *    were frozen.
+ * 3. `default` — DEFAULT_COMMISSION_PERCENT.
+ */
+export function resolveCommissionPercent(
+  request: { commissionPercent?: unknown },
+  garage?: { commissionPercent?: unknown } | null
+): { percent: number; source: CommissionRateSource } {
+  const frozen = parseCommissionPercent(request.commissionPercent)
+  if (frozen !== null) return { percent: frozen, source: 'job' }
+  const agreed = parseCommissionPercent(garage?.commissionPercent)
+  if (agreed !== null) return { percent: agreed, source: 'garage' }
+  return { percent: DEFAULT_COMMISSION_PERCENT, source: 'default' }
+}
+
+/** The garage's current rate — what a job it completes today is frozen at. */
+export function garageCommissionPercent(garage?: { commissionPercent?: unknown } | null): number {
+  return parseCommissionPercent(garage?.commissionPercent) ?? DEFAULT_COMMISSION_PERCENT
+}
+
 /** Rounds to the cent — every money figure on the commission pages goes through this. */
 export function roundCents(value: number): number {
   return Math.round(value * 100) / 100

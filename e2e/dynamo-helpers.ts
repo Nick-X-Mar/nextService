@@ -130,6 +130,17 @@ export async function insertCompetingOffer(
  * completion flow looks like: COMPLETED with no outcome and no declared
  * amount, which is exactly the row the commission fallback exists for.
  */
+/** A job closed before rates were frozen on it: billed at the garage's rate today. */
+export async function unfreezeCommissionRate(requestId: string): Promise<void> {
+  await client.send(
+    new UpdateCommand({
+      TableName: 'ServiceRequests',
+      Key: { id: requestId },
+      UpdateExpression: 'REMOVE commissionPercent',
+    })
+  )
+}
+
 export async function makeLegacyCompletion(requestId: string): Promise<void> {
   await client.send(
     new UpdateCommand({
