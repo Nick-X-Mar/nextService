@@ -34,7 +34,7 @@ Store GitHub token before deploying Amplify:
 import aws_cdk as cdk
 from stacks.dynamodb_stack import DynamoDBStack
 from stacks.s3_stack import S3Stack
-from stacks.appsync_stack import AppSyncStack
+from stacks.appsync_stack import AppSyncStack, REALTIME_SECRET_NAME
 from stacks.monitoring_stack import MonitoringStack
 from stacks.amplify_stack import AmplifyStack
 from stacks.notifications_stack import NotificationsStack
@@ -117,7 +117,7 @@ appsync = AppSyncStack(
 appsync.add_dependency(monitoring)
 
 # 5. Amplify Hosting — Next.js SSR with env vars from other stacks
-# AppSync attr_dns is a list: [http_endpoint, realtime_endpoint]
+# AppSync endpoints are the Events API's Dns.Http / Dns.Realtime attributes.
 amplify = AmplifyStack(
     app, "NextService-Amplify",
     github_owner=GITHUB_OWNER,
@@ -130,6 +130,7 @@ amplify = AmplifyStack(
     appsync_http_endpoint=appsync.http_endpoint,
     appsync_realtime_endpoint=appsync.realtime_endpoint,
     appsync_api_key=appsync.api_key.attr_api_key,
+    realtime_secret_name=REALTIME_SECRET_NAME,
     env=env,
 )
 # Amplify no longer imports anything from the S3 stack (bucket name is passed

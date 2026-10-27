@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useLayoutEffect, useRef, useEffect } from 'react'
+import React, { useState, useLayoutEffect, useRef, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { gsap } from 'gsap'
 import Icon from '@/components/ui/Icon'
@@ -9,9 +9,27 @@ import { useNavigation } from '@/hooks/useNavigation'
 import { startNewRequest } from '@/utils/formStorage'
 import { SERVICE_CATEGORIES as categories } from '@/utils/categoryLabels'
 
+/**
+ * Opens the category menu on `/?open=1` — where the "Νέο Αίτημα" buttons send
+ * you, even from the homepage itself, so it has to react to the URL changing.
+ *
+ * Its own component behind its own Suspense: on a static page useSearchParams
+ * renders nothing on the server up to the nearest boundary. With the hook in
+ * HeroSection that was the whole hero — the page's only h1 and the category
+ * list — so crawlers got an empty `min-h-screen` div. Now only this, which
+ * renders nothing anyway, waits for the browser.
+ */
+function OpenOnParam({ onOpen }: { onOpen: () => void }) {
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    if (searchParams.get('open') === '1') onOpen()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+  return null
+}
+
 export default function HeroSection() {
   const { navigate } = useNavigation()
-  const searchParams = useSearchParams()
   const [selectedCategory, setSelectedCategory] = useState('')
   // The category tap fires a 500ms close animation before the push, so without
   // this the row sits there looking inert for the whole wait.
@@ -20,6 +38,10 @@ export default function HeroSection() {
   const containerRef = useRef<HTMLDivElement>(null)
   const itemsRef = useRef<HTMLDivElement[]>([])
   const tlRef = useRef<gsap.core.Timeline | null>(null)
+  // Read by OpenOnParam's callback, which can fire without this component
+  // re-rendering, so a captured `isOpen` could be stale.
+  const isOpenRef = useRef(false)
+  useEffect(() => { isOpenRef.current = isOpen }, [isOpen])
 
   const selectedLabel = categories.find(c => c.value === selectedCategory)?.label || ''
 
@@ -35,15 +57,13 @@ export default function HeroSection() {
   }, [])
 
   // Auto-open when navigated with ?open=1
-  useEffect(() => {
-    if (searchParams.get('open') === '1' && tlRef.current && !isOpen) {
-      setTimeout(() => {
-        tlRef.current?.play()
-        setIsOpen(true)
-      }, 300)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams])
+  const openFromParam = () => {
+    if (!tlRef.current || isOpenRef.current) return
+    setTimeout(() => {
+      tlRef.current?.play()
+      setIsOpen(true)
+    }, 300)
+  }
 
   const toggleMenu = () => {
     if (!tlRef.current) return
@@ -80,6 +100,10 @@ export default function HeroSection() {
   return (
     <section className="relative min-h-screen flex flex-col justify-center">
       {/* Overlay removed — now applied globally in LandingPage */}
+
+      <Suspense fallback={null}>
+        <OpenOnParam onOpen={openFromParam} />
+      </Suspense>
 
       <h1 className="sr-only">
         NextService — Βρες συνεργείο αυτοκινήτου στην Ελλάδα και πάρε προσφορές από επαγγελματίες για service, συμπλέκτη, ιμάντα χρονισμού και φανοποιεία

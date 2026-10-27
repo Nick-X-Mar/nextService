@@ -445,17 +445,24 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
             )}
 
             {!hasLicensePhoto ? (
-              <input
-                type="text"
-                aria-label="Αριθμός κινητήρα"
-                value={engineNumber}
-                onChange={(e) => {
-                  const val = e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g, '')
-                  setEngineNumber(val)
-                }}
-                placeholder="π.χ. ABC123456"
-                className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
-              />
+              <>
+                {/* Without the άδεια both numbers are needed — say so up front,
+                    rather than leaving the submit button grey with no reason. */}
+                <p className="text-xs text-on-surface-variant">
+                  Συμπληρώστε τον αριθμό κινητήρα <span className="font-bold text-on-surface">και</span> τον αριθμό πλαισίου.
+                </p>
+                <input
+                  type="text"
+                  aria-label="Αριθμός κινητήρα"
+                  value={engineNumber}
+                  onChange={(e) => {
+                    const val = e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g, '')
+                    setEngineNumber(val)
+                  }}
+                  placeholder="π.χ. ABC123456"
+                  className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
+                />
+              </>
             ) : (
               <>
                 <div className="bg-tertiary/10 border border-tertiary/20 rounded-xl p-3 flex items-start gap-2">
@@ -580,7 +587,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <label className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
-                Αριθμός Πλαισίου
+                Αριθμός Πλαισίου <span className="text-error">*</span>
               </label>
               <div className="relative">
                 <Icon

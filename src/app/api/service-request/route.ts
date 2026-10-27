@@ -15,7 +15,7 @@ import { broadcastNewRequest } from '@/utils/requestBroadcast'
 import { getCategoryText } from '@/utils/categoryLabels'
 import { estimateFor } from '@/app/api/price-estimation/estimate'
 import { isValidEngineCC, normalizeEngineCC } from '@/app/api/vehicles/engineCC'
-import { GUEST_PLACEHOLDER_NAME } from '@/app/api/auth/_lib/guestMerge'
+import { GUEST_PLACEHOLDER_NAME } from '@/types/clients'
 import { randomUUID } from 'crypto'
 
 // Same budget as /api/auth/register: this route registers guests inline, so

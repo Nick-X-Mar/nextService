@@ -3,6 +3,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand } from '@aws-sdk/lib-dynamodb'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { MAX_CHAT_MESSAGE_LENGTH } from '@/types/chat'
 import {
   createChatMessage,
   resolveThread,
@@ -31,7 +32,7 @@ const MAX_FILES_PER_MESSAGE = 5
  * two, and would mean accepting S3 keys from the client on the send call —
  * which is a way to attach somebody else's file to your own message.
  *
- * Scope: the message is written into `request-{requestId}-garage-{garageId}`,
+ * Scope: the message is written into the thread `chatChannel(requestId, garageId)`,
  * the same per-garage thread the text messages use. A client's photo therefore
  * reaches only the garage they are talking to; the read path filters on the
  * same `garageId`, so no other garage on the request can query it back.
@@ -60,6 +61,10 @@ async function _POST(
     const files = formData.getAll('files') as File[]
     const caption = (formData.get('message') as string | null) ?? ''
     const requestedGarageId = (formData.get('garageId') as string | null) ?? null
+
+    if (caption.length > MAX_CHAT_MESSAGE_LENGTH) {
+      return NextResponse.json({ error: `Το μήνυμα έχει όριο ${MAX_CHAT_MESSAGE_LENGTH} χαρακτήρες` }, { status: 400 })
+    }
 
     if (!files || files.length === 0) {
       return NextResponse.json({ error: 'Δεν στάλθηκε κανένα αρχείο' }, { status: 400 })

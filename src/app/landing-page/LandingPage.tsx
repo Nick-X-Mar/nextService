@@ -1,4 +1,3 @@
-import { Suspense } from 'react'
 import HeroSection from './components/HeroSection'
 import OffersSection from './components/OffersSection'
 import FAQSection from './components/FAQSection'
@@ -21,11 +20,9 @@ export default function LandingPage() {
         {/* Dark overlay across entire background */}
         <div className="absolute inset-0 bg-black/30" />
       </div>
-      {/* HeroSection reads useSearchParams, so it carries its own boundary —
-          AppShell no longer wraps page content in one. */}
-      <Suspense fallback={<div className="min-h-screen" />}>
-        <HeroSection />
-      </Suspense>
+      {/* Server-rendered: its useSearchParams sits behind a boundary of its
+          own inside HeroSection, so the h1 and the categories are in the HTML. */}
+      <HeroSection />
       <OffersSection />
       <FAQSection />
     </div>

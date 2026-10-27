@@ -23,6 +23,8 @@ import {
   type TestGarage,
 } from './E-helpers'
 import { isAppSyncMockReachable, realtimeTokenFor, subscribeToChannels } from './appsync-helpers'
+import { chatChannel } from '../src/lib/realtime-channels'
+import { MAX_CHAT_MESSAGE_LENGTH } from '../src/types/chat'
 
 const CLIENT_EMAIL = `e2e-chat-${Date.now()}@test.com`
 const CLIENT_PASSWORD = 'TestPass123'
@@ -75,6 +77,18 @@ test.describe.serial('Chat flows', () => {
       expect(data.success).toBeDefined()
     } else {
       expect(resp.status()).toBeGreaterThanOrEqual(400)
+    }
+  })
+
+  test('An over-long message is a 400, not a 500, and is not stored', async ({ request }) => {
+    // A body past DynamoDB's 400 KB item limit used to come back as a bare 500.
+    for (const length of [MAX_CHAT_MESSAGE_LENGTH + 1, 500_000]) {
+      const resp = await request.post(`/api/chat/${serviceRequestId}/messages/`, {
+        headers: { Cookie: `auth-token=${garageToken}` },
+        data: { message: 'α'.repeat(length) },
+      })
+      expect(resp.status(), `length ${length}`).toBe(400)
+      expect((await resp.json()).error).toContain(String(MAX_CHAT_MESSAGE_LENGTH))
     }
   })
 
@@ -549,7 +563,7 @@ test.describe.serial('The client is named to each garage by the winner-only rule
   test('The realtime copy of a message names the client the same way', async ({ request }) => {
     test.skip(!(await isAppSyncMockReachable()), 'AppSync mock is not running')
     const other = await newRequest(request, client, { brand: 'Nissan', model: 'Note' })
-    const channel = `request-${other}-garage-${loser.id}`
+    const channel = chatChannel(other, loser.id)
     const sub = await subscribeToChannels([channel], { token: await realtimeTokenFor(loser.token) })
     try {
       expect((await postMessage(request, client.token, other, 'Ζωντανά', loser.id)).status()).toBe(200)

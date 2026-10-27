@@ -4,6 +4,10 @@ import { useState, useEffect } from 'react'
 import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
 import { styles } from '../../../../styles/styles'
+import { GUEST_PLACEHOLDER_NAME } from '@/types/clients'
+
+/** The placeholder is not a name: the field starts empty so it isn't saved back as one. */
+const editableFirstName = (name?: string) => (name && name !== GUEST_PLACEHOLDER_NAME ? name : '')
 
 interface Client {
   id: string
@@ -26,7 +30,7 @@ export default function UserInfoSection({ client, onUpdate }: UserInfoSectionPro
   const [isEditing, setIsEditing] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
-    firstName: client.firstName || '',
+    firstName: editableFirstName(client.firstName),
     lastName: client.lastName || '',
     email: client.email || '',
     phoneNumber: client.phoneNumber || '',
@@ -36,7 +40,7 @@ export default function UserInfoSection({ client, onUpdate }: UserInfoSectionPro
   // Update form data when client data changes
   useEffect(() => {
     setFormData({
-      firstName: client.firstName || '',
+      firstName: editableFirstName(client.firstName),
       lastName: client.lastName || '',
       email: client.email || '',
       phoneNumber: client.phoneNumber || '',
@@ -65,7 +69,7 @@ export default function UserInfoSection({ client, onUpdate }: UserInfoSectionPro
 
   const handleCancel = () => {
     setFormData({
-      firstName: client.firstName || '',
+      firstName: editableFirstName(client.firstName),
       lastName: client.lastName || '',
       email: client.email || '',
       phoneNumber: client.phoneNumber || '',

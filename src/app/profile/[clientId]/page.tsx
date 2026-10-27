@@ -12,7 +12,7 @@ export default async function Page({ params }: PageProps) {
 }
 
 export const metadata = {
-  title: 'Προφίλ - NextService',
+  title: 'Προφίλ',
   description: 'Δείτε και επεξεργαστείτε τα στοιχεία του προφίλ σας',
 }
 

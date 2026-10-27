@@ -168,7 +168,8 @@ function renderEmail(companyName, request) {
   const link = `${APP_URL}/login/?next=${encodeURIComponent(
     `/garage-dashboard/${request.acceptedGarageId}/?tab=appointments`
   )}`
-  const when = request.appointmentDate
+  // `2026-10-28` → `28/10/2026`, as the app's own mails print it.
+  const when = String(request.appointmentDate || '').replace(/^(\d{4})-(\d{2})-(\d{2})/, (_, y, m, d) => `${d}/${m}/${y}`)
   const subject = 'Έγινε η επισκευή; Δήλωσέ το στο NextService'
 
   const html = `<!doctype html><html lang="el"><body style="margin:0;padding:0;background:#fbf9f8;font-family:Inter,Arial,sans-serif;color:#1b1c1c">

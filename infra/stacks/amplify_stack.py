@@ -33,6 +33,7 @@ class AmplifyStack(Stack):
         appsync_http_endpoint: str,
         appsync_realtime_endpoint: str,
         appsync_api_key: str,
+        realtime_secret_name: str,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -387,6 +388,14 @@ frontend:
                 ),
                 amplify.CfnApp.EnvironmentVariableProperty(
                     name="ADMIN_SESSION_EXPIRY", value="8h",
+                ),
+                # Realtime tokens — the secret the AppSync authorizer verifies
+                # with, owned by the AppSync stack (deployed first). It must be
+                # declared here: CloudFormation rewrites this whole list, so a
+                # value added to the app by hand is dropped on the next deploy.
+                amplify.CfnApp.EnvironmentVariableProperty(
+                    name="REALTIME_JWT_SECRET",
+                    value=SecretValue.secrets_manager(realtime_secret_name).unsafe_unwrap(),
                 ),
                 # SEO — public-facing origin for canonical URLs, OG tags,
                 # sitemap, robots, JSON-LD. Set per-deploy from app.py.

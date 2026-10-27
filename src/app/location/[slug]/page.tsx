@@ -140,7 +140,7 @@ export default async function LocationPage({ params }: PageProps) {
       <div className="min-h-screen bg-surface pb-16">
         <div className="max-w-4xl mx-auto px-5 md:px-8 pt-8">
           {/* Breadcrumb — visible, matching the schema above */}
-          <nav aria-label="Breadcrumb" className="mb-6">
+          <nav aria-label="Διαδρομή πλοήγησης" className="mb-6">
             <ol className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
               <li>
                 <Link href="/" className="hover:text-primary transition-colors">

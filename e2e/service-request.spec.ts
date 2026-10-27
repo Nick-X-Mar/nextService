@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { registerClient, loginViaAPI } from './helpers'
+import { registerClient, loginViaAPI, setAuthCookie, TEST_GARAGE } from './helpers'
 import {
   clientsWithEmail,
   freshClient,
@@ -447,6 +447,32 @@ test.describe('Request funnel in the browser', () => {
     expect(stored[0].description).toBe(marker)
     expect(stored[0].estimatedCost).toBe(estimate.estimation.estimatedCost)
     expect(uploadedFiles).toBe(1)
+  })
+
+  test('A signed-in garage is told the request makes it a client account', async ({ page, request }) => {
+    // Submitting registers a client and its cookie replaces the garage's — it
+    // used to happen with no word of warning.
+    const { token } = await loginViaAPI(request, TEST_GARAGE.email, TEST_GARAGE.password, 'garage')
+    await setAuthCookie(page, token)
+    await seedDraft(page, { ...mechanicalRequest(), owner: 'guest' }, '/car-specifications/')
+    await expect(page.getByText('Με την αποστολή θα δημιουργηθεί λογαριασμός πελάτη')).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('#guest-email')).toBeVisible()
+  })
+
+  test('Without the άδεια, the form says both numbers are needed', async ({ page }) => {
+    await seedDraft(page, { ...mechanicalRequest(), owner: 'guest' }, '/car-specifications/')
+    await page.getByRole('button', { name: 'Αριθμός Κινητήρα' }).click()
+    await expect(page.getByText('Συμπληρώστε τον αριθμό κινητήρα')).toBeVisible()
+    await page.getByRole('textbox', { name: 'Αριθμός κινητήρα' }).fill('KFV12345')
+    // Engine number alone is not enough — the button stays off until the VIN is in.
+    await page.locator('#guest-email').fill(`e2e-vin-${Date.now()}@test.com`)
+    await page.locator('#guest-password').fill('GoodPass123')
+    await page.locator('#guest-password-confirm').fill('GoodPass123')
+    await page.getByRole('checkbox').check()
+    const submit = page.getByRole('button', { name: 'ΑΠΟΣΤΟΛΗ ΑΙΤΗΜΑΤΟΣ' })
+    await expect(submit).toBeDisabled()
+    await page.getByRole('textbox', { name: 'Αριθμός πλαισίου' }).fill('VF3VINHINT0000001')
+    await expect(submit).toBeEnabled()
   })
 
   test('A taken email that slipped past the live check offers the login', async ({ page, playwright }) => {

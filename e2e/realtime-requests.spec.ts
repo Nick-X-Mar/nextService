@@ -10,6 +10,7 @@ import {
   trySubscribe,
 } from './appsync-helpers'
 import { loginAdmin, newClient, newGarage, newRequest } from './E-helpers'
+import { chatChannel } from '../src/lib/realtime-channels'
 import { adminPost, adminSession } from './a-helpers'
 
 // The realtime fan-out hangs off the local AppSync mock (port 3002). Without
@@ -93,8 +94,8 @@ test.describe.serial('Realtime new-request broadcasts', () => {
     // shouldn't see new-request events leak into its callback. The AppSync
     // mock filters by roomId on the server side, so this is a regression
     // guard against the multi-subscriber refactor.
-    const chatChannel = `request-isolation-test-garage-${TEST_GARAGE.id}`
-    const sub = await subscribeToChannels([chatChannel])
+    const isolationChannel = chatChannel('sr-isolation-test', TEST_GARAGE.id)
+    const sub = await subscribeToChannels([isolationChannel])
     try {
       const resp = await request.post('/api/service-request', {
         headers: { Cookie: `auth-token=${clientToken}` },
@@ -266,7 +267,7 @@ test.describe.serial('Realtime authorization', () => {
   test('A garage token cannot publish — not on the broadcast channels, not on its own thread', async ({ request }) => {
     const garage = await newGarage(request, { prefix: 'rt-forge' })
     const token = await realtimeTokenFor(garage.token)
-    const thread = `request-sr-e2e-forge-${Date.now()}-garage-${garage.id}`
+    const thread = chatChannel(`sr-e2e-forge-${Date.now()}`, garage.id)
     const listener = await subscribeToChannels(['request-updates', 'new-requests', thread], { token })
     try {
       // Listening on all three, so "nothing arrived" below means something.
@@ -290,7 +291,7 @@ test.describe.serial('Realtime authorization', () => {
     const client = await newClient(request, 'rt-forge-client')
     const requestId = await newRequest(request, client)
     const token = await realtimeTokenFor(client.token)
-    const thread = `request-${requestId}-garage-${TEST_GARAGE.id}`
+    const thread = chatChannel(requestId, TEST_GARAGE.id)
     expect(await trySubscribe(thread, token)).toBe('subscribed')
     expect(await tryPublish(thread, { id: 'forged', message: 'forged', senderType: 'garage' }, token)).toBe('refused')
   })
@@ -301,7 +302,7 @@ test.describe.serial('Realtime authorization', () => {
     expect(await trySubscribe(null, token)).toBe('denied')
     expect(await tryPublish(null, { __type: 'request-update' }, token)).toBe('refused')
     // Wildcards are judged on their literal text, so they are not accepted at all.
-    expect(await trySubscribe(`request-*-garage-${garage.id}`, token)).toBe('denied')
+    expect(await trySubscribe(chatChannel('*', garage.id), token)).toBe('denied')
   })
 
   test('An inactive garage gets no realtime token, and an earlier token stops subscribing', async ({ request }) => {
@@ -313,7 +314,7 @@ test.describe.serial('Realtime authorization', () => {
     // Approved, takes a token, then is deactivated while the token still lives.
     const garage = await newGarage(request, { prefix: 'rt-deactivated' })
     const token = await realtimeTokenFor(garage.token)
-    const thread = `request-sr-e2e-deactivated-${Date.now()}-garage-${garage.id}`
+    const thread = chatChannel(`sr-e2e-deactivated-${Date.now()}`, garage.id)
     expect(await trySubscribe(thread, token)).toBe('subscribed')
 
     const admin = await adminSession()
@@ -334,7 +335,7 @@ test.describe.serial('Realtime authorization', () => {
     const garage = await newGarage(request, { prefix: 'rt-system' })
     const client = await newClient(request, 'rt-system')
     const requestId = await newRequest(request, client)
-    const thread = `request-${requestId}-garage-${garage.id}`
+    const thread = chatChannel(requestId, garage.id)
     const listener = await subscribeToChannels([thread], { token: await realtimeTokenFor(garage.token) })
     try {
       const body = `system publish probe ${Date.now()}`

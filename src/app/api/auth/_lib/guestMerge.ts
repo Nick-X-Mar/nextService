@@ -20,8 +20,8 @@ import { REVIEWS_TABLE_NAME } from '@/utils/ensureReviewsTable'
 const CLIENTS = 'Clients'
 const WALLET_TRANSACTIONS = process.env.WALLET_TRANSACTIONS_TABLE || 'WalletTransactions'
 
-/** The first name the old funnel gave every guest it created. */
-export const GUEST_PLACEHOLDER_NAME = 'Επισκέπτης'
+/** The first name the old funnel gave every guest it created (shared with the UI). */
+export { GUEST_PLACEHOLDER_NAME } from '@/types/clients'
 
 /** Still a guest: not registered, not merged. Every write in this flow is conditioned on it. */
 export const GUEST_CONDITION =

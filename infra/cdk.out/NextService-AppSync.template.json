@@ -1,5 +1,21 @@
 {
  "Resources": {
+  "RealtimeJwtSecretE8152CE0": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "Description": "Signs the browser's AppSync Events tokens; read by the authorizer and the Amplify app",
+    "GenerateSecretString": {
+     "ExcludePunctuation": true,
+     "PasswordLength": 64
+    },
+    "Name": "nextservice/realtime-jwt-secret"
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/RealtimeJwtSecret/Resource"
+   }
+  },
   "EventsAuthorizerFnServiceRole37EFF19E": {
    "Type": "AWS::IAM::Role",
    "Properties": {
@@ -42,7 +58,10 @@
       {
        "Action": "dynamodb:GetItem",
        "Effect": "Allow",
-       "Resource": "arn:aws:dynamodb:eu-central-1:766671488262:table/ServiceRequests"
+       "Resource": [
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/ServiceRequests",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/Garages"
+       ]
       }
      ],
      "Version": "2012-10-17"
@@ -63,13 +82,25 @@
    "Properties": {
     "Code": {
      "S3Bucket": "cdk-hnb659fds-assets-766671488262-eu-central-1",
-     "S3Key": "a6dd8359712281cf57d0166ae805d89e99f55be69d35be3e44d6573c75719e20.zip"
+     "S3Key": "df408d689efd7f5b53eee83867eae3a65c2fc2570b06e094afe508715d3cb46d.zip"
     },
     "Description": "Authorizes AppSync Events connect/subscribe/publish per channel",
     "Environment": {
      "Variables": {
       "SERVICE_REQUESTS_TABLE": "ServiceRequests",
-      "REALTIME_JWT_SECRET": "unused-for-dynamodb-stack"
+      "GARAGES_TABLE": "Garages",
+      "REALTIME_JWT_SECRET": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:secretsmanager:",
+         {
+          "Ref": "RealtimeJwtSecretE8152CE0"
+         },
+         ":SecretString:::}}"
+        ]
+       ]
+      }
      }
     },
     "FunctionName": "nextservice-appsync-authorizer",
@@ -90,7 +121,7 @@
    ],
    "Metadata": {
     "aws:cdk:path": "NextService-AppSync/EventsAuthorizerFn/Resource",
-    "aws:asset:path": "asset.a6dd8359712281cf57d0166ae805d89e99f55be69d35be3e44d6573c75719e20",
+    "aws:asset:path": "asset.df408d689efd7f5b53eee83867eae3a65c2fc2570b06e094afe508715d3cb46d",
     "aws:asset:is-bundled": false,
     "aws:asset:property": "Code"
    }
@@ -133,7 +164,7 @@
       {
        "AuthType": "AWS_LAMBDA",
        "LambdaAuthorizerConfig": {
-        "AuthorizerResultTtlInSeconds": 300,
+        "AuthorizerResultTtlInSeconds": 0,
         "AuthorizerUri": {
          "Fn::GetAtt": [
           "EventsAuthorizerFnE9651D1C",
@@ -141,33 +172,21 @@
          ]
         }
        }
-      },
-      {
-       "AuthType": "API_KEY"
       }
      ],
      "ConnectionAuthModes": [
       {
        "AuthType": "AWS_LAMBDA"
-      },
-      {
-       "AuthType": "API_KEY"
       }
      ],
      "DefaultPublishAuthModes": [
       {
        "AuthType": "AWS_LAMBDA"
-      },
-      {
-       "AuthType": "API_KEY"
       }
      ],
      "DefaultSubscribeAuthModes": [
       {
        "AuthType": "AWS_LAMBDA"
-      },
-      {
-       "AuthType": "API_KEY"
       }
      ]
     },
@@ -390,7 +409,7 @@
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/02NQWrDMBBFz5K9Mm3jQrt1DN0UWuMcIEzkSaxYGhmPVGOE7l6sdNHVe8wf/j/A4fUdnne4yF73496aC6RTQD0qXOScLLpLj5A+IutgPKvmyv+9pdkZEeM5K4MOUuctbUFh663Ra/krlpVUZxShIFBvUFLBMeqRwhGFFE6TrKwhNVeuJ6Me+KRS0QzITPYLHcmEmrKiH+IgkLr4txktZaWtj/2CQQ+QaouzKzWb5KzK6ingzfBtu3/HMMWQVbuGwfNTBS8VvO3uYsx+jhyMI+ge/AWWzgmKKgEAAA=="
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/02NwU7DMAyGn2X31MCKBNdtEhckqNoHmLzM67ImblU7TFOUd0dNOXD6Pvu3/G9h+/oOzxu8S2XPQ+XdCVKnaAeDdzkmITuTSkDGnmZIXZnN4cKrZeMxnM4I6SOyVTfykv33hubgRNzI2TgMkNrR0xIUNqN39lHuimUj9RFFSAV2C4zUsI92IN2jkMFpkgdbSIcL7yZnVnxSeXG4IjP5LwwkE1rKhn6IVSC18a8zesrG+jGe76j2CmnncQ7lzSI5m9LaKfaO+2X/HXWKmk3z0OvITzW81PC2uYlz1RxZXSBoV/4C83uVsEwBAAA="
    },
    "Metadata": {
     "aws:cdk:path": "NextService-AppSync/CDKMetadata/Default"
@@ -411,17 +430,9 @@
   },
   "AppSyncHttpEndpoint": {
    "Value": {
-    "Fn::Join": [
-     "",
-     [
-      {
-       "Fn::GetAtt": [
-        "ChatEventsApi",
-        "ApiId"
-       ]
-      },
-      ".appsync-api.eu-central-1.amazonaws.com"
-     ]
+    "Fn::GetAtt": [
+     "ChatEventsApi",
+     "Dns.Http"
     ]
    },
    "Export": {
@@ -430,17 +441,9 @@
   },
   "AppSyncRealtimeEndpoint": {
    "Value": {
-    "Fn::Join": [
-     "",
-     [
-      {
-       "Fn::GetAtt": [
-        "ChatEventsApi",
-        "ApiId"
-       ]
-      },
-      ".appsync-realtime-api.eu-central-1.amazonaws.com"
-     ]
+    "Fn::GetAtt": [
+     "ChatEventsApi",
+     "Dns.Realtime"
     ]
    },
    "Export": {
@@ -458,15 +461,26 @@
     "Name": "NextService-AppSyncApiKey"
    }
   },
-  "ExportsOutputFnGetAttChatEventsApiApiId96C43684": {
+  "ExportsOutputFnGetAttChatEventsApiDnsHttpDEB2CED0": {
    "Value": {
     "Fn::GetAtt": [
      "ChatEventsApi",
-     "ApiId"
+     "Dns.Http"
     ]
    },
    "Export": {
-    "Name": "NextService-AppSync:ExportsOutputFnGetAttChatEventsApiApiId96C43684"
+    "Name": "NextService-AppSync:ExportsOutputFnGetAttChatEventsApiDnsHttpDEB2CED0"
+   }
+  },
+  "ExportsOutputFnGetAttChatEventsApiDnsRealtimeE7B76BC0": {
+   "Value": {
+    "Fn::GetAtt": [
+     "ChatEventsApi",
+     "Dns.Realtime"
+    ]
+   },
+   "Export": {
+    "Name": "NextService-AppSync:ExportsOutputFnGetAttChatEventsApiDnsRealtimeE7B76BC0"
    }
   },
   "ExportsOutputFnGetAttChatApiKeyApiKeyCBB19482": {

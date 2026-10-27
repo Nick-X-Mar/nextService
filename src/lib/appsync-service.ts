@@ -237,7 +237,7 @@ class AppSyncService {
           .replace(/=+$/, '')
 
         // The CDK stack exports the realtime endpoint as a bare host
-        // (`<id>.appsync-realtime-api.<region>.amazonaws.com`). Without a scheme
+        // (`<dns-prefix>.appsync-realtime-api.<region>.amazonaws.com`). Without a scheme
         // the browser resolves it as a path on this site and the socket 404s, so
         // real-time never connected in AWS while the mock (`ws://…`) always did.
         const base = /^wss?:\/\//.test(endpoint) ? endpoint : `wss://${endpoint}`

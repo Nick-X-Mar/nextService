@@ -208,6 +208,22 @@ const CSP = [
 
 const nextConfig: NextConfig = {
   trailingSlash: true,
+  // No `x-powered-by: Next.js` on every response.
+  poweredByHeader: false,
+  // The Open Graph image routes read their fonts, the logo and the offer
+  // artwork off disk (on purpose — see app/opengraph-image.tsx). On Amplify the
+  // SSR bundle carries no `public/`, which only the CDN serves, so a card
+  // rendered at request time — every /offer/<slug>/ one — hit ENOENT, returned
+  // 500, and offer links were shared with no preview. Tracing the files in
+  // ships them with the server code. The site-wide card is prerendered at
+  // build time, which is why it never broke.
+  outputFileTracingIncludes: {
+    '**/opengraph-image*': [
+      './public/fonts/**',
+      './public/images/next_logo.svg',
+      './public/images/offers/**',
+    ],
+  },
   devIndicators: {
     appIsrStatus: false,
     buildActivity: false,

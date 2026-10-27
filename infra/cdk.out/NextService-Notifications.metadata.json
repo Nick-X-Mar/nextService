@@ -89,6 +89,30 @@
       "data": "BroadcastDLQAlarm7F657A13"
     }
   ],
+  "/NextService-Notifications/CompletionSweeperFn/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CompletionSweeperFn2717FB77"
+    }
+  ],
+  "/NextService-Notifications/CompletionSweeperSchedule/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CompletionSweeperScheduleEE9296AC"
+    }
+  ],
+  "/NextService-Notifications/CompletionSweeperSchedule/AllowEventRuleNextServiceNotificationsCompletionSweeperFn2159EC6E": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CompletionSweeperScheduleAllowEventRuleNextServiceNotificationsCompletionSweeperFn2159EC6E3D8205AD"
+    }
+  ],
+  "/NextService-Notifications/CompletionSweeperErrorsAlarm/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CompletionSweeperErrorsAlarmAA435F6F"
+    }
+  ],
   "/NextService-Notifications/BroadcastErrorsAlarm/Resource": [
     {
       "type": "aws:cdk:logicalId",
@@ -143,6 +167,12 @@
       "data": "NewRequestBroadcastFnServiceRoleAC0DE572"
     }
   ],
+  "/NextService-Notifications/CompletionSweeperFn/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CompletionSweeperFnServiceRoleF9B56C68"
+    }
+  ],
   "/NextService-Notifications/SesEventProcessorFn/ServiceRole/DefaultPolicy/Resource": [
     {
       "type": "aws:cdk:logicalId",
@@ -153,6 +183,12 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "NewRequestBroadcastFnServiceRoleDefaultPolicy68916853"
+    }
+  ],
+  "/NextService-Notifications/CompletionSweeperFn/ServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CompletionSweeperFnServiceRoleDefaultPolicy0765FC81"
     }
   ]
 }

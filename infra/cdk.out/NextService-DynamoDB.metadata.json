@@ -194,5 +194,11 @@
       "type": "aws:cdk:logicalId",
       "data": "ExportsOutputFnGetAttServiceRequestsTable5933C500StreamArn6C932827"
     }
+  ],
+  "/NextService-DynamoDB/Exports/Output{\"Fn::GetAtt\":[\"ServiceRequestsTable5933C500\",\"Arn\"]}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputFnGetAttServiceRequestsTable5933C500ArnB899F6D6"
+    }
   ]
 }

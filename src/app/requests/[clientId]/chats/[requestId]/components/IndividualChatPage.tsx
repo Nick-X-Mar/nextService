@@ -13,6 +13,8 @@ import { RequestDetailsPanel, LoadMoreButton, Spinner, ChatAttachments, Attachme
 import { useChatAttachments, MAX_CHAT_ATTACHMENTS } from '@/hooks/useChatAttachments'
 import type { ServiceRequest } from '../../../../../../types/requests'
 import appSyncService from '@/lib/appsync-service'
+import { chatChannel } from '@/lib/realtime-channels'
+import { MAX_CHAT_MESSAGE_LENGTH } from '@/types/chat'
 
 interface ChatMessage {
   id: string
@@ -222,7 +224,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
       appSyncService.unsubscribe(subscriptionRef.current)
     }
 
-    const channelName = `request-${requestId}-garage-${garageId}`
+    const channelName = chatChannel(requestId, garageId)
     console.log(`[Client] Subscribing to AppSync channel: ${channelName}`)
 
     try {
@@ -771,6 +773,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                             }}
                             placeholder={attachments.hasPending ? 'Προσθέστε λεζάντα (προαιρετικά)...' : 'Γράψτε μήνυμα...'}
                             rows={1}
+                            maxLength={MAX_CHAT_MESSAGE_LENGTH}
                             className="w-full bg-surface-container-low border-0 rounded-2xl px-4 py-2.5 text-sm font-medium text-on-surface placeholder:text-outline focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all resize-none max-h-24"
                             disabled={sending}
                           />

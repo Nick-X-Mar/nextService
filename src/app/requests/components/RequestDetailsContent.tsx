@@ -1418,7 +1418,9 @@ export default function RequestDetailsContent({
                   {acceptedGarage?.companyName
                     ? `${acceptedGarage.companyName} σας περιμένει`
                     : 'Το συνεργείο σας περιμένει'}
-                  {request.appointmentDate ? ` στις ${formatAvailabilityDate(request.appointmentDate)}` : ''}
+                  {/* The date opens with its weekday, whose article varies (την
+                      Τετάρτη, το Σάββατο) — "στις Τετάρτη" read wrong. */}
+                  {request.appointmentDate ? `: ${formatAvailabilityDate(request.appointmentDate)}` : ''}
                   {request.appointmentTime
                     ? `, στις ${request.appointmentTime}`
                     : acceptedGarage?.workdayStartTime

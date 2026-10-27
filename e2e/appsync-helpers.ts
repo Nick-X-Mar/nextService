@@ -17,7 +17,7 @@ const APP_URL = 'http://localhost:3000'
  * A realtime token for TEST_GARAGE, minted by the app exactly as a browser
  * gets one. The mock enforces the production authorizer's rules, so a
  * tokenless subscriber is refused — and TEST_GARAGE (active) may join the
- * broadcast channels and its own `request-*-garage-<id>` threads, which is
+ * broadcast channels and its own `request/<requestId>/garage/<id>` threads, which is
  * every channel these suites listen on.
  */
 let garageToken: { value: string; expiresAt: number } | null = null

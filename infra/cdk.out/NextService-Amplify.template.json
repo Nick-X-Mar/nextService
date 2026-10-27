@@ -291,7 +291,8 @@
         "dynamodb:Query",
         "dynamodb:Scan",
         "dynamodb:BatchGetItem",
-        "dynamodb:BatchWriteItem"
+        "dynamodb:BatchWriteItem",
+        "dynamodb:ConditionCheckItem"
        ],
        "Effect": "Allow",
        "Resource": [
@@ -322,7 +323,11 @@
         "arn:aws:dynamodb:eu-central-1:766671488262:table/PerformanceMetrics",
         "arn:aws:dynamodb:eu-central-1:766671488262:table/PerformanceMetrics/index/*",
         "arn:aws:dynamodb:eu-central-1:766671488262:table/ErrorResolutions",
-        "arn:aws:dynamodb:eu-central-1:766671488262:table/ErrorResolutions/index/*"
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/ErrorResolutions/index/*",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/SiteContent",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/SiteContent/index/*",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/Reviews",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/Reviews/index/*"
        ],
        "Sid": "DynamoDBAccess"
       },
@@ -342,7 +347,9 @@
         "arn:aws:dynamodb:eu-central-1:766671488262:table/WalletTransactions",
         "arn:aws:dynamodb:eu-central-1:766671488262:table/HotDeals",
         "arn:aws:dynamodb:eu-central-1:766671488262:table/PerformanceMetrics",
-        "arn:aws:dynamodb:eu-central-1:766671488262:table/ErrorResolutions"
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/ErrorResolutions",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/SiteContent",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/Reviews"
        ],
        "Sid": "DynamoDBCreateTable"
       },
@@ -468,29 +475,13 @@
      {
       "Name": "NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT",
       "Value": {
-       "Fn::Join": [
-        "",
-        [
-         {
-          "Fn::ImportValue": "NextService-AppSync:ExportsOutputFnGetAttChatEventsApiApiId96C43684"
-         },
-         ".appsync-api.eu-central-1.amazonaws.com"
-        ]
-       ]
+       "Fn::ImportValue": "NextService-AppSync:ExportsOutputFnGetAttChatEventsApiDnsHttpDEB2CED0"
       }
      },
      {
       "Name": "NEXT_PUBLIC_APPSYNC_WEBSOCKET_ENDPOINT",
       "Value": {
-       "Fn::Join": [
-        "",
-        [
-         {
-          "Fn::ImportValue": "NextService-AppSync:ExportsOutputFnGetAttChatEventsApiApiId96C43684"
-         },
-         ".appsync-realtime-api.eu-central-1.amazonaws.com"
-        ]
-       ]
+       "Fn::ImportValue": "NextService-AppSync:ExportsOutputFnGetAttChatEventsApiDnsRealtimeE7B76BC0"
       }
      },
      {
@@ -543,6 +534,10 @@
      {
       "Name": "ADMIN_SESSION_EXPIRY",
       "Value": "8h"
+     },
+     {
+      "Name": "REALTIME_JWT_SECRET",
+      "Value": "{{resolve:secretsmanager:nextservice/realtime-jwt-secret:SecretString:::}}"
      },
      {
       "Name": "SITE_URL",

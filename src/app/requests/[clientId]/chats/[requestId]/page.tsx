@@ -19,6 +19,6 @@ export default async function Page({ params }: PageProps) {
 }
 
 export const metadata = {
-  title: 'Συνομιλία - NextService',
+  title: 'Συνομιλία',
   description: 'Συνομιλία με το συνεργείο',
 }

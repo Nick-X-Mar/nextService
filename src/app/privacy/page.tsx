@@ -21,10 +21,32 @@ export const revalidate = 300
 
 export async function generateMetadata(): Promise<Metadata> {
   const page = await getSitePage('privacy')
+  const title = page.meta.title
+  const description = toPlainText(page.meta.description)
   return {
-    title: page.meta.title,
-    description: toPlainText(page.meta.description),
+    title,
+    description,
     alternates: { canonical: URL },
+    // Without its own block the page inherited the homepage's, so a shared
+    // link read as the homepage: its og:url, its title, and the root card's
+    // auto-generated `/opengraph-image?…` URL, which 308s.
+    openGraph: {
+      type: 'website',
+      url: URL,
+      siteName: 'NextService',
+      locale: 'el_GR',
+      title: `${title} | NextService`,
+      description,
+      images: [
+        {
+          url: `${SITE_URL}/opengraph-image/`,
+          width: 1200,
+          height: 630,
+          alt: title,
+          type: 'image/png',
+        },
+      ],
+    },
   }
 }
 

@@ -17,6 +17,8 @@ import { useNavigation } from '@/hooks/useNavigation'
 import { getCategoryText } from '@/utils/categoryLabels'
 import { isGarageInactive } from '../../../components/garageInactive'
 import GaragePendingView from '../../../chats/components/GaragePendingView'
+import { chatChannel } from '@/lib/realtime-channels'
+import { MAX_CHAT_MESSAGE_LENGTH } from '@/types/chat'
 
 interface Message {
   id: string
@@ -81,8 +83,8 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
       appSyncService.unsubscribe(subscriptionRef.current)
     }
 
-    // Use request ID + garage ID for unique conversation channel
-    const channelName = `request-${requestId}-garage-${garageId}`
+    // One channel per thread: this request × this garage.
+    const channelName = chatChannel(requestId, garageId)
     console.log(`[Garage] Subscribing to AppSync channel: ${channelName}`)
 
     try {
@@ -671,6 +673,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
                 placeholder={attachments.hasPending ? 'Προσθέστε λεζάντα (προαιρετικά)...' : 'Γράψτε μήνυμα...'}
                 className="flex-1 bg-surface-container-highest border-0 rounded-xl px-4 py-3 text-sm font-medium text-on-surface focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all resize-none max-h-[120px]"
                 rows={1}
+                maxLength={MAX_CHAT_MESSAGE_LENGTH}
                 disabled={isSending}
               />
               <button

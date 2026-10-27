@@ -93,7 +93,7 @@ Key routes:
 - `/register-professional`, `/profile/[clientId]`, `/offer`, `/privacy`, `/terms`
 - `/admin/**` — dashboard, users, garages, requests, payments, commissions, emails, errors, funnel, performance, hot-deals, custom-vehicles, **content** (edit the public pages' copy), **reviews** (moderation), settings, tests
 
-SEO: `sitemap.ts`, `robots.ts`, `opengraph-image.tsx`, canonical URLs from `src/lib/site-url.ts` (`SITE_URL`). `trailingSlash: true` is enabled — URLs without a trailing slash 308-redirect.
+SEO: `sitemap.ts`, `robots.ts`, `opengraph-image.tsx` (the OG routes read fonts/logo/artwork from `public/` on disk; Amplify's SSR bundle has no `public/`, so those files are listed in `outputFileTracingIncludes` in `next.config.ts` — add any new file an OG route reads there), canonical URLs from `src/lib/site-url.ts` (`SITE_URL`). `trailingSlash: true` is enabled — URLs without a trailing slash 308-redirect.
 
 ### Shared Code
 
@@ -143,9 +143,11 @@ SEO: `sitemap.ts`, `robots.ts`, `opengraph-image.tsx`, canonical URLs from `src/
 
 Dual approach: REST routes persist to DynamoDB, AppSync Events pushes real-time. Used for chat *and* for fanning new requests out to garage dashboards (`requestBroadcast.ts`, `useRealtimeRequests`). `local-appsync-server.js` simulates AppSync in dev.
 
-Chat channels are `request-{requestId}-garage-{garageId}`. In AWS, `infra/lambdas/appsync-authorizer` checks every subscribe/publish against the token from `/api/realtime/token`. A garage gets only channels with its own id; a client gets only channels for requests it owns. A new channel name has to fit that convention, or the authorizer rejects it.
+Chat channels are `request/{requestId}/garage/{garageId}` — always built with `chatChannel()` (`src/lib/realtime-channels.ts`). AppSync Events allows at most 4 segments after the namespace and 50 characters (letters, digits, dashes) per segment and refuses anything else with "Invalid Channel Format" before the authorizer runs; the old single-segment name was ~100 characters and never once subscribed in AWS. The mock enforces the same limits. In AWS, `infra/lambdas/appsync-authorizer` checks every subscribe/publish against the token from `/api/realtime/token`. A garage gets only channels with its own id; a client gets only channels for requests it owns. A new channel name has to fit that convention, or the authorizer rejects it.
 - **Token-only.** `ALLOW_API_KEY = False` in `infra/stacks/appsync_stack.py`; the browser never sends the API key and doesn't connect without a token. The authorizer decides per operation: CONNECT with any valid token, SUBSCRIBE by the channel rules (garages must be active), **PUBLISH only for the server's `system` token** — browsers never publish. `/api/realtime/token` refuses inactive garages; `AuthContext` calls `appSyncService.resetIdentity()` when the signed-in user changes.
 - The CDK realtime endpoint is a bare host; `appsync-service.ts` adds `wss://` when no scheme is present (without it the socket never connected in AWS). Authorizer results are **not cached** (`authorizer_result_ttl_in_seconds=0`, `ttlOverride: 0`) because AppSync keys the cache on the token alone — a cached CONNECT "allow" would skip every per-channel check.
+- In AWS the key lives in Secrets Manager (`nextservice/realtime-jwt-secret`, created by the AppSync stack) and reaches both the authorizer and the Amplify app as a `{{resolve:secretsmanager:…}}` reference — nothing to export before `cdk synth`, and nothing in `cdk.out`. Never hand-add an env var to the Amplify app: CloudFormation rewrites the whole list on the next Amplify deploy and drops it.
+- The CDK endpoints are the Events API's `Dns.Http` / `Dns.Realtime` attributes; the host prefix is not the API id.
 - `local-appsync-server.js` enforces the same tokens and channel rules locally, so `REALTIME_JWT_SECRET` must be set in `.env.local` or real-time refuses everything in dev.
 
 ### Notifications (out-of-band)
@@ -187,7 +189,7 @@ IAM: the Amplify SSR role's DynamoDB permissions in `infra/stacks/amplify_stack.
 - `ACCESS_KEY_ID` / `SECRET_ACCESS_KEY` — optional explicit AWS creds (IAM role in prod; `.aws/` profile as dev fallback)
 - `NEXT_PUBLIC_APPSYNC_*` — endpoint, WS endpoint, API key, region
 - `JWT_SECRET`, `SESSION_EXPIRY`, `ADMIN_JWT_SECRET`, `ADMIN_SESSION_EXPIRY`, `ADMIN_EMAIL`
-- `REALTIME_JWT_SECRET` — signs the short-lived tokens the browser presents to AppSync (`/api/realtime/token`). **Required locally too**: without it that route 500s, `getRealtimeToken()` returns null, and real-time falls back to an API key the production authorizer rejects. Any random string works for local dev; in AWS it must match the value on the `nextservice-appsync-authorizer` Lambda.
+- `REALTIME_JWT_SECRET` — signs the short-lived tokens the browser presents to AppSync (`/api/realtime/token`). **Required locally too**: without it that route 500s, `getRealtimeToken()` returns null, and real-time falls back to an API key the production authorizer rejects. Any random string works for local dev; in AWS it comes from Secrets Manager (see Real-time).
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_PAYMENTS_ENABLED`, `NEXT_PUBLIC_PAYMENTS_REFUNDS_ENABLED`, `DEPOSIT_PERCENT`, `CANCELLATION_DEADLINE_DAYS`
 - `SES_FROM_ADDRESS`, `SES_REGION`, `SES_CONFIG_SET`, `NOTIFICATIONS_ENABLED`
 - `SITE_URL`, `NEXT_PUBLIC_APP_URL`

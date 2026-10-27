@@ -18,7 +18,7 @@
  *                publishes anything. A user token that could would let any
  *                approved garage forge `request-updates` and drop requests off
  *                competitors' dashboards, or forge messages into its threads.
- *   - SUBSCRIBE  `request-{requestId}-garage-{garageId}`: the approved garage
+ *   - SUBSCRIBE  `request/{requestId}/garage/{garageId}`: the approved garage
  *                named in it, or the client that owns the request (looked up in
  *                ServiceRequests). `new-requests` / `request-updates`: approved
  *                garages only.
@@ -28,7 +28,7 @@
  *
  * AppSync documents the request as `requestContext.operation`
  * (EVENT_CONNECT | EVENT_SUBSCRIBE | EVENT_PUBLISH) and `requestContext.channel`
- * (`/default/<name>`, null on CONNECT). The extraction below still tolerates
+ * (`/default/<path>`, null on CONNECT). The extraction below still tolerates
  * near variants, and logs what it saw whenever it cannot place an event, so a
  * shape change shows up in CloudWatch as a refusal with a reason rather than
  * as an open door.
@@ -138,35 +138,32 @@ function extractChannel(event) {
   return ctx.channel || ctx.channelName || event?.channel || null
 }
 
-/** `/default/<name>` → `<name>`, or null for anything this API does not serve. */
+/**
+ * `/default/<path>` → `<path>` (its segments after the namespace, joined by
+ * `/`), or null for anything this API does not serve.
+ */
 function channelName(channel) {
   if (typeof channel !== 'string') return null
   const segments = channel.split('/').filter(Boolean)
-  // The namespace prefix is what AppSync sends. A bare name is accepted too —
-  // it is judged by exactly the same rules — so a shape change cannot quietly
-  // refuse every channel.
-  const name =
-    segments.length === 2 && segments[0] === NAMESPACE ? segments[1]
-      : segments.length === 1 ? segments[0]
-        : null
+  // The namespace prefix is what AppSync sends. A path without it is judged by
+  // exactly the same rules, so a shape change cannot quietly refuse every
+  // channel; anything else that comes out of this matches no rule below.
+  const path = segments[0] === NAMESPACE ? segments.slice(1) : segments
+  if (path.length === 0) return null
   // AppSync accepts `*` in a subscribe. Nothing in the app subscribes that
   // way, and a pattern would be judged on its literal text rather than on
   // every channel it goes on to match.
-  if (!name || name.includes('*')) return null
-  return name
+  if (path.some((s) => s.includes('*'))) return null
+  return path.join('/')
 }
 
 /**
- * `request-{requestId}-garage-{garageId}` → its two ids.
- *
- * The first group is non-greedy on purpose. Garage ids are themselves prefixed
- * `garage-`, so a real channel reads `request-sr-X-garage-garage-Y`. A greedy
- * first group swallows up to the LAST `-garage-`, yielding a garageId with the
- * prefix stripped — which never equals the caller's id, so every garage was
- * denied access to its own channel.
+ * `request/{requestId}/garage/{garageId}` → its two ids. Same shape as
+ * `chatChannel()` in src/lib/realtime-channels.ts: AppSync caps a segment at
+ * 50 characters, so the ids each get their own instead of one long name.
  */
 function parseRequestChannel(name) {
-  const match = name.match(/^request-(.+?)-garage-(.+)$/)
+  const match = name.match(/^request\/([A-Za-z0-9-]+)\/garage\/([A-Za-z0-9-]+)$/)
   if (!match) return null
   return { requestId: match[1], garageId: match[2] }
 }

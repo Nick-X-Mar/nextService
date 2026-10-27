@@ -53,6 +53,12 @@
       "data": "CheckBootstrapVersion"
     }
   ],
+  "/NextService-AppSync/RealtimeJwtSecret/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RealtimeJwtSecretE8152CE0"
+    }
+  ],
   "/NextService-AppSync/EventsAuthorizerFn/Resource": [
     {
       "type": "aws:cdk:logicalId",
@@ -95,10 +101,16 @@
       "data": "CDKMetadata"
     }
   ],
-  "/NextService-AppSync/Exports/Output{\"Fn::GetAtt\":[\"ChatEventsApi\",\"ApiId\"]}": [
+  "/NextService-AppSync/Exports/Output{\"Fn::GetAtt\":[\"ChatEventsApi\",\"Dns.Http\"]}": [
     {
       "type": "aws:cdk:logicalId",
-      "data": "ExportsOutputFnGetAttChatEventsApiApiId96C43684"
+      "data": "ExportsOutputFnGetAttChatEventsApiDnsHttpDEB2CED0"
+    }
+  ],
+  "/NextService-AppSync/Exports/Output{\"Fn::GetAtt\":[\"ChatEventsApi\",\"Dns.Realtime\"]}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputFnGetAttChatEventsApiDnsRealtimeE7B76BC0"
     }
   ],
   "/NextService-AppSync/Exports/Output{\"Fn::GetAtt\":[\"ChatApiKey\",\"ApiKey\"]}": [

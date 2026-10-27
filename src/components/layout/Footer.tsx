@@ -7,7 +7,7 @@ import Icon from '@/components/ui/Icon'
 const socialLinks = [
   { icon: 'mail', label: 'Email', href: 'mailto:info@nextservice.gr' },
   { icon: 'facebook', label: 'Facebook', href: 'https://facebook.com/nextservice.gr', isBrand: true },
-  { icon: 'share', label: 'Share', href: '#share' },
+  { icon: 'share', label: 'Κοινοποίηση', href: '#share' },
 ]
 
 // Trailing slashes are required — `trailingSlash: true` means a slashless href
@@ -104,7 +104,7 @@ export default function Footer() {
         {/* Bottom: Copyright */}
         <div className="border-t border-outline-variant/20 pt-6">
           <p className="text-xs text-on-surface-variant/60 text-center">
-            &copy; {new Date().getFullYear()} NextService. All rights reserved.
+            &copy; {new Date().getFullYear()} NextService. Με επιφύλαξη παντός δικαιώματος.
           </p>
         </div>
       </div>

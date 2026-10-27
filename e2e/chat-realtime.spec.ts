@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { registerClient, loginViaAPI, TEST_GARAGE } from './helpers'
 import { subscribeToChannels, isAppSyncMockReachable, type Subscription } from './appsync-helpers'
+import { chatChannel } from '../src/lib/realtime-channels'
 
 /**
  * Regression cover for the bug that made real-time chat look browser-specific.
@@ -63,7 +64,7 @@ test.describe.serial('Chat realtime publishing', () => {
   })
 
   test('A garage message is published to the thread channel', async ({ request }) => {
-    const channel = `request-${requestId}-garage-${TEST_GARAGE.id}`
+    const channel = chatChannel(requestId, TEST_GARAGE.id)
     sub = await subscribeToChannels([channel])
 
     const body = `Γεια σας — realtime probe ${Date.now()}`

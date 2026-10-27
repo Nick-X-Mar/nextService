@@ -21,6 +21,7 @@ import { presignAttachmentList, type ChatAttachment } from '@/utils/chatAttachme
 import { invalidateUnread } from '@/utils/unreadCache'
 import { garageClientView, quotingFirstName, resolveWinningGarageId } from '@/utils/garageClientView'
 import { randomUUID } from 'crypto'
+import { chatChannel } from '@/lib/realtime-channels'
 
 export type { ChatAttachment }
 
@@ -426,9 +427,8 @@ export async function createChatMessage(args: {
   // The thread's channel is the garage's as much as the client's, so the copy
   // published there carries the name the garage may see. The client's own
   // window renders the POST response and de-dupes the echo on id.
-  const channelName = `request-${requestId}-garage-${garageId}`
   try {
-    await appSyncService.publishEvent(channelName, { ...wireMessage, senderName: names.forGarage })
+    await appSyncService.publishEvent(chatChannel(requestId, garageId), { ...wireMessage, senderName: names.forGarage })
   } catch (error) {
     // Realtime is best-effort — the message is already stored, and the other
     // side will see it on their next fetch.

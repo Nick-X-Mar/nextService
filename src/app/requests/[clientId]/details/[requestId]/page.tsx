@@ -13,6 +13,6 @@ export default async function Page({ params }: PageProps) {
 }
 
 export const metadata = {
-  title: 'Λεπτομέρειες Αιτήματος - NextService',
+  title: 'Λεπτομέρειες Αιτήματος',
   description: 'Δείτε τις λεπτομέρειες του αιτήματός σας',
 }

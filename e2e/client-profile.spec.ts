@@ -296,6 +296,17 @@ test.describe('Profile email edits', () => {
 })
 
 test.describe('Profile in the browser', () => {
+  test('An account still on the «Επισκέπτης» placeholder opens the name field empty', async ({ page, playwright }) => {
+    // Registered without a name, so the row holds the placeholder. Prefilling it
+    // made every such client delete «Επισκέπτης» before typing their name.
+    const { clientId } = await freshClient(playwright, 'placeholder', page)
+    await page.goto(`/profile/${clientId}/`)
+    const section = page.locator('#user-info-section')
+    await section.getByRole('button', { name: 'Επεξεργασία' }).click()
+    await expect(section.getByRole('textbox', { name: 'Όνομα' })).toHaveValue('')
+    await expect(section.getByRole('button', { name: 'Αποθήκευση' })).toBeDisabled()
+  })
+
   test('Vehicle fields keep focus while typing, and the edit persists', async ({ page, playwright }) => {
     const { api, clientId } = await freshClient(playwright, 'focus', page)
     const sr = await (await api.post('/api/service-request/', { data: mechanicalRequest() })).json()

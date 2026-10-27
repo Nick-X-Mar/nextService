@@ -718,6 +718,17 @@
    "Export": {
     "Name": "NextService-DynamoDB:ExportsOutputFnGetAttServiceRequestsTable5933C500StreamArn6C932827"
    }
+  },
+  "ExportsOutputFnGetAttServiceRequestsTable5933C500ArnB899F6D6": {
+   "Value": {
+    "Fn::GetAtt": [
+     "ServiceRequestsTable5933C500",
+     "Arn"
+    ]
+   },
+   "Export": {
+    "Name": "NextService-DynamoDB:ExportsOutputFnGetAttServiceRequestsTable5933C500ArnB899F6D6"
+   }
   }
  },
  "Parameters": {

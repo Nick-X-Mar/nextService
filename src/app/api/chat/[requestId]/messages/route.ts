@@ -4,6 +4,7 @@ import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { decodeCursor, encodeCursor, parseLimit } from '@/utils/pagination'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { MAX_CHAT_MESSAGE_LENGTH } from '@/types/chat'
 import {
   createChatMessage,
   resolveThread,
@@ -249,6 +250,9 @@ async function _POST(
 
     if (!message || typeof message !== 'string' || !message.trim()) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
+    }
+    if (message.length > MAX_CHAT_MESSAGE_LENGTH) {
+      return NextResponse.json({ error: `Το μήνυμα έχει όριο ${MAX_CHAT_MESSAGE_LENGTH} χαρακτήρες` }, { status: 400 })
     }
 
     // Ownership, thread selection and the read-only rule once the request has

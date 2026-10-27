@@ -1,6 +1,6 @@
 import { getByIdOrNull } from '@/utils/getById'
 import { ServiceRequestStatus } from '@/types/statuses'
-import { GUEST_PLACEHOLDER_NAME } from '@/app/api/auth/_lib/guestMerge'
+import { GUEST_PLACEHOLDER_NAME } from '@/types/clients'
 
 /**
  * What a garage may see of a client and their car.

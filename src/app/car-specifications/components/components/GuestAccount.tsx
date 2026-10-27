@@ -125,11 +125,22 @@ export default function GuestAccountFields({ account }: { account: GuestAccount 
     acceptedTerms, setAcceptedTerms, emailExists, isCheckingEmail, showEmailHint, setShowEmailHint,
     showLoginModal, setShowLoginModal,
   } = account
+  // A garage session counts as signed out here: submitting registers a client
+  // and the new client cookie replaces the garage's. Say so before it happens.
+  const { userType } = useAuth()
 
   return (
     <>
       {authSettled && !isLoggedIn && (
         <div className="space-y-5">
+          {userType === 'garage' && (
+            <div className="bg-tertiary/10 border border-tertiary/20 rounded-xl p-3 flex items-start gap-2">
+              <Icon name="info" size="sm" className="text-tertiary mt-0.5 shrink-0" />
+              <p className="text-xs text-on-surface-variant">
+                Είστε συνδεδεμένοι ως <span className="font-bold text-on-surface">συνεργείο</span>. Με την αποστολή θα δημιουργηθεί λογαριασμός πελάτη με αυτό το email και θα αποσυνδεθείτε από το συνεργείο.
+              </p>
+            </div>
+          )}
           {/* Email */}
           <div className="space-y-3">
             <label htmlFor="guest-email" className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">

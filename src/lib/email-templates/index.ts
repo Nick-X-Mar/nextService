@@ -24,6 +24,14 @@ export type TemplateRenderer = (vars: Record<string, string>) => RenderedEmail
 const link = (path: string) => `${SITE_URL}${path.startsWith('/') ? '' : '/'}${path}`
 
 /**
+ * `2026-10-28` (or `2026-10-28, 10:00`) → `28/10/2026` (`28/10/2026, 10:00`).
+ * The routes pass the stored ISO date, which read "στις 2026-10-28" in a Greek
+ * mail. Anything that isn't ISO-dated is left as it came.
+ */
+const greekDate = (value?: string) =>
+  (value || '').replace(/^(\d{4})-(\d{2})-(\d{2})/, (_, y, m, d) => `${d}/${m}/${y}`)
+
+/**
  * Lays a template out and derives its plain-text part. The CTA's URL is
  * appended to the text: a tag-stripped copy keeps the button's label and loses
  * its href, which left text-only mail clients with no link at all.
@@ -110,7 +118,7 @@ const renderers: Record<EmailTemplateName, TemplateRenderer> = {
       subject,
       bodyHtml: `
         <h2 style="margin:0 0 16px 0;font-size:20px;">Συγχαρητήρια!</h2>
-        <p>Ο πελάτης αποδέχτηκε την προσφορά σου${v.offerAmount ? ` ύψους <strong>${v.offerAmount}€</strong>` : ''}${v.appointmentDate ? ` και προγραμμάτισε ραντεβού για <strong>${v.appointmentDate}</strong>` : ''}.</p>
+        <p>Ο πελάτης αποδέχτηκε την προσφορά σου${v.offerAmount ? ` ύψους <strong>${v.offerAmount}€</strong>` : ''}${v.appointmentDate ? ` και προγραμμάτισε ραντεβού για <strong>${greekDate(v.appointmentDate)}</strong>` : ''}.</p>
         <p>Δες τις λεπτομέρειες του ραντεβού στο dashboard σου.</p>
       `,
       ctaLabel: 'Άνοιγμα dashboard',
@@ -124,7 +132,7 @@ const renderers: Record<EmailTemplateName, TemplateRenderer> = {
       subject,
       bodyHtml: `
         <h2 style="margin:0 0 16px 0;font-size:20px;">Το ραντεβού σου επιβεβαιώθηκε</h2>
-        <p>Έχεις προγραμματίσει ραντεβού με το συνεργείο <strong>${v.garageName || ''}</strong> για τις <strong>${v.appointmentDate || ''}</strong>${v.appointmentPrice ? ` με συμφωνημένο κόστος <strong>${v.appointmentPrice}€</strong>` : ''}.</p>
+        <p>Έχεις προγραμματίσει ραντεβού με το συνεργείο <strong>${v.garageName || ''}</strong> για τις <strong>${greekDate(v.appointmentDate)}</strong>${v.appointmentPrice ? ` με συμφωνημένο κόστος <strong>${v.appointmentPrice}€</strong>` : ''}.</p>
         <p>Μπορείς να δεις όλες τις λεπτομέρειες στην εφαρμογή.</p>
       `,
       ctaLabel: 'Δες το ραντεβού',
@@ -166,7 +174,7 @@ const renderers: Record<EmailTemplateName, TemplateRenderer> = {
       subject,
       bodyHtml: `
         <h2 style="margin:0 0 16px 0;font-size:20px;">Η πληρωμή σου ολοκληρώθηκε</h2>
-        <p>Καταβλήθηκε προκαταβολή <strong>${v.depositAmount || ''}€</strong> για το ραντεβού σου με το συνεργείο <strong>${v.garageName || ''}</strong> στις <strong>${v.appointmentDate || ''}</strong>.</p>
+        <p>Καταβλήθηκε προκαταβολή <strong>${v.depositAmount || ''}€</strong> για το ραντεβού σου με το συνεργείο <strong>${v.garageName || ''}</strong> στις <strong>${greekDate(v.appointmentDate)}</strong>.</p>
         <p><strong>Υπόλοιπο στο συνεργείο:</strong> ${v.remainingAmount || ''}€</p>
         <p>Μπορείς να δεις τις λεπτομέρειες στην εφαρμογή.</p>
       `,
@@ -184,7 +192,7 @@ const renderers: Record<EmailTemplateName, TemplateRenderer> = {
       subject,
       bodyHtml: `
         <h2 style="margin:0 0 16px 0;font-size:20px;">Το ραντεβού σου ακυρώθηκε</h2>
-        <p>Το ραντεβού σου με το συνεργείο <strong>${v.garageName || ''}</strong> στις <strong>${v.appointmentDate || ''}</strong> ακυρώθηκε.</p>
+        <p>Το ραντεβού σου με το συνεργείο <strong>${v.garageName || ''}</strong> στις <strong>${greekDate(v.appointmentDate)}</strong> ακυρώθηκε.</p>
         ${refundText}
       `
     })
@@ -196,7 +204,7 @@ const renderers: Record<EmailTemplateName, TemplateRenderer> = {
       subject,
       bodyHtml: `
         <h2 style="margin:0 0 16px 0;font-size:20px;">Ακυρώθηκε ραντεβού</h2>
-        <p>Ο πελάτης <strong>${v.clientName || ''}</strong> ακύρωσε το ραντεβού του στις <strong>${v.appointmentDate || ''}</strong>.</p>
+        <p>Ο πελάτης <strong>${v.clientName || ''}</strong> ακύρωσε το ραντεβού του στις <strong>${greekDate(v.appointmentDate)}</strong>.</p>
         <p>Η ημερομηνία είναι πλέον διαθέσιμη στο πρόγραμμά σου.</p>
       `,
       ctaLabel: 'Άνοιγμα dashboard',

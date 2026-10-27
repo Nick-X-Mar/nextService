@@ -101,23 +101,29 @@ function tokenFromProtocols(protocolHeader) {
   return null;
 }
 
-/** `/default/<name>` or a bare `<name>` → `<name>`; wildcards and other namespaces → null. */
+/**
+ * AppSync's own channel rules: at most 4 segments after the namespace, each 1–50
+ * letters, digits or dashes. AWS refuses anything else ("Invalid Channel
+ * Format") before the authorizer runs, so the mock does too — it used to accept
+ * a ~100-character chat channel that never once subscribed in AWS.
+ */
+const SEGMENT = /^[A-Za-z0-9-]{1,50}$/;
+
+/** `/default/<path>` or a bare `<path>` → `<path>`; wildcards, other namespaces and malformed paths → null. */
 function channelName(channel) {
   if (typeof channel !== 'string') return null;
   const segments = channel.split('/').filter(Boolean);
-  const name =
-    segments.length === 2 && segments[0] === 'default' ? segments[1]
-      : segments.length === 1 ? segments[0]
-        : null;
-  if (!name || name.includes('*')) return null;
-  return name;
+  const path = segments[0] === 'default' ? segments.slice(1) : segments;
+  if (path.length === 0 || path.length > 4 || !path.every((s) => SEGMENT.test(s))) return null;
+  return path.join('/');
 }
 
 async function maySubscribe(claims, name) {
   if (BROADCAST_CHANNELS.has(name)) {
     return claims.userType === 'garage' && (await isActiveGarage(claims.userId));
   }
-  const match = /^request-(.+?)-garage-(.+)$/.exec(name);
+  // Same shape as chatChannel() in src/lib/realtime-channels.ts.
+  const match = /^request\/([A-Za-z0-9-]+)\/garage\/([A-Za-z0-9-]+)$/.exec(name);
   if (!match) return false;
   const [, requestId, garageId] = match;
   // A deactivated garage keeps a valid token for its 15-minute life; its own
