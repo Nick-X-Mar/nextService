@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { registerClient, loginViaAPI } from './helpers'
 import { PASSWORD, acceptOffer, cookie, makeOffer, newClient, newGarage, newRequest, postMessage, setClientName } from './E-helpers'
+import { freshClient, getRow, mechanicalRequest, setChatMessageFields, setLicensePhotoKey, setRequestFields } from './b-helpers'
 
 const CLIENT_EMAIL = `e2e-gdpr-${Date.now()}@test.com`
 const CLIENT_PASSWORD = 'TestPass123'
@@ -90,6 +91,36 @@ test.describe.serial('GDPR: Data Export & Account Deletion', () => {
     const { status, data } = await loginViaAPI(request, CLIENT_EMAIL, CLIENT_PASSWORD, 'client')
     expect(data.success).toBeFalsy()
   })
+})
+
+test('Account deletion removes the S3 objects too: request photos, the άδεια, chat attachments', async ({ playwright, request }) => {
+  // Request photos are stored as keys in `photoUrls`; the cascade used to read
+  // a `photos` field nothing writes, so it never deleted a single object — the
+  // άδεια (name, address) included. Keys are staged on the rows directly, as
+  // elsewhere in the suite, so no real upload is needed: S3 deletes are
+  // idempotent, and what this pins is that every key is found.
+  const { api, password } = await freshClient(playwright, 'gdpr-s3')
+  const sr = await (await api.post('/api/service-request/', { data: mechanicalRequest() })).json()
+  await setRequestFields(sr.serviceRequestId, {
+    photoUrls: [`Requests/${sr.serviceRequestId}/e2e-gdpr-photo.jpg`],
+  })
+  await setLicensePhotoKey(sr.vehicleId, `Requests/${sr.vehicleId}/license/e2e-gdpr.png`)
+
+  const garage = await newGarage(request, { prefix: 'gdpr-s3' })
+  const sent = await postMessage(request, garage.token, sr.serviceRequestId, 'Φωτογραφία')
+  expect(sent.status()).toBe(200)
+  const messageId = (await sent.json()).message.id as string
+  await setChatMessageFields(messageId, {
+    attachments: [{ s3Key: `Requests/${sr.serviceRequestId}/chat/e2e-gdpr.jpg`, contentType: 'image/jpeg' }],
+  })
+
+  const resp = await api.post('/api/account/delete/', { data: { password } })
+  expect(resp.status()).toBe(200)
+  const { summary } = await resp.json()
+  expect(summary).toMatchObject({ serviceRequests: 1, vehicles: 1, chatMessages: 1, s3Photos: 3 })
+  expect(await getRow('ServiceRequests', sr.serviceRequestId)).toBeUndefined()
+  expect(await getRow('Vehicles', sr.vehicleId)).toBeUndefined()
+  expect(await getRow('ChatMessages', messageId)).toBeUndefined()
 })
 
 /** Every JSON path whose string value contains `needle` — names the leak, not just that there is one. */

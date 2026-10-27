@@ -113,6 +113,12 @@ export const setVehicleFields = (vehicleId: string, fields: Record<string, unkno
 export const setClientFields = (clientId: string, fields: Record<string, unknown>) =>
   setFields('Clients', clientId, fields)
 
+export const setRequestFields = (requestId: string, fields: Record<string, unknown>) =>
+  setFields('ServiceRequests', requestId, fields)
+
+export const setChatMessageFields = (messageId: string, fields: Record<string, unknown>) =>
+  setFields('ChatMessages', messageId, fields)
+
 export const uniqueMarker = (label: string) => `e2e-B-${label}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
 
 type PlaywrightLike = { request: { newContext: (o: { baseURL: string }) => Promise<APIRequestContext> } }

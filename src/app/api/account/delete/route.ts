@@ -4,7 +4,11 @@ import {
   GetCommand,
   QueryCommand,
   DeleteCommand,
-  BatchWriteCommand
+  BatchWriteCommand,
+  type BatchWriteCommandInput,
+  type BatchWriteCommandOutput,
+  type QueryCommandInput,
+  type ScanCommandInput,
 } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
 import { verifyPassword } from '@/utils/passwordService'
@@ -35,7 +39,8 @@ interface DeleteSummary {
  * Verifies the password (defense in depth — even if an attacker knows the
  * userId, they can't delete the account without the password) and then
  * cascades a hard delete across every table that references the user,
- * plus all associated S3 photos.
+ * plus every S3 object they put there: request photos, the άδεια of their
+ * cars, chat attachments.
  *
  * This is the GDPR "right to erasure" implementation.
  */
@@ -133,133 +138,160 @@ async function _POST(request: NextRequest) {
   }
 }
 
-async function deleteClientCascade(clientId: string, summary: DeleteSummary): Promise<void> {
-  // 1. Find all service requests by this client (need them for offer + chat cleanup + S3)
-  const reqsRes = await dynamoDB.send(
-    new QueryCommand({
-      TableName: 'ServiceRequests',
-      IndexName: 'ClientRequestsIndex',
-      KeyConditionExpression: 'clientId = :c',
-      ExpressionAttributeValues: { ':c': clientId }
-    })
-  )
-  const requests = reqsRes.Items || []
-  const requestIds = requests.map((r) => r.id as string)
+type Row = Record<string, unknown>
 
-  // 2. Delete S3 photos referenced by requests
-  for (const req of requests) {
-    const photos = (req.photos as Array<{ s3Key?: string; s3Url?: string }>) || []
-    for (const photo of photos) {
-      const key = photo.s3Key || (photo.s3Url ? extractS3KeyFromUrl(photo.s3Url) : null)
-      if (key) {
-        try {
-          await deleteFileFromS3(key)
-          summary.s3Photos++
-        } catch (e) {
-          console.error('[account/delete] failed to delete S3 photo:', key, e)
-        }
-      }
-    }
+/**
+ * Every page of a Query or Scan. A single call stops at 1 MB of data read, so
+ * on the shared log tables — where one user's rows are a sliver of the whole —
+ * a deletion used to leave most of them behind and still report success.
+ */
+async function queryAll(input: QueryCommandInput): Promise<Row[]> {
+  const rows: Row[] = []
+  let start: Record<string, unknown> | undefined
+  do {
+    const res = await dynamoDB.send(new QueryCommand({ ...input, ExclusiveStartKey: start }))
+    rows.push(...((res.Items as Row[] | undefined) || []))
+    start = res.LastEvaluatedKey
+  } while (start)
+  return rows
+}
+
+async function scanAll(input: ScanCommandInput): Promise<Row[]> {
+  const rows: Row[] = []
+  let start: Record<string, unknown> | undefined
+  do {
+    const res = await dynamoDB.send(new ScanCommand({ ...input, ExclusiveStartKey: start }))
+    rows.push(...((res.Items as Row[] | undefined) || []))
+    start = res.LastEvaluatedKey
+  } while (start)
+  return rows
+}
+
+/** A stored photo reference — a bare key, or a full URL on older rows — as its S3 key. */
+function s3KeyOf(value: unknown): string | null {
+  if (typeof value !== 'string' || !value) return null
+  return value.includes('amazonaws.com/') ? extractS3KeyFromUrl(value) : value
+}
+
+/**
+ * Every S3 object a set of rows points at. Request photos live in `photoUrls`
+ * (keys) — this used to read a `photos` field nothing writes, so not one photo
+ * was ever deleted. Older rows may still carry `photos: [{ s3Key | s3Url }]`.
+ */
+function requestPhotoKeys(request: Row): string[] {
+  const keys = ((request.photoUrls as unknown[] | undefined) || []).map(s3KeyOf)
+  for (const photo of (request.photos as Array<{ s3Key?: string; s3Url?: string }> | undefined) || []) {
+    keys.push(s3KeyOf(photo?.s3Key) ?? s3KeyOf(photo?.s3Url))
+  }
+  return keys.filter((k): k is string => !!k)
+}
+
+function attachmentKeys(message: Row): string[] {
+  return ((message.attachments as Array<{ s3Key?: string }> | undefined) || [])
+    .map((a) => s3KeyOf(a?.s3Key))
+    .filter((k): k is string => !!k)
+}
+
+async function deleteS3Objects(keys: Iterable<string>, summary: DeleteSummary): Promise<void> {
+  for (const key of new Set(keys)) {
+    // deleteFileFromS3 reports failure in its result rather than throwing.
+    const res = await deleteFileFromS3(key)
+    if (res.success) summary.s3Photos++
+    else console.error('[account/delete] failed to delete S3 object:', key, res.error)
+  }
+}
+
+async function deleteClientCascade(clientId: string, summary: DeleteSummary): Promise<void> {
+  const requests = await queryAll({
+    TableName: 'ServiceRequests',
+    IndexName: 'ClientRequestsIndex',
+    KeyConditionExpression: 'clientId = :c',
+    ExpressionAttributeValues: { ':c': clientId },
+  })
+  const vehicles = await queryAll({
+    TableName: 'Vehicles',
+    IndexName: 'ClientVehiclesIndex',
+    KeyConditionExpression: 'clientId = :c',
+    ExpressionAttributeValues: { ':c': clientId },
+  })
+
+  // The photos of every request, every chat attachment in their threads, and
+  // the άδεια of every car — which carries the owner's name and address.
+  const s3Keys: string[] = requests.flatMap(requestPhotoKeys)
+  for (const vehicle of vehicles) {
+    const key = s3KeyOf(vehicle.licensePhotoUrl)
+    if (key) s3Keys.push(key)
   }
 
-  // 3. Delete chat messages for these requests
-  for (const requestId of requestIds) {
-    const chatRes = await dynamoDB.send(
-      new QueryCommand({
-        TableName: 'ChatMessages',
-        IndexName: 'RequestMessagesIndex',
-        KeyConditionExpression: 'requestId = :r',
-        ExpressionAttributeValues: { ':r': requestId }
-      })
-    )
-    for (const msg of chatRes.Items || []) {
-      await dynamoDB.send(
-        new DeleteCommand({ TableName: 'ChatMessages', Key: { id: msg.id } })
-      )
+  for (const req of requests) {
+    const requestId = req.id as string
+    const messages = await queryAll({
+      TableName: 'ChatMessages',
+      IndexName: 'RequestMessagesIndex',
+      KeyConditionExpression: 'requestId = :r',
+      ExpressionAttributeValues: { ':r': requestId },
+    })
+    for (const msg of messages) {
+      s3Keys.push(...attachmentKeys(msg))
+      await dynamoDB.send(new DeleteCommand({ TableName: 'ChatMessages', Key: { id: msg.id } }))
       summary.chatMessages++
     }
-  }
 
-  // 4. Delete offers attached to these requests
-  for (const requestId of requestIds) {
-    const offerRes = await dynamoDB.send(
-      new QueryCommand({
-        TableName: 'Offers',
-        IndexName: 'ServiceRequestOffersIndex',
-        KeyConditionExpression: 'serviceRequestId = :r',
-        ExpressionAttributeValues: { ':r': requestId }
-      })
-    )
-    for (const offer of offerRes.Items || []) {
-      await dynamoDB.send(
-        new DeleteCommand({ TableName: 'Offers', Key: { id: offer.id } })
-      )
+    const offers = await queryAll({
+      TableName: 'Offers',
+      IndexName: 'ServiceRequestOffersIndex',
+      KeyConditionExpression: 'serviceRequestId = :r',
+      ExpressionAttributeValues: { ':r': requestId },
+      ProjectionExpression: 'id',
+    })
+    for (const offer of offers) {
+      await dynamoDB.send(new DeleteCommand({ TableName: 'Offers', Key: { id: offer.id } }))
       summary.offers++
     }
-  }
 
-  // 5. Delete the service requests themselves
-  for (const requestId of requestIds) {
-    await dynamoDB.send(
-      new DeleteCommand({ TableName: 'ServiceRequests', Key: { id: requestId } })
-    )
+    await dynamoDB.send(new DeleteCommand({ TableName: 'ServiceRequests', Key: { id: requestId } }))
     summary.serviceRequests++
   }
 
-  // 6. Delete the client's vehicles
-  const vehiclesRes = await dynamoDB.send(
-    new QueryCommand({
-      TableName: 'Vehicles',
-      IndexName: 'ClientVehiclesIndex',
-      KeyConditionExpression: 'clientId = :c',
-      ExpressionAttributeValues: { ':c': clientId }
-    })
-  )
-  for (const vehicle of vehiclesRes.Items || []) {
-    await dynamoDB.send(
-      new DeleteCommand({ TableName: 'Vehicles', Key: { id: vehicle.id } })
-    )
+  for (const vehicle of vehicles) {
+    await dynamoDB.send(new DeleteCommand({ TableName: 'Vehicles', Key: { id: vehicle.id } }))
     summary.vehicles++
   }
 
-  // 7. Wipe analytics: EventLogs + EmailLogs that mention this client
+  await deleteS3Objects(s3Keys, summary)
+
+  // Analytics: EventLogs + EmailLogs that mention this client
   await wipeLogsByAttribute('clientId', clientId, summary)
 }
 
 async function deleteGarageCascade(garageId: string, summary: DeleteSummary): Promise<void> {
-  // 1. Delete all offers from this garage
-  const offerRes = await dynamoDB.send(
-    new QueryCommand({
-      TableName: 'Offers',
-      IndexName: 'GarageOffersIndex',
-      KeyConditionExpression: 'garageId = :g',
-      ExpressionAttributeValues: { ':g': garageId }
-    })
-  )
-  for (const offer of offerRes.Items || []) {
-    await dynamoDB.send(
-      new DeleteCommand({ TableName: 'Offers', Key: { id: offer.id } })
-    )
+  const offers = await queryAll({
+    TableName: 'Offers',
+    IndexName: 'GarageOffersIndex',
+    KeyConditionExpression: 'garageId = :g',
+    ExpressionAttributeValues: { ':g': garageId },
+    ProjectionExpression: 'id',
+  })
+  for (const offer of offers) {
+    await dynamoDB.send(new DeleteCommand({ TableName: 'Offers', Key: { id: offer.id } }))
     summary.offers++
   }
 
-  // 2. Delete chat messages where the garage is sender
-  const chatRes = await dynamoDB.send(
-    new ScanCommand({
-      TableName: 'ChatMessages',
-      FilterExpression:
-        '(senderType = :g AND senderId = :id) OR garageId = :id',
-      ExpressionAttributeValues: { ':g': 'garage', ':id': garageId }
-    })
-  )
-  for (const msg of chatRes.Items || []) {
-    await dynamoDB.send(
-      new DeleteCommand({ TableName: 'ChatMessages', Key: { id: msg.id } })
-    )
+  // Every message in this garage's threads, from either side, with its photos.
+  const messages = await scanAll({
+    TableName: 'ChatMessages',
+    FilterExpression: '(senderType = :g AND senderId = :id) OR garageId = :id',
+    ExpressionAttributeValues: { ':g': 'garage', ':id': garageId },
+  })
+  const s3Keys: string[] = []
+  for (const msg of messages) {
+    s3Keys.push(...attachmentKeys(msg))
+    await dynamoDB.send(new DeleteCommand({ TableName: 'ChatMessages', Key: { id: msg.id } }))
     summary.chatMessages++
   }
+  await deleteS3Objects(s3Keys, summary)
 
-  // 3. Wipe analytics: EventLogs + EmailLogs
+  // Analytics: EventLogs + EmailLogs
   await wipeLogsByAttribute('garageId', garageId, summary)
 }
 
@@ -268,45 +300,38 @@ async function wipeLogsByAttribute(
   value: string,
   summary: DeleteSummary
 ): Promise<void> {
-  // EventLogs
-  const eventRes = await dynamoDB.send(
-    new ScanCommand({
-      TableName: EVENT_LOGS_TABLE,
-      FilterExpression: `${attrName} = :v`,
-      ExpressionAttributeValues: { ':v': value }
-    })
-  )
-  await batchDelete(EVENT_LOGS_TABLE, 'eventId', (eventRes.Items || []).map((i) => i.eventId as string))
-  summary.eventLogs += (eventRes.Items || []).length
+  const events = await scanAll({
+    TableName: EVENT_LOGS_TABLE,
+    FilterExpression: `${attrName} = :v`,
+    ExpressionAttributeValues: { ':v': value },
+    ProjectionExpression: 'eventId',
+  })
+  await batchDelete(EVENT_LOGS_TABLE, 'eventId', events.map((i) => i.eventId as string))
+  summary.eventLogs += events.length
 
-  // EmailLogs
-  const emailRes = await dynamoDB.send(
-    new ScanCommand({
-      TableName: EMAIL_LOGS_TABLE,
-      FilterExpression: `${attrName} = :v`,
-      ExpressionAttributeValues: { ':v': value }
-    })
-  )
-  await batchDelete(EMAIL_LOGS_TABLE, 'emailId', (emailRes.Items || []).map((i) => i.emailId as string))
-  summary.emailLogs += (emailRes.Items || []).length
+  const emails = await scanAll({
+    TableName: EMAIL_LOGS_TABLE,
+    FilterExpression: `${attrName} = :v`,
+    ExpressionAttributeValues: { ':v': value },
+    ProjectionExpression: 'emailId',
+  })
+  await batchDelete(EMAIL_LOGS_TABLE, 'emailId', emails.map((i) => i.emailId as string))
+  summary.emailLogs += emails.length
 }
 
-async function batchDelete(
-  table: string,
-  pkName: string,
-  ids: string[]
-): Promise<void> {
-  // BatchWriteCommand max 25 items at a time
+async function batchDelete(table: string, pkName: string, ids: string[]): Promise<void> {
+  // BatchWriteCommand takes at most 25 items, and may hand some back
+  // unprocessed under throttling — those are retried rather than dropped.
   for (let i = 0; i < ids.length; i += 25) {
-    const chunk = ids.slice(i, i + 25)
-    if (chunk.length === 0) continue
-    await dynamoDB.send(
-      new BatchWriteCommand({
-        RequestItems: {
-          [table]: chunk.map((id) => ({ DeleteRequest: { Key: { [pkName]: id } } }))
-        }
-      })
-    )
+    let pending: BatchWriteCommandInput['RequestItems'] = {
+      [table]: ids.slice(i, i + 25).map((id) => ({ DeleteRequest: { Key: { [pkName]: id } } })),
+    }
+    for (let attempt = 0; pending && Object.keys(pending).length > 0; attempt++) {
+      if (attempt === 5) throw new Error(`[account/delete] ${table}: unprocessed deletes after retries`)
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 100 * 2 ** attempt))
+      const res: BatchWriteCommandOutput = await dynamoDB.send(new BatchWriteCommand({ RequestItems: pending }))
+      pending = res.UnprocessedItems
+    }
   }
 }
 
