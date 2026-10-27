@@ -4,9 +4,12 @@ import { estimateFor, type EstimateInput } from './estimate'
 
 async function _POST(request: NextRequest) {
   try {
-    const body: EstimateInput = await request.json()
+    // An unreadable body — empty, malformed, or cut off when the form's request
+    // is aborted mid-navigation — is the caller's problem, not a 500 that lands
+    // in the admin error log.
+    const body = (await request.json().catch(() => null)) as EstimateInput | null
 
-    if (!body.category || !body.brand) {
+    if (!body || typeof body !== 'object' || !body.category || !body.brand) {
       return NextResponse.json(
         { error: 'Missing required fields for price estimation' },
         { status: 400 }

@@ -98,3 +98,15 @@ test.describe('Estimate on bodywork and on the stored request', () => {
     expect((await getRow('ServiceRequests', unpriced.serviceRequestId))?.estimatedCost).toBeUndefined()
   })
 })
+
+test('An unreadable or empty body is a 400, not a 500', async ({ request }) => {
+  // The form's request is aborted mid-body whenever the user navigates away;
+  // reading that as a 500 filled the admin error log with noise.
+  for (const data of ['', 'null', '{not json', '[]']) {
+    const resp = await request.post('/api/price-estimation/', {
+      headers: { 'Content-Type': 'application/json' },
+      data,
+    })
+    expect(resp.status(), JSON.stringify(data)).toBe(400)
+  }
+})
