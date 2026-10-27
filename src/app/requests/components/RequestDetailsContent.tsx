@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Icon from '@/components/ui/Icon'
 import { DayPicker } from 'react-day-picker'
 import 'react-day-picker/dist/style.css'
@@ -189,7 +189,8 @@ export default function RequestDetailsContent({
   const acceptedGarage = offers.find(
     (offer) => offer.id === request.acceptedOfferId || offer.status === OfferStatus.ACCEPTED
   )?.garage
-  const showWaitingForResponsesBanner = request.status === ServiceRequestStatus.PENDING && !hasOffers
+  const isOpenForOffers = request.status === ServiceRequestStatus.PENDING
+  const showWaitingForResponsesBanner = isOpenForOffers && !hasOffers
 
   const formatAvailabilityDate = (dateString: string) => {
     const date = new Date(`${dateString}T00:00:00`)
@@ -451,7 +452,9 @@ export default function RequestDetailsContent({
       const payload: Record<string, unknown> = {
         offerId: offer.id,
         appointmentDate: selectedDate,
-        appointmentPrice: offer.offerAmount
+        // The price on screen. The server books its own stored figure and
+        // refuses (409) if the garage has changed it since this was loaded.
+        expectedAmount: offer.offerAmount
       }
       // Omitted entirely for offers with no published hours, so the route can
       // tell "day-granularity offer" from "client skipped the hour".
@@ -476,15 +479,29 @@ export default function RequestDetailsContent({
         const errorMessage =
           data?.error || 'Δεν ήταν δυνατή η αποδοχή της προσφοράς. Δοκιμάστε ξανά.'
         setAcceptError(errorMessage)
+        // A 409 means what is on screen is out of date — a new price, an offer
+        // that is gone, a request that moved on. Show what is true now, so the
+        // next tap is made on the current figures.
+        if (response.status === 409) {
+          await Promise.all([loadOffers({ keepSelections: true }), refreshRequest()])
+        }
         return
       }
 
+      // What the server booked, not what this tab last loaded.
+      const bookedPrice: number =
+        typeof data.request?.appointmentPrice === 'number' ? data.request.appointmentPrice : offer.offerAmount
+      // The booked hour is part of the appointment — it used to be dropped here, so
+      // the confirmation banner read "από τις 09:00" for a 14:00 booking until reload.
+      const appointmentTime: string | null = data.request?.appointmentTime ?? selectedTime ?? null
       const updatedRequest: ServiceRequest = {
         ...request,
         status: ServiceRequestStatus.APPOINTMENT,
         acceptedOfferId: offer.id,
-        appointmentDate: selectedDate ?? undefined,
-        appointmentPrice: offer.offerAmount,
+        acceptedGarageId: offer.garageId ?? request.acceptedGarageId ?? null,
+        appointmentDate: data.request?.appointmentDate ?? selectedDate ?? undefined,
+        appointmentTime,
+        appointmentPrice: bookedPrice,
         updatedAt: data.request?.updatedAt ?? new Date().toISOString()
       }
 
@@ -494,8 +511,8 @@ export default function RequestDetailsContent({
             ? {
                 ...item,
                 status: OfferStatus.ACCEPTED,
-                appointmentDate: selectedDate ?? undefined,
-                appointmentPrice: offer.offerAmount
+                appointmentDate: updatedRequest.appointmentDate,
+                appointmentPrice: bookedPrice
               }
             : {
                 ...item,
@@ -599,127 +616,145 @@ export default function RequestDetailsContent({
     setPaymentAmounts(null)
   }
 
+  const mountedRef = useRef(true)
+  // Read by loadOffers, which must not be rebuilt on every pick.
+  const selectionsRef = useRef({ dates: selectedOfferDates, times: selectedOfferTimes })
+  selectionsRef.current = { dates: selectedOfferDates, times: selectedOfferTimes }
   useEffect(() => {
-    let isMounted = true
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
-    const loadOffers = async () => {
-      setOffersLoading(true)
-      setOffersError(null)
+  /**
+   * `keepSelections` reloads in place after a refused acceptance: the offers
+   * may have changed under the client, but a date it picked that is still on
+   * offer stays picked, rather than the whole card resetting.
+   */
+  const loadOffers = useCallback(async ({ keepSelections = false }: { keepSelections?: boolean } = {}) => {
+    if (!keepSelections) setOffersLoading(true)
+    setOffersError(null)
 
-      try {
-        const response = await fetch(`/api/offers/?serviceRequestId=${request.id}`)
+    try {
+      const response = await fetch(`/api/offers/?serviceRequestId=${request.id}`)
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch offers')
-        }
+      if (!response.ok) {
+        throw new Error('Failed to fetch offers')
+      }
 
-        const data = await response.json()
-        const offersData: Offer[] = Array.isArray(data.offers) ? data.offers : []
-        const garageCache = new Map<string, GarageSummary | null>()
+      const data = await response.json()
+      const offersData: Offer[] = Array.isArray(data.offers) ? data.offers : []
+      const garageCache = new Map<string, GarageSummary | null>()
 
-        const offersWithGarage = await Promise.all(
-          offersData.map(async (offer) => {
-            if (!offer.garageId) {
-              return { ...offer, garage: null }
-            }
+      const offersWithGarage = await Promise.all(
+        offersData.map(async (offer) => {
+          if (!offer.garageId) {
+            return { ...offer, garage: null }
+          }
 
-            if (garageCache.has(offer.garageId)) {
-              return { ...offer, garage: garageCache.get(offer.garageId) ?? null }
-            }
+          if (garageCache.has(offer.garageId)) {
+            return { ...offer, garage: garageCache.get(offer.garageId) ?? null }
+          }
 
-            try {
-              const garageResponse = await fetch(`/api/garage/${offer.garageId}/`)
+          try {
+            const garageResponse = await fetch(`/api/garage/${offer.garageId}/`)
 
-              if (!garageResponse.ok) {
-                garageCache.set(offer.garageId, null)
-                return { ...offer, garage: null }
-              }
-
-              const garageData = await garageResponse.json()
-              const normalizedBenefits = Array.isArray(garageData?.garage?.benefits)
-                ? garageData?.garage?.benefits
-                    .map((benefit: unknown) => (typeof benefit === 'string' ? benefit.trim() : ''))
-                    .filter((benefit: string): benefit is string => benefit.length > 0)
-                : []
-
-              const garageSummary: GarageSummary = {
-                id: garageData?.garage?.id ?? offer.garageId,
-                companyName: garageData?.garage?.companyName,
-                address: garageData?.garage?.address,
-                mobile: garageData?.garage?.mobile,
-                workdayStartTime: garageData?.garage?.workdayStartTime,
-                benefits: normalizedBenefits
-              }
-
-              garageCache.set(offer.garageId, garageSummary)
-              return { ...offer, garage: garageSummary }
-            } catch {
+            if (!garageResponse.ok) {
               garageCache.set(offer.garageId, null)
               return { ...offer, garage: null }
             }
-          })
-        )
 
-        const sortedOffers = offersWithGarage.sort((a, b) => {
-          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
-          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
-          return timeA - timeB
-        })
+            const garageData = await garageResponse.json()
+            const normalizedBenefits = Array.isArray(garageData?.garage?.benefits)
+              ? garageData?.garage?.benefits
+                  .map((benefit: unknown) => (typeof benefit === 'string' ? benefit.trim() : ''))
+                  .filter((benefit: string): benefit is string => benefit.length > 0)
+              : []
 
-        if (isMounted) {
-          setOffers(sortedOffers)
-          setExpandedOfferId((prev) => {
-            if (prev && sortedOffers.some((offer) => offer.id === prev)) {
-              return prev
+            const garageSummary: GarageSummary = {
+              id: garageData?.garage?.id ?? offer.garageId,
+              companyName: garageData?.garage?.companyName,
+              address: garageData?.garage?.address,
+              mobile: garageData?.garage?.mobile,
+              workdayStartTime: garageData?.garage?.workdayStartTime,
+              benefits: normalizedBenefits
             }
-            return sortedOffers[0]?.id ?? null
+
+            garageCache.set(offer.garageId, garageSummary)
+            return { ...offer, garage: garageSummary }
+          } catch {
+            garageCache.set(offer.garageId, null)
+            return { ...offer, garage: null }
+          }
+        })
+      )
+
+      const sortedOffers = offersWithGarage.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        return timeA - timeB
+      })
+
+      if (mountedRef.current) {
+        setOffers(sortedOffers)
+        setExpandedOfferId((prev) => {
+          if (prev && sortedOffers.some((offer) => offer.id === prev)) {
+            return prev
+          }
+          return sortedOffers[0]?.id ?? null
+        })
+        // A picked date and hour survive a reload only while the garage still
+        // offers them.
+        const nextDates: Record<string, string | null> = {}
+        const nextTimes: Record<string, string | null> = {}
+        sortedOffers.forEach((offer) => {
+          const date = keepSelections ? selectionsRef.current.dates[offer.id] : null
+          const keepDate = !!date && (offer.availabilityDates ?? []).includes(date)
+          nextDates[offer.id] = keepDate ? date : null
+          const time = keepDate ? selectionsRef.current.times[offer.id] : null
+          const hours = keepDate && date ? slotsForDate(offer.availabilitySlots, date) : null
+          nextTimes[offer.id] = time && hours?.includes(time) ? time : null
+        })
+        setSelectedOfferDates(nextDates)
+        setSelectedOfferTimes(nextTimes)
+        if (keepSelections) return
+        setCustomPickerOpen(() => {
+          const next: Record<string, boolean> = {}
+          sortedOffers.forEach((offer) => {
+            next[offer.id] = false
           })
-          setSelectedOfferDates(() => {
-            const next: Record<string, string | null> = {}
-            sortedOffers.forEach((offer) => {
-              next[offer.id] = null
-            })
-            return next
+          return next
+        })
+        setCustomDatesByOffer(() => {
+          const next: Record<string, Date[]> = {}
+          sortedOffers.forEach((offer) => {
+            const parsedDates = (offer.clientAvailabilityDates || [])
+              .map(parseDateString)
+              .filter((date): date is Date => date !== null)
+            next[offer.id] = parsedDates
           })
-          setCustomPickerOpen(() => {
-            const next: Record<string, boolean> = {}
-            sortedOffers.forEach((offer) => {
-              next[offer.id] = false
-            })
-            return next
-          })
-          setCustomDatesByOffer(() => {
-            const next: Record<string, Date[]> = {}
-            sortedOffers.forEach((offer) => {
-              const parsedDates = (offer.clientAvailabilityDates || [])
-                .map(parseDateString)
-                .filter((date): date is Date => date !== null)
-              next[offer.id] = parsedDates
-            })
-            return next
-          })
-          setCustomDateErrors({})
-          setCustomDateSuccesses({})
-          setSavingCustomDates({})
-        }
-      } catch {
-        if (isMounted) {
-          setOffers([])
-          setOffersError('Δεν ήταν δυνατή η φόρτωση των προσφορών. Δοκιμάστε ξανά αργότερα.')
-        }
-      } finally {
-        if (isMounted) {
-          setOffersLoading(false)
-        }
+          return next
+        })
+        setCustomDateErrors({})
+        setCustomDateSuccesses({})
+        setSavingCustomDates({})
+      }
+    } catch {
+      if (mountedRef.current) {
+        setOffers([])
+        setOffersError('Δεν ήταν δυνατή η φόρτωση των προσφορών. Δοκιμάστε ξανά αργότερα.')
+      }
+    } finally {
+      if (mountedRef.current) {
+        setOffersLoading(false)
       }
     }
-
-    loadOffers()
-
-    return () => {
-      isMounted = false
-    }
   }, [request.id])
+
+  useEffect(() => {
+    loadOffers()
+  }, [loadOffers])
 
   useEffect(() => {
     setVehicleForm(createVehicleFormState(vehicleDetails))
@@ -953,11 +988,13 @@ export default function RequestDetailsContent({
                   : null
                 // Only demand an hour when the offer actually publishes hours.
                 const needsTime = offerHours !== null && offerHours.length > 0
+                // Only an open request can take an offer. Testing "not an appointment"
+                // left the button live on cancelled and completed requests.
                 const canAcceptOffer =
+                  isOpenForOffers &&
                   hasAvailability &&
                   Boolean(selectedDate) &&
                   (!needsTime || Boolean(selectedTime)) &&
-                  request.status !== ServiceRequestStatus.APPOINTMENT &&
                   offer.status !== OfferStatus.ACCEPTED &&
                   offer.status !== OfferStatus.REJECTED
                 const isExpanded = expandedOfferId === offer.id
@@ -1073,18 +1110,17 @@ export default function RequestDetailsContent({
                         {availabilityDates.length > 0 ? (
                           <div className="space-y-3">
                             <p className="text-sm text-on-surface-variant">
-                              {request.status === ServiceRequestStatus.APPOINTMENT
+                              {!isOpenForOffers
                                 ? 'Διαθέσιμες ημερομηνίες συνεργείου:'
                                 : 'Επιλέξτε μία από τις διαθέσιμες ημερομηνίες του συνεργείου.'}
                             </p>
                             <div className="flex flex-wrap gap-2">
                               {availabilityDates.map((date) => {
                                 const isSelected = selectedDate === date
-                                const isAppointment = request.status === ServiceRequestStatus.APPOINTMENT
-                                // Only a booked appointment freezes the choice. Picking a date
+                                // Only a closed request freezes the choice. Picking a date
                                 // used to disable all the others, so a mis-tap was final until
                                 // the page was reloaded.
-                                const isDisabled = isAppointment
+                                const isDisabled = !isOpenForOffers
 
                                 return (
                                   <button
@@ -1115,8 +1151,8 @@ export default function RequestDetailsContent({
                             {selectedDate && offerHours !== null && (
                               <div className="space-y-2">
                                 <p className="text-sm text-on-surface-variant">
-                                  {request.status === ServiceRequestStatus.APPOINTMENT
-                                    ? 'Ώρα ραντεβού:'
+                                  {!isOpenForOffers
+                                    ? 'Ώρες συνεργείου:'
                                     : 'Επιλέξτε ώρα παραλαβής:'}
                                 </p>
                                 {offerHours.length === 0 ? (
@@ -1127,12 +1163,12 @@ export default function RequestDetailsContent({
                                   <div className="flex flex-wrap gap-2">
                                     {offerHours.map((time) => {
                                       const isTimeSelected = selectedTime === time
-                                      const isAppointment = request.status === ServiceRequestStatus.APPOINTMENT
+                                      const isClosed = !isOpenForOffers
                                       return (
                                         <button
                                           key={time}
                                           type="button"
-                                          disabled={isAppointment}
+                                          disabled={isClosed}
                                           onClick={(event) => {
                                             event.stopPropagation()
                                             handleSelectOfferTime(offer.id, time)
@@ -1140,7 +1176,7 @@ export default function RequestDetailsContent({
                                           className={`px-4 py-2 rounded-xl text-sm font-bold transition-all duration-200 ${
                                             isTimeSelected
                                               ? 'bg-gradient-to-br from-primary to-primary-container text-on-primary shadow-lg shadow-primary/20'
-                                              : isAppointment
+                                              : isClosed
                                                 ? 'bg-surface-container border border-outline-variant/10 text-on-surface-variant/40 cursor-not-allowed'
                                                 : 'bg-surface-container border border-outline-variant/20 text-on-surface hover:border-primary/30'
                                           }`}
@@ -1166,7 +1202,7 @@ export default function RequestDetailsContent({
                                       ? `, από τις ${offer.garage.workdayStartTime}`
                                       : ''}
                                 </span>
-                                {request.status !== ServiceRequestStatus.APPOINTMENT && (
+                                {isOpenForOffers && (
                                   <span className="text-xs text-on-surface-variant">
                                     (μπορείτε να αλλάξετε επιλογή)
                                   </span>
@@ -1203,7 +1239,7 @@ export default function RequestDetailsContent({
                         )}
 
                         {/* Custom date picker toggle */}
-                        {hasAvailability && request.status !== ServiceRequestStatus.APPOINTMENT && (
+                        {hasAvailability && isOpenForOffers && (
                           <>
                             <button
                               type="button"
@@ -1326,7 +1362,7 @@ export default function RequestDetailsContent({
                         {/* Accept, or ask first — accepting is a commitment, and a customer
                             with a question had nowhere to put it before. */}
                         <div className="flex flex-wrap gap-3 pt-2">
-                          {request.status !== ServiceRequestStatus.APPOINTMENT && offer.status !== OfferStatus.ACCEPTED && (
+                          {isOpenForOffers && offer.status !== OfferStatus.ACCEPTED && (
                             <button
                               type="button"
                               onClick={(event) => {

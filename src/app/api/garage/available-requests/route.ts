@@ -1,17 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { batchGetById } from '@/utils/batchGetById'
 import { collectAll, decodeCursor, encodeCursor, parseLimit } from '@/utils/pagination'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
-import { requireGarage } from '@/utils/requireAuth'
+import { requireActiveGarage } from '@/utils/requireAuth'
 import { generatePresignedUrls } from '@/utils/s3Service'
 import { withMetrics } from '@/utils/withMetrics'
+import {
+  garageClientView,
+  garageVehicleView,
+  QUOTING_CLIENT_PROJECTION,
+  QUOTING_VEHICLE_NAMES,
+  QUOTING_VEHICLE_PROJECTION,
+} from '@/utils/garageClientView'
 
 async function _GET(request: NextRequest) {
   try {
-    const garageId = requireGarage(request)
+    // The feed carries the open market — every pending request, its photos and
+    // the client's first name — so a garage an admin has not approved (or has
+    // since deactivated) gets a 403 the dashboard turns into its pending screen.
+    const garageId = await requireActiveGarage(request)
     if (garageId instanceof NextResponse) return garageId
 
     logEvent({
@@ -120,64 +131,40 @@ async function _GET(request: NextRequest) {
       })
     }
 
-    // For each service request, get client + vehicle details + presigned URLs
-    // — all three are independent so fetch them in parallel.
-    const requestsWithDetails = await Promise.all(
-      availableRequests.map(async (request) => {
-        // A row missing clientId or vehicleId would make GetCommand throw
-        // ValidationException ("number of conditions on the keys is invalid"),
-        // and because these run inside Promise.all that single bad row failed
-        // the whole feed — every garage saw an empty dashboard with a 500.
-        // Skip the lookup instead and let the request render without that part.
-        const [clientResult, vehicleResult, presignedUrls] = await Promise.all([
-          request.clientId
-            ? dynamoDB.send(new GetCommand({
-                TableName: 'Clients',
-                Key: { id: request.clientId }
-              }))
-            : Promise.resolve({ Item: undefined }),
-          request.vehicleId
-            ? dynamoDB.send(new GetCommand({
-                TableName: 'Vehicles',
-                Key: { id: request.vehicleId }
-              }))
-            : Promise.resolve({ Item: undefined }),
-          (request.photoUrls && request.photoUrls.length > 0)
+    // Batched, and projected down to the quoting view: this feed goes to every
+    // active garage, so the client's surname, phone and email and the car's
+    // plate, VIN and engine number are not even read. A row missing clientId or
+    // vehicleId is skipped by the batch rather than failing the whole feed.
+    const [clients, vehicles, presignedByRequest] = await Promise.all([
+      batchGetById('Clients', availableRequests.map((r) => r.clientId as string | undefined), {
+        projection: QUOTING_CLIENT_PROJECTION,
+      }),
+      batchGetById('Vehicles', availableRequests.map((r) => r.vehicleId as string | undefined), {
+        projection: QUOTING_VEHICLE_PROJECTION,
+        names: QUOTING_VEHICLE_NAMES,
+      }),
+      Promise.all(
+        availableRequests.map((request) =>
+          request.photoUrls && request.photoUrls.length > 0
             ? generatePresignedUrls(request.photoUrls)
             : Promise.resolve([])
-        ])
+        )
+      ),
+    ])
 
-        const client = clientResult.Item
-        const vehicle = vehicleResult.Item
-
-        return {
-          id: request.id,
-          description: request.description,
-          category: request.category,
-          status: request.status,
-          createdAt: request.createdAt,
-          clientAvailabilityDates: request.clientAvailabilityDates || [],
-          photoUrls: presignedUrls,
-          client: client ? {
-            firstName: client.firstName,
-            lastName: client.lastName,
-            phoneNumber: client.phoneNumber
-          } : null,
-          vehicle: vehicle ? {
-            brand: vehicle.brand,
-            model: vehicle.model,
-            year: vehicle.year,
-            licensePlate: vehicle.licensePlate,
-            modelYear: vehicle.modelYear,
-            engineCC: vehicle.engineCC,
-            fuelType: vehicle.fuelType,
-            isAutomatic: vehicle.isAutomatic,
-            is4x4: vehicle.is4x4,
-            isTurbo: vehicle.isTurbo
-          } : null
-        }
-      })
-    )
+    const requestsWithDetails = availableRequests.map((request, i) => ({
+      id: request.id,
+      description: request.description,
+      category: request.category,
+      status: request.status,
+      createdAt: request.createdAt,
+      clientAvailabilityDates: request.clientAvailabilityDates || [],
+      photoUrls: presignedByRequest[i],
+      estimatedCost: request.estimatedCost ?? null,
+      // Nobody has won a pending request, so this is always the quoting view.
+      client: garageClientView(clients.get(request.clientId as string), false),
+      vehicle: garageVehicleView(vehicles.get(request.vehicleId as string), false),
+    }))
 
     // Filter out requests where we couldn't find client or vehicle details
     const validRequests = requestsWithDetails.filter(

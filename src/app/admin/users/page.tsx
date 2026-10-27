@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import Spinner from '@/components/Spinner'
+import { useNavigation } from '@/hooks/useNavigation'
 import DataTable, { type Column } from '../components/DataTable'
 
 interface ClientRecord {
@@ -14,7 +15,7 @@ interface ClientRecord {
 }
 
 export default function UsersPage() {
-  const router = useRouter()
+  const { navigate, isNavigating } = useNavigation()
   const [data, setData] = useState<ClientRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -43,7 +44,11 @@ export default function UsersPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold font-headline text-on-surface mb-6">Clients</h1>
+      <h1 className="text-2xl font-bold font-headline text-on-surface mb-6 flex items-center gap-3">
+        Clients
+        {/* Row clicks navigate; the table has no per-row control to spin. */}
+        {isNavigating() && <Spinner size="sm" className="text-primary" />}
+      </h1>
 
       <div className="mb-4">
         <input
@@ -61,7 +66,7 @@ export default function UsersPage() {
         keyField="id"
         loading={loading}
         emptyMessage="No clients found"
-        onRowClick={(item) => router.push(`/admin/users/${item.id}/`)}
+        onRowClick={(item) => navigate(`/admin/users/${item.id}/`)}
       />
     </div>
   )

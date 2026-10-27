@@ -1,6 +1,8 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react'
+import appSyncService from '@/lib/appsync-service'
+import { clearFormData } from '@/utils/formStorage'
 
 export type UserType = 'client' | 'garage' | 'guest' | null
 
@@ -45,6 +47,14 @@ interface AuthContextType {
   logout: () => void
   refreshClient: (clientId: string) => Promise<void>
   refreshGarage: (garageId: string) => Promise<void>
+  /**
+   * Re-asks the server who this browser is and adopts the answer. For flows
+   * where the session cookie can change underneath the page — e.g. a guest
+   * whose confirmation link was opened in another tab of the same browser.
+   * Resolves to the confirmed identity, or null when signed out. A network
+   * failure rejects and leaves the current state untouched.
+   */
+  syncSession: () => Promise<{ userType: 'client' | 'garage'; id: string } | null>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -118,6 +128,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Ignore errors - we're logging out anyway
     }
+    // Explicitly, not only through the identity effect below: the full-page
+    // navigation that follows may well beat the effect to it.
+    clearFormData()
     clearAuth()
     window.location.href = '/'
   }, [clearAuth])
@@ -212,6 +225,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [clearAuth])
 
+  // Adopts an /api/auth/me answer as the current identity.
+  const applyMeResponse = useCallback((data: {
+    authenticated?: boolean
+    userType?: string
+    user?: Record<string, unknown> & { id: string }
+  } | null): { userType: 'client' | 'garage'; id: string } | null => {
+    const user = data?.authenticated ? data.user : undefined
+    if (user && data?.userType === 'client') {
+      const userData: ClientUser = {
+        id: user.id,
+        firstName: user.firstName as string,
+        lastName: user.lastName as string | undefined,
+        email: user.email as string | undefined,
+        phoneNumber: user.phoneNumber as string | undefined,
+        isRegistered: !!user.email
+      }
+      setClient(userData)
+      setGarage(null)
+      setUserType('client')
+      localStorage.setItem('clientId', user.id)
+      localStorage.removeItem('garageId')
+      writeAuthCache({ userType: 'client', client: userData })
+      return { userType: 'client', id: user.id }
+    }
+    if (user && data?.userType === 'garage') {
+      const userData: GarageUser = {
+        id: user.id,
+        companyName: user.companyName as string,
+        email: user.email as string,
+        mobile: user.mobile as string,
+        address: user.address as string,
+        tin: user.tin as string,
+        taxAuthority: user.taxAuthority as string,
+        description: user.description as string | undefined,
+        isActive: user.isActive as boolean,
+        activatedAt: (user.activatedAt as string) || undefined
+      }
+      setGarage(userData)
+      setClient(null)
+      setUserType('garage')
+      localStorage.setItem('garageId', user.id)
+      localStorage.removeItem('clientId')
+      writeAuthCache({ userType: 'garage', garage: userData })
+      return { userType: 'garage', id: user.id }
+    }
+    // The server did not recognise us. Drop every trace of the previous
+    // identity — leaving it behind is what let a forgotten session on a
+    // shared browser resurface for whoever opened the app next.
+    clearAuth()
+    setUserType('guest')
+    return null
+  }, [clearAuth])
+
+  const syncSession = useCallback(async () => {
+    const response = await fetch('/api/auth/me/', { cache: 'no-store' })
+    if (response.status >= 500) throw new Error(`auth/me ${response.status}`)
+    const data = response.ok ? await response.json() : null
+    const identity = applyMeResponse(data)
+    setIsVerified(true)
+    setIsLoading(false)
+    return identity
+  }, [applyMeResponse])
+
   // Check authentication on mount using /api/auth/me (JWT cookie-based).
   // If we have a cached identity in localStorage, hydrate from it FIRST and
   // run the network call in the background — keeps the UI responsive across
@@ -241,59 +317,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const checkAuth = async () => {
       try {
         const response = await fetch('/api/auth/me/')
-        if (response.ok) {
-          const data = await response.json()
-          if (data.authenticated && data.user) {
-            if (data.userType === 'client') {
-              const userData: ClientUser = {
-                id: data.user.id,
-                firstName: data.user.firstName,
-                lastName: data.user.lastName,
-                email: data.user.email,
-                phoneNumber: data.user.phoneNumber,
-                isRegistered: !!data.user.email
-              }
-              setClient(userData)
-              setUserType('client')
-              localStorage.setItem('clientId', data.user.id)
-              localStorage.removeItem('garageId')
-              writeAuthCache({ userType: 'client', client: userData })
-            } else if (data.userType === 'garage') {
-              const userData: GarageUser = {
-                id: data.user.id,
-                companyName: data.user.companyName,
-                email: data.user.email,
-                mobile: data.user.mobile,
-                address: data.user.address,
-                tin: data.user.tin,
-                taxAuthority: data.user.taxAuthority,
-                description: data.user.description,
-                isActive: data.user.isActive,
-                activatedAt: data.user.activatedAt || undefined
-              }
-              setGarage(userData)
-              setUserType('garage')
-              localStorage.setItem('garageId', data.user.id)
-              localStorage.removeItem('clientId')
-              writeAuthCache({ userType: 'garage', garage: userData })
-            }
-          } else {
-            // Server says we're a guest — drop any stale cache.
-            writeAuthCache(null)
-            setClient(null)
-            setGarage(null)
-            setUserType('guest')
-          }
-        } else {
-          // The server did not recognise us. Drop every trace of the previous
-          // identity — leaving it behind is what let a forgotten session on a
-          // shared browser resurface for whoever opened the app next.
-          clearAuth()
-          setUserType('guest')
-        }
-        // Both branches above are answers from the server, so the identity is
-        // now confirmed. Deliberately not in `finally`: a network failure
-        // leaves the cached identity in place and must NOT be marked verified.
+        applyMeResponse(response.ok ? await response.json() : null)
+        // An answer from the server either way, so the identity is now
+        // confirmed. Deliberately not in `finally`: a network failure leaves
+        // the cached identity in place and must NOT be marked verified.
         setIsVerified(true)
       } catch {
         // Network error: keep cached identity if any, otherwise mark guest.
@@ -304,7 +331,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     checkAuth()
-  }, [clearAuth])
+  }, [applyMeResponse])
+
+  // The realtime token and the request draft belong to whoever was signed in.
+  // When that user changes or ends in this tab — a guest merged into an
+  // account, a logout, a different login, a session the server no longer
+  // honours — both go: the cached token would keep presenting the previous
+  // identity to AppSync (every channel the new user opens refused until it
+  // expired), and a draft left on a shared device would greet the next person.
+  //
+  // Keyed on a previous identity having existed. `clearAuth` alone cannot be
+  // the trigger: it also runs on every page load of an anonymous visitor
+  // (/api/auth/me answers 401), and wiping the draft there would empty the
+  // request funnel between its steps.
+  const signedInAs = client?.id ?? garage?.id ?? null
+  const previousIdentity = useRef<string | null>(null)
+  useEffect(() => {
+    const previous = previousIdentity.current
+    previousIdentity.current = signedInAs
+    if (!previous || previous === signedInAs) return
+    appSyncService.resetIdentity()
+    clearFormData()
+  }, [signedInAs])
 
   // Update userType when client or garage changes
   useEffect(() => {
@@ -329,7 +377,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setGarage,
         logout,
         refreshClient,
-        refreshGarage
+        refreshGarage,
+        syncSession
       }}
     >
       {children}

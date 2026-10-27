@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
-import { getAuth, requireOwner } from '@/utils/requireAuth'
+import { GetCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { requireClientOwner } from '@/app/api/clients/requireClientOwner'
 import { withMetrics } from '@/utils/withMetrics'
 
 async function _GET(
@@ -11,14 +11,12 @@ async function _GET(
   try {
     const { clientId } = await params
 
-    // Auth check: allow client viewing own profile or any garage
-    const auth = getAuth(request)
-    if (!auth) {
-      return NextResponse.json({ error: 'Απαιτείται σύνδεση' }, { status: 401 })
-    }
-    if (auth.userId !== clientId && auth.userType !== 'garage') {
-      return NextResponse.json({ error: 'Δεν έχετε πρόσβαση σε αυτόν τον πόρο' }, { status: 403 })
-    }
+    // The owner only. This used to let any garage session — pending and
+    // deactivated ones included — read any client's email, phone and address
+    // by id, which no garage screen ever needed: a garage sees a client only
+    // through the request it is quoting or has won (see garageClientView).
+    const auth = requireClientOwner(request, clientId)
+    if (auth instanceof NextResponse) return auth
 
     if (!clientId) {
       return NextResponse.json(
@@ -52,22 +50,9 @@ async function _GET(
       )
     }
 
-    // Return client data (excluding sensitive information)
-    const clientData = {
-      id: result.Item.id,
-      firstName: result.Item.firstName,
-      lastName: result.Item.lastName,
-      email: result.Item.email,
-      phoneNumber: result.Item.phoneNumber,
-      address: result.Item.address,
-      isActive: result.Item.isActive,
-      createdAt: result.Item.createdAt,
-      updatedAt: result.Item.updatedAt
-    }
-
     return NextResponse.json({
       success: true,
-      client: clientData
+      client: presentClient(result.Item)
     })
 
   } catch (error) {
@@ -82,6 +67,23 @@ async function _GET(
   }
 }
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/** What the profile screens get back — never the password hash or other internals. */
+function presentClient(item: Record<string, unknown>) {
+  return {
+    id: item.id,
+    firstName: item.firstName,
+    lastName: item.lastName,
+    email: item.email,
+    phoneNumber: item.phoneNumber,
+    address: item.address,
+    isActive: item.isActive,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt
+  }
+}
+
 async function _PUT(
   request: NextRequest,
   { params }: { params: Promise<{ clientId: string }> }
@@ -90,99 +92,139 @@ async function _PUT(
     const { clientId } = await params
 
     // Auth check: only the client can edit their own profile
-    const auth = requireOwner(request, clientId)
+    const auth = requireClientOwner(request, clientId)
     if (auth instanceof NextResponse) return auth
 
-    const body = await request.json()
-
-    if (!clientId) {
-      return NextResponse.json({ error: 'Client ID is required' }, { status: 400 })
+    const body = await request.json().catch(() => null)
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Μη έγκυρο αίτημα' }, { status: 400 })
     }
 
-    // Validate required fields
-    if (!body.email) {
-      return NextResponse.json({ 
-        error: 'Email is required' 
-      }, { status: 400 })
+    // Login lowercases what it is given, so an address stored as typed ("Maria@…")
+    // could never be matched again and the owner was locked out of their account.
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+    if (!email) {
+      return NextResponse.json({ error: 'Το email είναι υποχρεωτικό' }, { status: 400 })
+    }
+    if (!EMAIL_PATTERN.test(email) || email.length > 254) {
+      return NextResponse.json({ error: 'Μη έγκυρη διεύθυνση email' }, { status: 400 })
     }
 
-    // Prepare update expression and values
-    const setExpressions: string[] = []
-    const removeExpressions: string[] = []
-    const expressionAttributeNames: Record<string, string> = {}
-    const expressionAttributeValues: Record<string, string | number | boolean> = {}
-
-    // Add fields to update
-    if (body.firstName) {
-      setExpressions.push('#firstName = :firstName')
-      expressionAttributeNames['#firstName'] = 'firstName'
-      expressionAttributeValues[':firstName'] = body.firstName
-    } else {
-      // Set default firstName if not provided
-      setExpressions.push('#firstName = :firstName')
-      expressionAttributeNames['#firstName'] = 'firstName'
-      expressionAttributeValues[':firstName'] = 'Επισκέπτης'
+    let firstName = typeof body.firstName === 'string' ? body.firstName.trim() : ''
+    if (firstName.length > 60) {
+      return NextResponse.json({ error: 'Το όνομα έχει όριο 60 χαρακτήρες' }, { status: 400 })
     }
 
-    if (body.lastName) {
-      setExpressions.push('#lastName = :lastName')
-      expressionAttributeNames['#lastName'] = 'lastName'
-      expressionAttributeValues[':lastName'] = body.lastName
-    }
-
-    if (body.email !== undefined) {
-      if (body.email === null) {
-        // Remove the email field if null is provided
-        removeExpressions.push('#email')
-        expressionAttributeNames['#email'] = 'email'
-      } else {
-        // Set the email field if a value is provided
-        setExpressions.push('#email = :email')
-        expressionAttributeNames['#email'] = 'email'
-        expressionAttributeValues[':email'] = body.email
+    // Older accounts were given their email's local part as `firstName`
+    // ("maria.papadopoulou84"). Garages are shown a first name before they win
+    // a job, and `quotingFirstName` hides such a value only while it still
+    // matches the current address — so when the address changes, the old local
+    // part becomes the placeholder instead of outliving the email it came from.
+    if (firstName) {
+      const current = (await dynamoDB.send(new GetCommand({
+        TableName: 'Clients',
+        Key: { id: clientId },
+        ProjectionExpression: 'email',
+      }))).Item
+      const oldLocal = typeof current?.email === 'string' ? current.email.split('@')[0].toLowerCase() : ''
+      if (oldLocal && firstName.toLowerCase() === oldLocal && email !== String(current?.email).toLowerCase()) {
+        firstName = ''
       }
     }
 
-    if (body.phoneNumber) {
-      setExpressions.push('#phoneNumber = :phoneNumber')
-      expressionAttributeNames['#phoneNumber'] = 'phoneNumber'
-      expressionAttributeValues[':phoneNumber'] = body.phoneNumber
+    // Optional fields: a value sets it, an empty string clears it, absent leaves it.
+    const optional: Record<string, { max: number; pattern?: RegExp; error: string }> = {
+      lastName: { max: 60, error: 'Το επώνυμο έχει όριο 60 χαρακτήρες' },
+      phoneNumber: { max: 20, pattern: /^\+?[\d\s-]{6,20}$/, error: 'Μη έγκυρος αριθμός τηλεφώνου' },
+      address: { max: 200, error: 'Η διεύθυνση έχει όριο 200 χαρακτήρες' },
     }
 
-    // Add updatedAt timestamp
-    setExpressions.push('#updatedAt = :updatedAt')
-    expressionAttributeNames['#updatedAt'] = 'updatedAt'
-    expressionAttributeValues[':updatedAt'] = new Date().toISOString()
-
-    // Build the update expression
-    let updateExpression = ''
-    if (setExpressions.length > 0) {
-      updateExpression += `SET ${setExpressions.join(', ')}`
+    const setExpressions: string[] = [
+      '#email = :email',
+      '#firstName = :firstName',
+      '#updatedAt = :updatedAt'
+    ]
+    const removeExpressions: string[] = []
+    const expressionAttributeNames: Record<string, string> = {
+      '#email': 'email',
+      '#firstName': 'firstName',
+      '#updatedAt': 'updatedAt'
     }
-    if (removeExpressions.length > 0) {
-      if (updateExpression) updateExpression += ' '
-      updateExpression += `REMOVE ${removeExpressions.join(', ')}`
+    const expressionAttributeValues: Record<string, string | number | boolean> = {
+      ':email': email,
+      ':firstName': firstName || 'Επισκέπτης',
+      ':updatedAt': new Date().toISOString()
     }
 
-    const updateCommand = new UpdateCommand({
+    for (const [field, rule] of Object.entries(optional)) {
+      const raw = body[field]
+      if (raw === undefined) continue
+      if (raw !== null && typeof raw !== 'string') {
+        return NextResponse.json({ error: rule.error }, { status: 400 })
+      }
+      const value = (raw ?? '').trim()
+      expressionAttributeNames[`#${field}`] = field
+      if (!value) {
+        removeExpressions.push(`#${field}`)
+        continue
+      }
+      if (value.length > rule.max || (rule.pattern && !rule.pattern.test(value))) {
+        return NextResponse.json({ error: rule.error }, { status: 400 })
+      }
+      setExpressions.push(`#${field} = :${field}`)
+      expressionAttributeValues[`:${field}`] = value
+    }
+
+    // One account per email. Clients.EmailIndex is keyed on email, so this is a point
+    // lookup; the owner keeping their own address is not a clash.
+    const holders = await dynamoDB.send(new QueryCommand({
       TableName: 'Clients',
-      Key: { id: clientId },
-      UpdateExpression: updateExpression,
-      ExpressionAttributeNames: expressionAttributeNames,
-      ExpressionAttributeValues: expressionAttributeValues,
-      ReturnValues: 'ALL_NEW'
-    })
+      IndexName: 'EmailIndex',
+      KeyConditionExpression: 'email = :email',
+      ExpressionAttributeValues: { ':email': email },
+      ProjectionExpression: 'id',
+    }))
+    if ((holders.Items ?? []).some((item) => item.id !== clientId)) {
+      return NextResponse.json(
+        { error: 'Το email χρησιμοποιείται ήδη από άλλον λογαριασμό.', code: 'EMAIL_EXISTS' },
+        { status: 409 }
+      )
+    }
 
-    const { Attributes } = await dynamoDB.send(updateCommand)
+    let updateExpression = `SET ${setExpressions.join(', ')}`
+    if (removeExpressions.length > 0) {
+      updateExpression += ` REMOVE ${removeExpressions.join(', ')}`
+    }
+
+    let Attributes: Record<string, unknown> | undefined
+    try {
+      const result = await dynamoDB.send(new UpdateCommand({
+        TableName: 'Clients',
+        Key: { id: clientId },
+        UpdateExpression: updateExpression,
+        // Without this an UpdateCommand on a deleted account quietly recreates a
+        // half-empty row from a still-valid session.
+        ConditionExpression: 'attribute_exists(id)',
+        ExpressionAttributeNames: expressionAttributeNames,
+        ExpressionAttributeValues: expressionAttributeValues,
+        ReturnValues: 'ALL_NEW'
+      }))
+      Attributes = result.Attributes
+    } catch (error) {
+      if (error instanceof Error && error.name === 'ConditionalCheckFailedException') {
+        return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+      }
+      throw error
+    }
 
     if (!Attributes) {
       return NextResponse.json({ error: 'Client not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: 'Client updated successfully',
-      client: Attributes 
+      client: presentClient(Attributes)
     })
 
   } catch (error) {

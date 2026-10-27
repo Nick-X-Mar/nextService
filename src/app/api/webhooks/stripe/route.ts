@@ -6,6 +6,7 @@ import { ensurePaymentsTable } from '@/utils/ensurePaymentTables'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { withMetrics } from '@/utils/withMetrics'
+import { invalidateUnread } from '@/utils/unreadCache'
 
 async function _POST(request: NextRequest) {
   try {
@@ -46,14 +47,20 @@ async function _POST(request: NextRequest) {
         // "does this booking still owe a deposit?" means scanning Payments,
         // which the notification summary would have to do on every poll.
         if (pi.metadata?.requestId) {
-          await dynamoDB.send(
+          const updated = await dynamoDB.send(
             new UpdateCommand({
               TableName: 'ServiceRequests',
               Key: { id: pi.metadata.requestId },
               UpdateExpression: 'SET depositPaidAt = :now, updatedAt = :now',
-              ExpressionAttributeValues: { ':now': now }
+              ExpressionAttributeValues: { ':now': now },
+              ReturnValues: 'ALL_NEW'
             })
           )
+          // The client's "εκκρεμεί η προκαταβολή" alert is computed from this
+          // field; drop their cached summary so it clears on the next poll. The
+          // client is read off the row, not the intent's metadata.
+          const clientId = updated.Attributes?.clientId
+          if (typeof clientId === 'string') invalidateUnread('client', clientId)
         }
 
         logEvent({

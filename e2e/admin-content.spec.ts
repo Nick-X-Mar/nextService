@@ -120,6 +120,48 @@ test.describe.serial('Admin content CMS', () => {
     expect(body.error).toContain('δεν επιτρέπεται')
   })
 
+  test('Only relative, https:, mailto: and tel: links are accepted', async ({ request }) => {
+    const current = await request.get('/api/admin/content/pages/contact/', {
+      headers: { Cookie: adminCookie },
+    })
+    const { page } = await current.json()
+
+    const attempt = (blocks: unknown[]) =>
+      request.put('/api/admin/content/pages/contact/', {
+        headers: { Cookie: adminCookie },
+        data: { ...page, blocks },
+      })
+
+    // Refused: a plain-http CTA or card, and any unsafe inline link in text.
+    for (const blocks of [
+      [{ id: 'http-cta', type: 'cta', label: 'Κλικ', href: 'http://example.com/', variant: 'primary' }],
+      [{ id: 'http-card', type: 'cards', items: [{ title: 'Τίτλος', body: 'Κείμενο', href: 'http://example.com/' }] }],
+      [{ id: 'proto-rel', type: 'cta', label: 'Κλικ', href: '//evil.example/', variant: 'primary' }],
+      [{ id: 'http-inline', type: 'paragraph', text: 'Δείτε [εδώ](http://example.com/) τις λεπτομέρειες.' }],
+      [{ id: 'js-inline', type: 'list', items: ['Ένα [κλικ](javascript:alert(1)) εδώ'] }],
+      [{ id: 'data-faq', type: 'faq', items: [{ question: 'Ερώτηση;', answer: '[Άνοιγμα](data:text/html,x)' }] }],
+    ]) {
+      const save = await attempt(blocks)
+      expect(save.status(), JSON.stringify(blocks)).toBe(400)
+      expect((await save.json()).error).toContain('δεν επιτρέπεται')
+    }
+
+    // Accepted: every allowed form, inline and as a CTA.
+    const ok = await attempt([
+      {
+        id: 'safe-links',
+        type: 'paragraph',
+        text: 'Γράψτε στο [email](mailto:info@nextservice.gr), καλέστε στο [τηλέφωνο](tel:+302100000000), δείτε τις [ερωτήσεις](/faq/) ή την [ΑΠΔΠΧ](https://www.dpa.gr).',
+      },
+      { id: 'safe-cta', type: 'cta', label: 'Επικοινωνία', href: 'https://nextservice.gr/contact/', variant: 'primary' },
+    ])
+    expect(ok.status()).toBe(200)
+
+    // Put the shipped copy back.
+    const reset = await request.delete('/api/admin/content/pages/contact/', { headers: { Cookie: adminCookie } })
+    expect(reset.status()).toBe(200)
+  })
+
   test('Duplicate block ids are refused', async ({ request }) => {
     const current = await request.get('/api/admin/content/pages/contact/', {
       headers: { Cookie: adminCookie },

@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNotifications } from '@/contexts/NotificationsContext'
 import { useNewRequestNotifier } from '@/hooks/useNewRequestNotifier'
+import { useNavigation } from '@/hooks/useNavigation'
 
 /**
  * The garage's bell: how many requests landed since it last looked, from any
@@ -18,8 +19,25 @@ export default function NewRequestBell() {
   const { liveRequests, availableRequests, markRequestsSeen } = useNotifications()
   const { soundEnabled, setSoundEnabled } = useNewRequestNotifier()
   const [open, setOpen] = useState(false)
+  // Which entry was tapped, so only that one spins while the feed loads.
+  const [tapped, setTapped] = useState<string | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
-  const router = useRouter()
+  const { navigate, isNavigating } = useNavigation()
+  const requestsHref = garage ? `/garage-dashboard/${garage.id}/?tab=requests` : ''
+  const opening = isNavigating(requestsHref)
+  const wasOpening = useRef(false)
+
+  // The panel stays open, spinner showing, until the feed has actually loaded;
+  // only then is the bell emptied. Clearing it on tap swapped the list for
+  // "no new requests" while the page was still on its way.
+  useEffect(() => {
+    if (wasOpening.current && !opening) {
+      markRequestsSeen()
+      setOpen(false)
+      setTapped(null)
+    }
+    wasOpening.current = opening
+  }, [opening, markRequestsSeen])
 
   useEffect(() => {
     if (!open) return
@@ -33,12 +51,11 @@ export default function NewRequestBell() {
   if (userType !== 'garage' || !garage?.isActive) return null
 
   const count = liveRequests.length
-  const requestsHref = `/garage-dashboard/${garage.id}/?tab=requests`
 
-  const openFeed = () => {
-    markRequestsSeen()
-    setOpen(false)
-    router.push(requestsHref)
+  const openFeed = (key: string) => {
+    if (opening) return
+    setTapped(key)
+    navigate(requestsHref)
   }
 
   return (
@@ -96,11 +113,14 @@ export default function NewRequestBell() {
                 <li key={r.id}>
                   <button
                     type="button"
-                    onClick={openFeed}
-                    className="w-full text-left px-4 py-3 hover:bg-surface-container transition-colors flex items-start gap-3"
+                    onClick={() => openFeed(r.id)}
+                    disabled={opening}
+                    className="w-full text-left px-4 py-3 hover:bg-surface-container transition-colors flex items-start gap-3 disabled:cursor-wait"
                   >
                     <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Icon name="build" size="sm" className="text-primary" />
+                      {opening && tapped === r.id
+                        ? <Spinner size="sm" className="text-primary" />
+                        : <Icon name="build" size="sm" className="text-primary" />}
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-bold text-on-surface truncate">{r.category}</p>
@@ -116,9 +136,11 @@ export default function NewRequestBell() {
 
           <button
             type="button"
-            onClick={openFeed}
-            className="w-full px-4 py-3 text-xs font-bold uppercase tracking-[0.1em] text-primary hover:bg-primary/5 transition-colors border-t border-outline-variant/10"
+            onClick={() => openFeed('all')}
+            disabled={opening}
+            className="w-full px-4 py-3 text-xs font-bold uppercase tracking-[0.1em] text-primary hover:bg-primary/5 transition-colors border-t border-outline-variant/10 flex items-center justify-center gap-2 disabled:cursor-wait"
           >
+            {opening && tapped === 'all' && <Spinner size="sm" />}
             Δες τα αιτήματα
           </button>
         </div>

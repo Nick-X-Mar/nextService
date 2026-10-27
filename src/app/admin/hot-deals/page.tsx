@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Spinner from '@/components/Spinner'
 import { useAsyncTask } from '@/hooks/useAsyncTask'
 import type { HotDeal } from '@/types/hotDeals'
+import { REQUEST_CATEGORIES, getCategoryText } from '@/utils/categoryLabels'
 
 const emptyDeal: Partial<HotDeal> = {
   title: '', subtitle: '', description: '', price: '', priceNum: 0,
@@ -252,8 +253,14 @@ export default function HotDealsAdminPage() {
                 onChange={(e) => setEditing({ ...editing, category: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg border border-outline-variant/30 bg-surface text-sm text-on-surface"
               >
-                <option value="service">Service</option>
-                <option value="fanopeia">Fanopeia</option>
+                {/* A deal saved before these were the choices (e.g. `fanopeia`)
+                    keeps its value visible until someone picks a real one. */}
+                {editing.category && !REQUEST_CATEGORIES.includes(editing.category) && (
+                  <option value={editing.category}>{getCategoryText(editing.category)}</option>
+                )}
+                {REQUEST_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{getCategoryText(c)}</option>
+                ))}
               </select>
             </div>
             <div>

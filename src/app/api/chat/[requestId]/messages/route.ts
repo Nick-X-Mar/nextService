@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
-import { requireAuth } from '@/utils/requireAuth'
 import { decodeCursor, encodeCursor, parseLimit } from '@/utils/pagination'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
-import { createChatMessage, resolveThread, isChatPermissionError } from '@/utils/chatService'
+import {
+  createChatMessage,
+  resolveThread,
+  isChatPermissionError,
+  requireChatParticipant,
+  threadWriteStateFor,
+  readOnlyNotice,
+  redactClientNames,
+  garageMayReadLegacyMessages,
+} from '@/utils/chatService'
 import { presignChatAttachments } from '@/utils/chatAttachments'
 
 const checkMessageRate = createRateLimiter('chat-message', 60, 3600000)
@@ -15,7 +23,7 @@ async function _GET(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
-    const auth = requireAuth(request)
+    const auth = await requireChatParticipant(request)
     if (auth instanceof NextResponse) return auth
 
     const { requestId } = await params
@@ -56,11 +64,16 @@ async function _GET(
 
     // Query messages by requestId via the RequestMessagesIndex GSI.
     // FilterExpression still narrows to a specific garage thread when requested.
+    //
+    // A client row without `garageId` predates per-garage threads. The client
+    // sees those in every thread (they wrote them); a garage only if it was
+    // part of the conversation — see garageMayReadLegacyMessages.
     const expressionValues: Record<string, unknown> = { ':requestId': requestId }
-    let filterExpression: string | undefined
+    const THREAD = '(senderId = :garageId OR (senderType = :clientType AND garageId = :garageId))'
+    const THREAD_WITH_LEGACY =
+      '(senderId = :garageId OR (senderType = :clientType AND (garageId = :garageId OR attribute_not_exists(garageId))))'
 
     if (garageId) {
-      filterExpression = '(senderId = :garageId OR (senderType = :clientType AND (garageId = :garageId OR attribute_not_exists(garageId))))'
       expressionValues[':garageId'] = garageId
       expressionValues[':clientType'] = 'client'
     }
@@ -86,45 +99,68 @@ async function _GET(
     // worst case so a pathological thread can't turn one request into an
     // unbounded scan.
     const MAX_INDEX_PAGES = 5
-    const pageSize = filterExpression ? Math.min(limit * 4, 200) : limit
 
     type ChatRow = Record<string, unknown> & { id?: string; timestamp?: string }
-    const collected: ChatRow[] = []
-    let startKey = decodeCursor(searchParams.get('cursor'))
-    let lastEvaluatedKey: Record<string, unknown> | undefined
-    let pages = 0
+    const cursor = decodeCursor(searchParams.get('cursor'))
 
-    do {
-      const page = await dynamoDB.send(new QueryCommand({
-        TableName: 'ChatMessages',
-        IndexName: 'RequestMessagesIndex',
-        KeyConditionExpression: 'requestId = :requestId',
-        ExpressionAttributeValues: expressionValues,
-        ...(filterExpression ? { FilterExpression: filterExpression } : {}),
-        ScanIndexForward: false,
-        Limit: pageSize,
-        ExclusiveStartKey: startKey,
-      }))
-      collected.push(...((page.Items || []) as ChatRow[]))
-      lastEvaluatedKey = page.LastEvaluatedKey
-      startKey = lastEvaluatedKey
-      pages++
-    } while (lastEvaluatedKey && collected.length < limit && pages < MAX_INDEX_PAGES)
+    const readPage = async (filterExpression: string | undefined) => {
+      const pageSize = filterExpression ? Math.min(limit * 4, 200) : limit
+      const collected: ChatRow[] = []
+      let startKey = cursor
+      let lastEvaluatedKey: Record<string, unknown> | undefined
+      let pages = 0
 
-    // Trim to the page the caller asked for. When we overshot, the resume
-    // point is the last row we are actually returning — `LastEvaluatedKey`
-    // points past it and would skip everything in between. The index is
-    // (requestId, timestamp) over a table keyed by `id`, so those three
-    // attributes are the whole key.
-    const overshot = collected.length > limit
-    const kept = overshot ? collected.slice(0, limit) : collected
-    const boundary = kept[kept.length - 1]
-    const nextCursorKey = overshot && boundary
-      ? { requestId, timestamp: boundary.timestamp, id: boundary.id }
-      : lastEvaluatedKey
+      do {
+        const page = await dynamoDB.send(new QueryCommand({
+          TableName: 'ChatMessages',
+          IndexName: 'RequestMessagesIndex',
+          KeyConditionExpression: 'requestId = :requestId',
+          ExpressionAttributeValues: expressionValues,
+          ...(filterExpression ? { FilterExpression: filterExpression } : {}),
+          ScanIndexForward: false,
+          Limit: pageSize,
+          ExclusiveStartKey: startKey,
+        }))
+        collected.push(...((page.Items || []) as ChatRow[]))
+        lastEvaluatedKey = page.LastEvaluatedKey
+        startKey = lastEvaluatedKey
+        pages++
+      } while (lastEvaluatedKey && collected.length < limit && pages < MAX_INDEX_PAGES)
 
-    // Back to chronological order for rendering.
-    const ordered = [...kept].reverse()
+      // Trim to the page the caller asked for. When we overshot, the resume
+      // point is the last row we are actually returning — `LastEvaluatedKey`
+      // points past it and would skip everything in between. The index is
+      // (requestId, timestamp) over a table keyed by `id`, so those three
+      // attributes are the whole key.
+      const overshot = collected.length > limit
+      const kept = overshot ? collected.slice(0, limit) : collected
+      const boundary = kept[kept.length - 1]
+      const nextCursorKey = overshot && boundary
+        ? { requestId, timestamp: boundary.timestamp, id: boundary.id }
+        : lastEvaluatedKey
+      return { kept, nextCursorKey }
+    }
+
+    let page = await readPage(garageId ? THREAD_WITH_LEGACY : undefined)
+    // Legacy rows are rare and only ever fewer, so the involvement check runs
+    // only when this page actually holds one, and a garage that may not see
+    // them gets the page re-read without them — same cursor, same size.
+    if (
+      auth.userType === 'garage' &&
+      garageId &&
+      page.kept.some((m) => m.senderType === 'client' && !m.garageId) &&
+      !(await garageMayReadLegacyMessages(requestResult.Item, garageId))
+    ) {
+      page = await readPage(THREAD)
+    }
+    const { kept, nextCursorKey } = page
+
+    // Back to chronological order for rendering. A garage sees the client's
+    // name as the winner-only rule allows, on old rows as much as new ones.
+    const chronological = [...kept].reverse()
+    const ordered = auth.userType === 'garage' && garageId
+      ? await redactClientNames(chronological, requestResult.Item, garageId)
+      : chronological
     // Attachments are stored as S3 keys against a private bucket; the viewer
     // gets a short-lived signed URL minted here.
     const messages = await presignChatAttachments(ordered)
@@ -139,11 +175,22 @@ async function _GET(
     const readKey = auth.userType === 'garage' ? auth.userId : garageId
     const lastReadAt = readKey ? readMap?.[readKey] ?? null : null
 
+    // Whether this thread still takes messages, from the same rule the POST
+    // enforces — so the composer and the server can never disagree about it.
+    const writeState = garageId
+      ? await threadWriteStateFor(requestResult.Item, garageId, auth.userType)
+      : { canWrite: false }
+
     return NextResponse.json({
       success: true,
       messages,
       lastReadAt,
       nextCursor: encodeCursor(nextCursorKey),
+      canWrite: writeState.canWrite,
+      readOnlyNotice:
+        !writeState.canWrite && writeState.reason
+          ? readOnlyNotice(writeState.reason, auth.userType)
+          : null,
     }, {
       // Private, and never reusable. Safari is markedly more willing than
       // Chrome to serve a directive-less fetch() GET from its disk cache, and
@@ -169,7 +216,7 @@ async function _POST(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
-    const auth = requireAuth(request)
+    const auth = await requireChatParticipant(request)
     if (auth instanceof NextResponse) return auth
 
     if (!checkMessageRate(auth.userId)) {
@@ -180,7 +227,8 @@ async function _POST(
     }
 
     const { requestId } = await params
-    const body = await request.json()
+    const parsed: unknown = await request.json().catch(() => null)
+    const body = (parsed && typeof parsed === 'object' ? parsed : {}) as { message?: unknown; garageId?: unknown }
 
     if (!requestId) {
       return NextResponse.json({
@@ -196,17 +244,18 @@ async function _POST(
       return NextResponse.json({ error: 'Request not found' }, { status: 404 })
     }
 
-    const { message, garageId } = body
+    const { message } = body
+    const garageId = typeof body.garageId === 'string' ? body.garageId : null
 
     if (!message || typeof message !== 'string' || !message.trim()) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
     }
 
-    // Ownership, thread selection and the post-appointment read-only rule all
-    // live in one place, shared with the attachments route.
-    const thread = resolveThread(auth, requestResult.Item, garageId)
+    // Ownership, thread selection and the read-only rule once the request has
+    // left the market all live in one place, shared with the attachments route.
+    const thread = await resolveThread(auth, requestResult.Item, garageId)
     if (isChatPermissionError(thread)) {
-      return NextResponse.json({ error: thread.error }, { status: thread.status })
+      return NextResponse.json({ error: thread.error, code: thread.code }, { status: thread.status })
     }
 
     const messageData = await createChatMessage({

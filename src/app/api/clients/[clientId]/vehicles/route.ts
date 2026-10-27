@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { QueryCommand } from '@aws-sdk/lib-dynamodb'
-import { requireOwner } from '@/utils/requireAuth'
+import { requireClientOwner } from '@/app/api/clients/requireClientOwner'
 import { withMetrics } from '@/utils/withMetrics'
+import { presentVehicle } from '@/app/api/vehicles/vehicleView'
 
 async function _GET(
   request: NextRequest,
@@ -12,7 +13,7 @@ async function _GET(
     const { clientId } = await params
 
     // Auth check: only the client can see their vehicles
-    const auth = requireOwner(request, clientId)
+    const auth = requireClientOwner(request, clientId)
     if (auth instanceof NextResponse) return auth
 
     if (!clientId) {
@@ -50,28 +51,9 @@ async function _GET(
       })
     }
 
-    // Return vehicle data
-    const vehicles = result.Items.map((vehicle) => ({
-      id: vehicle.id,
-      clientId: vehicle.clientId,
-      brand: vehicle.brand,
-      model: vehicle.model,
-      modelYear: vehicle.modelYear,
-      engineCC: vehicle.engineCC,
-      fuelType: vehicle.fuelType,
-      isAutomatic: vehicle.isAutomatic,
-      is4x4: vehicle.is4x4,
-      isTurbo: vehicle.isTurbo,
-      licensePlate: vehicle.licensePlate,
-      engineNumber: vehicle.engineNumber,
-      vinNumber: vehicle.vinNumber,
-      color: vehicle.color,
-      nickname: vehicle.nickname,
-      licensePhotoUrl: vehicle.licensePhotoUrl,
-      isActive: vehicle.isActive,
-      createdAt: vehicle.createdAt,
-      updatedAt: vehicle.updatedAt
-    }))
+    // Presigned per request: the άδεια photo is a private S3 key, and the form shows
+    // it straight back to the customer when they pick this car for a new request.
+    const vehicles = await Promise.all(result.Items.map(presentVehicle))
 
     return NextResponse.json({
       success: true,

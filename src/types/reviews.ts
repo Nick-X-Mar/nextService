@@ -6,6 +6,8 @@
  * rate the client. Once it does, the client is asked to rate the garage.
  */
 
+import { athensDateTime } from '@/utils/athensTime'
+
 /** Greek standard VAT rate, as a percentage. */
 export const DEFAULT_VAT_RATE = 24
 
@@ -160,16 +162,15 @@ export function splitVat(
 /**
  * The moment an appointment is considered over.
  *
- * Appointments are stored as a local date plus an optional 'HH:MM', with no
- * timezone — every date comparison in this app is local-midnight arithmetic.
+ * Appointments are stored as an Athens date plus an optional 'HH:MM', with no
+ * timezone, so they are read as Europe/Athens wall-clock (`athensDateTime`)
+ * whatever zone the server or browser runs in.
  * A missing time means the appointment predates hourly slots, so it is treated
  * as running to the end of the working day.
  */
 export function appointmentEndsAt(date: string, time?: string | null): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null
   const clock = time && /^\d{2}:\d{2}$/.test(time) ? time : ASSUMED_APPOINTMENT_END
-  const parsed = new Date(`${date}T${clock}:00`)
-  return isNaN(parsed.getTime()) ? null : parsed
+  return athensDateTime(date, clock)
 }
 
 /** Whether enough time has passed since the appointment to ask about it. */

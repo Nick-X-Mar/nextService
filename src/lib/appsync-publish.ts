@@ -98,12 +98,16 @@ export async function publishOverHttp(
   let body: string
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
 
+  // Always a bearer token — never the API key, which AppSync no longer
+  // accepts. The mock verifies it the same way, so a missing or mismatched
+  // REALTIME_JWT_SECRET shows up locally instead of first in production.
+  const token = await systemToken()
+  if (!token) return false
+  headers.Authorization = `Bearer ${token}`
+
   if (endpoints.kind === 'mock') {
     body = JSON.stringify({ roomId: channelName, message })
   } else {
-    const token = await systemToken()
-    if (!token) return false
-    headers.Authorization = `Bearer ${token}`
     headers.host = endpoints.host
     body = JSON.stringify({
       channel: `/default/${channelName}`,

@@ -15,6 +15,8 @@
  * historical offer look unbookable.
  */
 
+import { athensDateTime, isPastAthensDate } from '@/utils/athensTime'
+
 export type AvailabilitySlots = Record<string, string[]>
 
 /** Fallback when a garage has not filled in its working hours. */
@@ -90,6 +92,55 @@ export function sanitizeSlots(
     out[date] = clean
   }
   return out
+}
+
+/**
+ * Gives every date that has no slot entry the garage's whole working day.
+ *
+ * No entry means "book by day, no hour" (see `slotsForDate`) — right for an
+ * offer made before slots existed, wrong for a new one: the grid showed the
+ * garage every hour as open, and leaving it untouched means exactly that. Sent
+ * as-is, the client would book a day with no hour, contradicting the "pick one
+ * of the available hours" the garage was promised.
+ */
+export function fillMissingSlots(
+  slots: AvailabilitySlots,
+  dates: string[],
+  dayHours: string[]
+): AvailabilitySlots {
+  const out: AvailabilitySlots = { ...slots }
+  for (const date of dates) {
+    if (!Array.isArray(out[date])) out[date] = [...dayHours]
+  }
+  return out
+}
+
+/** A real calendar date written 'YYYY-MM-DD' ('2026-02-30' is not one). */
+export function isValidDate(value: unknown): value is string {
+  return typeof value === 'string' && athensDateTime(value, '00:00') !== null
+}
+
+/**
+ * Validates a list of availability dates from a request body: real dates, none
+ * before Athens' today, at most `max` of them. Returns them deduplicated and
+ * sorted, or a Greek error message for the API to send back.
+ */
+export function parseAvailabilityDates(
+  raw: unknown,
+  max: number
+): { dates: string[] } | { error: string } {
+  if (raw === undefined || raw === null) return { dates: [] }
+  if (!Array.isArray(raw) || !raw.every(isValidDate)) {
+    return { error: 'Μη έγκυρες ημερομηνίες διαθεσιμότητας' }
+  }
+  const dates = Array.from(new Set(raw)).sort()
+  if (dates.length > max) {
+    return { error: `Μπορείτε να δηλώσετε έως ${max} ημερομηνίες` }
+  }
+  if (dates.some((d) => isPastAthensDate(d))) {
+    return { error: 'Μία ή περισσότερες ημερομηνίες έχουν ήδη περάσει' }
+  }
+  return { dates }
 }
 
 /** Dates the garage kept but left with no bookable hour. */

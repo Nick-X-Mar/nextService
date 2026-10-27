@@ -51,7 +51,7 @@ async function _POST(request: NextRequest) {
       return NextResponse.json({ error: 'Λείπει το token επαναφοράς' }, { status: 400 })
     }
     if (!['client', 'garage'].includes(userType)) {
-      return NextResponse.json({ error: 'Invalid userType' }, { status: 400 })
+      return NextResponse.json({ error: 'Μη έγκυρος τύπος λογαριασμού' }, { status: 400 })
     }
     if (!newPassword || typeof newPassword !== 'string' || newPassword.length < MIN_PASSWORD_LENGTH) {
       return NextResponse.json(
@@ -63,16 +63,24 @@ async function _POST(request: NextRequest) {
     const tableName = userType === 'garage' ? 'Garages' : 'Clients'
     const tokenHash = hashToken(token)
 
-    // Find user by reset token hash. DynamoDB scan is fine here — password
-    // reset is rare and we don't want to add a GSI just for this.
-    const result = await dynamoDB.send(
-      new ScanCommand({
-        TableName: tableName,
-        FilterExpression: 'passwordResetTokenHash = :h',
-        ExpressionAttributeValues: { ':h': tokenHash }
-      })
-    )
-    const user = result.Items?.[0]
+    // Find user by reset token hash. A scan is acceptable — password reset is
+    // rare and we don't want a GSI just for this — but it must walk every page:
+    // the filter runs per 1MB page, so stopping after the first one fails the
+    // reset for anyone whose row happens to sit further into the table.
+    let user: { id: string; passwordResetExpiresAt?: string } | undefined
+    let ExclusiveStartKey: Record<string, unknown> | undefined
+    do {
+      const page = await dynamoDB.send(
+        new ScanCommand({
+          TableName: tableName,
+          FilterExpression: 'passwordResetTokenHash = :h',
+          ExpressionAttributeValues: { ':h': tokenHash },
+          ExclusiveStartKey
+        })
+      )
+      user = page.Items?.[0] as typeof user
+      ExclusiveStartKey = page.LastEvaluatedKey
+    } while (!user && ExclusiveStartKey)
 
     if (!user) {
       return NextResponse.json(
@@ -91,18 +99,32 @@ async function _POST(request: NextRequest) {
 
     const newHash = await hashPassword(newPassword)
 
-    await dynamoDB.send(
-      new UpdateCommand({
-        TableName: tableName,
-        Key: { id: user.id },
-        UpdateExpression:
-          'SET passwordHash = :p, updatedAt = :u REMOVE passwordResetTokenHash, passwordResetExpiresAt',
-        ExpressionAttributeValues: {
-          ':p': newHash,
-          ':u': new Date().toISOString()
-        }
-      })
-    )
+    // Conditioned on the token still being the one presented, so two
+    // concurrent submits of the same link cannot both set a password.
+    try {
+      await dynamoDB.send(
+        new UpdateCommand({
+          TableName: tableName,
+          Key: { id: user.id },
+          UpdateExpression:
+            'SET passwordHash = :p, updatedAt = :u REMOVE passwordResetTokenHash, passwordResetExpiresAt',
+          ConditionExpression: 'passwordResetTokenHash = :h AND passwordResetExpiresAt > :u',
+          ExpressionAttributeValues: {
+            ':p': newHash,
+            ':h': tokenHash,
+            ':u': new Date().toISOString()
+          }
+        })
+      )
+    } catch (err) {
+      if (err instanceof Error && err.name === 'ConditionalCheckFailedException') {
+        return NextResponse.json(
+          { error: 'Ο σύνδεσμος επαναφοράς δεν είναι έγκυρος ή έχει ήδη χρησιμοποιηθεί' },
+          { status: 409 }
+        )
+      }
+      throw err
+    }
 
     logEvent({
       eventName: EventName.PasswordResetCompleted,

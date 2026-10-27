@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { RequestDetailsPanel } from '@/components'
+import { RequestDetailsPanel, ReviewPanel } from '@/components'
 import { styles } from '@/styles/styles'
 import { ServiceRequestStatus } from '@/types/statuses'
 import type { ServiceRequest } from '@/types/requests'
@@ -13,7 +13,10 @@ import { useChatAttachments, MAX_CHAT_ATTACHMENTS } from '@/hooks/useChatAttachm
 import appSyncService from '@/lib/appsync-service'
 import { useNotifications } from '@/contexts/NotificationsContext'
 import { useToast } from '@/hooks/useToast'
+import { useNavigation } from '@/hooks/useNavigation'
 import { getCategoryText } from '@/utils/categoryLabels'
+import { isGarageInactive } from '../../../components/garageInactive'
+import GaragePendingView from '../../../chats/components/GaragePendingView'
 
 interface Message {
   id: string
@@ -48,13 +51,19 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const attachments = useChatAttachments()
   const router = useRouter()
+  const { back, isNavigating } = useNavigation()
   const { refresh: refreshUnread } = useNotifications()
   const { showToast } = useToast()
-  // Read-only once the job is booked — unless this is the garage that got it, which
-  // still has an appointment to arrange with the customer.
-  const isReadOnly =
-    requestData?.status === ServiceRequestStatus.APPOINTMENT &&
-    requestData?.acceptedGarageId !== garageId
+  // Whether this thread still takes messages comes from the server, which
+  // applies the same rule to the send: once the request leaves the market only
+  // the garage that got the job may write, and nobody once it is cancelled.
+  // Working it out here as well is how the two drifted apart before.
+  const [readOnlyNotice, setReadOnlyNotice] = useState<string | null>(null)
+  const isReadOnly = readOnlyNotice !== null
+  // The server answered GARAGE_INACTIVE: not approved yet, or deactivated
+  // since the session was cached. The pending screen replaces the chat.
+  const [inactive, setInactive] = useState(false)
+  const isWinner = !!requestData?.acceptedGarageId && requestData.acceptedGarageId === garageId
 
   // Subscription refs
   const subscriptionRef = useRef<string | null>(null)
@@ -193,35 +202,48 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
         fetch(`/api/chat/${requestId}/messages/?garageId=${garageId}`, { cache: 'no-store' }),
       ])
 
-      if (requestResponse.ok) {
-        const requestResult = await requestResponse.json()
+      const [requestResult, garageResult, messagesResult] = await Promise.all([
+        requestResponse.json().catch(() => null),
+        garageResponse.json().catch(() => null),
+        messagesResponse.json().catch(() => null),
+      ])
+
+      if (isGarageInactive(requestResponse, requestResult) || isGarageInactive(messagesResponse, messagesResult)) {
+        setInactive(true)
+        return
+      }
+      setInactive(false)
+
+      if (requestResponse.ok && requestResult) {
         // Some endpoints return { success, request }, others may return just { request }
         const request = requestResult.request || requestResult
         setRequestData(request)
       }
 
-      if (garageResponse.ok) {
-        const garageResult = await garageResponse.json()
-        if (garageResult.success) {
-          setGarageData(garageResult.garage)
-        }
+      if (garageResponse.ok && garageResult?.success) {
+        setGarageData(garageResult.garage)
       }
 
-      if (messagesResponse.ok) {
-        const messagesResult = await messagesResponse.json()
-        if (messagesResult.success) {
-          const validMessages = (messagesResult.messages || []).filter(
-            (msg: Message) => msg.timestamp && !isNaN(new Date(msg.timestamp).getTime())
-          )
-          setOlderCursor(messagesResult.nextCursor ?? null)
-          setMessages(validMessages)
-        }
-      }
+      if (messagesResponse.ok && messagesResult?.success) {
+        const validMessages = (messagesResult.messages || []).filter(
+          (msg: Message) => msg.timestamp && !isNaN(new Date(msg.timestamp).getTime())
+        )
+        setOlderCursor(messagesResult.nextCursor ?? null)
+        setMessages(validMessages)
+        setReadOnlyNotice(
+          messagesResult.canWrite === false
+            ? messagesResult.readOnlyNotice || 'Η συνομιλία είναι μόνο για ανάγνωση.'
+            : null
+        )
 
-      // Fire-and-forget: real-time is an enhancement on top of the messages we
-      // just fetched, never a preconditon for showing them.
-      console.log('[Garage] Starting AppSync subscription...')
-      void subscribeToMessages()
+        // Fire-and-forget: real-time is an enhancement on top of the messages
+        // we just fetched, never a precondition for showing them. Only once
+        // the server has let us read the thread, though — subscribing after
+        // it refused would hold a socket open on a conversation this garage
+        // may not see.
+        console.log('[Garage] Starting AppSync subscription...')
+        void subscribeToMessages()
+      }
     } catch (error) {
       console.error('Error loading chat data:', error)
     } finally {
@@ -304,6 +326,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
         setIsSending(true)
         const result = await attachments.upload({ requestId, garageId, caption: text })
         if (!result.ok) {
+          if (result.code === 'CHAT_READ_ONLY') setReadOnlyNotice(result.error)
           showToast({ type: 'error', title: result.error })
           return
         }
@@ -357,6 +380,11 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
         }
       } else {
         const err = await response.json().catch(() => ({}))
+        // The request changed hands (or was cancelled) while this page was
+        // open: lock the composer instead of letting every retry fail.
+        if (err.code === 'CHAT_READ_ONLY') {
+          setReadOnlyNotice(err.error || 'Η συνομιλία είναι μόνο για ανάγνωση.')
+        }
         showToast({ type: 'error', title: err.error || 'Δεν στάλθηκε το μήνυμα. Δοκιμάστε ξανά.' })
       }
     } catch (error) {
@@ -410,6 +438,10 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     return groups
   }, [])
 
+  if (inactive) {
+    return <GaragePendingView garageId={garageId} onApproved={loadChatData} />
+  }
+
   if (isLoading) {
     return (
       <div className="app-viewport bg-surface flex items-center justify-center">
@@ -430,8 +462,8 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
           </div>
           <h2 className={`${styles.sectionTitle} mb-2`}>Σφάλμα</h2>
           <p className={`${styles.bodyText} mb-6`}>Δεν ήταν δυνατή η φόρτωση των δεδομένων.</p>
-          <button onClick={() => router.back()} className={styles.btnOutline}>
-            <Icon name="arrow_back" size="sm" />
+          <button onClick={back} disabled={isNavigating('__back__')} className={styles.btnOutline}>
+            {isNavigating('__back__') ? <Spinner size="sm" /> : <Icon name="arrow_back" size="sm" />}
             Επιστροφή
           </button>
         </div>
@@ -446,23 +478,32 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
         <div className="max-w-3xl mx-auto px-5 md:px-8">
           <div className="flex items-center gap-3 py-3">
             <button
-              onClick={() => router.back()}
-              className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-highest transition-colors flex-shrink-0"
+              onClick={back}
+              disabled={isNavigating('__back__')}
+              className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center hover:bg-surface-container-highest transition-colors flex-shrink-0 disabled:opacity-60"
             >
-              <Icon name="arrow_back" size="sm" className="text-on-surface" />
+              {isNavigating('__back__')
+                ? <Spinner size="sm" className="text-on-surface" />
+                : <Icon name="arrow_back" size="sm" className="text-on-surface" />}
             </button>
             <div className="flex-1 min-w-0">
+              {/* The request route sends the surname only to the garage that won
+                  the job, and no first name at all for an account without one. */}
               <h1 className="text-base font-bold text-on-surface truncate">
-                {requestData.client?.firstName} {requestData.client?.lastName}
+                {[requestData.client?.firstName, requestData.client?.lastName].filter(Boolean).join(' ') || 'Πελάτης'}
               </h1>
               <p className="text-xs text-secondary truncate">
                 {requestData.vehicle?.brand} {requestData.vehicle?.model} -- {getCategoryText(requestData.category)}
               </p>
             </div>
-            {isReadOnly && (
-              <span className={styles.statusAppointment}>
-                Ραντεβού
-              </span>
+            {isWinner && requestData.status === ServiceRequestStatus.APPOINTMENT && (
+              <span className={styles.statusAppointment}>Ραντεβού</span>
+            )}
+            {isWinner && requestData.status === ServiceRequestStatus.COMPLETED && (
+              <span className={styles.statusCompleted}>Ολοκληρώθηκε</span>
+            )}
+            {requestData.status === ServiceRequestStatus.CANCELLED && (
+              <span className={styles.statusCancelled}>Ακυρώθηκε</span>
             )}
           </div>
         </div>
@@ -546,6 +587,20 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
               </div>
             ))
           )}
+          {/* The job is closed: rating the client is the last step of it, and
+              the "αξιολόγησε" alert points here. Below the conversation so it
+              is what the page scrolls to on arrival. */}
+          {isWinner && requestData.status === ServiceRequestStatus.COMPLETED && (
+            <div className="mt-6">
+              <ReviewPanel
+                requestId={requestId}
+                counterpartyLabel="τον πελάτη"
+                counterpartyName={
+                  [requestData.client?.firstName, requestData.client?.lastName].filter(Boolean).join(' ') || undefined
+                }
+              />
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
       </div>
@@ -556,7 +611,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
           <div className="max-w-3xl mx-auto px-5 md:px-8 py-3">
             <div className="flex items-center gap-2 justify-center text-sm text-secondary bg-surface-container rounded-xl px-4 py-3">
               <Icon name="lock" size="sm" className="text-secondary" />
-              <span>Το αίτημα ανατέθηκε σε άλλο συνεργείο -- η συνομιλία είναι μόνο για ανάγνωση.</span>
+              <span>{readOnlyNotice}</span>
             </div>
           </div>
         </div>

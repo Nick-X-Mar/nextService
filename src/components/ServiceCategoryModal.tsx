@@ -5,25 +5,23 @@ import Modal from '@/components/Modal'
 import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
 import { useNavigation } from '@/hooks/useNavigation'
-import { saveFormData } from '@/utils/formStorage'
-
-const categories = [
-  { icon: 'settings', label: 'Συμπλέκτης (Δίσκος-πλατό)', value: 'symplektis' },
-  { icon: 'conveyor_belt', label: 'Ιμάντας', value: 'imantas' },
-  { icon: 'format_paint', label: 'Ολική Βαφή', value: 'oliki-vafi' },
-  { icon: 'brush', label: 'Μερική Βαφή', value: 'meriki-vafi' },
-  { icon: 'sensors', label: 'Αισθητήρες', value: 'aisthitires' },
-  { icon: 'oil_barrel', label: 'Αλλαγή λαδιών', value: 'allagi-ladion' },
-]
+import { startNewRequest } from '@/utils/formStorage'
+import { SERVICE_CATEGORIES as categories } from '@/utils/categoryLabels'
 
 interface ServiceCategoryModalProps {
   isOpen: boolean
   onClose: () => void
   /** Optional extra form data to save alongside the category (e.g. pre-filled vehicle data) */
   extraFormData?: Record<string, unknown>
+  /**
+   * Pick a category for the draft already in progress instead of starting a new
+   * request: the modal neither touches form storage nor navigates, it just hands the
+   * choice back. Used on /car-details itself.
+   */
+  onSelect?: (category: string) => void
 }
 
-export default function ServiceCategoryModal({ isOpen, onClose, extraFormData }: ServiceCategoryModalProps) {
+export default function ServiceCategoryModal({ isOpen, onClose, extraFormData, onSelect }: ServiceCategoryModalProps) {
   const { navigate, isNavigating } = useNavigation()
   const [search, setSearch] = useState('')
   const [pendingCategory, setPendingCategory] = useState('')
@@ -33,9 +31,15 @@ export default function ServiceCategoryModal({ isOpen, onClose, extraFormData }:
     : categories
 
   const selectCategory = (value: string) => {
+    if (onSelect) {
+      onSelect(value)
+      return
+    }
     if (pendingCategory) return
     setPendingCategory(value)
-    saveFormData({ ...extraFormData, category: value })
+    // A new request: the previous draft's description, VIN and saved-vehicle link
+    // must not ride along into this one.
+    startNewRequest({ ...extraFormData, category: value })
     // No onClose() here on purpose: the modal stays up, spinner running, until
     // /car-details is ready and the navigation unmounts it. Closing first would
     // drop the spinner and leave the user on an unchanged page with no feedback.

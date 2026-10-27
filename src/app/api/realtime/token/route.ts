@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SignJWT } from 'jose'
-import { requireAuth } from '@/utils/requireAuth'
+import { requireActiveGarage, requireAuth } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
 
@@ -33,6 +33,14 @@ async function _GET(request: NextRequest) {
   try {
     const auth = requireAuth(request)
     if (auth instanceof NextResponse) return auth
+    // Every channel a garage may join carries client data, and a pending or
+    // deactivated garage still holds a valid session. Refusing the token is
+    // the first gate; the authorizer re-checks approval on every subscribe,
+    // since a token minted before a deactivation lives on for its TTL.
+    if (auth.userType === 'garage') {
+      const active = await requireActiveGarage(request)
+      if (active instanceof NextResponse) return active
+    }
 
     if (!checkRate(auth.userId)) {
       return NextResponse.json(

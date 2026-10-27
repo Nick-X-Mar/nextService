@@ -24,8 +24,8 @@ export default function NotificationSettings() {
           <Icon name="notifications_active" filled size="md" />
         </div>
         <div>
-          <h3 className="text-lg font-bold text-on-surface">Ειδοποιησεις Νεων Αιτηματων</h3>
-          <p className="text-xs text-secondary">Πως θελετε να ενημερωνεστε οταν φτανει νεο αιτημα</p>
+          <h3 className="text-lg font-bold text-on-surface">Ειδοποιήσεις Νέων Αιτημάτων</h3>
+          <p className="text-xs text-secondary">Πώς θέλετε να ενημερώνεστε όταν φτάνει νέο αίτημα</p>
         </div>
       </div>
 
@@ -34,8 +34,8 @@ export default function NotificationSettings() {
           <div className="flex items-center gap-3 min-w-0">
             <Icon name="volume_up" filled size="sm" className="text-primary" />
             <div className="min-w-0">
-              <p className="text-sm font-bold text-on-surface">Ηχητικη ειδοποιηση</p>
-              <p className="text-xs text-secondary truncate">Συντομος ηχος μολις φτασει νεο αιτημα</p>
+              <p className="text-sm font-bold text-on-surface">Ηχητική ειδοποίηση</p>
+              <p className="text-xs text-secondary truncate">Σύντομος ήχος μόλις φτάσει νέο αίτημα</p>
             </div>
           </div>
           <Switch checked={soundEnabled} onChange={setSoundEnabled} size="md" />
@@ -45,11 +45,11 @@ export default function NotificationSettings() {
           <div className="flex items-center gap-3 min-w-0">
             <Icon name="desktop_windows" filled size="sm" className="text-primary" />
             <div className="min-w-0">
-              <p className="text-sm font-bold text-on-surface">Ειδοποιηση συστηματος</p>
+              <p className="text-sm font-bold text-on-surface">Ειδοποίηση συστήματος</p>
               <p className="text-xs text-secondary truncate">
                 {browserNotifSupported
-                  ? 'Native ειδοποιηση οταν το παραθυρο δεν ειναι ενεργο'
-                  : 'Ο browser σας δεν υποστηριζει native ειδοποιησεις'}
+                  ? 'Ειδοποίηση του συστήματος όταν το παράθυρο δεν είναι ενεργό'
+                  : 'Ο browser σας δεν υποστηρίζει ειδοποιήσεις συστήματος'}
               </p>
             </div>
           </div>
@@ -63,7 +63,7 @@ export default function NotificationSettings() {
 
         {browserNotifSupported && browserNotifPermission === 'denied' && (
           <p className="text-xs text-error px-3">
-            Εχετε αρνηθει τις ειδοποιησεις στον browser. Αλλαξτε το απο τις ρυθμισεις του browser για να τις ενεργοποιησετε.
+            Έχετε αρνηθεί τις ειδοποιήσεις στον browser. Αλλάξτε το από τις ρυθμίσεις του browser για να τις ενεργοποιήσετε.
           </p>
         )}
       </div>

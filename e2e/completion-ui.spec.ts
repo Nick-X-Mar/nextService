@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test'
-import { registerClient, loginViaAPI, loginAsClient, loginAsGarage, TEST_GARAGE } from './helpers'
+import { registerClient, loginViaAPI, loginAsClient } from './helpers'
 import { ageAppointment } from './dynamo-helpers'
+import { athensDatePlus } from './d-helpers'
+import { newGarage, signInGarage } from './E-helpers'
 
 /**
  * The journey a real garage and a real client take after an appointment.
@@ -11,7 +13,10 @@ import { ageAppointment } from './dynamo-helpers'
  */
 
 const PASSWORD = 'TestPass123'
-const FUTURE_DATES = ['2027-06-10', '2027-06-11']
+const FUTURE_DATES = [athensDatePlus(30), athensDatePlus(31)]
+// The garage dashboard's CTA; matched with or without the enclitic accent
+// ("Δήλωσέ το") so a copy fix there does not read as a broken flow here.
+const DECLARE_CTA = /Δήλωσ[εέ] το/
 
 test('A garage closes a past appointment from the dashboard and the client reviews it', async ({
   page,
@@ -26,7 +31,11 @@ test('A garage closes a past appointment from the dashboard and the client revie
   const reg = await registerClient(request, email, PASSWORD)
   const clientId: string = reg.client.id
   const clientToken = (await loginViaAPI(request, email, PASSWORD, 'client')).token
-  const garageToken = (await loginViaAPI(request, TEST_GARAGE.email, TEST_GARAGE.password, 'garage')).token
+  // A garage of its own: the shared test garage carries hundreds of offers
+  // from earlier runs, and its Appointments tab can take longer to load than
+  // this test waits.
+  const shop = await newGarage(request, { prefix: 'completion-ui' })
+  const garageToken = shop.token
 
   const sr = await request.post('/api/service-request', {
     headers: { Cookie: `auth-token=${clientToken}` },
@@ -40,22 +49,23 @@ test('A garage closes a past appointment from the dashboard and the client revie
 
   const offer = await request.post('/api/offers', {
     headers: { Cookie: `auth-token=${garageToken}` },
-    data: { serviceRequestId: requestId, offerAmount: 180, benefits: [], availableDates: FUTURE_DATES },
+    data: { serviceRequestId: requestId, offerAmount: 180, benefits: [], availabilityDates: FUTURE_DATES },
   })
   const offerId = (await offer.json()).offer.id
 
-  await request.patch(`/api/requests/${requestId}/accept-offer/`, {
+  const accept = await request.patch(`/api/requests/${requestId}/accept-offer/`, {
     headers: { Cookie: `auth-token=${clientToken}` },
-    data: { offerId, appointmentDate: FUTURE_DATES[0], appointmentTime: '11:00', appointmentPrice: 180 },
+    data: { offerId, appointmentDate: FUTURE_DATES[0], appointmentTime: '11:00' },
   })
+  expect(accept.status(), await accept.text()).toBe(200)
 
   // The appointment has to be in the past for the prompt to open, and booking
   // one in the past is (correctly) impossible through the API.
   await ageAppointment(requestId, 2)
 
   // ── Garage: close the job ───────────────────────────────────────────────
-  await loginAsGarage(page, request)
-  await page.goto(`/garage-dashboard/${TEST_GARAGE.id}/?tab=appointments`)
+  await signInGarage(page, shop)
+  await page.goto(`/garage-dashboard/${shop.id}/?tab=appointments`)
 
   // Scope to the section: the standing alert banner carries a CTA with the
   // same label, and clicking that navigates instead of opening the modal.
@@ -71,9 +81,9 @@ test('A garage closes a past appointment from the dashboard and the client revie
   const row = awaiting
     .locator('div')
     .filter({ hasText: model })
-    .filter({ has: page.getByRole('button', { name: 'Δήλωσε το' }) })
+    .filter({ has: page.getByRole('button', { name: DECLARE_CTA }) })
     .last()
-  await row.getByRole('button', { name: 'Δήλωσε το' }).click()
+  await row.getByRole('button', { name: DECLARE_CTA }).click()
 
   const modal = page.getByRole('heading', { name: 'Ολοκλήρωση εργασίας' })
   await expect(modal).toBeVisible()

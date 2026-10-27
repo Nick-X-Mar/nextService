@@ -59,6 +59,10 @@ export function useChatAttachments() {
           return {
             ok: false as const,
             error: (data.error as string) || 'Η αποστολή της φωτογραφίας απέτυχε',
+            // Passed through so the page can react to *why* — 'CHAT_READ_ONLY'
+            // means the thread closed while it was open, and the composer
+            // must lock rather than let every retry fail the same way.
+            code: typeof data.code === 'string' ? data.code : undefined,
           }
         }
 
@@ -72,7 +76,7 @@ export function useChatAttachments() {
           message: data.message as Record<string, unknown> | undefined,
         }
       } catch {
-        return { ok: false as const, error: 'Η αποστολή της φωτογραφίας απέτυχε' }
+        return { ok: false as const, error: 'Η αποστολή της φωτογραφίας απέτυχε', code: undefined }
       } finally {
         setUploading(false)
       }

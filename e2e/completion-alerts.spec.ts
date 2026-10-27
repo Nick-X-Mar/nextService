@@ -1,6 +1,7 @@
 import { test, expect, type APIRequestContext } from '@playwright/test'
 import { registerClient, loginViaAPI, TEST_GARAGE } from './helpers'
 import { ageAppointment } from './dynamo-helpers'
+import { athensDatePlus } from './d-helpers'
 
 /**
  * The in-app prompts that actually drive the completion flow.
@@ -11,7 +12,7 @@ import { ageAppointment } from './dynamo-helpers'
  */
 
 const PASSWORD = 'TestPass123'
-const FUTURE_DATES = ['2027-05-20', '2027-05-21']
+const FUTURE_DATES = [athensDatePlus(30), athensDatePlus(31)]
 
 /**
  * The summary is cached per user for 20s. Routes that change what it counts
@@ -56,14 +57,15 @@ test('A passed appointment raises a completion prompt for the garage, then a rev
 
   const offer = await request.post('/api/offers', {
     headers: { Cookie: `auth-token=${garageToken}` },
-    data: { serviceRequestId: requestId, offerAmount: 150, benefits: [], availableDates: FUTURE_DATES },
+    data: { serviceRequestId: requestId, offerAmount: 150, benefits: [], availabilityDates: FUTURE_DATES },
   })
   const offerId = (await offer.json()).offer.id
 
-  await request.patch(`/api/requests/${requestId}/accept-offer/`, {
+  const accept = await request.patch(`/api/requests/${requestId}/accept-offer/`, {
     headers: { Cookie: `auth-token=${clientToken}` },
-    data: { offerId, appointmentDate: FUTURE_DATES[0], appointmentTime: '10:00', appointmentPrice: 150 },
+    data: { offerId, appointmentDate: FUTURE_DATES[0], appointmentTime: '10:00' },
   })
+  expect(accept.status(), await accept.text()).toBe(200)
 
   await ageAppointment(requestId, 2)
 

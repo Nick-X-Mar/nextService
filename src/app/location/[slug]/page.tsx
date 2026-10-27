@@ -8,6 +8,7 @@ import { RichLine } from '@/components/content/RichText'
 import type { AreaContent as Area } from '@/types/siteContent'
 import { getAllOffers } from '@/lib/offers'
 import { SITE_URL } from '@/lib/site-url'
+import { NEW_REQUEST_HREF } from '@/utils/formStorage'
 import {
   ORGANIZATION_ID,
   breadcrumbJsonLd,
@@ -207,7 +208,7 @@ export default async function LocationPage({ params }: PageProps) {
             <p className="mt-3 text-base text-secondary leading-relaxed">{area.detail}</p>
 
             <Link
-              href="/car-details/"
+              href={NEW_REQUEST_HREF}
               className="mt-6 inline-flex bg-gradient-to-br from-primary to-primary-container text-on-primary px-6 py-3 rounded-lg text-sm font-bold transition-all duration-200 active:scale-95 shadow-lg shadow-primary/20 items-center gap-2"
             >
               <Icon name="send" size="sm" />

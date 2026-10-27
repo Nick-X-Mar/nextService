@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
@@ -9,6 +8,7 @@ import { GarageStatusPanel } from '@/components'
 import { useToast } from '@/hooks/useToast'
 import { useAuth } from '@/contexts/AuthContext'
 import { useGarageApprovalWatch } from '@/hooks/useGarageApprovalWatch'
+import { useNavigation } from '@/hooks/useNavigation'
 import { styles } from '@/styles/styles'
 import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 
@@ -54,7 +54,7 @@ export default function RegisterProfessionalPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [justRegistered, setJustRegistered] = useState(false)
 
-  const router = useRouter()
+  const { navigate, isNavigating } = useNavigation()
   const { success, error } = useToast()
   const { userType, garage, isLoading: authLoading, logout, refreshGarage } = useAuth()
 
@@ -67,6 +67,22 @@ export default function RegisterProfessionalPage() {
     hasGarageSession && !isApproved,
     () => success('Ο λογαριασμός σας ενεργοποιήθηκε!', 'Μπορείτε πλέον να δείτε αιτήματα και να στείλετε προσφορές.')
   )
+
+  // GarageStatusPanel spins its "enter" button for as long as the promise it
+  // gets back is pending, so hand it one that settles when the navigation does.
+  const navigationDone = useRef<(() => void) | null>(null)
+  const navigating = isNavigating()
+  useEffect(() => {
+    if (!navigating && navigationDone.current) {
+      navigationDone.current()
+      navigationDone.current = null
+    }
+  }, [navigating])
+  const enterDashboard = (garageId: string) =>
+    new Promise<void>((resolve) => {
+      navigationDone.current = resolve
+      navigate(`/garage-dashboard/${garageId}/`)
+    })
 
   useEffect(() => {
     const savedEmail = sessionStorage.getItem('garageRegEmail')
@@ -157,7 +173,7 @@ export default function RegisterProfessionalPage() {
 
     if (showPasswordFields) {
       if (!password || password.length < MIN_PASSWORD_LENGTH) {
-        error('Σφάλμα', 'Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες')
+        error('Σφάλμα', `Ο κωδικός πρέπει να έχει τουλάχιστον ${MIN_PASSWORD_LENGTH} χαρακτήρες`)
         return false
       }
       if (password !== confirmPassword) {
@@ -246,7 +262,7 @@ export default function RegisterProfessionalPage() {
           justRegistered={justRegistered}
           onCheck={garage ? checkNow : undefined}
           isChecking={isChecking}
-          onEnter={garage ? () => router.push(`/garage-dashboard/${garage.id}/`) : undefined}
+          onEnter={garage ? () => enterDashboard(garage.id) : undefined}
           onLogout={garage ? logout : undefined}
         />
       </div>
@@ -311,7 +327,7 @@ export default function RegisterProfessionalPage() {
           <div>
             <p className="text-sm font-bold text-on-surface mb-1">Απαιτούμενα στοιχεία</p>
             <p className="text-xs text-secondary leading-relaxed">
-              Ολα τα πεδία είναι υποχρεωτικά. Ο ΑΦΜ πρέπει να είναι 9 ψηφία και ο αριθμός κινητού σε ελληνικό format.
+              Όλα τα πεδία είναι υποχρεωτικά. Ο ΑΦΜ πρέπει να είναι 9 ψηφία και ο αριθμός κινητού σε ελληνικό format.
             </p>
           </div>
         </div>
@@ -518,13 +534,16 @@ export default function RegisterProfessionalPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center">
-          <p className={styles.smallText}>
-            Έχετε ήδη λογαριασμό;{' '}
+          <p className={`${styles.smallText} flex items-center justify-center gap-1.5`}>
+            Έχετε ήδη λογαριασμό;
             <button
-              onClick={() => router.push('/')}
-              className={styles.linkText}
+              type="button"
+              onClick={() => navigate('/login/')}
+              disabled={isNavigating('/login/')}
+              className={`${styles.linkText} inline-flex items-center gap-1.5`}
             >
-              Επιστροφή στην Αρχική
+              {isNavigating('/login/') && <Spinner size="sm" />}
+              Σύνδεση
             </button>
           </p>
         </div>

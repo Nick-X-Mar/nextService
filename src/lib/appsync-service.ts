@@ -13,24 +13,41 @@ type ReconnectListener = () => void
  * Fetches a short-lived realtime token from our own API.
  *
  * The AppSync Events API is authorized by a Lambda that validates this token
- * and checks the caller against the channel they ask for. The API key is no
- * longer an access control — it is public in this bundle, so anyone holding it
- * could previously read or forge any conversation.
+ * and checks the caller against the channel they ask for. There is no fallback:
+ * the API key that used to stand in when this failed is public in the bundle,
+ * so a socket opened with it proved nothing about who was listening. No token,
+ * no connection — the reconnect and wake paths simply try again later.
  *
- * Cached until shortly before expiry so reconnects don't hit the API each time.
+ * Cached until shortly before expiry so reconnects and per-channel subscribe
+ * frames don't hit the API each time — and dropped by `resetIdentity()` the
+ * moment the tab's session changes hands. The token names the user it was
+ * minted for, so after a guest merge or a logout/login in the same tab the
+ * cached one would otherwise keep presenting the previous identity, and the
+ * authorizer would refuse every channel the new one opens until it expired.
  */
 let realtimeToken: { value: string; expiresAt: number } | null = null
+let tokenRequest: Promise<string | null> | null = null
+// Bumped on every identity reset. A fetch that started under an older value
+// was answered for the previous session's cookie, so its token is discarded.
+let tokenEpoch = 0
 
 async function getRealtimeToken(): Promise<string | null> {
   if (realtimeToken && realtimeToken.expiresAt > Date.now() + 30_000) {
     return realtimeToken.value
   }
-  // On the server there is no /api to call and no cookie to present — mint a
-  // system token directly. API routes publishing chat messages and request
-  // broadcasts take this path.
-  if (typeof window === 'undefined') {
-    return mintSystemToken()
-  }
+  // The server never holds a socket: it publishes over HTTP with its own
+  // system token (src/lib/appsync-publish.ts).
+  if (typeof window === 'undefined') return null
+  // A burst of subscribes after a reconnect shares one fetch.
+  if (tokenRequest) return tokenRequest
+  const request: Promise<string | null> = fetchRealtimeToken(tokenEpoch).finally(() => {
+    if (tokenRequest === request) tokenRequest = null
+  })
+  tokenRequest = request
+  return request
+}
+
+async function fetchRealtimeToken(epoch: number): Promise<string | null> {
   try {
     // Bounded on purpose. This runs before the socket exists, so it is not
     // covered by CONNECT_TIMEOUT_MS; a fetch that never settles used to leave
@@ -43,6 +60,7 @@ async function getRealtimeToken(): Promise<string | null> {
     if (!res.ok) return null
     const data = await res.json()
     if (!data?.token) return null
+    if (epoch !== tokenEpoch) return null
     realtimeToken = {
       value: data.token,
       expiresAt: Date.now() + (Number(data.expiresIn) || 900) * 1000,
@@ -53,52 +71,12 @@ async function getRealtimeToken(): Promise<string | null> {
   }
 }
 
-/**
- * The credential attached to every subscribe/publish frame.
- *
- * Browser: the realtime token fetched above. Server (API routes publishing
- * chat and request broadcasts): a token minted locally with the same secret and
- * `userType: 'system'`, which the authorizer accepts for publishing to any
- * channel. Falling back to the API key keeps the local mock server working,
- * since it has no authorizer in front of it.
- */
-/**
- * Signs a short-lived `system` token for server-side publishing.
- *
- * Server code is already trusted — it is the thing that decided the message is
- * legitimate — but the authorizer now requires a token on every publish, so it
- * needs one of its own. Never reachable from the browser: `jose` is imported
- * lazily inside the server-only branch so it stays out of the client bundle.
- */
-async function mintSystemToken(): Promise<string | null> {
-  const secret = process.env.REALTIME_JWT_SECRET
-  if (!secret) {
-    console.error('[appsync] REALTIME_JWT_SECRET not set — cannot publish')
-    return null
+/** The credential block AppSync (and the local mock) read off every frame. */
+function authorizationFor(token: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${token}`,
+    host: process.env.NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT || '',
   }
-  try {
-    const { SignJWT } = await import('jose')
-    const ttl = 300
-    const token = await new SignJWT({ userId: 'system', userType: 'system' })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuedAt()
-      .setAudience('appsync-events')
-      .setExpirationTime(`${ttl}s`)
-      .sign(new TextEncoder().encode(secret))
-    realtimeToken = { value: token, expiresAt: Date.now() + ttl * 1000 }
-    return token
-  } catch (err) {
-    console.error('[appsync] failed to mint system token', err)
-    return null
-  }
-}
-
-function buildAuthorization(): Record<string, string | undefined> {
-  const host = process.env.NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT
-  if (realtimeToken && realtimeToken.expiresAt > Date.now()) {
-    return { Authorization: `Bearer ${realtimeToken.value}`, host }
-  }
-  return { 'x-api-key': process.env.NEXT_PUBLIC_APPSYNC_API_KEY, host }
 }
 
 // Safari never gives up on a stalled WebSocket handshake by itself — the socket
@@ -128,7 +106,7 @@ function isMockEndpoint(): boolean {
  * NEXT_PUBLIC_APPSYNC_DEBUG=true; warnings and errors always print.
  */
 const DEBUG = process.env.NEXT_PUBLIC_APPSYNC_DEBUG === 'true'
-const debug = (...args: unknown[]) => { if (DEBUG) debug(...args) }
+const debug = (...args: unknown[]) => { if (DEBUG) console.log(...args) }
 
 class AppSyncService {
   private ws: WebSocket | null = null
@@ -142,6 +120,11 @@ class AppSyncService {
   // another live server-side subscription on the shared socket until it hit
   // AppSync's per-connection cap and started refusing new ones.
   private subscriptionIds: Map<string, string> = new Map()
+  // The reverse: AppSync Events data frames are `{ type: 'data', id, event }`,
+  // where `id` is the subscribe frame's id — they don't name the channel. With
+  // more than one subscription on the socket (every garage dashboard holds
+  // `new-requests` and `request-updates`) this is the only way to route them.
+  private channelBySubscriptionId: Map<string, string> = new Map()
   private reconnectListeners: Set<ReconnectListener> = new Set()
   private reconnectAttempts = 0
   private maxReconnectAttempts = 10
@@ -156,6 +139,10 @@ class AppSyncService {
   // Set by disconnect() so a deliberate teardown isn't mistaken for an outage.
   private intentionalClose = false
   private wakeListenersBound = false
+  // Bumped by resetIdentity(). Work that began under an older generation — a
+  // handshake, a subscribe waiting on its token — belongs to the previous
+  // session and must not attach itself to the new one.
+  private generation = 0
 
   constructor() {
     this.bindWakeListeners()
@@ -197,16 +184,25 @@ class AppSyncService {
     if (this.connectPromise) return this.connectPromise
 
     this.intentionalClose = false
-    this.connectPromise = this.openSocket().finally(() => {
-      this.connectPromise = null
+    const attempt: Promise<void> = this.openSocket().finally(() => {
+      // An identity reset may already have started a newer attempt.
+      if (this.connectPromise === attempt) this.connectPromise = null
     })
-    return this.connectPromise
+    this.connectPromise = attempt
+    return attempt
   }
 
   private async openSocket(): Promise<void> {
+    const generation = this.generation
     // Obtained before opening the socket: the authorizer rejects the
-    // connection without it.
-    const realtimeAuth = await getRealtimeToken()
+    // connection without it, and there is nothing else to present.
+    const token = await getRealtimeToken()
+    if (generation !== this.generation) {
+      throw new Error('Signed-in user changed while connecting — superseded')
+    }
+    if (!token) {
+      throw new Error('No realtime token (signed out, or /api/realtime/token failed) — not connecting')
+    }
     return new Promise((resolve, reject) => {
       // The handshake can end in onopen, onerror, onclose or the timeout below,
       // and on Safari more than one of those fires. Settle exactly once.
@@ -226,53 +222,29 @@ class AppSyncService {
       }
       try {
         const endpoint = process.env.NEXT_PUBLIC_APPSYNC_WEBSOCKET_ENDPOINT
-        const apiKey = process.env.NEXT_PUBLIC_APPSYNC_API_KEY
         const graphqlEndpoint = process.env.NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT
-        
-        debug('🔌 AppSync Environment Variables:')
-        debug('  WEBSOCKET_ENDPOINT:', endpoint)
-        debug('  API_KEY:', apiKey ? 'SET' : 'NOT SET')
-        debug('  GRAPHQL_ENDPOINT:', graphqlEndpoint)
-        
-        if (!endpoint || !apiKey || !graphqlEndpoint) {
+
+        if (!endpoint || !graphqlEndpoint) {
           throw new Error('AppSync configuration missing')
         }
 
-        debug('🔌 Connecting to AppSync Events WebSocket:', endpoint)
-        
-        // Authorization for AppSync Events. The Lambda authorizer reads the
-        // bearer token; `x-api-key` is kept for the local mock server only,
-        // which has no authorizer.
-        const authorization: Record<string, string> = realtimeAuth
-          ? { Authorization: `Bearer ${realtimeAuth}`, host: graphqlEndpoint }
-          : { 'x-api-key': apiKey, host: graphqlEndpoint }
-        
-        // Construct the protocol header for the connection (AWS AppSync Events format)
-        const getAuthProtocol = () => {
-          const header = btoa(JSON.stringify(authorization))
-            .replace(/\+/g, '-') // Convert '+' to '-'
-            .replace(/\//g, '_') // Convert '/' to '_'
-            .replace(/=+$/, '') // Remove padding '='
-          return `header-${header}`
-        }
-        
-        // Use AppSync Events WebSocket endpoint with proper protocol
-        const isLocal = isMockEndpoint()
-        const wsUrl = isLocal ? endpoint : `${endpoint}/event/realtime`
-        debug('🔌 AppSync Events WebSocket URL:', wsUrl)
-        
-        // Use the correct WebSocket protocol based on server type
-        if (isLocal) {
-          // Local server - simple WebSocket connection
-          this.ws = new WebSocket(wsUrl)
-        } else {
-          // AWS AppSync - use proper protocol
-          this.ws = new WebSocket(wsUrl, [
-            'aws-appsync-event-ws',
-            getAuthProtocol(),
-          ])
-        }
-        
+        // AppSync Events reads the connection's credentials from a subprotocol,
+        // since a browser WebSocket cannot set headers. The local mock reads the
+        // same thing, so both paths authenticate identically.
+        const header = btoa(JSON.stringify(authorizationFor(token)))
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '')
+
+        // The CDK stack exports the realtime endpoint as a bare host
+        // (`<id>.appsync-realtime-api.<region>.amazonaws.com`). Without a scheme
+        // the browser resolves it as a path on this site and the socket 404s, so
+        // real-time never connected in AWS while the mock (`ws://…`) always did.
+        const base = /^wss?:\/\//.test(endpoint) ? endpoint : `wss://${endpoint}`
+        const wsUrl = isMockEndpoint() ? base : `${base}/event/realtime`
+        debug('🔌 Connecting to AppSync Events WebSocket:', wsUrl)
+        this.ws = new WebSocket(wsUrl, ['aws-appsync-event-ws', `header-${header}`])
+
         // Every handler below belongs to *this* socket. A replaced socket can
         // still emit close/error afterwards, and without this guard that stale
         // event would mark the live connection as down.
@@ -286,7 +258,13 @@ class AppSyncService {
         }, CONNECT_TIMEOUT_MS)
 
         this.ws.onopen = () => {
-          if (!isCurrent()) return
+          if (!isCurrent()) {
+            // Replaced (identity reset) mid-handshake: it opened with the
+            // previous session's token, so it must not carry anything.
+            try { socket.close(1000, 'superseded') } catch { /* already gone */ }
+            fail(new Error('AppSync WebSocket superseded before it opened'))
+            return
+          }
           debug('✅ AppSync Events WebSocket connected')
           // `reconnectAttempts > 0` covers the case where the very first
           // handshake failed and a retry succeeded: subscribers still need the
@@ -300,7 +278,7 @@ class AppSyncService {
           // never got its wire frame sent, and used to stay silently dead for
           // the rest of the page's life.
           this.subscriptions.forEach((_callbacks, channelName) => {
-            this.sendSubscribeMessage(channelName)
+            void this.sendSubscribeMessage(channelName)
           })
           if (isReconnect) {
             this.reconnectListeners.forEach(listener => {
@@ -321,9 +299,11 @@ class AppSyncService {
         
         this.ws.onclose = (event) => {
           debug('🔌 AppSync Events WebSocket disconnected:', event.code, event.reason)
+          // Settles this attempt even for a replaced socket, so nothing waits
+          // out the handshake timeout on a connection nobody wants any more.
+          fail(new Error(`AppSync WebSocket closed before opening (${event.code})`))
           if (!isCurrent()) return
           this.isConnected = false
-          fail(new Error(`AppSync WebSocket closed before opening (${event.code})`))
           // 1006 (abnormal closure) is what every real network drop looks like,
           // and it is what Safari reports after suspending a backgrounded tab.
           // Excluding it meant the one case that always needs recovery was the
@@ -335,9 +315,9 @@ class AppSyncService {
         
         this.ws.onerror = (error) => {
           console.error('❌ AppSync Events WebSocket error:', error)
+          fail(error)
           if (!isCurrent()) return
           this.isConnected = false
-          fail(error)
         }
         
       } catch (error) {
@@ -388,11 +368,14 @@ class AppSyncService {
       // Handle incoming events (AWS AppSync Events uses 'data' type with event field)
       try {
         const eventData = JSON.parse(data.event) as AppSyncEvent
-        // AWS AppSync Events delivers per-channel; the WS message includes
-        // the channel name at the top level on the AWS side.
+        // AWS addresses a data frame by the id of the subscription it belongs
+        // to, not by channel; a top-level `channel` is honoured if present.
         const channelName: string | undefined = (() => {
           if (typeof data.channel === 'string') {
             return data.channel.replace(/^\/default\//, '')
+          }
+          if (typeof data.id === 'string') {
+            return this.channelBySubscriptionId.get(data.id)
           }
           return undefined
         })()
@@ -491,7 +474,7 @@ class AppSyncService {
     // subscribers share a single server-side subscription.
     if (isFirstSubscriber) {
       if (this.isConnected && this.ws?.readyState === WebSocket.OPEN) {
-        this.sendSubscribeMessage(channelName)
+        void this.sendSubscribeMessage(channelName)
       } else {
         // Not up yet: connect and let onopen replay this channel. Callers no
         // longer need to await connect() before subscribing, so a slow or
@@ -518,30 +501,47 @@ class AppSyncService {
   // Sends the wire-level subscribe frame for a channel. Extracted so that
   // reconnection logic can replay subscriptions without touching the local
   // callbacks map.
-  private sendSubscribeMessage(channelName: string) {
-    const defaultChannelName = `/default/${channelName}`
-    const isLocal = isMockEndpoint()
-    const messageType = isLocal ? 'start' : 'subscribe'
+  private async sendSubscribeMessage(channelName: string) {
+    const generation = this.generation
+    // Claimed before the await, so a later call for the same channel (an
+    // unsubscribe + re-subscribe in one tick, a StrictMode remount, the onopen
+    // replay) supersedes this one instead of both sending a frame — the first
+    // id would be overwritten and never unsubscribed, and AWS would deliver
+    // every event twice.
+    const subscriptionId = `sub-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
+    const previous = this.subscriptionIds.get(channelName)
+    if (previous) this.channelBySubscriptionId.delete(previous)
+    this.subscriptionIds.set(channelName, subscriptionId)
+    const stillCurrent = () => this.subscriptionIds.get(channelName) === subscriptionId
 
-    if (this.isConnected && this.ws) {
-      const subscriptionId = `sub-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
-      this.subscriptionIds.set(channelName, subscriptionId)
-      const subscribeMessage = {
-        id: subscriptionId,
-        type: messageType,
-        ...(isLocal ? {
-          payload: {
-            data: channelName
-          }
-        } : {
-          channel: defaultChannelName,
-          authorization: buildAuthorization()
-        })
-      }
-
-      debug('📡 Sending subscription message:', subscribeMessage)
-      this.send(subscribeMessage)
+    // Every subscribe is authorized on its own, and the connection may well
+    // outlive the token it opened with.
+    const token = await getRealtimeToken()
+    if (!token) {
+      if (stillCurrent()) this.subscriptionIds.delete(channelName)
+      console.warn(`[appsync] no realtime token — ${channelName} will subscribe on the next connect`)
+      return
     }
+    // The await may have spanned a reconnect, an identity reset (the new
+    // socket's onopen replays this channel itself), the last listener leaving,
+    // or a newer subscribe for this channel.
+    if (generation !== this.generation || !stillCurrent()) return
+    if (!this.isConnected || !this.ws || !this.subscriptions.has(channelName)) {
+      this.subscriptionIds.delete(channelName)
+      return
+    }
+
+    const isLocal = isMockEndpoint()
+    this.channelBySubscriptionId.set(subscriptionId, channelName)
+    const subscribeMessage = {
+      id: subscriptionId,
+      type: isLocal ? 'start' : 'subscribe',
+      ...(isLocal ? { payload: { data: channelName } } : { channel: `/default/${channelName}` }),
+      authorization: authorizationFor(token),
+    }
+
+    debug('📡 Sending subscription message:', subscribeMessage)
+    this.send(subscribeMessage)
   }
 
   // Register a callback that fires every time the WebSocket transitions from
@@ -567,6 +567,9 @@ class AppSyncService {
   private sendUnsubscribeMessage(channelName: string) {
     const id = this.subscriptionIds.get(channelName)
     this.subscriptionIds.delete(channelName)
+    // An id without a reverse entry was claimed but its frame never went out
+    // (still waiting on the token); there is no server-side subscription to end.
+    const wasSent = !!id && this.channelBySubscriptionId.delete(id)
     if (!this.isConnected || !this.ws) return
 
     if (isMockEndpoint()) {
@@ -579,51 +582,28 @@ class AppSyncService {
     }
 
     // AppSync Events keys the teardown off the subscribe frame's id. Without
-    // one there is nothing meaningful to send.
-    if (!id) return
+    // one that was actually sent there is nothing meaningful to send.
+    if (!wasSent) return
     this.send({ id, type: 'unsubscribe' })
   }
 
-  // Publish an event to a channel using AppSync Events
+  /**
+   * Publishes an event — from server code only, over HTTP. See
+   * src/lib/appsync-publish.ts for why a request handler never uses this
+   * socket. The import is dynamic so `jose` and the publish path stay out of
+   * the client bundle.
+   *
+   * There is no browser path: the authorizer accepts a publish only with the
+   * app server's `system` token. Every event a user can cause goes through a
+   * REST route, which authorizes it and publishes on the user's behalf.
+   */
   async publishEvent(channelName: string, message: AppSyncEvent): Promise<void> {
-    // Server-side publishing goes over HTTP, never this socket: everything
-    // below is built for a long-lived browser tab, not a request handler that
-    // may be frozen the moment it responds. See src/lib/appsync-publish.ts.
-    // The import is dynamic so `jose` and the publish path stay out of the
-    // client bundle.
     if (typeof window === 'undefined') {
       const { publishOverHttp } = await import('./appsync-publish')
       await publishOverHttp(channelName, message as Record<string, unknown>)
       return
     }
-
-    // Try to connect if not already connected
-    if (!this.isConnected || !this.ws) {
-      try {
-        await this.connect()
-      } catch (error) {
-        console.error('Failed to connect to AppSync Events:', error)
-        return
-      }
-    }
-
-    // Use the actual channel name for proper message routing
-    const isLocal = isMockEndpoint()
-    const publishMessage = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      type: 'publish',
-      ...(isLocal ? {
-        roomId: channelName,
-        message: message
-      } : {
-        channel: `/default/${channelName}`,
-        events: [JSON.stringify(message)],
-        authorization: buildAuthorization()
-      })
-    }
-
-    debug('📤 Publishing event to AppSync Events:', publishMessage)
-    this.send(publishMessage)
+    console.warn(`[appsync] browsers cannot publish — ${channelName} event dropped (publish through an API route)`)
   }
 
   // Simulate receiving a message (for testing)
@@ -639,6 +619,40 @@ class AppSyncService {
     }
   }
 
+  /**
+   * Forgets the signed-in user this tab's realtime state was built for: drops
+   * the cached token and closes the socket that presented it. Called by
+   * AuthContext whenever the session's user changes or ends — a guest merged
+   * into an account, a logout, a different login in the same tab.
+   *
+   * Registered channels are kept: they belong to components that are still
+   * mounted, and they replay on a fresh connection under the new identity
+   * (where the authorizer refuses any the new user may not open).
+   */
+  resetIdentity() {
+    tokenEpoch++
+    realtimeToken = null
+    tokenRequest = null
+    this.generation++
+    this.connectPromise = null
+    this.subscriptionIds.clear()
+    this.channelBySubscriptionId.clear()
+    this.reconnectAttempts = 0
+    const socket = this.ws
+    // Detached before closing, so its close handler sees a replaced socket and
+    // does not schedule a reconnect of its own.
+    this.ws = null
+    this.isConnected = false
+    if (socket) {
+      try { socket.close(1000, 'signed-in user changed') } catch { /* already gone */ }
+    }
+    if (this.subscriptions.size > 0) {
+      // Signed out entirely, this fails for want of a token — expected, and
+      // the wake listeners try again if the page is still in use.
+      this.connect().catch(err => debug('Reconnect after identity change failed:', err))
+    }
+  }
+
   disconnect() {
     this.intentionalClose = true
     if (this.ws) {
@@ -647,6 +661,7 @@ class AppSyncService {
     }
     this.subscriptions.clear()
     this.subscriptionIds.clear()
+    this.channelBySubscriptionId.clear()
     this.isConnected = false
     debug('🔌 AppSync WebSocket disconnected')
   }

@@ -15,6 +15,8 @@ export const EventName = {
   GarageLoginPendingValidation: 'garage_login_pending_validation',
   GarageValidated: 'garage_validated',
   GuestRegisteredFromRequest: 'guest_registered_from_request',
+  GuestMergeRequested: 'guest_merge_requested',
+  GuestMergedIntoAccount: 'guest_merged_into_account',
 
   // Phase A+ — Form funnel (client-side, tracked via /api/track)
   CategorySelected: 'category_selected',
@@ -112,7 +114,8 @@ export const EmailTemplate = {
   PasswordReset: 'password_reset',
   PaymentConfirmationClient: 'payment_confirmation_client',
   CancellationConfirmationClient: 'cancellation_confirmation_client',
-  CancellationNotificationGarage: 'cancellation_notification_garage'
+  CancellationNotificationGarage: 'cancellation_notification_garage',
+  AccountMergeConfirmation: 'account_merge_confirmation'
 } as const
 
 export type EmailTemplateName = typeof EmailTemplate[keyof typeof EmailTemplate]

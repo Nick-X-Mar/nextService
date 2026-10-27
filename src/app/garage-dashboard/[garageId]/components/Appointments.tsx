@@ -10,13 +10,14 @@ import { getCategoryText } from '@/utils/categoryLabels'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { isCompletionDue } from '@/types/reviews'
 import CompletionModal from './CompletionModal'
+import { isGarageInactive } from './garageInactive'
+import { formatAppointment, isUpcomingAppointment } from './offerStatus'
+import { clientDisplayName, clientInitials, telHref } from './clientLabel'
 
 interface Offer {
   id: string
   serviceRequestId: string
-  price: number
-  currency: string
-  description: string
+  offerAmount: number
   status: OfferStatus
   createdAt: string
   appointmentDate?: string
@@ -24,30 +25,42 @@ interface Offer {
   appointmentPrice?: number
   serviceRequest: {
     id: string
-    description: string
+    description?: string
     category: string
     status?: string
     completedAt?: string
     completionOutcome?: string
     finalAmounts?: { gross: number; net: number; vat: number; vatRate: number }
+    /**
+     * Surname, phone and email reach only the garage that won — and not after
+     * a cancellation. Every field may be missing.
+     */
     client: {
-      firstName: string
-      lastName: string
+      firstName?: string
+      lastName?: string
       phoneNumber?: string
-    }
+      email?: string
+    } | null
     vehicle: {
       brand: string
       model: string
       year: number
-    }
+      /** The winner's only. */
+      licensePlate?: string
+    } | null
   }
 }
 
 interface AppointmentsProps {
   garageId: string
+  /** Called when the API says this garage is not (or no longer) approved. */
+  onInactive?: () => void
 }
 
-export default function Appointments({ garageId }: AppointmentsProps) {
+/** Sorts by date, then hour — the strings are fixed-width, so they compare as text. */
+const appointmentKey = (offer: Offer) => `${offer.appointmentDate ?? ''}T${offer.appointmentTime ?? '00:00'}`
+
+export default function Appointments({ garageId, onInactive }: AppointmentsProps) {
   const { navigate, isNavigating } = useNavigation()
   const [appointments, setAppointments] = useState<Offer[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -60,34 +73,14 @@ export default function Appointments({ garageId }: AppointmentsProps) {
       const response = await fetch(`/api/garage/offers/?garageId=${garageId}`)
       const data = await response.json()
 
+      if (isGarageInactive(response, data)) {
+        onInactive?.()
+        return
+      }
       if (response.ok && data.success) {
-        // Filter for accepted offers with appointment dates
-        // Check both enum and string format for status
-        const appointmentsList = data.offers.filter((offer: Offer) => {
-          const isAccepted = offer.status === OfferStatus.ACCEPTED || (offer.status as string) === 'accepted'
-          const hasAppointmentDate = offer.appointmentDate && offer.appointmentDate.trim() !== ''
-
-          if (isAccepted && hasAppointmentDate) {
-            console.log('Found appointment offer:', {
-              id: offer.id,
-              status: offer.status,
-              appointmentDate: offer.appointmentDate,
-              appointmentTime: offer.appointmentTime ?? null,
-              serviceRequestId: offer.serviceRequestId
-            })
-          }
-
-          return isAccepted && hasAppointmentDate
-        })
-
-        console.log('Total appointments found:', appointmentsList.length)
-
-        // Sort by appointment date (earliest first)
-        appointmentsList.sort((a: Offer, b: Offer) => {
-          const dateA = new Date(a.appointmentDate || '').getTime()
-          const dateB = new Date(b.appointmentDate || '').getTime()
-          return dateA - dateB
-        })
+        const appointmentsList = (data.offers as Offer[])
+          .filter((offer) => offer.status === OfferStatus.ACCEPTED && !!offer.appointmentDate?.trim())
+          .sort((a, b) => appointmentKey(a).localeCompare(appointmentKey(b)))
 
         setAppointments(appointmentsList)
       } else {
@@ -100,48 +93,11 @@ export default function Appointments({ garageId }: AppointmentsProps) {
     } finally {
       setIsLoading(false)
     }
-  }, [garageId])
+  }, [garageId, onInactive])
 
   useEffect(() => {
     loadAppointments()
   }, [loadAppointments])
-
-  const formatAppointmentDate = (dateString: string) => {
-    const date = new Date(`${dateString}T00:00:00`)
-    return date.toLocaleDateString('el-GR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      weekday: 'long'
-    })
-  }
-
-  const isAppointmentTodayOrFuture = (dateString: string) => {
-    try {
-      // Handle different date formats
-      let appointmentDate: Date
-      if (dateString.includes('T')) {
-        appointmentDate = new Date(dateString)
-      } else {
-        appointmentDate = new Date(`${dateString}T00:00:00`)
-      }
-
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      appointmentDate.setHours(0, 0, 0, 0)
-
-      // Check if date is valid
-      if (isNaN(appointmentDate.getTime())) {
-        console.error('Invalid appointment date:', dateString)
-        return false
-      }
-
-      return appointmentDate >= today
-    } catch (error) {
-      console.error('Error checking appointment date:', error, dateString)
-      return false
-    }
-  }
 
   const chatHref = (requestId: string) => `/garage-dashboard/${garageId}/chat/${requestId}/`
 
@@ -149,13 +105,9 @@ export default function Appointments({ garageId }: AppointmentsProps) {
     navigate(chatHref(requestId))
   }
 
-  const handleCardClick = (offer: Offer) => {
-    navigate(`/garage-dashboard/${garageId}/offers/${offer.serviceRequestId}/`)
-  }
+  const offerHref = (offer: Offer) => `/garage-dashboard/${garageId}/offers/${offer.serviceRequestId}/`
 
-  const upcomingAppointments = appointments.filter(
-    (offer) => offer.appointmentDate && isAppointmentTodayOrFuture(offer.appointmentDate)
-  )
+  const upcomingAppointments = appointments.filter(isUpcomingAppointment)
 
   /**
    * Appointments whose slot has passed and that nobody has closed.
@@ -176,7 +128,7 @@ export default function Appointments({ garageId }: AppointmentsProps) {
     return (
       <div className="text-center py-12">
         <div className={styles.loadingSpinner}></div>
-        <p className="text-sm text-secondary">Φορτωση ραντεβου...</p>
+        <p className="text-sm text-secondary">Φόρτωση ραντεβού...</p>
       </div>
     )
   }
@@ -216,10 +168,9 @@ export default function Appointments({ garageId }: AppointmentsProps) {
                     {offer.serviceRequest.vehicle?.brand} {offer.serviceRequest.vehicle?.model}
                   </p>
                   <p className="text-xs text-on-surface-variant">
-                    {offer.appointmentDate && formatAppointmentDate(offer.appointmentDate)}
-                    {offer.appointmentTime ? `, ${offer.appointmentTime}` : ''}
+                    {offer.appointmentDate && formatAppointment(offer.appointmentDate, offer.appointmentTime)}
                     {' · '}
-                    {offer.serviceRequest.client?.firstName} {offer.serviceRequest.client?.lastName}
+                    {clientDisplayName(offer.serviceRequest.client)}
                   </p>
                 </div>
                 <button
@@ -227,7 +178,7 @@ export default function Appointments({ garageId }: AppointmentsProps) {
                   className="bg-gradient-to-br from-primary to-primary-container text-on-primary px-4 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 active:scale-95 shadow-lg shadow-primary/20 flex items-center gap-2"
                 >
                   <Icon name="check_circle" size="sm" />
-                  Δήλωσε το
+                  Δήλωσέ το
                 </button>
               </div>
             ))}
@@ -243,10 +194,10 @@ export default function Appointments({ garageId }: AppointmentsProps) {
               <Icon name="calendar_month" size="lg" className="text-outline" />
             </div>
             <h3 className="text-2xl font-bold tracking-tight text-on-surface mb-2">
-              Δεν υπαρχουν ραντεβου
+              Δεν υπάρχουν ραντεβού
             </h3>
             <p className="text-base text-secondary leading-relaxed">
-              Δεν εχετε προγραμματισμενα ραντεβου απο σημερα και μετα.
+              Δεν έχετε προγραμματισμένα ραντεβού από σήμερα και μετά.
             </p>
           </div>
         </article>
@@ -256,19 +207,21 @@ export default function Appointments({ garageId }: AppointmentsProps) {
             <article
               key={offer.id}
               className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10 hover:shadow-2xl hover:shadow-on-surface/5 transition-all duration-300 cursor-pointer"
-              onClick={() => handleCardClick(offer)}
+              onClick={() => navigate(offerHref(offer))}
             >
               {/* Appointment date banner */}
               {offer.appointmentDate && (
                 <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/10 rounded-xl mb-4">
                   <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                    <Icon name="event" filled size="md" className="text-primary" />
+                    {/* The whole card opens the offer, so this is where it spins. */}
+                    {isNavigating(offerHref(offer))
+                      ? <Spinner size="sm" className="text-primary" />
+                      : <Icon name="event" filled size="md" className="text-primary" />}
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-primary">Ημερομηνια Ραντεβου</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-primary">Ραντεβού</p>
                     <p className="text-base font-bold text-on-surface">
-                      {formatAppointmentDate(offer.appointmentDate)}
-                      {offer.appointmentTime ? `, ${offer.appointmentTime}` : ''}
+                      {formatAppointment(offer.appointmentDate, offer.appointmentTime)}
                     </p>
                   </div>
                 </div>
@@ -281,10 +234,11 @@ export default function Appointments({ garageId }: AppointmentsProps) {
                 </span>
                 <div className="text-right">
                   <p className="text-2xl font-black text-primary tracking-tight">
-                    {typeof offer.appointmentPrice === 'number'
+                    {(typeof offer.appointmentPrice === 'number'
                       ? offer.appointmentPrice
-                      : offer.price}{' '}
-                    <span className="text-sm font-bold text-on-surface-variant">{offer.currency || 'EUR'}</span>
+                      : offer.offerAmount
+                    )?.toLocaleString('el-GR') ?? '-'}{' '}
+                    <span className="text-sm font-bold text-on-surface-variant">€</span>
                   </p>
                 </div>
               </div>
@@ -292,41 +246,77 @@ export default function Appointments({ garageId }: AppointmentsProps) {
               {/* Vehicle Spec Bento Grid */}
               <div className="grid grid-cols-3 gap-2 mb-4">
                 <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
-                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Μαρκα</span>
-                  <span className="text-xs font-bold text-on-surface">{offer.serviceRequest.vehicle.brand}</span>
+                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Μάρκα</span>
+                  <span className="text-xs font-bold text-on-surface">{offer.serviceRequest.vehicle?.brand || '-'}</span>
                 </div>
                 <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
-                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Μοντελο</span>
-                  <span className="text-xs font-bold text-on-surface">{offer.serviceRequest.vehicle.model}</span>
+                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Μοντέλο</span>
+                  <span className="text-xs font-bold text-on-surface">{offer.serviceRequest.vehicle?.model || '-'}</span>
                 </div>
                 <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
-                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Ετος</span>
-                  <span className="text-xs font-bold text-on-surface">{offer.serviceRequest.vehicle.year}</span>
+                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Έτος</span>
+                  <span className="text-xs font-bold text-on-surface">{offer.serviceRequest.vehicle?.year || '-'}</span>
                 </div>
               </div>
 
-              {/* Client info bar */}
+              {/* The plate is how the shop tells this car apart when it arrives. */}
+              {offer.serviceRequest.vehicle?.licensePlate && (
+                <div className="flex items-center gap-2 mb-4">
+                  <span className={styles.labelUpper}>Πινακίδα</span>
+                  <span className="text-sm font-bold tracking-wide text-on-surface">
+                    {offer.serviceRequest.vehicle.licensePlate}
+                  </span>
+                </div>
+              )}
+
+              {/* Client info bar — the winner's contact details, each shown
+                  only when the client actually gave it. */}
               <div className="flex items-center gap-3 p-3 bg-surface-container-low rounded-lg mb-4">
-                <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black uppercase">
-                  {offer.serviceRequest.client.firstName?.charAt(0)}{offer.serviceRequest.client.lastName?.charAt(0)}
+                <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black uppercase flex-shrink-0">
+                  {clientInitials(offer.serviceRequest.client) || <Icon name="person" size="sm" filled />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-on-surface truncate">
-                    {offer.serviceRequest.client.firstName} {offer.serviceRequest.client.lastName}
+                    {clientDisplayName(offer.serviceRequest.client)}
                   </p>
-                  {offer.serviceRequest.client.phoneNumber && (
+                  {offer.serviceRequest.client?.phoneNumber && (
                     <p className="text-xs text-secondary truncate">{offer.serviceRequest.client.phoneNumber}</p>
                   )}
+                  {offer.serviceRequest.client?.email && (
+                    <p className="text-xs text-secondary truncate">{offer.serviceRequest.client.email}</p>
+                  )}
                 </div>
+                {offer.serviceRequest.client?.phoneNumber && (
+                  <a
+                    href={telHref(offer.serviceRequest.client.phoneNumber)}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label="Κλήση πελάτη"
+                    className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 hover:bg-primary/20 transition-colors duration-200 active:scale-95"
+                  >
+                    <Icon name="call" size="sm" filled />
+                  </a>
+                )}
+                {offer.serviceRequest.client?.email && (
+                  <a
+                    href={`mailto:${offer.serviceRequest.client.email}`}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label="Email στον πελάτη"
+                    className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 hover:bg-primary/20 transition-colors duration-200 active:scale-95"
+                  >
+                    <Icon name="mail" size="sm" filled />
+                  </a>
+                )}
               </div>
 
-              {/* Offer description */}
-              <div className="border-t border-outline-variant/10 pt-4 mb-4">
-                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mb-1">Περιγραφη Προσφορας</p>
-                <p className="text-sm text-on-surface-variant line-clamp-2">
-                  {offer.description}
-                </p>
-              </div>
+              {/* What the client asked for. Offers carry no description of their own. */}
+              {offer.serviceRequest.description && (
+                <div className="border-t border-outline-variant/10 pt-4 mb-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mb-1">Περιγραφή αιτήματος</p>
+                  <p className="text-sm text-on-surface-variant line-clamp-2">
+                    {offer.serviceRequest.description}
+                  </p>
+                </div>
+              )}
 
               {/* Chat Button */}
               <button
@@ -340,7 +330,7 @@ export default function Appointments({ garageId }: AppointmentsProps) {
                 {isNavigating(chatHref(offer.serviceRequestId))
                   ? <Spinner size="sm" />
                   : <Icon name="chat" size="sm" />}
-                Ανοιγμα Συνομιλιας
+                Άνοιγμα συνομιλίας
               </button>
             </article>
           ))}
@@ -361,7 +351,7 @@ export default function Appointments({ garageId }: AppointmentsProps) {
           quotedPrice={
             typeof completing.appointmentPrice === 'number'
               ? completing.appointmentPrice
-              : completing.price
+              : completing.offerAmount
           }
           onCompleted={loadAppointments}
         />

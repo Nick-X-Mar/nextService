@@ -6,39 +6,48 @@ import { OfferStatus } from '@/types/statuses'
 import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
 import { useNavigation } from '@/hooks/useNavigation'
+import { getCategoryText } from '@/utils/categoryLabels'
+import { isGarageInactive } from './garageInactive'
+import { formatAppointment, garageOfferState, offerStatusClass, offerStatusIcon, offerStatusLabel } from './offerStatus'
+import { clientDisplayName, clientInitials } from './clientLabel'
 
 interface Offer {
   id: string
   serviceRequestId: string
-  price: number
-  currency: string
-  description: string
+  offerAmount: number
+  benefits?: string[]
   status: OfferStatus
   createdAt: string
   appointmentDate?: string
+  appointmentTime?: string | null
   appointmentPrice?: number
   clientAvailabilityDates?: string[]
   serviceRequest: {
     id: string
-    description: string
+    description?: string
     category: string
+    status?: string
+    acceptedOfferId?: string | null
+    /** First name only unless this garage won; may be empty altogether. */
     client: {
-      firstName: string
-      lastName: string
-    }
+      firstName?: string
+      lastName?: string
+    } | null
     vehicle: {
       brand: string
       model: string
       year: number
-    }
+    } | null
   }
 }
 
 interface MyOffersProps {
   garageId: string
+  /** Called when the API says this garage is not (or no longer) approved. */
+  onInactive?: () => void
 }
 
-export default function MyOffers({ garageId }: MyOffersProps) {
+export default function MyOffers({ garageId, onInactive }: MyOffersProps) {
   const { navigate, isNavigating } = useNavigation()
   const [offers, setOffers] = useState<Offer[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -51,6 +60,10 @@ export default function MyOffers({ garageId }: MyOffersProps) {
       const response = await fetch(`/api/garage/offers/?garageId=${garageId}`)
       const data = await response.json()
 
+      if (isGarageInactive(response, data)) {
+        onInactive?.()
+        return
+      }
       if (response.ok && data.success) {
         setOffers(data.offers)
       } else {
@@ -63,60 +76,18 @@ export default function MyOffers({ garageId }: MyOffersProps) {
     } finally {
       setIsLoading(false)
     }
-  }, [garageId])
+  }, [garageId, onInactive])
 
   useEffect(() => {
     loadOffers()
   }, [loadOffers])
 
-  const getStatusStyle = (status: OfferStatus) => {
-    switch (status) {
-      case OfferStatus.PENDING:
-        return 'text-[0.65rem] font-black uppercase tracking-[0.1em] text-primary bg-primary/10 px-2 py-1 rounded-sm'
-      case OfferStatus.ACCEPTED:
-        return 'text-[0.65rem] font-black uppercase tracking-[0.1em] text-green-700 bg-green-100 px-2 py-1 rounded-sm'
-      case OfferStatus.REJECTED:
-        return 'text-[0.65rem] font-black uppercase tracking-[0.1em] text-red-700 bg-red-100 px-2 py-1 rounded-sm'
-      case OfferStatus.EXPIRED:
-        return 'text-[0.65rem] font-black uppercase tracking-[0.1em] text-on-surface-variant bg-surface-container px-2 py-1 rounded-sm'
-      default:
-        return 'text-[0.65rem] font-black uppercase tracking-[0.1em] text-on-surface-variant bg-surface-container px-2 py-1 rounded-sm'
-    }
-  }
+  const offerHref = (offer: Offer) => `/garage-dashboard/${garageId}/offers/${offer.serviceRequestId}/`
 
-  const getStatusText = (status: OfferStatus) => {
-    switch (status) {
-      case OfferStatus.PENDING:
-        return 'Εκκρεμης'
-      case OfferStatus.ACCEPTED:
-        return 'Αποδεκτη'
-      case OfferStatus.REJECTED:
-        return 'Απορριφθηκε'
-      case OfferStatus.EXPIRED:
-        return 'Εληξε'
-      default:
-        return status
-    }
-  }
-
-  const getStatusIcon = (status: OfferStatus) => {
-    switch (status) {
-      case OfferStatus.PENDING:
-        return 'schedule'
-      case OfferStatus.ACCEPTED:
-        return 'check_circle'
-      case OfferStatus.REJECTED:
-        return 'cancel'
-      case OfferStatus.EXPIRED:
-        return 'timer_off'
-      default:
-        return 'help'
-    }
-  }
-
-  const handleOfferClick = (offer: Offer) => {
-    navigate(`/garage-dashboard/${garageId}/offers/${offer.serviceRequestId}/`)
-  }
+  // What the offer amounts to given its request — the same reading the badge
+  // and the offer page use, so a cancelled job never shows as "Απορρίφθηκε".
+  const stateOf = (o: Offer) => garageOfferState(o.status, o.serviceRequest, o.id)
+  const isClosed = (state: ReturnType<typeof stateOf>) => state === OfferStatus.REJECTED || state === 'cancelled'
 
   const filteredOffers = offers.filter(offer => {
     // Exclude accepted offers with appointmentDate (they should be in Appointments tab)
@@ -125,14 +96,18 @@ export default function MyOffers({ garageId }: MyOffersProps) {
     }
 
     if (filter === 'all') return true
-    return offer.status === filter
+    const state = stateOf(offer)
+    // The "Απορρίφθηκε" chip collects every offer that is over without a booking.
+    return filter === OfferStatus.REJECTED ? isClosed(state) : state === filter
   })
+
+  const requestsHref = `/garage-dashboard/${garageId}/?tab=requests`
 
   if (isLoading) {
     return (
       <div className="text-center py-12">
         <div className={styles.loadingSpinner}></div>
-        <p className="text-sm text-secondary">Φορτωση προσφορων...</p>
+        <p className="text-sm text-secondary">Φόρτωση προσφορών...</p>
       </div>
     )
   }
@@ -142,10 +117,10 @@ export default function MyOffers({ garageId }: MyOffersProps) {
       {/* Header */}
       <div>
         <h2 className="text-3xl font-bold tracking-tight text-on-surface">
-          Οι Προσφορες μου
+          Οι Προσφορές μου
         </h2>
         <p className="text-base text-secondary leading-relaxed mt-1">
-          {filteredOffers.length} προσφορες συνολικα
+          {filteredOffers.length === 1 ? '1 προσφορά' : `${filteredOffers.length} προσφορές`} συνολικά
         </p>
       </div>
 
@@ -160,7 +135,7 @@ export default function MyOffers({ garageId }: MyOffersProps) {
               : 'bg-secondary-container text-on-secondary-container px-5 py-2 rounded-full text-sm font-bold whitespace-nowrap hover:bg-surface-container-high transition-colors cursor-pointer'
             }
           >
-            {status === 'all' ? 'Ολες' : getStatusText(status)}
+            {status === 'all' ? 'Όλες' : offerStatusLabel(status)}
           </button>
         ))}
       </div>
@@ -173,57 +148,56 @@ export default function MyOffers({ garageId }: MyOffersProps) {
               <Icon name="description" size="lg" className="text-outline" />
             </div>
             <h3 className="text-2xl font-bold tracking-tight text-on-surface mb-2">
-              Δεν υπαρχουν προσφορες
+              Δεν υπάρχουν προσφορές
             </h3>
             <p className="text-base text-secondary leading-relaxed mb-4">
               {filter === 'all'
-                ? 'Δεν εχετε κανει ακομα καμια προσφορα.'
-                : `Δεν υπαρχουν προσφορες με κατασταση "${getStatusText(filter)}".`
+                ? 'Δεν έχετε κάνει ακόμα καμία προσφορά.'
+                : `Δεν υπάρχουν προσφορές με κατάσταση «${offerStatusLabel(filter)}».`
               }
             </p>
             {filter === 'all' && (
               <button
-                onClick={() => {
-                  navigate(`/garage-dashboard/${garageId}/?tab=requests`)
-                }}
-                disabled={isNavigating(`/garage-dashboard/${garageId}/?tab=requests`)}
+                onClick={() => navigate(requestsHref)}
+                disabled={isNavigating(requestsHref)}
                 className={styles.btnPrimary}
               >
-                {isNavigating(`/garage-dashboard/${garageId}/?tab=requests`)
+                {isNavigating(requestsHref)
                   ? <Spinner size="sm" />
                   : <Icon name="add" size="sm" />}
-                Δειτε Διαθεσιμα Αιτηματα
+                Δείτε διαθέσιμα αιτήματα
               </button>
             )}
           </div>
         </article>
       ) : (
         <div className="space-y-4">
-          {filteredOffers.map((offer) => (
+          {filteredOffers.map((offer) => {
+            const href = offerHref(offer)
+            const price = typeof offer.appointmentPrice === 'number' ? offer.appointmentPrice : offer.offerAmount
+            const state = stateOf(offer)
+            const closed = isClosed(state)
+            return (
             <article
               key={offer.id}
               className={`bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10 transition-all duration-300 ${
-                offer.status === OfferStatus.REJECTED
+                closed
                   ? 'opacity-60 cursor-default'
                   : 'cursor-pointer hover:shadow-2xl hover:shadow-on-surface/5'
               }`}
               onClick={() => {
-                if (offer.status !== OfferStatus.REJECTED) {
-                  handleOfferClick(offer)
-                }
+                if (!closed) navigate(href)
               }}
             >
               {/* Status + Price row */}
               <div className="flex items-start justify-between mb-4">
-                <span className={getStatusStyle(offer.status)}>
-                  {getStatusText(offer.status)}
+                <span className={offerStatusClass(state)}>
+                  {offerStatusLabel(state)}
                 </span>
                 <div className="text-right">
                   <p className="text-2xl font-black text-primary tracking-tight">
-                    {typeof offer.appointmentPrice === 'number'
-                      ? offer.appointmentPrice
-                      : offer.price}{' '}
-                    <span className="text-sm font-bold text-on-surface-variant">{offer.currency}</span>
+                    {typeof price === 'number' ? price.toLocaleString('el-GR') : '-'}{' '}
+                    <span className="text-sm font-bold text-on-surface-variant">€</span>
                   </p>
                   <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mt-1">
                     {new Date(offer.createdAt).toLocaleDateString('el-GR')}
@@ -234,46 +208,53 @@ export default function MyOffers({ garageId }: MyOffersProps) {
               {/* Vehicle Spec Bento Grid */}
               <div className="grid grid-cols-3 gap-2 mb-4">
                 <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
-                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Μαρκα</span>
-                  <span className="text-xs font-bold text-on-surface">{offer.serviceRequest.vehicle.brand}</span>
+                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Μάρκα</span>
+                  <span className="text-xs font-bold text-on-surface">{offer.serviceRequest.vehicle?.brand || '-'}</span>
                 </div>
                 <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
-                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Μοντελο</span>
-                  <span className="text-xs font-bold text-on-surface">{offer.serviceRequest.vehicle.model}</span>
+                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Μοντέλο</span>
+                  <span className="text-xs font-bold text-on-surface">{offer.serviceRequest.vehicle?.model || '-'}</span>
                 </div>
                 <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
-                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Ετος</span>
-                  <span className="text-xs font-bold text-on-surface">{offer.serviceRequest.vehicle.year}</span>
+                  <span className="text-[9px] font-black uppercase text-outline opacity-70">Έτος</span>
+                  <span className="text-xs font-bold text-on-surface">{offer.serviceRequest.vehicle?.year || '-'}</span>
                 </div>
               </div>
 
               {/* Client info bar */}
               <div className="flex items-center gap-3 p-3 bg-surface-container-low rounded-lg mb-4">
                 <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black uppercase">
-                  {offer.serviceRequest.client.firstName?.charAt(0)}{offer.serviceRequest.client.lastName?.charAt(0)}
+                  {clientInitials(offer.serviceRequest.client) || <Icon name="person" size="sm" filled />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-on-surface truncate">
-                    {offer.serviceRequest.client.firstName} {offer.serviceRequest.client.lastName}
+                    {clientDisplayName(offer.serviceRequest.client)}
                   </p>
-                  <p className="text-xs text-secondary truncate">{offer.serviceRequest.category}</p>
+                  <p className="text-xs text-secondary truncate">{getCategoryText(offer.serviceRequest.category)}</p>
                 </div>
-                <Icon name={getStatusIcon(offer.status)} filled size="sm" className={
-                  offer.status === OfferStatus.PENDING ? 'text-primary' :
-                  offer.status === OfferStatus.ACCEPTED ? 'text-green-600' :
-                  offer.status === OfferStatus.REJECTED ? 'text-tertiary' : 'text-secondary'
-                } />
+                {/* The whole card opens the offer, so this is where it spins. */}
+                {isNavigating(href) ? (
+                  <Spinner size="sm" className="text-primary" />
+                ) : (
+                  <Icon name={offerStatusIcon(state)} filled size="sm" className={
+                    state === OfferStatus.PENDING ? 'text-primary' :
+                    state === OfferStatus.ACCEPTED ? 'text-green-600' :
+                    closed ? 'text-tertiary' : 'text-secondary'
+                  } />
+                )}
               </div>
 
               {/* Client proposed dates notification */}
-              {offer.clientAvailabilityDates && offer.clientAvailabilityDates.length > 0 && offer.status === OfferStatus.PENDING && (
+              {offer.clientAvailabilityDates && offer.clientAvailabilityDates.length > 0 && state === OfferStatus.PENDING && (
                 <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4 animate-pulse-subtle">
                   <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
                     <Icon name="event_note" filled size="sm" className="text-amber-700" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold text-amber-900">
-                      Ο πελάτης πρότεινε {offer.clientAvailabilityDates.length} νέες ημερομηνίες
+                      {offer.clientAvailabilityDates.length === 1
+                        ? 'Ο πελάτης πρότεινε μία νέα ημερομηνία'
+                        : `Ο πελάτης πρότεινε ${offer.clientAvailabilityDates.length} νέες ημερομηνίες`}
                     </p>
                     <p className="text-[10px] text-amber-700">
                       Πατήστε για να δείτε τις προτεινόμενες ημερομηνίες
@@ -283,28 +264,37 @@ export default function MyOffers({ garageId }: MyOffersProps) {
                 </div>
               )}
 
-              {/* Offer description */}
-              <div className="border-t border-outline-variant/10 pt-4">
-                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mb-1">Περιγραφη Προσφορας</p>
-                <p className="text-sm text-on-surface-variant line-clamp-2">
-                  {offer.description}
-                </p>
+              {/* What the client asked for, and what this offer throws in. Offers
+                  carry no free-text description of their own. */}
+              <div className="border-t border-outline-variant/10 pt-4 space-y-3">
+                {offer.serviceRequest.description && (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mb-1">Περιγραφή αιτήματος</p>
+                    <p className="text-sm text-on-surface-variant line-clamp-2">
+                      {offer.serviceRequest.description}
+                    </p>
+                  </div>
+                )}
+                {offer.benefits && offer.benefits.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mb-1">Παροχές</p>
+                    <p className="text-sm text-on-surface-variant line-clamp-2">
+                      {offer.benefits.join(' · ')}
+                    </p>
+                  </div>
+                )}
                 {offer.status === OfferStatus.ACCEPTED && offer.appointmentDate && (
-                  <div className="flex items-center gap-2 mt-3 p-2 bg-green-50 rounded-lg">
+                  <div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg">
                     <Icon name="event" filled size="sm" className="text-green-700" />
                     <span className="text-xs font-bold text-green-700">
-                      {new Date(`${offer.appointmentDate}T00:00:00`).toLocaleDateString('el-GR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        weekday: 'long'
-                      })}
+                      {formatAppointment(offer.appointmentDate, offer.appointmentTime)}
                     </span>
                   </div>
                 )}
               </div>
             </article>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

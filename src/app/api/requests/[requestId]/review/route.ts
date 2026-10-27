@@ -48,6 +48,9 @@ async function resolveParty(
   const auth = requireAuth(request)
   if (auth instanceof NextResponse) return auth
 
+  // No active-garage check: only the garage that did the job gets past the
+  // party check below, and one deactivated since keeps the right to review the
+  // jobs it completed — the same reasoning as the completion route.
   const res = await dynamoDB.send(
     new GetCommand({ TableName: 'ServiceRequests', Key: { id: requestId } })
   )

@@ -7,7 +7,8 @@ import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
 import { Badge } from '@/components/ui/badge'
 import { useNavigation } from '@/hooks/useNavigation'
-import { saveFormData } from '@/utils/formStorage'
+import { startNewRequest } from '@/utils/formStorage'
+import { getCategoryText } from '@/utils/categoryLabels'
 
 interface Offer {
   id?: string
@@ -39,7 +40,7 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
 
   const handleGetOffer = useCallback(() => {
     if (!offer) return
-    saveFormData({
+    startNewRequest({
       category: offer.category,
       description: offer.workType,
     })
@@ -139,7 +140,7 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
           {/* Category + what this listing actually is */}
           <div className="flex flex-wrap items-center gap-2">
             <Badge className="rounded-full bg-primary-container/30 text-primary border-primary/20 text-xs font-bold uppercase tracking-wider">
-              {offer.category === 'fanopeia' ? 'Φανοποιεία' : 'Service'}
+              {getCategoryText(offer.category)}
             </Badge>
             <Badge className="rounded-full bg-surface-container-high text-on-surface-variant border-outline-variant/20 text-xs font-bold uppercase tracking-wider">
               Ολοκληρωμένη εργασία

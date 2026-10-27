@@ -6,6 +6,14 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand } from '@aws-sdk/lib-dynamodb'
 import { generatePresignedUrls } from '@/utils/s3Service'
 import appSyncService from '@/lib/appsync-service'
+import {
+  garageClientView,
+  garageVehicleView,
+  QUOTING_CLIENT_PROJECTION,
+  QUOTING_VEHICLE_NAMES,
+  QUOTING_VEHICLE_PROJECTION,
+  type GarageClientView,
+} from '@/utils/garageClientView'
 
 // Channel names. Keep in sync with the client-side useRealtimeRequests hook.
 export const NEW_REQUESTS_CHANNEL = 'new-requests'
@@ -34,6 +42,9 @@ type RequestPhotosEvent = {
   photoUrls: string[]
 }
 
+// The quoting view (src/utils/garageClientView.ts): this goes to every active
+// garage at once, before anyone has won, so it never carries the client's
+// surname, phone or email, or the car's plate, VIN or engine number.
 interface BroadcastRequest {
   id: string
   description?: string
@@ -42,23 +53,9 @@ interface BroadcastRequest {
   createdAt: string
   clientAvailabilityDates?: string[]
   photoUrls: string[]
-  client: {
-    firstName?: string
-    lastName?: string
-    phoneNumber?: string
-  } | null
-  vehicle: {
-    brand?: string
-    model?: string
-    year?: string
-    licensePlate?: string
-    modelYear?: string
-    engineCC?: string
-    fuelType?: string
-    isAutomatic?: boolean
-    is4x4?: boolean
-    isTurbo?: boolean
-  } | null
+  estimatedCost?: number | null
+  client: GarageClientView | null
+  vehicle: ReturnType<typeof garageVehicleView>
 }
 
 /**
@@ -67,10 +64,17 @@ interface BroadcastRequest {
  * every row in the table and threw all but one away — three full table scans on
  * every single new request, on the path that fans out to every active garage.
  */
-async function loadById(table: string, id: string) {
+async function loadById(
+  table: string,
+  id: string,
+  projection?: { expression: string; names?: Record<string, string> }
+) {
   const res = await dynamoDB.send(new GetCommand({
     TableName: table,
-    Key: { id }
+    Key: { id },
+    ...(projection
+      ? { ProjectionExpression: projection.expression, ExpressionAttributeNames: projection.names }
+      : {}),
   }))
   return res.Item
 }
@@ -82,8 +86,15 @@ async function buildBroadcastRequest(serviceRequestId: string): Promise<Broadcas
   if (!request) return null
 
   const [client, vehicle] = await Promise.all([
-    request.clientId ? loadById('Clients', request.clientId) : Promise.resolve(null),
-    request.vehicleId ? loadById('Vehicles', request.vehicleId) : Promise.resolve(null),
+    request.clientId
+      ? loadById('Clients', request.clientId, { expression: QUOTING_CLIENT_PROJECTION })
+      : Promise.resolve(null),
+    request.vehicleId
+      ? loadById('Vehicles', request.vehicleId, {
+          expression: QUOTING_VEHICLE_PROJECTION,
+          names: QUOTING_VEHICLE_NAMES,
+        })
+      : Promise.resolve(null),
   ])
 
   const rawUrls: string[] = request.photoUrls || []
@@ -99,23 +110,9 @@ async function buildBroadcastRequest(serviceRequestId: string): Promise<Broadcas
     createdAt: request.createdAt,
     clientAvailabilityDates: request.clientAvailabilityDates || [],
     photoUrls: presignedUrls,
-    client: client ? {
-      firstName: client.firstName,
-      lastName: client.lastName,
-      phoneNumber: client.phoneNumber,
-    } : null,
-    vehicle: vehicle ? {
-      brand: vehicle.brand,
-      model: vehicle.model,
-      year: vehicle.year,
-      licensePlate: vehicle.licensePlate,
-      modelYear: vehicle.modelYear,
-      engineCC: vehicle.engineCC,
-      fuelType: vehicle.fuelType,
-      isAutomatic: vehicle.isAutomatic,
-      is4x4: vehicle.is4x4,
-      isTurbo: vehicle.isTurbo,
-    } : null,
+    estimatedCost: request.estimatedCost ?? null,
+    client: garageClientView(client, false),
+    vehicle: garageVehicleView(vehicle, false),
   }
 }
 

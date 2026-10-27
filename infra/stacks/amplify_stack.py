@@ -131,6 +131,7 @@ class AmplifyStack(Stack):
             "EventLogs", "EmailLogs", "AdminUsers",
             "Payments", "WalletTransactions", "HotDeals",
             "PerformanceMetrics", "ErrorResolutions",
+            "SiteContent", "Reviews",
         ]
         dynamo_resources = []
         for t in table_names:
@@ -152,6 +153,9 @@ class AmplifyStack(Stack):
                 "dynamodb:Scan",
                 "dynamodb:BatchGetItem",
                 "dynamodb:BatchWriteItem",
+                # TransactWriteItems is authorised per item: a ConditionCheck
+                # entry (offers, accept-offer) needs this on top of Put/Update.
+                "dynamodb:ConditionCheckItem",
             ],
             resources=dynamo_resources,
         ))
@@ -174,6 +178,8 @@ class AmplifyStack(Stack):
                 f"arn:aws:dynamodb:{self.region}:{self.account}:table/HotDeals",
                 f"arn:aws:dynamodb:{self.region}:{self.account}:table/PerformanceMetrics",
                 f"arn:aws:dynamodb:{self.region}:{self.account}:table/ErrorResolutions",
+                f"arn:aws:dynamodb:{self.region}:{self.account}:table/SiteContent",
+                f"arn:aws:dynamodb:{self.region}:{self.account}:table/Reviews",
             ],
         ))
 

@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
-import { logEvent } from '@/utils/eventLogger'
-import { sendEmail } from '@/utils/emailService'
-import { EventName, EmailTemplate } from '@/types/events'
+import { queryIndexOrScan } from '@/utils/indexQuery'
 import { requireOwner } from '@/utils/requireAuth'
+import { getAuthFromRequest } from '@/utils/auth'
 import { withMetrics } from '@/utils/withMetrics'
 
 async function _GET(
@@ -16,7 +15,7 @@ async function _GET(
 
     if (!garageId) {
       return NextResponse.json({ 
-        error: 'Garage ID is required' 
+        error: 'Λείπει το αναγνωριστικό συνεργείου' 
       }, { status: 400 })
     }
 
@@ -28,22 +27,28 @@ async function _GET(
 
     if (!result.Item) {
       return NextResponse.json({
-        error: 'Garage not found'
+        error: 'Το συνεργείο δεν βρέθηκε'
       }, { status: 404 })
     }
 
     const garage = result.Item
+
+    // This GET is public (the middleware lets it through without a session and
+    // strips any identity headers), because a client reads the shop's card off
+    // it when an offer arrives. The account's login email and its ΑΦΜ/ΔΟΥ are
+    // for the garage's own settings screen only — garage ids reach every client
+    // that gets an offer, so returning them here published every garage's login
+    // to anyone who asked. The cookie is checked here directly for that reason.
+    const viewer = await getAuthFromRequest(request)
+    const isOwner = viewer?.userType === 'garage' && viewer.userId === garageId
 
     return NextResponse.json({
       success: true,
       garage: {
         id: garage.id,
         companyName: garage.companyName,
-        email: garage.email,
         mobile: garage.mobile,
         address: garage.address,
-        tin: garage.tin,
-        taxAuthority: garage.taxAuthority,
         description: garage.description,
         isActive: garage.isActive,
         activatedAt: garage.activatedAt || null,
@@ -51,7 +56,10 @@ async function _GET(
         workdayStartTime: garage.workdayStartTime || '',
         workdayEndTime: garage.workdayEndTime || '',
         createdAt: garage.createdAt,
-        updatedAt: garage.updatedAt
+        updatedAt: garage.updatedAt,
+        ...(isOwner
+          ? { email: garage.email, tin: garage.tin, taxAuthority: garage.taxAuthority }
+          : {})
       }
     })
 
@@ -59,7 +67,7 @@ async function _GET(
     console.error('Error fetching garage data:', error)
     return NextResponse.json(
       { 
-        error: 'Error fetching garage data',
+        error: 'Σφάλμα κατά την ανάκτηση των στοιχείων του συνεργείου',
         details: 'Internal server error'
       },
       { status: 500 }
@@ -81,90 +89,98 @@ async function _PUT(
 
     if (!garageId) {
       return NextResponse.json({ 
-        error: 'Garage ID is required' 
+        error: 'Λείπει το αναγνωριστικό συνεργείου' 
       }, { status: 400 })
     }
 
     // Validate required fields
-    const requiredFields = ['companyName', 'email', 'mobile', 'address', 'tin', 'taxAuthority']
-    for (const field of requiredFields) {
-      if (!body[field]) {
-        return NextResponse.json({ 
-          error: `${field} is required` 
-        }, { status: 400 })
-      }
+    const requiredFields: Record<string, string> = {
+      companyName: 'Επωνυμία',
+      email: 'Email',
+      mobile: 'Κινητό',
+      address: 'Διεύθυνση',
+      tin: 'ΑΦΜ',
+      taxAuthority: 'ΔΟΥ',
+    }
+    const missing = Object.entries(requiredFields).filter(([field]) => !body[field]).map(([, label]) => label)
+    if (missing.length > 0) {
+      return NextResponse.json({ error: `Λείπουν: ${missing.join(', ')}` }, { status: 400 })
     }
 
     // Validate TIN format (should be 9 digits)
     if (!/^\d{9}$/.test(body.tin)) {
-      return NextResponse.json({ 
-        error: 'TIN must be exactly 9 digits' 
-      }, { status: 400 })
+      return NextResponse.json({ error: 'Το ΑΦΜ πρέπει να έχει ακριβώς 9 ψηφία' }, { status: 400 })
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(body.email)) {
-      return NextResponse.json({ 
-        error: 'Invalid email format' 
-      }, { status: 400 })
+    if (typeof body.email !== 'string' || !emailRegex.test(body.email.trim())) {
+      return NextResponse.json({ error: 'Μη έγκυρη διεύθυνση email' }, { status: 400 })
     }
 
-    // Snapshot previous isActive so we can detect a false→true transition
-    // (i.e. "garage_validated"). Best-effort: if the lookup fails we just
-    // skip the event.
-    let wasInactive = false
+    const email = String(body.email).trim().toLowerCase()
+
+    // Login and password reset both resolve a garage by EmailIndex with
+    // Limit 1, so a second row carrying the same address makes it a coin toss
+    // which account a sign-in or reset lands on. Same for the ΑΦΜ, which is
+    // how a business is told apart.
+    // queryIndexOrScan: TINIndex is declared in the CDK stack but missing from
+    // the local tables (and from any environment the stack hasn't reached).
+    const [emailOwners, tinOwners] = await Promise.all([
+      queryIndexOrScan<{ id: string }>({
+        table: 'Garages',
+        indexName: 'EmailIndex',
+        keyConditionExpression: 'email = :email',
+        scanFilterExpression: 'email = :email',
+        expressionAttributeValues: { ':email': email },
+      }),
+      queryIndexOrScan<{ id: string }>({
+        table: 'Garages',
+        indexName: 'TINIndex',
+        keyConditionExpression: 'tin = :tin',
+        scanFilterExpression: 'tin = :tin',
+        expressionAttributeValues: { ':tin': body.tin },
+      }),
+    ])
+    if (emailOwners.some((g) => g.id !== garageId)) {
+      return NextResponse.json({ error: 'Το email χρησιμοποιείται ήδη από άλλο συνεργείο.' }, { status: 409 })
+    }
+    if (tinOwners.some((g) => g.id !== garageId)) {
+      return NextResponse.json({ error: 'Το ΑΦΜ είναι ήδη καταχωρημένο σε άλλο συνεργείο.' }, { status: 409 })
+    }
+
+    // `isActive` is deliberately absent. Activation is an admin decision
+    // (api/admin/users/garages/[garageId]/activate, which also sends the
+    // activation email); this route used to set it to true on every save, so a
+    // pending or deactivated garage approved itself by editing its profile.
+    let result
     try {
-      const prev = await dynamoDB.send(new GetCommand({ TableName: 'Garages', Key: { id: garageId } }))
-      wasInactive = prev.Item?.isActive === false
-    } catch {
-      // ignore
-    }
-
-    // Update garage data
-    const updateCommand = new UpdateCommand({
-      TableName: 'Garages',
-      Key: { id: garageId },
-      UpdateExpression: 'SET companyName = :companyName, email = :email, mobile = :mobile, address = :address, tin = :tin, taxAuthority = :taxAuthority, description = :description, benefits = :benefits, workdayStartTime = :workdayStartTime, workdayEndTime = :workdayEndTime, isActive = :isActive, updatedAt = :updatedAt',
-      ExpressionAttributeValues: {
-        ':companyName': body.companyName,
-        ':email': body.email,
-        ':mobile': body.mobile,
-        ':address': body.address,
-        ':tin': body.tin,
-        ':taxAuthority': body.taxAuthority,
-        ':description': body.description || '',
-        ':benefits': body.benefits || [],
-        // "HH:MM", or empty when the shop hasn't said — the client UI just omits it then.
-        ':workdayStartTime': body.workdayStartTime || '',
-        ':workdayEndTime': body.workdayEndTime || '',
-        ':isActive': true,
-        ':updatedAt': new Date().toISOString()
-      },
-      ReturnValues: 'ALL_NEW'
-    })
-
-    const result = await dynamoDB.send(updateCommand)
-
-    if (wasInactive && result.Attributes?.isActive === true) {
-      logEvent({
-        eventName: EventName.GarageValidated,
-        actorType: 'system',
-        garageId,
-        source: 'api/garage/[garageId]',
-        metadata: { companyName: result.Attributes?.companyName }
-      })
-
-      const garageEmail = result.Attributes?.email as string | undefined
-      if (garageEmail) {
-        sendEmail({
-          to: garageEmail,
-          templateName: EmailTemplate.GarageActivated,
-          variables: { companyName: (result.Attributes?.companyName as string) || '' },
-          triggerEvent: EventName.GarageValidated,
-          garageId
-        })
+      result = await dynamoDB.send(new UpdateCommand({
+        TableName: 'Garages',
+        Key: { id: garageId },
+        UpdateExpression: 'SET companyName = :companyName, email = :email, mobile = :mobile, address = :address, tin = :tin, taxAuthority = :taxAuthority, description = :description, benefits = :benefits, workdayStartTime = :workdayStartTime, workdayEndTime = :workdayEndTime, updatedAt = :updatedAt',
+        ConditionExpression: 'attribute_exists(id)',
+        ExpressionAttributeValues: {
+          ':companyName': body.companyName,
+          ':email': email,
+          ':mobile': body.mobile,
+          ':address': body.address,
+          ':tin': body.tin,
+          ':taxAuthority': body.taxAuthority,
+          ':description': body.description || '',
+          ':benefits': body.benefits || [],
+          // "HH:MM", or empty when the shop hasn't said — the client UI just omits it then.
+          ':workdayStartTime': body.workdayStartTime || '',
+          ':workdayEndTime': body.workdayEndTime || '',
+          ':updatedAt': new Date().toISOString()
+        },
+        ReturnValues: 'ALL_NEW'
+      }))
+    } catch (err) {
+      if (err instanceof Error && err.name === 'ConditionalCheckFailedException') {
+        return NextResponse.json({ error: 'Το συνεργείο δεν βρέθηκε' }, { status: 404 })
       }
+      throw err
     }
 
     return NextResponse.json({
@@ -191,7 +207,7 @@ async function _PUT(
     console.error('Error updating garage data:', error)
     return NextResponse.json(
       { 
-        error: 'Error updating garage data',
+        error: 'Σφάλμα κατά την αποθήκευση των στοιχείων του συνεργείου',
         details: 'Internal server error'
       },
       { status: 500 }

@@ -44,9 +44,12 @@ async function _POST(
       )
     }
 
+    // Consistent: the step-2 form uploads straight after the request created this
+    // row, and an eventually consistent read can still miss it — a 404 on a fresh car.
     const vehicleRow = await dynamoDB.send(new GetCommand({
       TableName: 'Vehicles',
       Key: { id: vehicleId },
+      ConsistentRead: true,
     }))
     if (!vehicleRow.Item) {
       return NextResponse.json({ error: 'Vehicle not found' }, { status: 404 })
@@ -62,12 +65,18 @@ async function _POST(
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+      return NextResponse.json({ error: 'Δεν στάλθηκε φωτογραφία' }, { status: 400 })
     }
 
-    const validation = validateFile(file, 10, ['image/jpeg', 'image/png', 'image/jpg'])
+    // The form re-encodes to JPEG before sending (utils/imageCompression), so anything
+    // else reaching here is a file the browser could not decode — one a garage on
+    // another device would most likely not be able to open either.
+    const validation = validateFile(file, 10, ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'])
     if (!validation.valid) {
-      return NextResponse.json({ error: validation.error }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Η φωτογραφία πρέπει να είναι JPG, PNG ή WebP έως 10MB.', details: validation.error },
+        { status: 400 }
+      )
     }
 
     const upload = await uploadFileToS3(file, `Requests/${vehicleId}/license`)

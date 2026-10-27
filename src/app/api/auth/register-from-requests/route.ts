@@ -1,392 +1,184 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
-import { signToken, setAuthCookie } from '@/utils/auth'
+import { hashPassword } from '@/utils/passwordService'
+import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import {
+  GUEST_CONDITION,
+  GUEST_PLACEHOLDER_NAME,
+  PENDING_MERGE_FIELDS,
+  clientIp,
+  findClientByEmail,
+  isConditionalCheckFailed,
+  normalizeEmail,
+  publicClient,
+  requireGuestSession,
+} from '../_lib/guestMerge'
 
-const checkRateLimit = createRateLimiter('register-requests', 3, 3600000)
+const checkIpRate = createRateLimiter('register-requests', 10, 3600000)
+const checkGuestRate = createRateLimiter('register-requests-guest', 10, 3600000)
 
-interface VehicleIdentifier {
-  vinNumber?: string
-  engineNumber?: string
-  brand?: string
-  model?: string
+const CURRENT_TERMS_VERSION = '1.0'
+
+function optionalText(value: unknown, max: number): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  return trimmed ? trimmed.slice(0, max) : undefined
 }
 
-// Function to check if two vehicles are the same based on unique identifiers
-function areVehiclesSame(vehicle1: VehicleIdentifier, vehicle2: VehicleIdentifier): boolean {
-  // Primary check: VIN number (most reliable unique identifier)
-  if (vehicle1.vinNumber && vehicle2.vinNumber && 
-      vehicle1.vinNumber.trim().toLowerCase() === vehicle2.vinNumber.trim().toLowerCase()) {
-    return true
-  }
-  
-  // Secondary check: Engine number (also unique identifier)
-  if (vehicle1.engineNumber && vehicle2.engineNumber && 
-      vehicle1.engineNumber.trim().toLowerCase() === vehicle2.engineNumber.trim().toLowerCase()) {
-    return true
-  }
-  
-  // If neither VIN nor engine number match, they are different vehicles
-  return false
-}
-
+/**
+ * POST /api/auth/register-from-requests
+ *
+ * Completes a guest's registration from the requests page. The guest is the
+ * caller's own session; nothing in the body can point this at another row.
+ *
+ * When the email already belongs to an account this changes nothing and issues
+ * no session — it answers `409 EMAIL_EXISTS`, and the page offers the two ways to
+ * prove the account is theirs: its password
+ * (`./merge-with-password`) or a link sent to that inbox (`./send-confirmation`).
+ * This route used to merge into the existing account and sign the caller in as
+ * its owner on the strength of the email address alone.
+ */
 async function _POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { guestClientId, email, firstName, lastName, phoneNumber } = body
-
-    if (!guestClientId || typeof guestClientId !== 'string') {
-      return NextResponse.json({ 
-        error: 'Guest client ID is required' 
-      }, { status: 400 })
+    if (!checkIpRate(clientIp(request))) {
+      return NextResponse.json(
+        { error: 'Πολλές προσπάθειες από αυτή τη διεύθυνση. Δοκιμάστε ξανά σε 1 ώρα.' },
+        { status: 429 }
+      )
     }
 
-    if (!email || typeof email !== 'string') {
-      return NextResponse.json({ 
-        error: 'Email is required' 
-      }, { status: 400 })
+    const body = await request.json().catch(() => ({}))
+    const session = await requireGuestSession(request, body?.guestClientId)
+    if (session instanceof NextResponse) return session
+    const { guestId } = session
+
+    if (!checkGuestRate(guestId)) {
+      return NextResponse.json(
+        { error: 'Πολλές προσπάθειες. Δοκιμάστε ξανά σε 1 ώρα.' },
+        { status: 429 }
+      )
     }
 
-    // Get client IP for rate limiting
-    const clientIP = request.headers.get('x-forwarded-for') || 
-                     request.headers.get('x-real-ip') || 
-                     'unknown'
-
-    // Check rate limit (3 registrations per IP per hour)
-    if (!checkRateLimit(clientIP)) {
-      return NextResponse.json({ 
-        error: 'Πολλές εγγραφές από αυτή τη διεύθυνση. Παρακαλώ δοκιμάστε ξανά σε 1 ώρα.' 
-      }, { status: 429 })
+    const email = normalizeEmail(body?.email)
+    if (!email) {
+      return NextResponse.json({ error: 'Συμπληρώστε ένα έγκυρο email' }, { status: 400 })
     }
 
-    // Check if email already exists
-    const scanCommand = new ScanCommand({
-      TableName: 'Clients',
-      FilterExpression: 'email = :email',
-      ExpressionAttributeValues: {
-        ':email': email.trim().toLowerCase()
-      }
-    })
-
-    const existingResult = await dynamoDB.send(scanCommand)
-
-    if (existingResult.Items && existingResult.Items.length > 0) {
-      // User already exists - handle client and vehicle merging
-      const existingClient = existingResult.Items[0]
-      
-      // Get all service requests for the guest client
-      const guestRequestsScan = new ScanCommand({
-        TableName: 'ServiceRequests',
-        FilterExpression: 'clientId = :guestClientId',
-        ExpressionAttributeValues: {
-          ':guestClientId': guestClientId
-        }
-      })
-
-      const guestRequestsResult = await dynamoDB.send(guestRequestsScan)
-      
-      if (guestRequestsResult.Items && guestRequestsResult.Items.length > 0) {
-        // Get vehicle data from the guest client's service requests
-        const guestVehicleScan = new ScanCommand({
-          TableName: 'Vehicles',
-          FilterExpression: 'clientId = :guestClientId',
-          ExpressionAttributeValues: {
-            ':guestClientId': guestClientId
-          }
-        })
-
-        const guestVehiclesResult = await dynamoDB.send(guestVehicleScan)
-        
-        if (guestVehiclesResult.Items && guestVehiclesResult.Items.length > 0) {
-          // Check if existing client has matching vehicles
-          const existingVehiclesScan = new ScanCommand({
-            TableName: 'Vehicles',
-            FilterExpression: 'clientId = :existingClientId',
-            ExpressionAttributeValues: {
-              ':existingClientId': existingClient.id
-            }
-          })
-
-          const existingVehiclesResult = await dynamoDB.send(existingVehiclesScan)
-          
-          // Process each guest vehicle
-          for (const guestVehicle of guestVehiclesResult.Items) {
-            let vehicleMerged = false
-            
-            // Check if there's a matching existing vehicle
-            if (existingVehiclesResult.Items && existingVehiclesResult.Items.length > 0) {
-              const existingVehicle = existingVehiclesResult.Items.find(vehicle => 
-                areVehiclesSame(vehicle, guestVehicle)
-              )
-              
-              if (existingVehicle) {
-                // Merge vehicle data - update existing vehicle with missing info
-                const updateExpressions = []
-                const expressionAttributeValues: Record<string, unknown> = {
-                  ':updatedAt': new Date().toISOString()
-                }
-                
-                // Add missing VIN number
-                if (!existingVehicle.vinNumber && guestVehicle.vinNumber) {
-                  updateExpressions.push('vinNumber = :vinNumber')
-                  expressionAttributeValues[':vinNumber'] = guestVehicle.vinNumber
-                }
-                
-                // Add missing engine number
-                if (!existingVehicle.engineNumber && guestVehicle.engineNumber) {
-                  updateExpressions.push('engineNumber = :engineNumber')
-                  expressionAttributeValues[':engineNumber'] = guestVehicle.engineNumber
-                }
-                
-                // Add missing license plate
-                if (!existingVehicle.licensePlate && guestVehicle.licensePlate) {
-                  updateExpressions.push('licensePlate = :licensePlate')
-                  expressionAttributeValues[':licensePlate'] = guestVehicle.licensePlate
-                }
-                
-                // Add missing color
-                if (!existingVehicle.color && guestVehicle.color) {
-                  updateExpressions.push('color = :color')
-                  expressionAttributeValues[':color'] = guestVehicle.color
-                }
-                
-                // Update existing vehicle if there are missing fields to fill
-                if (updateExpressions.length > 0) {
-                  const updateVehicleCommand = new UpdateCommand({
-                    TableName: 'Vehicles',
-                    Key: {
-                      id: existingVehicle.id
-                    },
-                    UpdateExpression: `SET ${updateExpressions.join(', ')}, updatedAt = :updatedAt`,
-                    ExpressionAttributeValues: expressionAttributeValues
-                  })
-                  await dynamoDB.send(updateVehicleCommand)
-                }
-
-                // Update service requests to use existing vehicle and client
-                for (const serviceRequest of guestRequestsResult.Items) {
-                  const updateRequestCommand = new UpdateCommand({
-                    TableName: 'ServiceRequests',
-                    Key: {
-                      id: serviceRequest.id
-                    },
-                    UpdateExpression: 'SET vehicleId = :existingVehicleId, clientId = :existingClientId, updatedAt = :updatedAt',
-                    ExpressionAttributeValues: {
-                      ':existingVehicleId': existingVehicle.id,
-                      ':existingClientId': existingClient.id,
-                      ':updatedAt': new Date().toISOString()
-                    }
-                  })
-                  await dynamoDB.send(updateRequestCommand)
-                }
-
-                // Delete the guest vehicle
-                const deleteVehicleCommand = new DeleteCommand({
-                  TableName: 'Vehicles',
-                  Key: {
-                    id: guestVehicle.id
-                  }
-                })
-                await dynamoDB.send(deleteVehicleCommand)
-                
-                vehicleMerged = true
-              }
-            }
-            
-            // If no matching vehicle found, just transfer the vehicle to existing client
-            if (!vehicleMerged) {
-              const updateVehicleCommand = new UpdateCommand({
-                TableName: 'Vehicles',
-                Key: {
-                  id: guestVehicle.id
-                },
-                UpdateExpression: 'SET clientId = :existingClientId, updatedAt = :updatedAt',
-                ExpressionAttributeValues: {
-                  ':existingClientId': existingClient.id,
-                  ':updatedAt': new Date().toISOString()
-                }
-              })
-              await dynamoDB.send(updateVehicleCommand)
-              
-              // Update service requests to use existing client
-              for (const serviceRequest of guestRequestsResult.Items) {
-                const updateRequestCommand = new UpdateCommand({
-                  TableName: 'ServiceRequests',
-                  Key: {
-                    id: serviceRequest.id
-                  },
-                  UpdateExpression: 'SET clientId = :existingClientId, updatedAt = :updatedAt',
-                  ExpressionAttributeValues: {
-                    ':existingClientId': existingClient.id,
-                    ':updatedAt': new Date().toISOString()
-                  }
-                })
-                await dynamoDB.send(updateRequestCommand)
-              }
-            }
-          }
-        }
-      }
-
-      // Update existing client with new information if provided
-      const updateExpressions = []
-      const expressionAttributeValues: Record<string, unknown> = {
-        ':updatedAt': new Date().toISOString()
-      }
-      const expressionAttributeNames: Record<string, string> = {}
-
-      if (firstName) {
-        updateExpressions.push('#firstName = :firstName')
-        expressionAttributeNames['#firstName'] = 'firstName'
-        expressionAttributeValues[':firstName'] = firstName
-      }
-      if (lastName) {
-        updateExpressions.push('#lastName = :lastName')
-        expressionAttributeNames['#lastName'] = 'lastName'
-        expressionAttributeValues[':lastName'] = lastName
-      }
-      if (phoneNumber) {
-        updateExpressions.push('#phoneNumber = :phoneNumber')
-        expressionAttributeNames['#phoneNumber'] = 'phoneNumber'
-        expressionAttributeValues[':phoneNumber'] = phoneNumber
-      }
-
-      if (updateExpressions.length > 0) {
-        const updateClientCommand = new UpdateCommand({
-          TableName: 'Clients',
-          Key: {
-            id: existingClient.id
-          },
-          UpdateExpression: `SET ${updateExpressions.join(', ')}, updatedAt = :updatedAt`,
-          ExpressionAttributeNames: expressionAttributeNames,
-          ExpressionAttributeValues: expressionAttributeValues
-        })
-        await dynamoDB.send(updateClientCommand)
-      }
-
-      // Delete the guest client
-      const deleteGuestClientCommand = new DeleteCommand({
-        TableName: 'Clients',
-        Key: {
-          id: guestClientId
-        }
-      })
-      await dynamoDB.send(deleteGuestClientCommand)
-
-      logEvent({
-        eventName: EventName.GuestRegisteredFromRequest,
-        actorType: 'client',
-        actorId: existingClient.id,
-        clientId: existingClient.id,
-        source: 'api/auth/register-from-requests',
-        metadata: { guestClientId, mergedToExisting: true }
-      })
-
-      const tokenMerge = await signToken({ userId: existingClient.id, userType: 'client' })
-      const responseMerge = NextResponse.json({
-        success: true,
-        message: 'Existing user found - data merged successfully',
-        client: {
-          id: existingClient.id,
-          firstName: firstName || existingClient.firstName,
-          lastName: lastName || existingClient.lastName,
-          email: existingClient.email,
-          phoneNumber: phoneNumber || existingClient.phoneNumber
-        },
-        isExistingUser: true,
-        vehicleDeduplicated: true
-      })
-      setAuthCookie(responseMerge, tokenMerge)
-      return responseMerge
+    if (await findClientByEmail(email)) {
+      return NextResponse.json(
+        { code: 'EMAIL_EXISTS', error: 'Υπάρχει ήδη λογαριασμός με αυτό το email.' },
+        { status: 409 }
+      )
     }
 
-    // Email doesn't exist - just update the guest client with the new information
-    const updateExpressions = []
-    const expressionAttributeValues: Record<string, unknown> = {
-      ':updatedAt': new Date().toISOString()
+    const { password, acceptedTerms } = body
+    if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
+      return NextResponse.json(
+        { error: `Ο κωδικός πρέπει να έχει τουλάχιστον ${MIN_PASSWORD_LENGTH} χαρακτήρες` },
+        { status: 400 }
+      )
     }
-    const expressionAttributeNames: Record<string, string> = {}
+    if (acceptedTerms !== true) {
+      return NextResponse.json(
+        { error: 'Πρέπει να αποδεχτείς τους Όρους Χρήσης και την Πολιτική Απορρήτου' },
+        { status: 400 }
+      )
+    }
 
+    const passwordHash = await hashPassword(password)
+
+    // Hashing takes long enough for someone else to have registered the
+    // address meanwhile, so look again immediately before the write.
+    if (await findClientByEmail(email)) {
+      return NextResponse.json(
+        { code: 'EMAIL_EXISTS', error: 'Υπάρχει ήδη λογαριασμός με αυτό το email.' },
+        { status: 409 }
+      )
+    }
+
+    const now = new Date().toISOString()
+    const names: Record<string, string> = { '#email': 'email' }
+    const values: Record<string, unknown> = {
+      ':email': email,
+      ':passwordHash': passwordHash,
+      ':termsAt': now,
+      ':termsVersion': CURRENT_TERMS_VERSION,
+      ':now': now,
+    }
+    const sets = [
+      '#email = :email',
+      'passwordHash = :passwordHash',
+      'acceptedTermsAt = :termsAt',
+      'acceptedTermsVersion = :termsVersion',
+      'updatedAt = :now',
+    ]
+    // The name field is optional. Leaving it blank keeps whatever the guest
+    // already had — this used to overwrite a real name with the email's local
+    // part. A row still on the funnel's placeholder keeps the placeholder too:
+    // the first name is what every garage sees before winning the job, and an
+    // address's local part is often most of the address.
+    const firstName = optionalText(body.firstName, 100)
     if (firstName) {
-      updateExpressions.push('#firstName = :firstName')
-      expressionAttributeNames['#firstName'] = 'firstName'
-      expressionAttributeValues[':firstName'] = firstName
+      sets.push('firstName = :firstName')
+      values[':firstName'] = firstName
+    } else {
+      sets.push('firstName = if_not_exists(firstName, :placeholder)')
+      values[':placeholder'] = GUEST_PLACEHOLDER_NAME
     }
+    const lastName = optionalText(body.lastName, 100)
     if (lastName) {
-      updateExpressions.push('#lastName = :lastName')
-      expressionAttributeNames['#lastName'] = 'lastName'
-      expressionAttributeValues[':lastName'] = lastName
+      sets.push('lastName = :lastName')
+      values[':lastName'] = lastName
     }
-    if (email) {
-      updateExpressions.push('#email = :email')
-      expressionAttributeNames['#email'] = 'email'
-      expressionAttributeValues[':email'] = email.trim().toLowerCase()
-    }
+    const phoneNumber = optionalText(body.phoneNumber, 30)
     if (phoneNumber) {
-      updateExpressions.push('#phoneNumber = :phoneNumber')
-      expressionAttributeNames['#phoneNumber'] = 'phoneNumber'
-      expressionAttributeValues[':phoneNumber'] = phoneNumber
+      sets.push('phoneNumber = :phoneNumber')
+      values[':phoneNumber'] = phoneNumber
     }
 
-    const updateClientCommand = new UpdateCommand({
-      TableName: 'Clients',
-      Key: {
-        id: guestClientId
-      },
-      UpdateExpression: `SET ${updateExpressions.join(', ')}, updatedAt = :updatedAt`,
-      ExpressionAttributeNames: expressionAttributeNames,
-      ExpressionAttributeValues: expressionAttributeValues,
-      ReturnValues: 'ALL_NEW'
-    })
-
-    const { Attributes } = await dynamoDB.send(updateClientCommand)
-
-    if (!Attributes) {
-      return NextResponse.json({ error: 'Guest client not found' }, { status: 404 })
+    let updated: Record<string, unknown> | undefined
+    try {
+      const result = await dynamoDB.send(
+        new UpdateCommand({
+          TableName: 'Clients',
+          Key: { id: guestId },
+          // A half-finished merge must not be overtaken by a registration.
+          UpdateExpression: `SET ${sets.join(', ')} REMOVE ${PENDING_MERGE_FIELDS.join(', ')}`,
+          ConditionExpression: `${GUEST_CONDITION} AND attribute_not_exists(mergingInto)`,
+          ExpressionAttributeNames: names,
+          ExpressionAttributeValues: values,
+          ReturnValues: 'ALL_NEW',
+        })
+      )
+      updated = result.Attributes
+    } catch (err) {
+      if (isConditionalCheckFailed(err)) {
+        return NextResponse.json(
+          { code: 'NOT_GUEST', error: 'Ο λογαριασμός άλλαξε στο μεταξύ. Ανανεώστε τη σελίδα.' },
+          { status: 409 }
+        )
+      }
+      throw err
     }
 
     logEvent({
       eventName: EventName.GuestRegisteredFromRequest,
       actorType: 'client',
-      actorId: guestClientId,
-      clientId: guestClientId,
+      actorId: guestId,
+      clientId: guestId,
       source: 'api/auth/register-from-requests',
-      metadata: { guestClientId, mergedToExisting: false }
+      metadata: { mergedToExisting: false },
     })
 
-    const token = await signToken({ userId: guestClientId, userType: 'client' })
-    const response = NextResponse.json({
-      success: true,
-      message: 'Guest client updated successfully',
-      client: Attributes,
-      isExistingUser: false,
-      vehicleDeduplicated: false
-    })
-    setAuthCookie(response, token)
-    return response
-
+    return NextResponse.json({ success: true, client: publicClient(updated ?? { id: guestId }) })
   } catch (error) {
-    console.error('Registration from requests error:', error)
-    
-    // Log more detailed error information for debugging
-    if (error instanceof Error) {
-      console.error('Error name:', error.name)
-      console.error('Error message:', error.message)
-      console.error('Error stack:', error.stack)
-    }
-    
-    return NextResponse.json(
-      { 
-        error: 'Error during registration',
-        details: 'Internal server error',
-        timestamp: new Date().toISOString()
-      },
-      { status: 500 }
-    )
+    console.error('[register-from-requests] error:', error)
+    return NextResponse.json({ error: 'Σφάλμα κατά την εγγραφή' }, { status: 500 })
   }
 }
 

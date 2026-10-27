@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
-import { requireAuth } from '@/utils/requireAuth'
+import { requireAuth, requireActiveGarage } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
 import { invalidateUnread } from '@/utils/unreadCache'
 
@@ -14,6 +14,7 @@ import { invalidateUnread } from '@/utils/unreadCache'
  *
  *   offers   → ServiceRequests.clientOffersSeenAt  (client opened the offers)
  *   accepted → Offers.garageSeenAcceptedAt         (garage opened the won offer)
+ *   dates    → Offers.garageSeenDatesAt            (garage saw the client's proposed dates)
  *
  * Messages clear through chat/[requestId]/mark-read instead, because read state
  * there is per counterparty rather than per row.
@@ -23,8 +24,12 @@ async function _POST(request: NextRequest) {
     const auth = requireAuth(request)
     if (auth instanceof NextResponse) return auth
 
-    const { kind, id } = await request.json()
-    if (!kind || !id) {
+    // An empty or malformed body is the caller's mistake, not a server error:
+    // `request.json()` throws on it, which used to surface as a 500 and a
+    // SyntaxError in the logs.
+    const body: unknown = await request.json().catch(() => null)
+    const { kind, id } = (body && typeof body === 'object' ? body : {}) as { kind?: unknown; id?: unknown }
+    if (typeof kind !== 'string' || !kind || typeof id !== 'string' || !id) {
       return NextResponse.json({ error: 'kind and id are required' }, { status: 400 })
     }
 
@@ -48,22 +53,25 @@ async function _POST(request: NextRequest) {
         UpdateExpression: 'SET clientOffersSeenAt = :now',
         ExpressionAttributeValues: { ':now': now },
       }))
-    } else if (kind === 'accepted') {
+    } else if (kind === 'accepted' || kind === 'dates') {
       if (auth.userType !== 'garage') {
         return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
       }
+      const garageId = await requireActiveGarage(request)
+      if (garageId instanceof NextResponse) return garageId
       const offer = await dynamoDB.send(new GetCommand({
         TableName: 'Offers',
         Key: { id },
         ProjectionExpression: 'id, garageId',
       }))
-      if (offer.Item?.garageId !== auth.userId) {
+      if (offer.Item?.garageId !== garageId) {
         return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
       }
       await dynamoDB.send(new UpdateCommand({
         TableName: 'Offers',
         Key: { id },
-        UpdateExpression: 'SET garageSeenAcceptedAt = :now',
+        UpdateExpression:
+          kind === 'accepted' ? 'SET garageSeenAcceptedAt = :now' : 'SET garageSeenDatesAt = :now',
         ExpressionAttributeValues: { ':now': now },
       }))
     } else {

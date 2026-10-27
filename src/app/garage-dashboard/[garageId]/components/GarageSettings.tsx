@@ -79,7 +79,7 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to update garage data')
+        throw new Error(errorData.error || 'Δεν ήταν δυνατή η ενημέρωση των στοιχείων.')
       }
 
       const data = await response.json()
@@ -87,13 +87,13 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
       if (data.success) {
         onUpdate(data.garage)
         setHasChanges(false)
-        success('Επιτυχης Ενημερωση', 'Τα στοιχεια του συνεργειου ενημερωθηκαν επιτυχως!')
+        success('Επιτυχής ενημέρωση', 'Τα στοιχεία του συνεργείου ενημερώθηκαν.')
       } else {
-        throw new Error(data.error || 'Failed to update garage data')
+        throw new Error(data.error || 'Δεν ήταν δυνατή η ενημέρωση των στοιχείων.')
       }
     } catch (err) {
       console.error('Error updating garage data:', err)
-      error('Σφαλμα', err instanceof Error ? err.message : 'Δεν ηταν δυνατη η ενημερωση των στοιχειων. Παρακαλω δοκιμαστε ξανα.')
+      error('Σφάλμα', err instanceof Error ? err.message : 'Δεν ήταν δυνατή η ενημέρωση των στοιχείων. Παρακαλώ δοκιμάστε ξανά.')
     } finally {
       setIsLoading(false)
     }
@@ -105,18 +105,18 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
   }
 
   const infoFields = [
-    { icon: 'business', label: 'ΕΠΩΝΥΜΙΑ', field: 'companyName' as keyof GarageData, placeholder: 'π.χ. Συνεργειο Παπαδοπουλος', required: true },
+    { icon: 'business', label: 'ΕΠΩΝΥΜΙΑ', field: 'companyName' as keyof GarageData, placeholder: 'π.χ. Συνεργείο Παπαδόπουλος', required: true },
     { icon: 'receipt_long', label: 'ΑΦΜ', field: 'tin' as keyof GarageData, placeholder: '123456789', required: true },
     { icon: 'mail', label: 'EMAIL', field: 'email' as keyof GarageData, placeholder: 'info@garage.gr', required: true, type: 'email' },
     { icon: 'phone', label: 'ΤΗΛΕΦΩΝΟ', field: 'mobile' as keyof GarageData, placeholder: '+306984959044', required: true },
-    { icon: 'location_on', label: 'ΔΙΕΥΘΥΝΣΗ', field: 'address' as keyof GarageData, placeholder: 'Λεωφορος Πατησιων 123, Αθηνα', required: true, fullWidth: true },
-    { icon: 'account_balance', label: 'ΔΟΥ', field: 'taxAuthority' as keyof GarageData, placeholder: 'ΔΟΥ Αθηνων', required: true },
+    { icon: 'location_on', label: 'ΔΙΕΥΘΥΝΣΗ', field: 'address' as keyof GarageData, placeholder: 'Λεωφόρος Πατησίων 123, Αθήνα', required: true, fullWidth: true },
+    { icon: 'account_balance', label: 'ΔΟΥ', field: 'taxAuthority' as keyof GarageData, placeholder: 'ΔΟΥ Αθηνών', required: true },
     // These two drive the hourly availability grid on every offer: the rows of
     // that grid are the hours between them. Shown to the customer too, so
     // "Τρίτη 12/9" reads as "Τρίτη 12/9, από τις 09:00".
     { icon: 'schedule', label: 'ΩΡΑ ΕΝΑΡΞΗΣ ΕΡΓΑΣΙΩΝ', field: 'workdayStartTime' as keyof GarageData, placeholder: '09:00', required: false, type: 'time' },
     { icon: 'schedule', label: 'ΩΡΑ ΛΗΞΗΣ ΕΡΓΑΣΙΩΝ', field: 'workdayEndTime' as keyof GarageData, placeholder: '18:00', required: false, type: 'time' },
-    { icon: 'description', label: 'ΠΕΡΙΓΡΑΦΗ', field: 'description' as keyof GarageData, placeholder: 'Συντομη περιγραφη του συνεργειου...', required: false },
+    { icon: 'description', label: 'ΠΕΡΙΓΡΑΦΗ', field: 'description' as keyof GarageData, placeholder: 'Σύντομη περιγραφή του συνεργείου...', required: false },
   ]
 
   return (
@@ -124,10 +124,10 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
       {/* Header */}
       <div>
         <h2 className="text-3xl font-bold tracking-tight text-on-surface">
-          Προφιλ Συνεργειου
+          Προφίλ Συνεργείου
         </h2>
         <p className="text-base text-secondary leading-relaxed mt-1">
-          Διαχειριστειτε τα στοιχεια του συνεργειου σας
+          Διαχειριστείτε τα στοιχεία του συνεργείου σας
         </p>
       </div>
 
@@ -145,8 +145,8 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
             <Icon name="business" filled size="md" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-on-surface">Στοιχεια Εταιρειας</h3>
-            <p className="text-xs text-secondary">Βασικα στοιχεια επικοινωνιας</p>
+            <h3 className="text-lg font-bold text-on-surface">Στοιχεία Εταιρείας</h3>
+            <p className="text-xs text-secondary">Βασικά στοιχεία επικοινωνίας</p>
           </div>
         </div>
 
@@ -178,8 +178,8 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
             <Icon name="star" filled size="md" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-on-surface">Παροχες Εργασιας</h3>
-            <p className="text-xs text-secondary">Δωρεαν παροχες για τους πελατες σας</p>
+            <h3 className="text-lg font-bold text-on-surface">Παροχές Εργασίας</h3>
+            <p className="text-xs text-secondary">Δωρεάν παροχές για τους πελάτες σας</p>
           </div>
         </div>
 
@@ -189,7 +189,7 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
               <Input
                 value={newBenefit}
                 onChange={(value) => setNewBenefit(value)}
-                placeholder="π.χ. Δωρεαν διαγνωστικη"
+                placeholder="π.χ. Δωρεάν διαγνωστικός έλεγχος"
                 onKeyPress={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault()
@@ -204,7 +204,7 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
               className={newBenefit.trim() ? styles.btnPrimary : styles.btnDisabled}
             >
               <Icon name="add" size="sm" />
-              Προσθηκη
+              Προσθήκη
             </button>
           </div>
         </div>
@@ -220,6 +220,7 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
                 </div>
                 <button
                   onClick={() => handleRemoveBenefit(index)}
+                  aria-label={`Αφαίρεση: ${benefit}`}
                   className="text-tertiary hover:text-tertiary/80 opacity-0 group-hover:opacity-100 transition-opacity p-1"
                 >
                   <Icon name="close" size="sm" />
@@ -230,7 +231,7 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
             <div className="text-center py-6">
               <Icon name="inventory_2" size="lg" className="text-outline/40 mx-auto mb-2" />
               <p className="text-sm text-on-surface-variant italic">
-                Δεν εχουν προστεθει παροχες ακομα
+                Δεν έχουν προστεθεί παροχές ακόμα
               </p>
             </div>
           )}
@@ -245,8 +246,8 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
               <div className="flex items-center gap-3">
                 <Icon name="edit_note" size="md" className="text-on-primary" />
                 <div>
-                  <p className="text-sm font-bold text-on-primary">Μη αποθηκευμενες αλλαγες</p>
-                  <p className="text-xs text-on-primary/70">Αποθηκευστε τις αλλαγες σας</p>
+                  <p className="text-sm font-bold text-on-primary">Μη αποθηκευμένες αλλαγές</p>
+                  <p className="text-xs text-on-primary/70">Αποθηκεύστε τις αλλαγές σας</p>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -255,7 +256,7 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
                   disabled={isLoading}
                   className="px-4 py-2 rounded-lg text-sm font-bold text-on-primary/80 hover:bg-white/10 transition-colors"
                 >
-                  Ακυρωση
+                  Ακύρωση
                 </button>
                 <button
                   onClick={handleSave}
@@ -265,12 +266,12 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
                   {isLoading ? (
                     <span className="flex items-center gap-2">
                       <Spinner size="sm" />
-                      Αποθηκευση...
+                      Αποθήκευση…
                     </span>
                   ) : (
                     <span className="flex items-center gap-2">
                       <Icon name="save" size="sm" />
-                      Αποθηκευση
+                      Αποθήκευση
                     </span>
                   )}
                 </button>
@@ -288,14 +289,14 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
           </div>
           <div>
             <h4 className="text-sm font-bold text-on-surface mb-2">
-              Σημαντικες Πληροφοριες
+              Σημαντικές Πληροφορίες
             </h4>
             <ul className="space-y-1.5">
               {[
-                'Τα πεδια με * ειναι υποχρεωτικα',
-                'Το ΑΦΜ πρεπει να ειναι 9 ψηφια',
-                'Το email θα χρησιμοποιηθει για ειδοποιησεις',
-                'Το κινητο τηλεφωνο θα χρησιμοποιηθει για SMS'
+                'Τα πεδία με * είναι υποχρεωτικά',
+                'Το ΑΦΜ πρέπει να είναι 9 ψηφία',
+                'Το email θα χρησιμοποιηθεί για ειδοποιήσεις',
+                'Το κινητό τηλέφωνο θα χρησιμοποιηθεί για SMS'
               ].map((item, i) => (
                 <li key={i} className="flex items-center gap-2">
                   <Icon name="check" size="sm" className="text-primary" />

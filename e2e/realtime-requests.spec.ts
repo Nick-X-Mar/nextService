@@ -1,6 +1,16 @@
 import { test, expect } from '@playwright/test'
 import { registerClient, loginViaAPI, TEST_GARAGE } from './helpers'
-import { isAppSyncMockReachable, subscribeToChannels } from './appsync-helpers'
+import {
+  isAppSyncMockReachable,
+  publishOverHttpAs,
+  realtimeTokenFor,
+  requestRealtimeToken,
+  subscribeToChannels,
+  tryPublish,
+  trySubscribe,
+} from './appsync-helpers'
+import { loginAdmin, newClient, newGarage, newRequest } from './E-helpers'
+import { adminPost, adminSession } from './a-helpers'
 
 // The realtime fan-out hangs off the local AppSync mock (port 3002). Without
 // it the broadcast never happens, so guard the suite with a health check —
@@ -188,16 +198,17 @@ test.describe.serial('Realtime request-update broadcasts', () => {
     expect(srResp.status()).toBe(200)
     const requestId = (await srResp.json()).serviceRequestId
 
+    // The admin routes take the admin session, not a client's auth-token. This
+    // test used to send the client's cookie, get a 401 and skip itself — so
+    // it never once checked the broadcast.
+    const adminCookie = await loginAdmin(request)
+
     const sub = await subscribeToChannels(['request-updates'])
     try {
-      const cancelResp = await request.patch(`/api/admin/requests/${requestId}/cancel`, {
-        headers: { Cookie: `auth-token=${updateClientToken}` },
+      const cancelResp = await request.patch(`/api/admin/requests/${requestId}/cancel/`, {
+        headers: { Cookie: adminCookie },
       })
-      // Admin route may require admin auth — skip the assertion if so, the
-      // broadcast itself is what we're after when it does succeed.
-      if (cancelResp.status() !== 200) {
-        test.skip(true, `Admin cancel rejected (${cancelResp.status()}) — admin auth not configured for this test env`)
-      }
+      expect(cancelResp.status()).toBe(200)
 
       const event = await sub.waitFor(
         e => e.channel === 'request-updates'
@@ -238,4 +249,104 @@ test('AppSync mock round-trips a manual publish to the new-requests channel', as
   } finally {
     sub.close()
   }
+})
+
+/**
+ * Who may do what on the realtime API. The production authorizer
+ * (infra/lambdas/appsync-authorizer) and the mock enforce the same rules; the
+ * mock is what these exercise.
+ *
+ * Before: the authorizer looked at the channel only, never the operation. Any
+ * approved garage could PUBLISH on `request-updates` — dropping requests off
+ * every competitor's live dashboard — or forge events into its own threads;
+ * a deactivated garage kept a token and kept receiving its threads live; and a
+ * frame that named no channel was waved through as if it were the connect.
+ */
+test.describe.serial('Realtime authorization', () => {
+  test('A garage token cannot publish — not on the broadcast channels, not on its own thread', async ({ request }) => {
+    const garage = await newGarage(request, { prefix: 'rt-forge' })
+    const token = await realtimeTokenFor(garage.token)
+    const thread = `request-sr-e2e-forge-${Date.now()}-garage-${garage.id}`
+    const listener = await subscribeToChannels(['request-updates', 'new-requests', thread], { token })
+    try {
+      // Listening on all three, so "nothing arrived" below means something.
+      await expect.poll(() => listener.events.filter((e) => e.data.status === 'subscribed').length).toBe(3)
+      const forged = { __type: 'request-update', requestId: `sr-e2e-forged-${Date.now()}`, status: 'cancelled' }
+      expect(await tryPublish('request-updates', forged, token)).toBe('refused')
+      expect(await tryPublish('new-requests', { __type: 'new-request', request: { id: forged.requestId } }, token)).toBe('refused')
+      expect(await tryPublish(thread, { id: 'forged', message: 'forged', senderType: 'client' }, token)).toBe('refused')
+      // The HTTP path the app server uses refuses a garage token just the same.
+      expect(await publishOverHttpAs(token, 'request-updates', forged)).toBe(401)
+
+      await new Promise((r) => setTimeout(r, 500))
+      const leaked = listener.events.filter((e) => e.channel !== undefined)
+      expect(leaked, 'a forged event reached a subscriber').toEqual([])
+    } finally {
+      listener.close()
+    }
+  })
+
+  test('A client token cannot publish into its own conversation either', async ({ request }) => {
+    const client = await newClient(request, 'rt-forge-client')
+    const requestId = await newRequest(request, client)
+    const token = await realtimeTokenFor(client.token)
+    const thread = `request-${requestId}-garage-${TEST_GARAGE.id}`
+    expect(await trySubscribe(thread, token)).toBe('subscribed')
+    expect(await tryPublish(thread, { id: 'forged', message: 'forged', senderType: 'garage' }, token)).toBe('refused')
+  })
+
+  test('A subscribe or publish that names no channel is refused', async ({ request }) => {
+    const garage = await newGarage(request, { prefix: 'rt-nochannel' })
+    const token = await realtimeTokenFor(garage.token)
+    expect(await trySubscribe(null, token)).toBe('denied')
+    expect(await tryPublish(null, { __type: 'request-update' }, token)).toBe('refused')
+    // Wildcards are judged on their literal text, so they are not accepted at all.
+    expect(await trySubscribe(`request-*-garage-${garage.id}`, token)).toBe('denied')
+  })
+
+  test('An inactive garage gets no realtime token, and an earlier token stops subscribing', async ({ request }) => {
+    const pending = await newGarage(request, { active: false, prefix: 'rt-pending' })
+    const refused = await requestRealtimeToken(pending.token)
+    expect(refused.status).toBe(403)
+    expect(refused.data.code).toBe('GARAGE_INACTIVE')
+
+    // Approved, takes a token, then is deactivated while the token still lives.
+    const garage = await newGarage(request, { prefix: 'rt-deactivated' })
+    const token = await realtimeTokenFor(garage.token)
+    const thread = `request-sr-e2e-deactivated-${Date.now()}-garage-${garage.id}`
+    expect(await trySubscribe(thread, token)).toBe('subscribed')
+
+    const admin = await adminSession()
+    expect(await adminPost(`/api/admin/users/garages/${garage.id}/deactivate/`, admin)).toBe(200)
+
+    expect((await requestRealtimeToken(garage.token)).status).toBe(403)
+    expect(await trySubscribe(thread, token)).toBe('denied')
+    expect(await trySubscribe('new-requests', token)).toBe('denied')
+    expect(await trySubscribe('request-updates', token)).toBe('denied')
+
+    // Clients are unaffected by the garage gate.
+    const client = await newClient(request, 'rt-client-token')
+    expect((await requestRealtimeToken(client.token)).status).toBe(200)
+  })
+
+  // The app server's own publishes go to :3002 whatever APPSYNC_MOCK_PORT says.
+  test("The app server's system publish still reaches the thread", async ({ request }) => {
+    const garage = await newGarage(request, { prefix: 'rt-system' })
+    const client = await newClient(request, 'rt-system')
+    const requestId = await newRequest(request, client)
+    const thread = `request-${requestId}-garage-${garage.id}`
+    const listener = await subscribeToChannels([thread], { token: await realtimeTokenFor(garage.token) })
+    try {
+      const body = `system publish probe ${Date.now()}`
+      const resp = await request.post(`/api/chat/${requestId}/messages/`, {
+        headers: { Cookie: `auth-token=${garage.token}` },
+        data: { message: body, garageId: garage.id },
+      })
+      expect(resp.status()).toBe(200)
+      const event = await listener.waitFor((e) => e.channel === thread && e.data?.message === body, 8000)
+      expect(event.data.senderType).toBe('garage')
+    } finally {
+      listener.close()
+    }
+  })
 })

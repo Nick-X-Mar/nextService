@@ -1,9 +1,11 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
 import OfferDetailPage from './components/OfferDetailPage'
 import { getOfferBySlug, type Offer } from '@/lib/offers'
 import { SITE_URL } from '@/lib/site-url'
+import { getCategoryText } from '@/utils/categoryLabels'
 import {
   ORGANIZATION_ID,
   breadcrumbJsonLd,
@@ -97,7 +99,7 @@ function buildOfferJsonLd(offer: Offer) {
     serviceType: offer.workType,
     description: `${offer.title} σε ${offer.subtitle}, ολοκληρωμένη εργασία μέσω NextService. ${offer.description}`,
     image: absoluteImage(offer.image),
-    category: offer.category === 'fanopeia' ? 'Φανοποιεία' : 'Service αυτοκινήτου',
+    category: getCategoryText(offer.category),
     provider: { '@id': ORGANIZATION_ID },
     areaServed: { '@type': 'Country', name: 'GR' },
   }
@@ -157,9 +159,9 @@ export default async function OfferPage({ params }: PageProps) {
   const decodedSlug = decodeURIComponent(slug)
   const offer = await getOfferBySlug(decodedSlug)
 
-  if (!offer) {
-    return <OfferDetailPage slug={decodedSlug} initialOffer={null} />
-  }
+  // A real 404, not a 200 page that says "not found": crawlers index soft 404s, and
+  // the retired WordPress slugs still get hit.
+  if (!offer) notFound()
 
   const url = `${SITE_URL}/offer/${offer.slug}/`
   const faqs = buildOfferFaqs(offer)

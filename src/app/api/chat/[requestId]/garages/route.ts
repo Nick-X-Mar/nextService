@@ -4,6 +4,8 @@ import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { requireClient } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
 import { collectAll } from '@/utils/pagination'
+import { resolveWinner, threadWriteState } from '@/utils/chatService'
+import { ServiceRequestStatus } from '@/types/statuses'
 
 interface ChatMessageItem {
   id: string
@@ -58,7 +60,7 @@ async function _GET(
         KeyConditionExpression: 'requestId = :requestId',
         ExpressionAttributeValues: { ':requestId': requestId },
         // `timestamp` is a DynamoDB reserved word.
-        ProjectionExpression: 'id, senderId, senderType, #msg, #ts',
+        ProjectionExpression: 'id, senderId, senderType, #msg, #ts, garageId',
         ExpressionAttributeNames: { '#ts': 'timestamp', '#msg': 'message' },
         ExclusiveStartKey: startKey,
       })),
@@ -72,10 +74,13 @@ async function _GET(
       })
     }
 
+    // A thread exists once either side has written in it — including one the
+    // client opened from an offer before the garage replied. Listing only the
+    // garages that had written made such a deep link land on another thread.
+    const threadOf = (item: ChatMessageItem) =>
+      item.senderType === 'garage' ? item.senderId : item.garageId
     const garageIds = [...new Set(
-      messages
-        .filter((item) => item.senderType === 'garage')
-        .map((item) => item.senderId)
+      messages.map(threadOf).filter((id): id is string => !!id)
     )]
 
     if (garageIds.length === 0) {
@@ -84,6 +89,12 @@ async function _GET(
         garages: []
       })
     }
+
+    const status = requestResult.Item.status
+    const winnerId =
+      status && status !== ServiceRequestStatus.PENDING && status !== ServiceRequestStatus.CANCELLED
+        ? await resolveWinner(requestResult.Item)
+        : null
 
     // Get garage details — fetch all garages in parallel
     const garageResults = await Promise.all(
@@ -110,17 +121,19 @@ async function _GET(
 
       // Get last message and unread count for this garage
       const garageMessages = messages
-        .filter((item) => item.senderId === garage.id)
+        .filter((item) => threadOf(item) === garage.id)
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
       const lastMessage = garageMessages[0]
 
       // Read state is per (request, garage) — see the note in mark-read.
       // Absent entry means this client has never opened the thread, so every
-      // garage message counts as unread.
+      // garage message counts as unread. A read-only thread has nothing
+      // waiting on the client, the same rule the Μηνύματα badge counts by.
       const lastRead = clientReadAt[garage.id]
+      const writable = threadWriteState(status, garage.id, winnerId).canWrite
 
-      const hasUnreadMessages = garageMessages.some((msg) =>
+      const hasUnreadMessages = writable && garageMessages.some((msg) =>
         msg.senderType === 'garage' &&
         (!lastRead || new Date(msg.timestamp).getTime() > new Date(lastRead).getTime())
       )

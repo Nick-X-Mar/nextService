@@ -18,6 +18,20 @@ const checkRateLimit = createRateLimiter('register-pro', 3, 3600000)
 // version it agreed to so we can prove what they accepted at the time.
 const CURRENT_TERMS_VERSION = '1.0'
 
+/** Free-text chips from the form: strings only, trimmed, a sane number of them. */
+function stringList(raw: unknown, max = 20, maxLength = 200): string[] {
+  if (!Array.isArray(raw)) return []
+  const out: string[] = []
+  for (const item of raw) {
+    if (typeof item !== 'string') continue
+    const text = item.trim()
+    if (text && text.length <= maxLength && !out.includes(text)) out.push(text)
+  }
+  return out.slice(0, max)
+}
+
+const optionalText = (raw: unknown) => (typeof raw === 'string' ? raw.trim() : '')
+
 async function _POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -162,8 +176,8 @@ async function _POST(request: NextRequest) {
     const garageData = {
       id: garageId,
       companyName: companyName.trim(),
-      contactFirstName: contactFirstName ? contactFirstName.trim() : '',
-      contactLastName: contactLastName ? contactLastName.trim() : '',
+      contactFirstName: optionalText(contactFirstName),
+      contactLastName: optionalText(contactLastName),
       tin: cleanTin,
       email: normalizedEmail,
       passwordHash,
@@ -172,8 +186,8 @@ async function _POST(request: NextRequest) {
       mobile: cleanMobile,
       isActive: false,
       description: 'Εταιρεία εγγεγραμμένη στο NextService',
-      benefits: benefits && Array.isArray(benefits) ? benefits : [],
-      services: services && Array.isArray(services) ? services : [],
+      benefits: stringList(benefits),
+      services: stringList(services),
       acceptedTermsAt: nowIso,
       acceptedTermsVersion: CURRENT_TERMS_VERSION,
       createdAt: nowIso,

@@ -11,7 +11,6 @@ import { useToast } from '../../../../../../hooks/useToast'
 // Navigation handled by AppShell
 import { RequestDetailsPanel, LoadMoreButton, Spinner, ChatAttachments, AttachmentPreviewStrip, type ChatAttachmentView } from '../../../../../../components'
 import { useChatAttachments, MAX_CHAT_ATTACHMENTS } from '@/hooks/useChatAttachments'
-import { ServiceRequestStatus } from '../../../../../../types/statuses'
 import type { ServiceRequest } from '../../../../../../types/requests'
 import appSyncService from '@/lib/appsync-service'
 
@@ -60,11 +59,14 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [requestDetails, setRequestDetails] = useState<ServiceRequest | null>(null)
-  // With an appointment booked, only the thread with the chosen garage stays open —
-  // the rest of the conversations are history for both sides.
-  const isReadOnly =
-    requestDetails?.status === ServiceRequestStatus.APPOINTMENT &&
-    (!requestDetails?.acceptedGarageId || selectedGarage?.id !== requestDetails.acceptedGarageId)
+  // Whether the selected thread still takes messages, as the server decides it
+  // for the send: once the request leaves the market only the thread with the
+  // garage that got the job stays open, and none once it is cancelled. Keyed by
+  // garage so switching threads never shows the previous one's state.
+  const [readOnly, setReadOnly] = useState<{ garageId: string; notice: string | null } | null>(null)
+  const readOnlyNotice =
+    readOnly && selectedGarage && readOnly.garageId === selectedGarage.id ? readOnly.notice : null
+  const isReadOnly = readOnlyNotice !== null
 
   const subscriptionRef = useRef<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -169,6 +171,12 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
           (msg: ChatMessage) => msg.timestamp && !isNaN(new Date(msg.timestamp).getTime())
         )
         setOlderCursor(data.nextCursor ?? null)
+        setReadOnly({
+          garageId,
+          notice: data.canWrite === false
+            ? data.readOnlyNotice || 'Η συνομιλία είναι μόνο για ανάγνωση.'
+            : null,
+        })
         setMessages((prev) => {
           if (mode === 'replace') return validMessages
           const seen = new Set(prev.map((m) => m.id))
@@ -284,6 +292,9 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
           caption: text,
         })
         if (!result.ok) {
+          if (result.code === 'CHAT_READ_ONLY') {
+            setReadOnly({ garageId: selectedGarage.id, notice: result.error })
+          }
           showToast({ type: 'error', title: result.error })
           return
         }
@@ -312,6 +323,11 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
 
         if (!response.ok) {
           const error = await response.json().catch(() => ({}))
+          // The request was assigned or cancelled while this was open: lock
+          // the composer rather than let every retry fail the same way.
+          if (error.code === 'CHAT_READ_ONLY') {
+            setReadOnly({ garageId: selectedGarage.id, notice: error.error || 'Η συνομιλία είναι μόνο για ανάγνωση.' })
+          }
           showToast({ type: 'error', title: error.error || 'Σφάλμα κατά την αποστολή του μηνύματος' })
           return
         }
@@ -465,14 +481,9 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
             itself instead of pushing the composer off the screen. */}
         {requestDetails && (
           <div className="mb-4 flex-shrink-0 max-h-[45%] overflow-y-auto">
-            <RequestDetailsPanel
-              request={requestDetails}
-              allowEdit={true}
-              onUpdate={(updatedRequest) => {
-                setRequestDetails({ ...requestDetails, ...updatedRequest })
-                showToast({ type: 'success', title: 'Τα στοιχεία ενημερώθηκαν επιτυχώς' })
-              }}
-            />
+            {/* Read-only: editing here only ever changed local state — nothing
+                was saved, yet it reported success. */}
+            <RequestDetailsPanel request={requestDetails} allowEdit={false} />
           </div>
         )}
 
@@ -536,7 +547,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                                 </span>
                               </div>
                             )}
-                            {/* Online dot */}
+                            {/* Unread dot */}
                             {garage.hasUnreadMessages && (
                               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-surface rounded-full" />
                             )}
@@ -612,11 +623,9 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                             </span>
                           </div>
                         )}
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-surface-container-lowest rounded-full" />
                       </div>
                       <div>
                         <h3 className="text-sm font-bold text-on-surface">{selectedGarage.companyName}</h3>
-                        <p className="text-[11px] text-green-600 font-medium">Online</p>
                       </div>
                     </div>
                   </div>
@@ -698,9 +707,7 @@ export default function IndividualChatPage({ clientId, requestId }: IndividualCh
                     <div className="px-5 py-3 border-t border-outline-variant/10 bg-surface-container-lowest/80 backdrop-blur-sm">
                       <div className="rounded-xl bg-surface-container px-4 py-3 flex items-center gap-3">
                         <Icon name="lock" size="sm" className="text-secondary" />
-                        <p className="text-xs text-secondary">
-                          Το ραντεβού κλείστηκε με άλλο συνεργείο, οπότε αυτή η συνομιλία είναι πλέον μόνο για ανάγνωση.
-                        </p>
+                        <p className="text-xs text-secondary">{readOnlyNotice}</p>
                       </div>
                     </div>
                   ) : (

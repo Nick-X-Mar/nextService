@@ -22,7 +22,7 @@ interface Vehicle {
   vinNumber?: string
   color?: string
   nickname?: string
-  licensePhotoUrl?: string
+  licensePhotoUrl?: string | null
   isActive?: boolean
   createdAt?: string
   updatedAt?: string
@@ -31,6 +31,42 @@ interface Vehicle {
 interface VehiclesSectionProps {
   vehicles: Vehicle[]
   onUpdate: (vehicleId: string, updatedVehicle: Partial<Vehicle>) => Promise<boolean>
+}
+
+// Module scope on purpose. Declared inside the component, each render made these
+// brand-new component types, so React unmounted the <input> on every keystroke and
+// the field lost focus after one character.
+function ReadOnlyField({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="space-y-2">
+      <label className={styles.labelUpper}>{label}</label>
+      <div className="px-4 py-3.5 bg-surface-container-highest/50 rounded-xl">
+        <p className={`text-sm font-medium text-on-surface ${mono ? 'font-mono' : ''}`}>
+          {value || '-'}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function EditableField({ label, value, onChange, placeholder, required, maxLength }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder: string; required?: boolean; maxLength?: number
+}) {
+  return (
+    <div className="space-y-2">
+      <label className={styles.labelUpper}>{label}</label>
+      <input
+        type="text"
+        aria-label={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        required={required}
+        maxLength={maxLength}
+        className={styles.input}
+      />
+    </div>
+  )
 }
 
 export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionProps) {
@@ -117,7 +153,9 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
     }
   }
 
-  // Build vehicle form data to pass to the category modal
+  // Build vehicle form data to pass to the category modal. The car-details screen
+  // restores it on mount; the server compares against the stored car itself, so the
+  // id (and the άδεια, to show it back on step 2) is all the link it needs.
   const vehicleExtraFormData = useMemo(() => {
     if (!currentVehicle) return undefined
     return {
@@ -130,7 +168,7 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
       modelYear: currentVehicle.modelYear?.toString() || '',
       vinNumber: currentVehicle.vinNumber || '',
       engineCC: currentVehicle.engineCC?.toString() || '',
-      fuelType: (currentVehicle.fuelType as 'petrol' | 'diesel' | '') || '',
+      fuelType: currentVehicle.fuelType || '',
       isAutomatic: currentVehicle.isAutomatic || false,
       is4x4: currentVehicle.is4x4 || false,
       isTurbo: currentVehicle.isTurbo || false,
@@ -138,19 +176,10 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
       description: '',
       estimatedPrice: null,
       originalVehicleId: currentVehicle.id,
-      originalVehicleData: {
-        brand: currentVehicle.brand || '',
-        model: currentVehicle.model || '',
-        modelYear: currentVehicle.modelYear?.toString(),
-        engineCC: currentVehicle.engineCC?.toString(),
-        fuelType: currentVehicle.fuelType || '',
-        isAutomatic: currentVehicle.isAutomatic || false,
-        is4x4: currentVehicle.is4x4 || false,
-        vinNumber: currentVehicle.vinNumber || '',
-        engineNumber: currentVehicle.engineNumber || '',
-        licensePlate: currentVehicle.licensePlate || '',
-        color: currentVehicle.color || ''
-      }
+      originalVehicleLicensePhotoUrl: currentVehicle.licensePhotoUrl || '',
+      // The car's own numbers and άδεια are in here, so the draft is its owner's from
+      // the start rather than waiting for step 1 to claim it (see claimFormData).
+      owner: currentVehicle.clientId,
     }
   }, [currentVehicle])
 
@@ -181,33 +210,6 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
     : currentVehicle.fuelType === 'hybrid'
     ? 'Υβριδικό'
     : currentVehicle.fuelType || '-'
-
-  const ReadOnlyField = ({ label, value, mono }: { label: string; value: string; mono?: boolean }) => (
-    <div className="space-y-2">
-      <label className={styles.labelUpper}>{label}</label>
-      <div className="px-4 py-3.5 bg-surface-container-highest/50 rounded-xl">
-        <p className={`text-sm font-medium text-on-surface ${mono ? 'font-mono' : ''}`}>
-          {value || '-'}
-        </p>
-      </div>
-    </div>
-  )
-
-  const EditableField = ({ label, value, onChange, placeholder, required }: {
-    label: string; value: string; onChange: (v: string) => void; placeholder: string; required?: boolean
-  }) => (
-    <div className="space-y-2">
-      <label className={styles.labelUpper}>{label}</label>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        required={required}
-        className={styles.input}
-      />
-    </div>
-  )
 
   return (
     <div className={styles.card}>
@@ -298,12 +300,12 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {isEditing ? (
               <>
-                <EditableField label="Μάρκα" value={formData.brand || ''} onChange={(v) => handleInputChange('brand', v)} placeholder="Μάρκα" required />
-                <EditableField label="Μοντέλο" value={formData.model || ''} onChange={(v) => handleInputChange('model', v)} placeholder="Μοντέλο" required />
-                <EditableField label="Έτος Κατασκευής" value={formData.modelYear || ''} onChange={(v) => handleInputChange('modelYear', v)} placeholder="π.χ. 2020" />
-                <EditableField label="Χρώμα" value={formData.color || ''} onChange={(v) => handleInputChange('color', v)} placeholder="Χρώμα" />
-                <EditableField label="Πινακίδα" value={formData.licensePlate || ''} onChange={(v) => handleInputChange('licensePlate', v)} placeholder="π.χ. ABC-1234" />
-                <EditableField label="Ψευδώνυμο" value={formData.nickname || ''} onChange={(v) => handleInputChange('nickname', v)} placeholder="π.χ. Το αμάξι μου" />
+                <EditableField label="Μάρκα" value={formData.brand || ''} onChange={(v) => handleInputChange('brand', v)} placeholder="Μάρκα" required maxLength={60} />
+                <EditableField label="Μοντέλο" value={formData.model || ''} onChange={(v) => handleInputChange('model', v)} placeholder="Μοντέλο" required maxLength={60} />
+                <EditableField label="Έτος Κατασκευής" value={formData.modelYear || ''} onChange={(v) => handleInputChange('modelYear', v)} placeholder="π.χ. 2020" maxLength={4} />
+                <EditableField label="Χρώμα" value={formData.color || ''} onChange={(v) => handleInputChange('color', v)} placeholder="Χρώμα" maxLength={40} />
+                <EditableField label="Πινακίδα" value={formData.licensePlate || ''} onChange={(v) => handleInputChange('licensePlate', v)} placeholder="π.χ. ABC-1234" maxLength={20} />
+                <EditableField label="Ψευδώνυμο" value={formData.nickname || ''} onChange={(v) => handleInputChange('nickname', v)} placeholder="π.χ. Το αμάξι μου" maxLength={60} />
               </>
             ) : (
               <>
@@ -331,7 +333,7 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Engine CC */}
             {isEditing ? (
-              <EditableField label="Κυβισμός (cc)" value={formData.engineCC || ''} onChange={(v) => handleInputChange('engineCC', v)} placeholder="π.χ. 1600" />
+              <EditableField label="Κυβισμός (cc)" value={formData.engineCC || ''} onChange={(v) => handleInputChange('engineCC', v)} placeholder="π.χ. 1600" maxLength={5} />
             ) : (
               <ReadOnlyField label="Κυβισμός (cc)" value={currentVehicle.engineCC ? `${currentVehicle.engineCC} cc` : '-'} />
             )}
@@ -410,8 +412,8 @@ export default function VehiclesSection({ vehicles, onUpdate }: VehiclesSectionP
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {isEditing ? (
               <>
-                <EditableField label="Αριθμός Πλαισίου" value={formData.vinNumber || ''} onChange={(v) => handleInputChange('vinNumber', v)} placeholder="Αριθμός Πλαισίου" />
-                <EditableField label="Αριθμός Κινητήρα" value={formData.engineNumber || ''} onChange={(v) => handleInputChange('engineNumber', v)} placeholder="Αριθμός Κινητήρα" />
+                <EditableField label="Αριθμός Πλαισίου" value={formData.vinNumber || ''} onChange={(v) => handleInputChange('vinNumber', v)} placeholder="Αριθμός Πλαισίου" maxLength={32} />
+                <EditableField label="Αριθμός Κινητήρα" value={formData.engineNumber || ''} onChange={(v) => handleInputChange('engineNumber', v)} placeholder="Αριθμός Κινητήρα" maxLength={32} />
               </>
             ) : (
               <>

@@ -10,9 +10,13 @@ import type { ServiceRequest } from '@/types/requests'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { getCategoryText } from '@/utils/categoryLabels'
 import { useRealtimeRequests, type BroadcastRequest } from '@/hooks/useRealtimeRequests'
+import { isGarageInactive } from './garageInactive'
+import { clientDisplayName, clientInitials } from './clientLabel'
 
 interface AvailableRequestsProps {
   garageId: string
+  /** Called when the API says this garage is not (or no longer) approved. */
+  onInactive?: () => void
 }
 
 // Realtime payloads omit some fields that the local ServiceRequest interface
@@ -30,10 +34,10 @@ function toServiceRequest(broadcast: BroadcastRequest): ServiceRequest {
     createdAt: broadcast.createdAt,
     updatedAt: broadcast.createdAt,
     clientAvailabilityDates: broadcast.clientAvailabilityDates,
+    // The open-market view: a first name at most, and the car without its
+    // plate. Nobody has won a request that is still on the feed.
     client: broadcast.client ? {
       firstName: broadcast.client.firstName ?? '',
-      lastName: broadcast.client.lastName,
-      phoneNumber: broadcast.client.phoneNumber,
     } : undefined,
     vehicle: broadcast.vehicle ? {
       brand: broadcast.vehicle.brand ?? '',
@@ -44,22 +48,19 @@ function toServiceRequest(broadcast: BroadcastRequest): ServiceRequest {
       isAutomatic: broadcast.vehicle.isAutomatic,
       is4x4: broadcast.vehicle.is4x4,
       isTurbo: broadcast.vehicle.isTurbo,
-      licensePlate: broadcast.vehicle.licensePlate,
     } : undefined,
   }
 }
 
 const HIGHLIGHT_DURATION_MS = 10_000
 
-export default function AvailableRequests({ garageId }: AvailableRequestsProps) {
+export default function AvailableRequests({ garageId, onInactive }: AvailableRequestsProps) {
   const [requests, setRequests] = useState<ServiceRequest[]>([])
   // Cursor into the pending-request feed; null once it is exhausted.
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState<string>('all')
-  const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null)
-  const [showOfferModal, setShowOfferModal] = useState(false)
   // Ids that arrived via realtime in the last few seconds — used purely for a
   // visual highlight on the corresponding card.
   const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set())
@@ -86,6 +87,10 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
         `/api/garage/available-requests/?garageId=${garageId}&cursor=${encodeURIComponent(nextCursor)}`
       )
       const data = await response.json()
+      if (isGarageInactive(response, data)) {
+        onInactive?.()
+        return
+      }
       if (response.ok && data.success) {
         setNextCursor(data.nextCursor ?? null)
         setRequests((prev) => {
@@ -98,7 +103,7 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
     } finally {
       setLoadingMore(false)
     }
-  }, [nextCursor, loadingMore, garageId])
+  }, [nextCursor, loadingMore, garageId, onInactive])
 
   const loadAvailableRequests = useCallback(async () => {
     try {
@@ -107,6 +112,10 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
       const response = await fetch(`/api/garage/available-requests/?garageId=${garageId}`)
       const data = await response.json()
 
+      if (isGarageInactive(response, data)) {
+        onInactive?.()
+        return
+      }
       if (response.ok && data.success) {
         setNextCursor(data.nextCursor ?? null)
         setRequests(data.requests)
@@ -120,7 +129,7 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
     } finally {
       setIsLoading(false)
     }
-  }, [garageId])
+  }, [garageId, onInactive])
 
   useEffect(() => {
     loadAvailableRequests()
@@ -188,15 +197,15 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
     if (!fuelType) return '-'
     switch (fuelType.toLowerCase()) {
       case 'petrol':
-        return 'Βενζινη'
+        return 'Βενζίνη'
       case 'diesel':
-        return 'Πετρελαιο'
+        return 'Πετρέλαιο'
       case 'electric':
-        return 'Ηλεκτρικο'
+        return 'Ηλεκτρικό'
       case 'hybrid':
-        return 'Υβριδικο'
+        return 'Υβριδικό'
       case 'lpg':
-        return 'Υγραεριο'
+        return 'Υγραέριο'
       default:
         return fuelType
     }
@@ -234,7 +243,7 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
     return (
       <div className="text-center py-12">
         <div className={styles.loadingSpinner}></div>
-        <p className="text-sm text-secondary">Φορτωση αιτηματων...</p>
+        <p className="text-sm text-secondary">Φόρτωση αιτημάτων...</p>
       </div>
     )
   }
@@ -244,10 +253,10 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
       {/* Header */}
       <div>
         <h2 className="text-3xl font-bold tracking-tight text-on-surface">
-          Νεα Αιτηματα
+          Νέα Αιτήματα
         </h2>
         <p className="text-base text-secondary leading-relaxed mt-1">
-          {requests.length} αιτηματα υπηρεσιων διαθεσιμα
+          {requests.length === 1 ? '1 διαθέσιμο αίτημα' : `${requests.length} διαθέσιμα αιτήματα`}
         </p>
       </div>
 
@@ -260,7 +269,7 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
             : 'bg-secondary-container text-on-secondary-container px-5 py-2 rounded-full text-sm font-bold whitespace-nowrap hover:bg-surface-container-high transition-colors cursor-pointer'
           }
         >
-          Ολα
+          Όλα
         </button>
         {getUniqueCategories().map((category) => (
           <button
@@ -284,12 +293,12 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
               <Icon name="inbox" size="lg" className="text-outline" />
             </div>
             <h3 className="text-2xl font-bold tracking-tight text-on-surface mb-2">
-              Δεν υπαρχουν αιτηματα
+              Δεν υπάρχουν αιτήματα
             </h3>
             <p className="text-base text-secondary leading-relaxed">
               {filter === 'all'
-                ? 'Δεν υπαρχουν αιτηματα υπηρεσιων διαθεσιμα αυτη τη στιγμη.'
-                : `Δεν υπαρχουν αιτηματα στην κατηγορια "${getCategoryText(filter)}".`
+                ? 'Δεν υπάρχουν διαθέσιμα αιτήματα αυτή τη στιγμή.'
+                : `Δεν υπάρχουν αιτήματα στην κατηγορία «${getCategoryText(filter)}».`
               }
             </p>
           </div>
@@ -317,7 +326,7 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
                     </span>
                     {isNew && (
                       <span className="text-[0.6rem] font-black uppercase tracking-[0.1em] text-on-primary bg-primary px-2 py-1 rounded-sm">
-                        Νεο
+                        Νέο
                       </span>
                     )}
                   </div>
@@ -331,14 +340,15 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
                   {request.vehicle?.brand} {request.vehicle?.model} &mdash; {getCategoryText(request.category)}
                 </h3>
 
-                {/* Client info bar */}
+                {/* Client info bar — first name only until the job is won;
+                    contact goes through the chat button below. */}
                 <div className="flex items-center gap-3 p-3 bg-surface-container-low rounded-lg mb-4">
                   <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black uppercase">
-                    {request.client?.firstName?.charAt(0)}{request.client?.lastName?.charAt(0)}
+                    {clientInitials(request.client) || <Icon name="person" size="sm" filled />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-on-surface truncate">
-                      {request.client?.firstName} {request.client?.lastName}
+                      {clientDisplayName(request.client)}
                     </p>
                     <p className="text-xs text-secondary truncate">
                       {new Date(request.createdAt).toLocaleDateString('el-GR', { day: '2-digit', month: 'long', year: 'numeric' })}
@@ -349,28 +359,28 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
                 {/* Vehicle Spec Bento Grid */}
                 <div className="grid grid-cols-3 gap-2 mb-4">
                   <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
-                    <span className="text-[9px] font-black uppercase text-outline opacity-70">Μαρκα</span>
+                    <span className="text-[9px] font-black uppercase text-outline opacity-70">Μάρκα</span>
                     <span className="text-xs font-bold text-on-surface">{request.vehicle?.brand || '-'}</span>
                   </div>
                   <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
-                    <span className="text-[9px] font-black uppercase text-outline opacity-70">Μοντελο</span>
+                    <span className="text-[9px] font-black uppercase text-outline opacity-70">Μοντέλο</span>
                     <span className="text-xs font-bold text-on-surface">{request.vehicle?.model || '-'}</span>
                   </div>
                   <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
-                    <span className="text-[9px] font-black uppercase text-outline opacity-70">Κυβικα</span>
+                    <span className="text-[9px] font-black uppercase text-outline opacity-70">Κυβικά</span>
                     <span className="text-xs font-bold text-on-surface">{request.vehicle?.engineCC ? `${request.vehicle.engineCC}` : '-'}</span>
                   </div>
                   <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
-                    <span className="text-[9px] font-black uppercase text-outline opacity-70">Ετος</span>
+                    <span className="text-[9px] font-black uppercase text-outline opacity-70">Έτος</span>
                     <span className="text-xs font-bold text-on-surface">{request.vehicle?.modelYear || '-'}</span>
                   </div>
                   <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
-                    <span className="text-[9px] font-black uppercase text-outline opacity-70">Καυσιμο</span>
+                    <span className="text-[9px] font-black uppercase text-outline opacity-70">Καύσιμο</span>
                     <span className="text-xs font-bold text-on-surface">{getFuelTypeText(request.vehicle?.fuelType)}</span>
                   </div>
                   <div className="bg-surface-container p-2 rounded-lg flex flex-col items-center justify-center">
-                    <span className="text-[9px] font-black uppercase text-outline opacity-70">Κιβωτιο</span>
-                    <span className="text-xs font-bold text-on-surface">{request.vehicle?.isAutomatic ? 'Auto' : 'Manual'}</span>
+                    <span className="text-[9px] font-black uppercase text-outline opacity-70">Κιβώτιο</span>
+                    <span className="text-xs font-bold text-on-surface">{request.vehicle?.isAutomatic ? 'Αυτόματο' : 'Χειροκίνητο'}</span>
                   </div>
                 </div>
 
@@ -391,7 +401,7 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
                     <div className="flex gap-2">
                       {request.photoUrls.slice(0, 3).map((url: string, i: number) => (
                         <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden bg-surface-container flex-shrink-0">
-                          <Image src={url} alt={`Φωτο ${i + 1}`} fill sizes="64px" className="object-cover" />
+                          <Image src={url} alt={`Φωτογραφία ${i + 1}`} fill sizes="64px" className="object-cover" />
                         </div>
                       ))}
                       {request.photoUrls.length > 3 && (
@@ -416,7 +426,7 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
                     {isNavigating(offerHref(request.id))
                       ? <Spinner size="sm" />
                       : <Icon name="send" size="sm" />}
-                    Κανε Προσφορα
+                    Κάνε προσφορά
                   </button>
                   <button
                     onClick={(e) => {
@@ -441,41 +451,6 @@ export default function AvailableRequests({ garageId }: AvailableRequestsProps) 
             onClick={loadMoreRequests}
             label="Περισσότερα αιτήματα"
           />
-        </div>
-      )}
-
-      {/* Offer Modal - TODO: Implement this */}
-      {showOfferModal && selectedRequest && (
-        <div className="fixed inset-0 bg-on-surface/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10 max-w-md w-full">
-            <h3 className="text-2xl font-bold tracking-tight text-on-surface mb-4">
-              Κανε Προσφορα
-            </h3>
-            <p className="text-base text-secondary leading-relaxed">
-              Προσφορα για: {selectedRequest.vehicle?.brand} {selectedRequest.vehicle?.model}
-            </p>
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={() => {
-                  // TODO: Implement offer submission
-                  setShowOfferModal(false)
-                  setSelectedRequest(null)
-                }}
-                className={styles.btnPrimary}
-              >
-                Υποβολη Προσφορας
-              </button>
-              <button
-                onClick={() => {
-                  setShowOfferModal(false)
-                  setSelectedRequest(null)
-                }}
-                className={styles.btnSecondary}
-              >
-                Ακυρωση
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>

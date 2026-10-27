@@ -19,25 +19,30 @@ import Link from 'next/link'
  */
 
 /**
- * Schemes an editor is allowed to link to.
+ * Schemes an editor is allowed to link to: site-relative, `https:`, `mailto:`
+ * and `tel:` — nothing else (CLAUDE.md). `isSafeHref` in
+ * src/lib/content-validation.ts applies the same list at save time.
  *
  * A link is the one place a content field turns into something the browser
  * will act on, so anything not on this list — `javascript:`, `data:`,
- * `vbscript:` — is rendered as plain text rather than silently dropped, so a
- * mistake is visible in preview instead of invisible in production.
+ * `vbscript:`, and plain `http:` — is rendered as plain text rather than
+ * silently dropped, so a mistake is visible in preview instead of invisible in
+ * production. `http:` is out because the site is HTTPS-only: such a link
+ * downgrades the visitor onto a connection anyone on the network can rewrite.
  */
 function safeHref(raw: string): { href: string; external: boolean } | null {
   const href = raw.trim()
   if (!href) return null
 
-  // Site-relative. `//evil.com` is protocol-relative, not site-relative.
-  if (href.startsWith('/') && !href.startsWith('//')) {
+  // Site-relative. `//evil.com` is protocol-relative, and `/\evil.com` is
+  // treated the same way by browsers — neither is site-relative.
+  if (href.startsWith('/') && !href.startsWith('//') && !href.startsWith('/\\')) {
     return { href, external: false }
   }
   if (/^(mailto:|tel:)/i.test(href)) {
     return { href, external: false }
   }
-  if (/^https?:\/\//i.test(href)) {
+  if (/^https:\/\//i.test(href)) {
     return { href, external: true }
   }
   return null

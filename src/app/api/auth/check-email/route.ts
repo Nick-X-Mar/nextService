@@ -13,7 +13,7 @@ import { withMetrics } from '@/utils/withMetrics'
  *
  *  1. It is rate limited per IP. Without a limit the whole user base could be
  *     enumerated by walking a list of candidate addresses.
- *  2. It returns ONLY booleans. It used to return the account holder's
+ *  2. It returns ONLY a boolean. It used to return the account holder's
  *     `firstName`, which handed an anonymous caller a real person's name for
  *     any email address they cared to guess — personal data disclosure with no
  *     authentication in front of it.
@@ -40,7 +40,7 @@ async function _POST(request: NextRequest) {
     const { email, userType } = await request.json()
 
     if (!email || typeof email !== 'string') {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Το email είναι υποχρεωτικό' }, { status: 400 })
     }
 
     const normalizedEmail = email.trim().toLowerCase()
@@ -57,19 +57,14 @@ async function _POST(request: NextRequest) {
         Limit: 1,
       })
     )
-    const user = result.Items?.[0]
-
-    if (!user) {
-      return NextResponse.json({ exists: false })
-    }
-
-    return NextResponse.json({
-      exists: true,
-      hasPassword: !!user.passwordHash,
-    })
+    // `exists` is the one fact the signup forms need, and the same fact
+    // /api/auth/register answers with its 409 — so the two endpoints disclose
+    // exactly as much as each other. It used to add `hasPassword`, which no
+    // caller read and which singled out credential-less accounts.
+    return NextResponse.json({ exists: !!result.Items?.[0] })
   } catch (error) {
     console.error('Check email error:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Σφάλμα διακομιστή' }, { status: 500 })
   }
 }
 

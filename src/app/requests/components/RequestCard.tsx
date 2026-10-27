@@ -4,7 +4,8 @@ import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
 import { ServiceRequestStatus } from '../../../types/statuses'
 import type { ServiceRequest } from '../../../types/requests'
-import { getCategoryText } from '@/utils/categoryLabels'
+import { SERVICE_CATEGORIES, getCategoryText } from '@/utils/categoryLabels'
+import { hasAppointmentStarted } from '@/lib/appointment-window'
 
 interface RequestCardProps {
   request: ServiceRequest
@@ -44,6 +45,8 @@ export default function RequestCard({
   }
 
   const getCategoryIcon = (category: string) => {
+    const picked = SERVICE_CATEGORIES.find((c) => c.value === category)
+    if (picked) return picked.icon
     switch (category) {
       case 'service':
         return 'build'
@@ -77,6 +80,13 @@ export default function RequestCard({
     : request.estimatedCost
   // Guarded rather than truthy-checked: a 0 renders as a literal "0" in JSX.
   const estimatedCost = (rawEstimatedCost ?? 0) > 0 ? rawEstimatedCost : null
+
+  // Mirrors the cancel route: once the slot has begun only the garage can say
+  // what happened, so the button would only lead to a refusal.
+  const canCancel =
+    request.status === ServiceRequestStatus.APPOINTMENT &&
+    !!onCancelClick &&
+    !hasAppointmentStarted(request.appointmentDate, request.appointmentTime)
 
   return (
     <div
@@ -175,11 +185,11 @@ export default function RequestCard({
               Συνομιλία
             </button>
           )}
-          {request.status === ServiceRequestStatus.APPOINTMENT && onCancelClick && (
+          {canCancel && (
             <button
               onClick={(e) => {
                 e.stopPropagation()
-                onCancelClick()
+                onCancelClick?.()
               }}
               className="px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-error bg-error-container/30 hover:bg-error-container/50 rounded-lg transition-colors"
             >

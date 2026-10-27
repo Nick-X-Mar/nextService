@@ -52,15 +52,24 @@ export function baseLayout({
 </html>`
 }
 
+const ENTITIES: Record<string, string> = { lt: '<', gt: '>', quot: '"', '#39': "'", amp: '&' }
+
+/** Reverses the escaping renderEmail applies, for text that is not HTML. */
+export function decodeEntities(text: string): string {
+  return text.replace(/&(lt|gt|quot|#39|amp);/g, (_, entity: string) => ENTITIES[entity])
+}
+
 /**
  * Strip HTML tags + collapse whitespace, used to derive a plain-text body
  * (for SES `Text` field) and the `bodyPreview` we store in EmailLogs.
  */
 export function htmlToPlainText(html: string): string {
-  return html
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
+  return decodeEntities(
+    html
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+  )
     .replace(/\s+/g, ' ')
     .trim()
 }

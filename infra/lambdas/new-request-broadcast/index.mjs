@@ -18,6 +18,7 @@ import { randomUUID } from 'node:crypto'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import {
   DynamoDBDocumentClient,
+  GetCommand,
   ScanCommand,
   PutCommand,
   UpdateCommand
@@ -30,6 +31,7 @@ const FROM_ADDRESS = process.env.SES_FROM_ADDRESS || 'no-reply@nextservice.gr'
 const FROM_NAME = 'NextService'
 const APP_URL = (process.env.APP_URL || 'https://nextservice.gr').replace(/\/$/, '')
 const GARAGES_TABLE = process.env.GARAGES_TABLE || 'Garages'
+const VEHICLES_TABLE = process.env.VEHICLES_TABLE || 'Vehicles'
 const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
 // Name of the SES Configuration Set defined in notifications_stack.py.
 // Empty string disables tagging (e.g. for local/ad-hoc testing).
@@ -41,6 +43,33 @@ const EMAIL_LOG_TTL_SECONDS = 180 * 24 * 60 * 60
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }))
 const ses = new SESClient({ region: REGION })
+
+// Greek labels for the request categories. A copy of the map in
+// src/utils/categoryLabels.ts — this Lambda ships without a bundler and cannot
+// import it — so keep the two in step. Without it the email printed the raw
+// slug, e.g. "(oliki-vafi)".
+const CATEGORY_LABELS = {
+  service: 'Συντήρηση',
+  brakes: 'Φρένα',
+  oils: 'Λάδια',
+  'allagi-ladion': 'Αλλαγή Λαδιών',
+  imantas: 'Ιμάντας',
+  symplektis: 'Συμπλέκτης (Δίσκος-πλατό)',
+  'oliki-vafi': 'Ολική Βαφή',
+  'meriki-vafi': 'Μερική Βαφή',
+  aisthitires: 'Αισθητήρες',
+  fanopeia: 'Φανοποιεία',
+  disk: 'Δισκόφρενα',
+  tires: 'Λάστιχα',
+  engine: 'Κινητήρας',
+  electrical: 'Ηλεκτρικά',
+  kteo: 'ΚΤΕΟ',
+  elastika: 'Ελαστικά'
+}
+
+function categoryLabel(category) {
+  return CATEGORY_LABELS[category] || category || ''
+}
 
 export const handler = async (event) => {
   const records = Array.isArray(event?.Records) ? event.Records : []
@@ -67,6 +96,14 @@ async function broadcastToGarages(request) {
     return
   }
 
+  // The request row carries only `vehicleId`; brand and model live on the
+  // vehicle. Reading `request.brand` is why the email never named the car.
+  const vehicle = await loadVehicle(request.vehicleId)
+
+  // Only approved garages. `isActive = :active` with a boolean true matches
+  // the BOOL attribute exactly, the same test login and requireActiveGarage
+  // apply — a pending or deactivated garage (false, or no attribute) gets
+  // nothing.
   const garages = []
   let ExclusiveStartKey
   do {
@@ -74,10 +111,12 @@ async function broadcastToGarages(request) {
       TableName: GARAGES_TABLE,
       FilterExpression: 'isActive = :active',
       ExpressionAttributeValues: { ':active': true },
-      ProjectionExpression: 'id, email, companyName',
+      ProjectionExpression: 'id, email, companyName, isActive',
       ExclusiveStartKey
     }))
-    for (const g of page.Items || []) garages.push(g)
+    for (const g of page.Items || []) {
+      if (g?.isActive === true) garages.push(g)
+    }
     ExclusiveStartKey = page.LastEvaluatedKey
   } while (ExclusiveStartKey)
 
@@ -89,7 +128,7 @@ async function broadcastToGarages(request) {
     const slice = garages.slice(i, i + SEND_CONCURRENCY)
     await Promise.all(
       slice.map((g) =>
-        sendToGarage(g, request).catch((err) => {
+        sendToGarage(g, request, vehicle).catch((err) => {
           console.error(`[broadcast] garage=${g?.id} failed:`, err)
         })
       )
@@ -97,7 +136,23 @@ async function broadcastToGarages(request) {
   }
 }
 
-async function sendToGarage(garage, request) {
+async function loadVehicle(vehicleId) {
+  if (typeof vehicleId !== 'string' || !vehicleId) return null
+  try {
+    const res = await ddb.send(new GetCommand({
+      TableName: VEHICLES_TABLE,
+      Key: { id: vehicleId },
+      ProjectionExpression: 'brand, model'
+    }))
+    return res.Item || null
+  } catch (err) {
+    // The email is still worth sending without the car in it.
+    console.error(`[broadcast] vehicle=${vehicleId} lookup failed:`, err)
+    return null
+  }
+}
+
+async function sendToGarage(garage, request, vehicle) {
   const email =
     typeof garage?.email === 'string' ? garage.email.trim().toLowerCase() : ''
   const garageId = typeof garage?.id === 'string' ? garage.id : ''
@@ -105,9 +160,9 @@ async function sendToGarage(garage, request) {
 
   const rendered = renderNewRequestEmail({
     companyName: garage.companyName || '',
-    brand: request.brand || '',
-    model: request.model || '',
-    category: request.category || '',
+    brand: vehicle?.brand || '',
+    model: vehicle?.model || '',
+    category: categoryLabel(request.category),
     garageId
   })
 

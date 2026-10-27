@@ -49,20 +49,76 @@ const MAX_PAGES = 20
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }))
 const ses = new SESClient({ region: REGION })
 
+/*
+ * Europe/Athens wall-clock → instant.
+ *
+ * A copy of src/utils/athensTime.ts (`athensOffsetMinutes` + `athensDateTime`):
+ * this Lambda ships without a bundler and cannot import from the Next.js app.
+ * The two must agree on when a slot has passed, or the email and the
+ * dashboard's own "έγινε η επισκευή;" alert would disagree by an hour every
+ * summer — change both files together.
+ */
+const ATHENS_PARTS = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Europe/Athens',
+  hourCycle: 'h23',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+})
+
+/** Athens' offset from UTC at a given instant, in minutes (120 in winter, 180 in summer). */
+function athensOffsetMinutes(at) {
+  const parts = ATHENS_PARTS.formatToParts(at)
+  const get = (type) => Number(parts.find((p) => p.type === type)?.value)
+  const wallAsUtc = Date.UTC(
+    get('year'),
+    get('month') - 1,
+    get('day'),
+    get('hour'),
+    get('minute'),
+    get('second')
+  )
+  return Math.round((wallAsUtc - at.getTime()) / 60_000)
+}
+
+/** The instant an Athens date + 'HH:MM' refers to, or null if either is malformed. */
+function athensDateTime(date, time) {
+  const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date || '')
+  const t = /^(\d{2}):(\d{2})$/.exec(time || '')
+  if (!d || !t) return null
+
+  const wallAsUtc = Date.UTC(+d[1], +d[2] - 1, +d[3], +t[1], +t[2])
+  // Date.UTC rolls over instead of failing ('2026-13-01' → January 2027).
+  const check = new Date(wallAsUtc)
+  if (
+    check.getUTCMonth() !== +d[2] - 1 ||
+    check.getUTCDate() !== +d[3] ||
+    check.getUTCHours() !== +t[1] ||
+    check.getUTCMinutes() !== +t[2]
+  ) {
+    return null
+  }
+
+  // Guess with the offset at the wall-clock instant, then re-check at the
+  // result: the two differ only within the hour around a DST switch.
+  const guess = athensOffsetMinutes(new Date(wallAsUtc))
+  let instant = wallAsUtc - guess * 60_000
+  const actual = athensOffsetMinutes(new Date(instant))
+  if (actual !== guess) instant = wallAsUtc - actual * 60_000
+  return new Date(instant)
+}
+
 /**
- * Appointments carry a local date and an optional 'HH:MM', with no timezone —
- * the whole app does local-midnight arithmetic. Lambda runs in UTC, and Greece
- * is UTC+2/+3, so an appointment is treated as ending at its wall-clock time in
- * Athens. Getting this wrong in the other direction would prompt garages while
- * the car is still on the ramp.
+ * When an appointment is over — the same rule as `appointmentEndsAt` in
+ * src/types/reviews.ts: its Athens date and time, or the end of the working
+ * day when it was booked before hourly slots existed.
  */
 function appointmentEndUtc(date, time) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return null
   const clock = /^\d{2}:\d{2}$/.test(time || '') ? time : ASSUMED_END
-  // Athens is UTC+3 in summer, UTC+2 in winter. Using the smaller offset makes
-  // the deadline slightly later rather than earlier — the safe direction.
-  const parsed = new Date(`${date}T${clock}:00+02:00`)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
+  return athensDateTime(date, clock)
 }
 
 function isDue(request, now) {
@@ -242,7 +298,34 @@ export const handler = async () => {
   console.log(`[sweeper] ${due.length} appointment(s) awaiting confirmation`)
 
   let prompted = 0
+  let promptedInactive = 0
   for (const request of due) {
+    let garage
+    try {
+      garage = (
+        await ddb.send(
+          new GetCommand({
+            TableName: GARAGES_TABLE,
+            Key: { id: request.acceptedGarageId },
+            ProjectionExpression: 'id, companyName, email, isActive',
+          })
+        )
+      ).Item
+    } catch (err) {
+      console.error(`[sweeper] garage lookup failed for ${request.id}:`, err)
+      continue
+    }
+    if (!garage) {
+      console.warn(`[sweeper] garage ${request.acceptedGarageId} not found`)
+      continue
+    }
+    // A deactivated garage is prompted too. Deactivation keeps it off the
+    // marketplace but leaves its bookings in place, and this is the only nudge
+    // to close them: its dashboard lists exactly these jobs (GET
+    // /api/garage/booked-jobs) and the completion route accepts them. The
+    // email carries only the appointment's date — no client data.
+    const inactive = garage.isActive !== true
+
     try {
       // Stamp first. If the email then fails, the garage still has the in-app
       // alert, and we do not re-send on every hourly run.
@@ -266,24 +349,14 @@ export const handler = async () => {
     }
 
     try {
-      const garage = await ddb.send(
-        new GetCommand({
-          TableName: GARAGES_TABLE,
-          Key: { id: request.acceptedGarageId },
-          ProjectionExpression: 'id, companyName, email',
-        })
-      )
-      if (!garage.Item) {
-        console.warn(`[sweeper] garage ${request.acceptedGarageId} not found`)
-        continue
-      }
-      await sendPrompt(garage.Item, request)
+      await sendPrompt(garage, request)
       prompted++
+      if (inactive) promptedInactive++
     } catch (err) {
       console.error(`[sweeper] prompt failed for ${request.id}:`, err)
     }
   }
 
-  console.log(`[sweeper] prompted ${prompted} garage(s)`)
-  return { examined: due.length, prompted }
+  console.log(`[sweeper] prompted ${prompted} garage(s), ${promptedInactive} of them deactivated`)
+  return { examined: due.length, prompted, promptedInactive }
 }

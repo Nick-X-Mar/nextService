@@ -186,7 +186,8 @@ export default function ServiceVehicleCard({
       {formattedEstimatedCost && (
         <div className="mb-5">
           <p className={styles.label}>Εκτιμώμενο Κόστος</p>
-          <p className="text-sm font-medium text-on-surface mt-1">{formattedEstimatedCost}</p>
+          {/* A floor — the lowest we've quoted for this car — never a quote. */}
+          <p className="text-sm font-medium text-on-surface mt-1">από {formattedEstimatedCost}</p>
         </div>
       )}
 
@@ -225,7 +226,7 @@ export default function ServiceVehicleCard({
         </div>
         {vehicle?.vinNumber && (
           <div className={styles.specCell}>
-            <p className={styles.specLabel}>Αρ. Πλαισιου</p>
+            <p className={styles.specLabel}>Αρ. Πλαισίου</p>
             <p className={`${styles.specValue} text-[10px]`}>{vehicle.vinNumber}</p>
           </div>
         )}

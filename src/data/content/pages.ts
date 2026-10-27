@@ -1,5 +1,6 @@
 import type { ContentBlock, SitePage, SitePageKey } from '@/types/siteContent'
 import { faqCategories, faqs } from '@/data/faq'
+import { NEW_REQUEST_HREF } from '@/utils/formStorage'
 
 /**
  * The copy every marketing page ships with.
@@ -84,7 +85,7 @@ const about: SitePage = {
       'about-cost-p',
       'Για τους ιδιοκτήτες οχημάτων η χρήση είναι δωρεάν: η εγγραφή, η αποστολή αιτημάτων, η συνομιλία με τα συνεργεία και η κράτηση δεν χρεώνονται. Το NextService δεν εισπράττει χρήματα από τον πελάτη — πληρώνεις μόνο την εργασία, απευθείας στο συνεργείο. Για τα συνεργεία δεν υπάρχει μηνιαία συνδρομή ούτε κόστος ανά click· τους εμπορικούς όρους τους συζητάμε απευθείας μαζί τους.',
     ),
-    b.cta('about-cta-request', 'Στείλε αίτημα', '/car-details/', 'primary'),
+    b.cta('about-cta-request', 'Στείλε αίτημα', NEW_REQUEST_HREF, 'primary'),
     b.cta('about-cta-garage', 'Έχω συνεργείο', '/register-professional/', 'secondary'),
   ],
 }
@@ -114,7 +115,7 @@ const faq: SitePage = {
         items: category.items.map((item) => ({ ...item })),
       })
     ),
-    b.cta('faq-cta', 'Στείλε αίτημα', '/car-details/', 'primary'),
+    b.cta('faq-cta', 'Στείλε αίτημα', NEW_REQUEST_HREF, 'primary'),
   ],
 }
 
@@ -164,7 +165,7 @@ const locations: SitePage = {
       'locations-outro',
       'Δεν βλέπεις την περιοχή σου; Στείλε αίτημα — είναι δωρεάν, και αν κάποιο συνεργείο μπορεί να σε εξυπηρετήσει θα σου απαντήσει.',
     ),
-    b.cta('locations-cta', 'Στείλε αίτημα', '/car-details/', 'primary'),
+    b.cta('locations-cta', 'Στείλε αίτημα', NEW_REQUEST_HREF, 'primary'),
   ],
 }
 

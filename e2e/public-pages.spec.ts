@@ -108,3 +108,11 @@ test.describe('Signed-in chrome', () => {
     await expect(chip).toHaveAttribute('href', `/profile/${reg.client.id}/`)
   })
 })
+
+test.describe('Completed-job pages', () => {
+  test('An unknown offer slug is a real 404, not a soft one', async ({ page }) => {
+    const response = await page.goto('/offer/e2e-no-such-offer/')
+    expect(response?.status()).toBe(404)
+    await expect(page.getByRole('heading', { name: 'Η εργασία δεν βρέθηκε' })).toBeVisible()
+  })
+})

@@ -81,9 +81,32 @@ function strList(value: unknown, field: string, maxItems: number, maxLen: number
 export function isSafeHref(raw: string): boolean {
   const href = raw.trim()
   if (!href) return false
-  if (href.startsWith('//')) return false
+  // Protocol-relative (`//host`, and `/\host`, which browsers read the same).
+  if (href.startsWith('//') || href.startsWith('/\\')) return false
   if (href.startsWith('/')) return true
-  return /^(https?:\/\/|mailto:|tel:)/i.test(href)
+  // https only: an `http:` link downgrades the reader off the HTTPS site.
+  return /^(https:\/\/|mailto:|tel:)/i.test(href)
+}
+
+const INLINE_LINK = /\[([^\]\n]+)\]\(([^)\s]+)\)/g
+
+/**
+ * Every `[label](href)` inside admin text must pass the same allowlist. The
+ * renderer would show a bad one as plain text, but refusing it here tells the
+ * editor at save time instead of leaving a dead link on a public page.
+ */
+function assertInlineLinksSafe(value: unknown): void {
+  if (typeof value === 'string') {
+    for (const match of value.matchAll(INLINE_LINK)) {
+      if (!isSafeHref(match[2])) {
+        fail(`Ο σύνδεσμος «${match[1]}» (${match[2]}) δεν επιτρέπεται. Χρησιμοποιήστε σχετική διαδρομή, https:, mailto: ή tel:.`)
+      }
+    }
+  } else if (Array.isArray(value)) {
+    value.forEach(assertInlineLinksSafe)
+  } else if (value && typeof value === 'object') {
+    Object.values(value).forEach(assertInlineLinksSafe)
+  }
 }
 
 function validateBlock(raw: unknown, index: number): ContentBlock {
@@ -229,6 +252,7 @@ export function validateSitePage(raw: unknown, updatedBy: string): SitePage {
     fail('Η σελίδα χρειάζεται επικεφαλίδα.')
   }
 
+  assertInlineLinksSafe(page)
   assertSize(page)
   return page
 }
@@ -282,6 +306,7 @@ export function validateAreaContent(raw: unknown, slug: string, updatedBy: strin
     updatedBy,
   }
 
+  assertInlineLinksSafe(area)
   assertSize(area)
   return area
 }

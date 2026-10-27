@@ -37,9 +37,10 @@ async function _GET(
 
     const vehicles = (vehiclesResult.Items || []).map((v) => ({
       id: v.id,
-      make: v.make || v.manufacturer || '',
+      // Vehicles are stored as brand/modelYear; make/year were never written.
+      make: v.brand || v.make || '',
       model: v.model || '',
-      year: v.year || ''
+      year: v.modelYear || v.year || ''
     }))
 
     return NextResponse.json({

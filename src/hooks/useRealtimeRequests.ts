@@ -18,16 +18,16 @@ export interface BroadcastRequest {
   createdAt: string
   clientAvailabilityDates?: string[]
   photoUrls: string[]
+  estimatedCost?: number | null
+  // The open-market (quoting) view of `src/utils/garageClientView.ts`: every
+  // active garage receives this, so it never carries surname, phone or plate.
   client: {
     firstName?: string
-    lastName?: string
-    phoneNumber?: string
   } | null
   vehicle: {
     brand?: string
     model?: string
     year?: string
-    licensePlate?: string
     modelYear?: string
     engineCC?: string
     fuelType?: string
@@ -89,46 +89,45 @@ export function useRealtimeRequests({
     if (!enabled) return
 
     let cancelled = false
-    let disposeNew: (() => void) | undefined
-    let disposeUpdate: (() => void) | undefined
 
-    const setup = async () => {
-      try {
-        if (!appSyncService.getConnectionStatus()) {
-          await appSyncService.connect()
-        }
-        if (cancelled) return
-        setIsConnected(true)
+    // Registered straight away rather than after connect() resolves: subscribe()
+    // opens the socket itself and every open replays the registered channels.
+    // Awaiting connect() first meant one failed handshake or token fetch (a 429,
+    // a timeout) skipped both subscriptions, and with nothing registered the
+    // wake listeners had nothing to retry — the feed stayed dead until reload.
+    const disposeNew = appSyncService.subscribe(NEW_REQUESTS_CHANNEL, (payload) => {
+      // Defensive: ignore subscription confirmations & cross-channel events
+      if (!payload || payload.__type !== 'new-request' || !payload.request) return
+      onNewRequestRef.current?.(payload.request as BroadcastRequest)
+    })
 
-        disposeNew = appSyncService.subscribe(NEW_REQUESTS_CHANNEL, (payload) => {
-          // Defensive: ignore subscription confirmations & cross-channel events
-          if (!payload || payload.__type !== 'new-request' || !payload.request) return
-          onNewRequestRef.current?.(payload.request as BroadcastRequest)
+    const disposeUpdate = appSyncService.subscribe(REQUEST_UPDATES_CHANNEL, (payload) => {
+      if (!payload || !payload.requestId) return
+      if (payload.__type === 'request-photos') {
+        onRequestPhotosRef.current?.({
+          requestId: payload.requestId,
+          photoUrls: Array.isArray(payload.photoUrls) ? payload.photoUrls : [],
         })
-
-        disposeUpdate = appSyncService.subscribe(REQUEST_UPDATES_CHANNEL, (payload) => {
-          if (!payload || !payload.requestId) return
-          if (payload.__type === 'request-photos') {
-            onRequestPhotosRef.current?.({
-              requestId: payload.requestId,
-              photoUrls: Array.isArray(payload.photoUrls) ? payload.photoUrls : [],
-            })
-            return
-          }
-          if (payload.__type !== 'request-update') return
-          onRequestUpdateRef.current?.({
-            requestId: payload.requestId,
-            status: payload.status,
-            reason: payload.reason,
-          })
-        })
-      } catch (error) {
-        console.error('[useRealtimeRequests] Failed to set up subscriptions:', error)
-        setIsConnected(false)
+        return
       }
-    }
+      if (payload.__type !== 'request-update') return
+      onRequestUpdateRef.current?.({
+        requestId: payload.requestId,
+        status: payload.status,
+        reason: payload.reason,
+      })
+    })
 
-    setup()
+    if (appSyncService.getConnectionStatus()) {
+      setIsConnected(true)
+    } else {
+      appSyncService.connect()
+        .then(() => { if (!cancelled) setIsConnected(true) })
+        .catch((error) => {
+          console.error('[useRealtimeRequests] Connect failed; will retry on reconnect/wake:', error)
+          if (!cancelled) setIsConnected(false)
+        })
+    }
 
     const removeReconnect = appSyncService.onReconnect(() => {
       setIsConnected(true)
@@ -138,8 +137,8 @@ export function useRealtimeRequests({
     return () => {
       cancelled = true
       removeReconnect()
-      disposeNew?.()
-      disposeUpdate?.()
+      disposeNew()
+      disposeUpdate()
     }
   }, [enabled])
 

@@ -13,7 +13,9 @@ import { requireAuth } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
 import { broadcastRequestPhotos } from '@/utils/requestBroadcast'
+import { ServiceRequestStatus } from '@/types/statuses'
 import { randomUUID } from 'crypto'
+import { SITE_URL } from '@/lib/site-url'
 
 const checkUploadRate = createRateLimiter('photo-upload', 60, 3600000)
 
@@ -22,6 +24,8 @@ const MAX_SIZE_MB = 15
 // nobody hits it honestly, low enough that the presigning fan-out on every
 // read of the request stays cheap.
 const MAX_PHOTOS_PER_REQUEST = 12
+// Same rule as the request page's "add photos" button.
+const OPEN_STATUSES = [ServiceRequestStatus.PENDING, ServiceRequestStatus.IN_PROGRESS]
 
 interface PhotoRecord {
   id: string
@@ -69,9 +73,13 @@ async function _POST(request: NextRequest) {
     // `vehicleId` used to arrive in the form body and was written into the S3
     // key unchecked, so the caller chose where their upload landed and could
     // attach photos to a request belonging to somebody else.
+    // Consistent: the bodywork form uploads straight after creating the request, and
+    // an eventually consistent read can still miss the new row — a 404 that left a
+    // fresh request without its photos.
     const existing = await dynamoDB.send(new GetCommand({
       TableName: 'ServiceRequests',
       Key: { id: serviceRequestId },
+      ConsistentRead: true,
     }))
     if (!existing.Item) {
       return NextResponse.json({ error: 'Το αίτημα δεν βρέθηκε' }, { status: 404 })
@@ -87,6 +95,15 @@ async function _POST(request: NextRequest) {
     if (!vehicleId) {
       return NextResponse.json(
         { error: 'Το αίτημα δεν έχει συνδεδεμένο όχημα' },
+        { status: 409 }
+      )
+    }
+
+    // Once the job is booked the photos are part of the record the garage quoted
+    // on; the request page hides the add button then, and so does the API.
+    if (!OPEN_STATUSES.includes(existing.Item.status as ServiceRequestStatus)) {
+      return NextResponse.json(
+        { error: 'Δεν μπορείτε πλέον να προσθέσετε φωτογραφίες σε αυτό το αίτημα' },
         { status: 409 }
       )
     }
@@ -159,20 +176,40 @@ async function _POST(request: NextRequest) {
     // Append, never replace. This endpoint is now called from the submission
     // wizard *and* from the request page afterwards, so a second call must add
     // to the set rather than wipe what the first one stored.
-    await dynamoDB.send(new UpdateCommand({
-      TableName: 'ServiceRequests',
-      Key: { id: serviceRequestId },
-      UpdateExpression:
-        'SET photos = list_append(if_not_exists(photos, :empty), :photos), ' +
-        'photoUrls = list_append(if_not_exists(photoUrls, :empty), :photoUrls), ' +
-        'updatedAt = :updatedAt',
-      ExpressionAttributeValues: {
-        ':photos': photoData,
-        ':photoUrls': photoData.map(p => p.s3Key),
-        ':empty': [],
-        ':updatedAt': new Date().toISOString(),
-      },
-    }))
+    //
+    // Conditional on the same two facts checked above, because two uploads running
+    // side by side both passed the read-time cap check and together overshot it.
+    try {
+      await dynamoDB.send(new UpdateCommand({
+        TableName: 'ServiceRequests',
+        Key: { id: serviceRequestId },
+        UpdateExpression:
+          'SET photos = list_append(if_not_exists(photos, :empty), :photos), ' +
+          'photoUrls = list_append(if_not_exists(photoUrls, :empty), :photoUrls), ' +
+          'updatedAt = :updatedAt',
+        ConditionExpression:
+          '#status IN (:pending, :inProgress) AND ' +
+          '(attribute_not_exists(photos) OR size(photos) <= :maxBefore)',
+        ExpressionAttributeNames: { '#status': 'status' },
+        ExpressionAttributeValues: {
+          ':photos': photoData,
+          ':photoUrls': photoData.map(p => p.s3Key),
+          ':empty': [],
+          ':updatedAt': new Date().toISOString(),
+          ':pending': ServiceRequestStatus.PENDING,
+          ':inProgress': ServiceRequestStatus.IN_PROGRESS,
+          ':maxBefore': MAX_PHOTOS_PER_REQUEST - photoData.length,
+        },
+      }))
+    } catch (error) {
+      if (error instanceof Error && error.name === 'ConditionalCheckFailedException') {
+        return NextResponse.json(
+          { error: `Το αίτημα δεν δέχεται άλλες φωτογραφίες (όριο ${MAX_PHOTOS_PER_REQUEST}).` },
+          { status: 409 }
+        )
+      }
+      throw error
+    }
 
     logEvent({
       eventName: EventName.DamagePhotosUploaded,
@@ -217,7 +254,7 @@ export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+      'Access-Control-Allow-Origin': SITE_URL,
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     },

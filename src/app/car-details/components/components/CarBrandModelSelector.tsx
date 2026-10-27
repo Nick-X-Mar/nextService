@@ -1,12 +1,19 @@
-import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import Image from 'next/image'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
 import GearSubmitButton from '@/components/GearSubmitButton'
 import PillToggle from '@/components/PillToggle'
-import { saveFormData, loadFormData, clearFormData } from '../../../../utils/formStorage'
-import { useToast } from '../../../../hooks/useToast'
+import {
+  saveFormData,
+  loadFormData,
+  clearFormData,
+  claimFormData,
+  DETACHED_VEHICLE,
+  guestOwner,
+  type ServiceFormData,
+} from '../../../../utils/formStorage'
 import { useAuth } from '@/contexts/AuthContext'
+import { useNavigation } from '@/hooks/useNavigation'
 
 // Greek to Latin phonetic transliteration for search matching
 const greekToLatinMap: Record<string, string> = {
@@ -117,11 +124,80 @@ const carBrands = {
 const titleCase = (s: string) =>
   s.replace(/\S+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1))
 
-export default function CarBrandModelSelector() {
-  const router = useRouter()
-  const { success, error: showError } = useToast()
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [dragActive, setDragActive] = useState(false)
+// Bodywork categories don't need engine/fuel/transmission details
+const BODYWORK_CATEGORIES = new Set(['oliki-vafi', 'meriki-vafi', 'fanopeia'])
+
+// Vehicle selector for logged-in users
+interface Vehicle {
+  id: string
+  brand: string
+  model: string
+  modelYear?: string
+  engineCC?: string
+  fuelType?: string
+  isAutomatic?: boolean
+  is4x4?: boolean
+  isTurbo?: boolean
+  vinNumber?: string
+  engineNumber?: string
+  licensePhotoUrl?: string | null
+}
+
+/** What the form shows for one car, whichever way it arrived. */
+interface VehicleFields {
+  brand: string
+  model: string
+  isBrandOther: boolean
+  isModelOther: boolean
+  customBrand: string
+  customModel: string
+  modelYear: string
+  engineCC: string
+  fuelType: string
+  isAutomatic: boolean
+  is4x4: boolean
+  isTurbo: boolean
+}
+
+/**
+ * Maps a car — a saved vehicle, the draft in form storage, or the profile's "Νέο
+ * Αίτημα" prefill — onto the form's controls. Brands and models are matched against
+ * the picker lists; anything not in them becomes the "Άλλο" free text, so a saved
+ * "Lada Niva" still shows up instead of an empty picker.
+ */
+function resolveVehicleFields(v: Partial<ServiceFormData & Vehicle>): VehicleFields {
+  const typedBrand = ((v.isBrandOther ? v.customBrand || v.brand : v.brand) || '').trim()
+  const typedModel = ((v.isModelOther || v.isBrandOther ? v.customModel || v.model : v.model) || '').trim()
+  const brandKey = v.isBrandOther ? undefined : Object.keys(carBrands).find((b) => b === typedBrand.toLowerCase())
+
+  let brandFields: Pick<VehicleFields, 'brand' | 'model' | 'isBrandOther' | 'isModelOther' | 'customBrand' | 'customModel'>
+  if (brandKey) {
+    const models: string[] = carBrands[brandKey as keyof typeof carBrands]
+    const listed = v.isModelOther ? undefined : models.find((m) => m.toLowerCase() === typedModel.toLowerCase())
+    brandFields = listed
+      ? { brand: brandKey, model: listed, isBrandOther: false, isModelOther: false, customBrand: '', customModel: '' }
+      : { brand: brandKey, model: '', isBrandOther: false, isModelOther: !!typedModel, customBrand: '', customModel: typedModel }
+  } else if (typedBrand) {
+    brandFields = { brand: '', model: '', isBrandOther: true, isModelOther: v.isModelOther ?? true, customBrand: typedBrand, customModel: typedModel }
+  } else {
+    brandFields = { brand: '', model: '', isBrandOther: false, isModelOther: false, customBrand: '', customModel: '' }
+  }
+
+  return {
+    ...brandFields,
+    modelYear: v.modelYear ? String(v.modelYear) : '',
+    engineCC: v.engineCC ? String(v.engineCC) : '',
+    // Kept as stored: a saved "hybrid" must not turn into "petrol" (and so into a
+    // different car on the server) just because the pill only has two options.
+    fuelType: v.fuelType || 'petrol',
+    isAutomatic: v.isAutomatic === true,
+    is4x4: v.is4x4 === true,
+    isTurbo: v.isTurbo === true,
+  }
+}
+
+export default function CarBrandModelSelector({ category }: { category: string }) {
+  const { navigate, back, isNavigating } = useNavigation()
   const [brand, setBrand] = useState('')
   const [model, setModel] = useState('')
   const [isBrandOther, setIsBrandOther] = useState(false)
@@ -129,32 +205,15 @@ export default function CarBrandModelSelector() {
   const [customBrand, setCustomBrand] = useState('')
   const [customModel, setCustomModel] = useState('')
   const [description, setDescription] = useState('')
-  const [descriptionPhotos, setDescriptionPhotos] = useState<File[]>([])
-  const [category, setCategory] = useState('')
   const [engineCC, setEngineCC] = useState('')
   const [modelYear, setModelYear] = useState('')
-  const [fuelType, setFuelType] = useState<'petrol' | 'diesel' | ''>('petrol')
+  const [fuelType, setFuelType] = useState('petrol')
   const [isAutomatic, setIsAutomatic] = useState(false)
   const [is4x4, setIs4x4] = useState(false)
   const [isTurbo, setIsTurbo] = useState(false)
-  const { client, isVerified } = useAuth()
+  const { client, garage, isVerified } = useAuth()
   const [mounted, setMounted] = useState(false)
 
-  // Vehicle selector for logged-in users
-  interface Vehicle {
-    id: string
-    brand: string
-    model: string
-    modelYear?: string
-    engineCC?: string
-    fuelType?: string
-    isAutomatic?: boolean
-    is4x4?: boolean
-    isTurbo?: boolean
-    vinNumber?: string
-    engineNumber?: string
-    licensePhotoUrl?: string
-  }
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('')
 
@@ -178,6 +237,14 @@ export default function CarBrandModelSelector() {
   // Models picked from the list already read as they should ("Yaris", "e-tron GT"); only
   // the free-text one needs fixing up.
   const currentModel = (isModelOther || isBrandOther) ? titleCase(customModel) : model
+
+  const applyFields = useCallback((f: VehicleFields) => {
+    setBrand(f.brand); setModel(f.model)
+    setIsBrandOther(f.isBrandOther); setIsModelOther(f.isModelOther)
+    setCustomBrand(f.customBrand); setCustomModel(f.customModel)
+    setModelYear(f.modelYear); setEngineCC(f.engineCC); setFuelType(f.fuelType)
+    setIsAutomatic(f.isAutomatic); setIs4x4(f.is4x4); setIsTurbo(f.isTurbo)
+  }, [])
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -207,12 +274,9 @@ export default function CarBrandModelSelector() {
     }
   }
 
-  // Check if CC is in reasonable range
-  const isCCValid = (cc: string) => {
-    if (!cc || cc.length === 0) return false
-    const ccNumber = parseInt(cc)
-    return ccNumber >= 100 && ccNumber <= 9999
-  }
+  // Digits only, in a sane range. parseInt read a restored "1600cc" as 1600, so the
+  // step passed and the API refused the request at the very end.
+  const isCCValid = (cc: string) => /^\d+$/.test(cc) && Number(cc) >= 100 && Number(cc) <= 9999
 
 
   // Track form funnel
@@ -226,20 +290,25 @@ export default function CarBrandModelSelector() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Load only category/description on mount; vehicle fields start fresh
+  // Restore the draft. This used to wipe every vehicle field on mount, which emptied
+  // step 1 on "Επιστροφή" from step 2 and threw away the car the profile's "Νέο
+  // Αίτημα" had just prefilled. Starting clean is now the job of the entry points
+  // (startNewRequest) and of a successful submit, not of this screen.
   useEffect(() => {
-    setMounted(true)
     const data = loadFormData()
-    if (data.category) setCategory(data.category)
     if (data.description) setDescription(data.description)
+    applyFields(resolveVehicleFields(data))
+    if (data.originalVehicleId) setSelectedVehicleId(data.originalVehicleId)
+    setMounted(true)
+  }, [applyFields])
 
-    // Clear stale vehicle fields from previous requests
-    clearFormData()
-    if (data.category || data.description) {
-      saveFormData({ category: data.category, description: data.description })
-    }
-
-  }, [])
+  // Whose draft this is can only be settled once the server has said who we are. One
+  // left by someone else keeps the job but not their car's link, numbers or άδεια.
+  const owner = isVerified ? client?.id ?? garage?.id ?? guestOwner() : null
+  useEffect(() => {
+    if (!mounted || !owner) return
+    if (claimFormData(owner)) setSelectedVehicleId('')
+  }, [mounted, owner])
 
   // Pre-fill the garage picker with the client's own vehicles. Keyed on the
   // server-confirmed session rather than a localStorage id, so a stale id left
@@ -287,68 +356,56 @@ export default function CarBrandModelSelector() {
     return parseInt(year) <= currentYear
   }
 
+  // A different brand or model is a different car, even one started from a saved car:
+  // its link, numbers and άδεια stay with the saved one. Left attached, step 2 showed
+  // the old car's άδεια as this one's, and the submit counted it as given. Not while
+  // the model is still being picked — choosing a brand empties it for a moment.
+  const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId)
+  useEffect(() => {
+    if (!selectedVehicle || !currentBrand.trim() || !currentModel.trim()) return
+    const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+    if (same(selectedVehicle.brand, currentBrand) && same(selectedVehicle.model, currentModel)) return
+    setSelectedVehicleId('')
+    saveFormData(DETACHED_VEHICLE)
+  }, [selectedVehicle, currentBrand, currentModel])
+
   // Fill form from a saved vehicle
   const selectVehicle = (vehicleId: string) => {
     setSelectedVehicleId(vehicleId)
     if (!vehicleId) {
-      // "Νέο Όχημα" — reset all fields
-      setBrand(''); setModel(''); setIsBrandOther(false); setIsModelOther(false)
-      setCustomBrand(''); setCustomModel(''); setEngineCC(''); setModelYear('')
-      setFuelType('petrol'); setIsAutomatic(false); setIs4x4(false); setIsTurbo(false)
+      // "Νέο Όχημα" — a different car, so nothing of the one picked before may ride
+      // along to step 2. Its VIN, engine number and saved-vehicle link used to, and
+      // the new car was filed under the old car's numbers.
+      applyFields(resolveVehicleFields({}))
+      saveFormData(DETACHED_VEHICLE)
       return
     }
     const v = vehicles.find(v => v.id === vehicleId)
     if (!v) return
 
-    // Set brand
-    const brandKey = Object.keys(carBrands).find(b => b === v.brand.toLowerCase())
-    if (brandKey) {
-      setIsBrandOther(false); setCustomBrand(''); setBrand(brandKey)
-      // Set model
-      const models = carBrands[brandKey as keyof typeof carBrands] || []
-      if (v.model && models.includes(v.model)) {
-        setIsModelOther(false); setCustomModel(''); setModel(v.model)
-      } else {
-        setIsModelOther(true); setCustomModel(v.model || '')
-      }
-    } else {
-      setIsBrandOther(true); setCustomBrand(v.brand || ''); setBrand('')
-      setIsModelOther(true); setCustomModel(v.model || '')
-    }
+    applyFields(resolveVehicleFields(v))
 
-    if (v.modelYear) setModelYear(v.modelYear)
-    if (v.engineCC) setEngineCC(v.engineCC)
-    if (v.fuelType) setFuelType(v.fuelType as 'petrol' | 'diesel')
-    if (v.isAutomatic !== undefined) setIsAutomatic(v.isAutomatic)
-    if (v.is4x4 !== undefined) setIs4x4(v.is4x4)
-    if (v.isTurbo !== undefined) setIsTurbo(v.isTurbo)
-
-    // Save vehicle data for the next step (car-specifications)
+    // Save vehicle data for the next step (car-specifications). The server compares
+    // against the stored car itself; the id is all it needs from us.
     saveFormData({
       vinNumber: v.vinNumber || '',
       engineNumber: v.engineNumber || '',
       originalVehicleId: v.id,
       originalVehicleLicensePhotoUrl: v.licensePhotoUrl || '',
-      originalVehicleData: {
-        brand: v.brand, model: v.model, modelYear: v.modelYear,
-        engineCC: v.engineCC, fuelType: v.fuelType,
-        isAutomatic: v.isAutomatic, is4x4: v.is4x4,
-        vinNumber: v.vinNumber, engineNumber: v.engineNumber
-      }
+      originalVehicleData: undefined,
     })
   }
 
-  // Bodywork categories don't need engine/fuel/transmission details
-  const isBodywork = category === 'oliki-vafi' || category === 'meriki-vafi' || category === 'fanopeia'
+  const isBodywork = BODYWORK_CATEGORIES.has(category)
 
   // Form validation
   const isFormValid =
     currentBrand.trim() !== '' &&
     currentModel.trim() !== '' &&
     isYearValid(modelYear) &&
-    (isBodywork ? descriptionPhotos.length >= 1 : (isCCValid(engineCC) && fuelType !== ''))
+    (isBodywork || (isCCValid(engineCC) && fuelType !== ''))
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!isFormValid) return
 
     saveFormData({
@@ -377,68 +434,17 @@ export default function CarBrandModelSelector() {
       }),
     }).catch(() => {})
 
-    // Bodywork: submit directly with photos, skip second page
-    if (isBodywork) {
-      if (descriptionPhotos.length < 1) {
-        showError('Σφάλμα', 'Ανεβάστε τουλάχιστον 1 φωτογραφία')
-        return
-      }
-      setIsSubmitting(true)
-      try {
-        const latestFormData = loadFormData()
-        // For bodywork, include the original vehicle's engine data so
-        // the backend comparison doesn't see a diff and create a clone.
-        const origData = latestFormData.originalVehicleData
-        const serviceRequestData = {
-          category, description, brand: currentBrand, model: currentModel,
-          modelYear, isBrandOther, isModelOther,
-          engineCC: origData?.engineCC || engineCC,
-          fuelType: origData?.fuelType || fuelType,
-          isAutomatic: origData?.isAutomatic ?? isAutomatic,
-          is4x4: origData?.is4x4 ?? is4x4,
-          vinNumber: origData?.vinNumber || '',
-          engineNumber: origData?.engineNumber || '',
-          photos: descriptionPhotos.map(p => ({ name: p.name, size: p.size, type: p.type })),
-          ...(latestFormData.originalVehicleId && { originalVehicleId: latestFormData.originalVehicleId }),
-          ...(origData && { originalVehicleData: origData }),
-          ...(clientId && { clientId })
-        }
-        const serviceResponse = await fetch('/api/service-request/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(serviceRequestData),
-        })
-        const serviceResult = await serviceResponse.json()
-        if (!serviceResponse.ok || !serviceResult.success) {
-          showError('Σφάλμα', serviceResult.error || 'Σφάλμα κατά την αποστολή')
-          return
-        }
-        // Upload photos to S3
-        const formData = new FormData()
-        descriptionPhotos.forEach(file => formData.append('files', file))
-        formData.append('serviceRequestId', serviceResult.serviceRequestId)
-        formData.append('vehicleId', serviceResult.vehicleId)
-        const uploadRes = await fetch('/api/upload-photos/', { method: 'POST', body: formData })
-        const uploadData = await uploadRes.json().catch(() => ({}))
-        const photosUploaded = uploadData.success === true
+    // Every category continues to step 2. Bodywork used to submit from here, with no
+    // email or password for a guest — the API stored the request, then refused it.
+    // Step 2 is where photos, the price estimate and the account all live.
+    navigate('/car-specifications/')
+  }
 
-        if (photosUploaded) {
-          success('Επιτυχία!', `Στάλθηκαν ${descriptionPhotos.length} φωτογραφίες\n\nΕιδοποίηση σε ${serviceResult.notificationsSent} συνεργεία μέσω SMS!`)
-        } else {
-          success('Αίτημα Υποβλήθηκε', `Ειδοποίηση σε ${serviceResult.notificationsSent} συνεργεία μέσω SMS!\n\nΟι φωτογραφίες δεν ανέβηκαν — δοκιμάστε ξανά αργότερα.`)
-        }
-        if (serviceResult.clientId) router.push(`/requests/${serviceResult.clientId}/`)
-        else if (clientId) router.push(`/requests/${clientId}/`)
-        else router.push('/requests/')
-      } catch {
-        showError('Σφάλμα', 'Σφάλμα κατά την αποστολή. Δοκιμάστε ξανά.')
-      } finally {
-        setIsSubmitting(false)
-      }
-      return
+  const clearAll = () => {
+    if (confirm('Θέλετε να διαγράψετε όλα τα στοιχεία της φόρμας;')) {
+      clearFormData()
+      navigate('/')
     }
-
-    router.push('/car-specifications/')
   }
 
   return (
@@ -460,98 +466,11 @@ export default function CarBrandModelSelector() {
               onChange={(e) => setDescription(e.target.value)}
             />
 
-            {/* Photo upload area - bodywork categories */}
             {isBodywork && (
-              <>
-                <div className="space-y-4">
-                  <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
-                    Φωτογραφίες Ζημιάς ({descriptionPhotos.length}/3)
-                  </label>
-
-                  {descriptionPhotos.length < 3 && (
-                    <div
-                      className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all duration-200 ${
-                        dragActive
-                          ? 'border-primary bg-primary/5'
-                          : 'border-outline-variant/30 hover:border-primary'
-                      }`}
-                      onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(true) }}
-                      onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false) }}
-                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragActive(true) }}
-                      onDrop={(e) => {
-                        e.preventDefault(); e.stopPropagation(); setDragActive(false)
-                        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
-                        setDescriptionPhotos(prev => [...prev, ...files].slice(0, 3))
-                      }}
-                    >
-                      <input
-                        type="file"
-                        id="bodywork-photos"
-                        accept="image/*"
-                        multiple
-                        onChange={(e) => {
-                          const files = Array.from(e.target.files || []).filter(f => f.type.startsWith('image/'))
-                          setDescriptionPhotos(prev => [...prev, ...files].slice(0, 3))
-                          e.target.value = ''
-                        }}
-                        className="hidden"
-                      />
-                      <label htmlFor="bodywork-photos" className="cursor-pointer">
-                        <Icon name="cloud_upload" size="xl" className="mx-auto mb-3 text-on-surface-variant/40" />
-                        <p className="text-sm font-bold text-on-surface">
-                          Κάνε κλικ ή σύρε φωτογραφίες εδώ
-                        </p>
-                        <p className="text-xs text-on-surface-variant mt-1">
-                          JPG, PNG μέχρι 10MB ανά φωτογραφία
-                        </p>
-                        <p className="text-[10px] text-on-surface-variant/50 mt-1">
-                          Μέχρι {3 - descriptionPhotos.length} ακόμα φωτογραφί{3 - descriptionPhotos.length === 1 ? 'α' : 'ες'}
-                        </p>
-                      </label>
-                    </div>
-                  )}
-
-                  {descriptionPhotos.length > 0 && (
-                    <div className="grid grid-cols-3 gap-3">
-                      {descriptionPhotos.map((photo, index) => (
-                        <div key={index} className="relative group">
-                          <div className="relative aspect-square bg-surface-container rounded-xl overflow-hidden">
-                            <Image
-                              src={URL.createObjectURL(photo)}
-                              alt={`Φωτογραφία ${index + 1}`}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setDescriptionPhotos(prev => prev.filter((_, i) => i !== index))}
-                            className="absolute -top-2 -right-2 bg-tertiary text-on-tertiary rounded-full h-6 w-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-md"
-                          >
-                            <Icon name="close" size="sm" />
-                          </button>
-                          <p className="text-[10px] text-on-surface-variant mt-1 truncate">{photo.name}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Tips card */}
-                <div className="p-4 bg-surface-container-lowest rounded-2xl">
-                  <div className="flex items-start gap-3">
-                    <Icon name="lightbulb" size="md" className="text-primary flex-shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="text-xs font-bold text-on-surface mb-1">Συμβουλές για καλές φωτογραφίες:</h4>
-                      <ul className="text-[11px] text-on-surface-variant space-y-0.5">
-                        <li>Φωτογραφίστε τη ζημιά από κοντά και από μακριά</li>
-                        <li>Χρησιμοποιήστε καλό φωτισμό (φυσικό φως)</li>
-                        <li>Συμπεριλάβετε το περιβάλλον της ζημιάς</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </>
+              <p className="text-xs text-on-surface-variant flex items-center gap-1">
+                <Icon name="photo_camera" size="sm" className="text-primary" />
+                Τις φωτογραφίες της ζημιάς θα τις ανεβάσεις στο επόμενο βήμα.
+              </p>
             )}
           </div>
 
@@ -800,7 +719,7 @@ export default function CarBrandModelSelector() {
           {/* Model Year */}
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
-              Ετος Μοντελου <span className="text-error">*</span>
+              Έτος Μοντέλου <span className="text-error">*</span>
             </label>
             <div className="relative">
               <input
@@ -815,7 +734,7 @@ export default function CarBrandModelSelector() {
             </div>
             {modelYear && modelYear.length === 4 && isYearValid(modelYear) && (
               <p className="text-xs text-green-600 flex items-center gap-1">
-                <Icon name="check_circle" size="sm" className="text-green-600" /> Εγκυρο
+                <Icon name="check_circle" size="sm" className="text-green-600" /> Έγκυρο
               </p>
             )}
             {modelYear && modelYear.length === 4 && !isYearValid(modelYear) && (
@@ -825,7 +744,7 @@ export default function CarBrandModelSelector() {
             )}
             {modelYear && modelYear.length > 0 && modelYear.length < 4 && (
               <p className="text-xs text-tertiary">
-                4 ψηφια απαιτουνται
+                Απαιτούνται 4 ψηφία
               </p>
             )}
           </div>
@@ -834,7 +753,7 @@ export default function CarBrandModelSelector() {
           {!isBodywork && (
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
-              Κυβισμος (CC) <span className="text-error">*</span>
+              Κυβισμός (CC) <span className="text-error">*</span>
             </label>
             <div className="relative">
               <input
@@ -849,7 +768,7 @@ export default function CarBrandModelSelector() {
             </div>
             {engineCC && isCCValid(engineCC) && (
               <p className="text-xs text-green-600 flex items-center gap-1">
-                <Icon name="check_circle" size="sm" className="text-green-600" /> Εγκυρο
+                <Icon name="check_circle" size="sm" className="text-green-600" /> Έγκυρο
               </p>
             )}
             {engineCC && engineCC.length > 0 && !isCCValid(engineCC) && (
@@ -866,14 +785,14 @@ export default function CarBrandModelSelector() {
           <>
           <div className="grid grid-cols-2 gap-4">
             <PillToggle
-              label="Καυσιμο"
-              options={[{ value: 'petrol', label: 'Βενζινη' }, { value: 'diesel', label: 'Πετρελαιο' }]}
+              label="Καύσιμο"
+              options={[{ value: 'petrol', label: 'Βενζίνη' }, { value: 'diesel', label: 'Πετρέλαιο' }]}
               value={fuelType === 'diesel' ? 'diesel' : 'petrol'}
               onChange={(value) => setFuelType(value)}
             />
             <PillToggle
-              label="Κιβωτιο"
-              options={[{ value: false, label: 'Χειροκινητο' }, { value: true, label: 'Αυτοματο' }]}
+              label="Κιβώτιο"
+              options={[{ value: false, label: 'Χειροκίνητο' }, { value: true, label: 'Αυτόματο' }]}
               value={isAutomatic}
               onChange={setIsAutomatic}
             />
@@ -881,14 +800,14 @@ export default function CarBrandModelSelector() {
 
           <div className="grid grid-cols-2 gap-4">
             <PillToggle
-              label="Κινηση"
+              label="Κίνηση"
               options={[{ value: false, label: '2WD' }, { value: true, label: '4x4' }]}
               value={is4x4}
               onChange={setIs4x4}
             />
             <PillToggle
               label="Turbo"
-              options={[{ value: false, label: 'Οχι' }, { value: true, label: 'Ναι' }]}
+              options={[{ value: false, label: 'Όχι' }, { value: true, label: 'Ναι' }]}
               value={isTurbo}
               onChange={setIsTurbo}
             />
@@ -899,28 +818,32 @@ export default function CarBrandModelSelector() {
       </div>
 
       {/* CTA Button */}
-      <GearSubmitButton onClick={handleSubmit} disabled={!isFormValid || isSubmitting} isLoading={isSubmitting} className="mt-6" />
+      <GearSubmitButton
+        onClick={handleSubmit}
+        disabled={!isFormValid}
+        isLoading={isNavigating('/car-specifications/')}
+        loadingLabel="Φόρτωση..."
+        className="mt-6"
+      />
 
       {/* Back button */}
       <div className="mt-4 text-center space-y-2">
         <button
-          onClick={() => router.back()}
-          className="text-primary hover:text-primary-container font-bold text-sm transition-colors duration-200 flex items-center gap-1 mx-auto"
+          onClick={back}
+          disabled={isNavigating('__back__')}
+          className="text-primary hover:text-primary-container font-bold text-sm transition-colors duration-200 flex items-center gap-1 mx-auto disabled:opacity-60"
         >
-          <Icon name="arrow_back" size="sm" />
-          Επιστροφη
+          {isNavigating('__back__') ? <Spinner size="sm" /> : <Icon name="arrow_back" size="sm" />}
+          Επιστροφή
         </button>
         <div>
           <button
-            onClick={() => {
-              if (confirm('Θελετε να διαγραψετε ολα τα στοιχεια της φορμας;')) {
-                clearFormData()
-                window.location.href = '/'
-              }
-            }}
-            className="text-secondary hover:text-on-surface text-xs transition-colors duration-200"
+            onClick={clearAll}
+            disabled={isNavigating('/')}
+            className="text-secondary hover:text-on-surface text-xs transition-colors duration-200 inline-flex items-center gap-1 disabled:opacity-60"
           >
-            Διαγραφη ολων των στοιχειων
+            {isNavigating('/') && <Spinner size="sm" />}
+            Διαγραφή όλων των στοιχείων
           </button>
         </div>
       </div>

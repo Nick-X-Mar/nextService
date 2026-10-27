@@ -15,8 +15,6 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-
 /**
  * POST /api/auth/forgot-password
  *
@@ -39,7 +37,7 @@ async function _POST(request: NextRequest) {
       return NextResponse.json({ error: 'Το email είναι υποχρεωτικό' }, { status: 400 })
     }
     if (!['client', 'garage'].includes(userType)) {
-      return NextResponse.json({ error: 'Invalid userType' }, { status: 400 })
+      return NextResponse.json({ error: 'Μη έγκυρος τύπος λογαριασμού' }, { status: 400 })
     }
 
     const clientIP =
@@ -107,7 +105,8 @@ async function _POST(request: NextRequest) {
       })
     )
 
-    const resetUrl = `${APP_URL}/reset-password/${rawToken}?userType=${userType}`
+    // A path: the template puts SITE_URL in front of every link it sends.
+    const resetPath = `/reset-password/${rawToken}/?userType=${userType}`
     const displayName =
       userType === 'garage' ? user.companyName || '' : user.firstName || ''
 
@@ -123,7 +122,7 @@ async function _POST(request: NextRequest) {
     sendEmail({
       to: normalizedEmail,
       templateName: EmailTemplate.PasswordReset,
-      variables: { resetUrl, displayName },
+      variables: { resetPath, displayName },
       triggerEvent: EventName.PasswordResetRequested,
       ...(userType === 'client' ? { clientId: user.id } : { garageId: user.id })
     })

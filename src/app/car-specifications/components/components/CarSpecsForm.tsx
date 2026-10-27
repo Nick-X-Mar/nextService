@@ -1,19 +1,19 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
+import Spinner from '@/components/Spinner'
 import GearSubmitButton from '@/components/GearSubmitButton'
-import LoginModal from '@/components/LoginModal'
-import { saveFormData, loadFormData } from '../../../../utils/formStorage'
+import { saveFormData, loadFormData, clearFormData, getSubmissionId } from '../../../../utils/formStorage'
 import { useToast } from '../../../../hooks/useToast'
-import { useAuth } from '@/contexts/AuthContext'
+import { useNavigation } from '@/hooks/useNavigation'
 import { usePriceEstimate } from '@/hooks/usePriceEstimate'
 import { getCategoryText } from '@/utils/categoryLabels'
-import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
+import { compressImage } from '@/utils/imageCompression'
 import EstimatedCostCard from './EstimatedCostCard'
 import LicenseSample from './LicenseSample'
+import GuestAccountFields, { useGuestAccount } from './GuestAccount'
 import { useFileDrop } from '@/hooks/useFileDrop'
 
 interface CarSpecsFormProps {
@@ -35,38 +35,50 @@ interface CarSpecsFormProps {
   }
 }
 
+// What /api/vehicles/[id]/license-photo stores. Checked when the photo is picked,
+// after re-encoding, so a file it would refuse never gets as far as the submit.
+const UPLOADABLE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const MAX_LICENSE_BYTES = 10 * 1024 * 1024
+
+/** The request exists but the άδεια didn't make it — the numbers are now required. */
+interface CreatedRequest {
+  clientId: string
+  vehicleId: string
+}
+
+async function uploadLicensePhoto(vehicleId: string, file: File): Promise<boolean> {
+  try {
+    const body = new FormData()
+    body.append('file', file)
+    const response = await fetch(`/api/vehicles/${vehicleId}/license-photo/`, { method: 'POST', body })
+    return response.ok
+  } catch {
+    return false
+  }
+}
+
 export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
-  const router = useRouter()
+  const { navigate, back, isNavigating } = useNavigation()
   const { success, error } = useToast()
-  const { refreshClient, client, isVerified } = useAuth()
+  const account = useGuestAccount()
   const [vinNumber, setVinNumber] = useState('')
   const [engineNumber, setEngineNumber] = useState('')
-  const [email, setEmail] = useState('')
-  const [acceptedTerms, setAcceptedTerms] = useState(false)
   // The photo is the path we want people on: one shot instead of two numbers copied off
   // the engine block. A returning visitor who already typed the numbers is switched back
   // to the manual tab on mount.
   const [hasLicensePhoto, setHasLicensePhoto] = useState(true)
   const [licensePhoto, setLicensePhoto] = useState<File | null>(null)
+  const [licensePhotoError, setLicensePhotoError] = useState<string | null>(null)
+  const [isPreparingPhoto, setIsPreparingPhoto] = useState(false)
   const [existingLicensePhotoUrl, setExistingLicensePhotoUrl] = useState<string>('')
   const [mounted, setMounted] = useState(false)
   const [showVinInfo, setShowVinInfo] = useState(false)
   const [showEngineInfo, setShowEngineInfo] = useState(false)
+  // Stays true from the first click through the redirect: the button must not come
+  // back to life while the requests page loads, or a second tap files a second request.
   const [isSubmitting, setIsSubmitting] = useState(false)
-  // Set by the inline LoginModal, whose refreshClient() lands a tick later.
-  const [justLoggedIn, setJustLoggedIn] = useState(false)
-  // Whether to submit as an existing account or register a new one. Derived from
-  // the server-confirmed session only — the old `localStorage.getItem('clientId')`
-  // check would hide the registration fields for a signed-out visitor whose
-  // browser still remembered someone else, and the request went to that account.
-  const authSettled = isVerified || justLoggedIn
-  const isLoggedIn = justLoggedIn || (isVerified && !!client)
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [emailExists, setEmailExists] = useState(false)
-  const [showLoginModal, setShowLoginModal] = useState(false)
-  const [isCheckingEmail, setIsCheckingEmail] = useState(false)
-  const [showEmailHint, setShowEmailHint] = useState(false)
+  const submittingRef = useRef(false)
+  const [createdRequest, setCreatedRequest] = useState<CreatedRequest | null>(null)
 
   // Track form funnel
   useEffect(() => {
@@ -86,7 +98,9 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
     const data = loadFormData()
     if (data.vinNumber) setVinNumber(data.vinNumber)
     if (data.engineNumber) setEngineNumber(data.engineNumber)
-    if (data.originalVehicleLicensePhotoUrl) {
+    // Only a presigned URL is renderable. Drafts saved before the vehicles list was
+    // presigned hold a raw S3 key, which next/image throws on.
+    if (data.originalVehicleLicensePhotoUrl?.startsWith('https://')) {
       setExistingLicensePhotoUrl(data.originalVehicleLicensePhotoUrl)
       setHasLicensePhoto(true)
     } else if (data.vinNumber || data.engineNumber) {
@@ -94,29 +108,43 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
     }
   }, [])
 
-  // Save data whenever it changes
+  // Save data whenever it changes — but not once the request exists: the draft has
+  // been cleared then, and writing to it again would seed the next request.
   useEffect(() => {
-    if (mounted) {
+    if (mounted && !createdRequest) {
       saveFormData({
         vinNumber,
         engineNumber
       })
     }
-  }, [vinNumber, engineNumber, mounted])
+  }, [vinNumber, engineNumber, mounted, createdRequest])
 
-  const acceptLicensePhoto = (files: File[]) => {
+  const acceptLicensePhoto = async (files: File[]) => {
     const file = files[0]
-    if (file) {
-      setLicensePhoto(file)
-      // Only the name is persisted to localStorage — a File can't be
-      // serialised. The upload itself happens on submit, once the vehicle id
-      // exists to key it against.
+    if (!file) return
+    setLicensePhotoError(null)
+    setIsPreparingPhoto(true)
+    try {
+      // Re-encoded to JPEG at pick time rather than at submit, so a photo the server
+      // would refuse — an iPhone HEIC this browser can't decode, a 15MB original — is
+      // caught while the customer can still pick another one or type the numbers.
+      const prepared = await compressImage(file)
+      if (!UPLOADABLE_TYPES.includes(prepared.type) || prepared.size > MAX_LICENSE_BYTES) {
+        setLicensePhoto(null)
+        setLicensePhotoError('Αυτή η φωτογραφία δεν μπορεί να σταλεί. Τράβηξε μια νέα ή συμπλήρωσε τον αριθμό πλαισίου και κινητήρα.')
+        return
+      }
+      // Only the File lives in memory — it can't be serialised to localStorage. The
+      // upload itself happens on submit, once the vehicle id exists to key it against.
+      setLicensePhoto(prepared)
       setHasLicensePhoto(true)
+    } finally {
+      setIsPreparingPhoto(false)
     }
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    acceptLicensePhoto(Array.from(e.target.files || []))
+    void acceptLicensePhoto(Array.from(e.target.files || []))
     // Reset so re-picking the same file still fires onChange, and so the
     // camera can be reopened straight after a retake.
     e.target.value = ''
@@ -125,161 +153,162 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
   // The dashed box below looked like a drop target but had no drop handling at
   // all, so a dropped photo made the browser navigate to it and wiped the
   // half-filled form. The whole window is the target now.
-  const { dragActive } = useFileDrop(acceptLicensePhoto, {
+  const { dragActive } = useFileDrop((files) => void acceptLicensePhoto(files), {
     accept: (file) => file.type.startsWith('image/'),
   })
 
-  const isEmailValid = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
-  const isPasswordValid = password.length >= MIN_PASSWORD_LENGTH && password === confirmPassword
+  const hasPhoto = licensePhoto !== null || !!existingLicensePhotoUrl
+  const numbersGiven = vinNumber.trim() !== '' && engineNumber.trim() !== ''
 
-  // Debounced email check
-  const checkEmail = useCallback(async (emailToCheck: string) => {
-    if (!isEmailValid(emailToCheck)) return
-    setIsCheckingEmail(true)
-    try {
-      const res = await fetch('/api/auth/check-email/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: emailToCheck, userType: 'client' })
-      })
-      const data = await res.json()
-      setEmailExists(data.exists)
-    } catch {
-      setEmailExists(false)
-    } finally {
-      setIsCheckingEmail(false)
+  const isFormValid = !isPreparingPhoto && (
+    createdRequest
+      // Recovery: a fresh photo, or both numbers. The failed one doesn't count.
+      ? licensePhoto !== null || numbersGiven
+      // The άδεια carries the πλαίσιο and the αρ. κινητήρα itself, so a photo is the
+      // whole answer — asking for the numbers on top of it (while their fields are
+      // hidden) left the submit button permanently disabled.
+      : account.isReady && (hasPhoto || numbersGiven)
+  )
+
+  const release = () => {
+    submittingRef.current = false
+    setIsSubmitting(false)
+  }
+
+  const carSummary = `${savedData.brand} ${savedData.model} (${savedData.modelYear})`
+
+  /** After a failed άδεια upload: retry the photo, or store the typed numbers. */
+  const completeVehicleDetails = async ({ clientId, vehicleId }: CreatedRequest) => {
+    let saved = licensePhoto ? await uploadLicensePhoto(vehicleId, licensePhoto) : false
+    if (!saved && numbersGiven) {
+      try {
+        const response = await fetch(`/api/vehicles/${vehicleId}/`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vinNumber, engineNumber }),
+        })
+        saved = response.ok
+        if (!saved) {
+          const result = await response.json().catch(() => ({}))
+          error('Δεν αποθηκεύτηκαν', result.error || 'Δοκιμάστε ξανά.')
+          release()
+          return
+        }
+      } catch {
+        saved = false
+      }
     }
-  }, [])
-
-  useEffect(() => {
-    if (!mounted || isLoggedIn || !isEmailValid(email)) {
-      setEmailExists(false)
+    if (!saved) {
+      error('Δεν αποθηκεύτηκαν', 'Συμπληρώστε τον αριθμό πλαισίου και κινητήρα και δοκιμάστε ξανά.')
+      setLicensePhoto(null)
+      setHasLicensePhoto(false)
+      release()
       return
     }
-    const timer = setTimeout(() => checkEmail(email), 800)
-    return () => clearTimeout(timer)
-  }, [email, mounted, isLoggedIn, checkEmail])
-
-  const hasPhoto = licensePhoto !== null || !!existingLicensePhotoUrl
-
-  const isFormValid =
-    // Until the session is settled we don't know which of the two shapes below
-    // this submit takes, so the button stays disabled rather than guessing.
-    authSettled &&
-    // The άδεια carries the πλαίσιο and the αρ. κινητήρα itself, so a photo is the whole
-    // answer — asking for the numbers on top of it (while their fields are hidden) left
-    // the submit button permanently disabled.
-    (hasPhoto || (vinNumber.trim() !== '' && engineNumber.trim() !== '')) &&
-    (isLoggedIn || (isEmailValid(email) && !emailExists && isPasswordValid && acceptedTerms))
+    success('Ολοκληρώθηκε', 'Τα στοιχεία του οχήματος αποθηκεύτηκαν στο αίτημά σου.')
+    navigate(`/requests/${clientId}/`)
+  }
 
   const handleSubmit = async () => {
-    if (isFormValid) {
-      setIsSubmitting(true)
+    if (!isFormValid || submittingRef.current) return
+    submittingRef.current = true
+    setIsSubmitting(true)
 
-      // Save final data
-      saveFormData({
-        vinNumber,
-        engineNumber
-      })
+    // Set once the API has stored the request. From then on a failure must not hand
+    // the button back: the draft is gone, so a second tap would file a second request.
+    let createdFor: string | null = null
+    try {
+      if (createdRequest) {
+        await completeVehicleDetails(createdRequest)
+        return
+      }
 
-      // Load latest form data to include originalVehicleId and originalVehicleData
+      saveFormData({ vinNumber, engineNumber })
       const latestFormData = loadFormData()
 
-      const serviceRequest = {
+      const body = {
         ...savedData,
         vinNumber,
         engineNumber,
-        // The API stores this as `estimatedCost`; savedData carries it as `estimatedPrice`,
-        // so without this line the estimate the customer saw is never persisted.
-        ...(estimate && { estimatedCost: estimate.estimatedCost }),
-        licensePhoto: licensePhoto?.name || null,
-        // Include original vehicle tracking data if present
+        // Only the id: the server reads the saved car itself and checks it is ours.
         ...(latestFormData.originalVehicleId && { originalVehicleId: latestFormData.originalVehicleId }),
-        ...(latestFormData.originalVehicleData && { originalVehicleData: latestFormData.originalVehicleData }),
-        // No clientId is sent: the API reads it from the auth cookie, so the
-        // request can only ever land in the account this browser is actually
-        // signed into. Signed-out visitors register inline instead.
-        ...(!isLoggedIn && email && { email, password, acceptedTerms: true })
+        // No clientId is sent: the API reads it from the auth cookie, so the request
+        // can only ever land in the account this browser is actually signed into.
+        // Signed-out visitors register inline instead.
+        ...account.credentials,
+      }
+      // Same key for every retry of this body, so a double-fired submit is stored once.
+      const serviceRequest = { ...body, submissionId: getSubmissionId(body) }
+
+      const response = await fetch('/api/service-request/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(serviceRequest),
+      })
+      const result = await response.json().catch(() => ({}))
+
+      if (!response.ok || !result.success) {
+        if (result.code === 'EMAIL_EXISTS') {
+          account.onEmailTaken()
+          error('Υπάρχει ήδη λογαριασμός', result.error)
+        } else {
+          error('Δεν στάλθηκε το αίτημα', result.error || 'Σφάλμα κατά την αποστολή. Δοκιμάστε ξανά.')
+        }
+        release()
+        return
       }
 
-      try {
-        const response = await fetch('/api/service-request/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(serviceRequest),
-        })
+      // The request exists from here on. The draft goes first, so neither "Πίσω" nor
+      // the next request can resubmit or inherit it.
+      createdFor = result.clientId
+      clearFormData()
 
-        const result = await response.json()
+      // A brand-new account was just registered inline and the server set its auth
+      // cookie, so pull the identity into AuthContext.
+      if (result.isNewAccount) account.onSignedIn(result.clientId)
 
-        if (!response.ok) {
-          error('Λείπουν στοιχεία', result.error || 'Σφάλμα κατά την αποστολή')
+      // The photo goes up after the request exists: it needs the vehicle id the API
+      // just minted, and for a guest the auth cookie the same call just set.
+      if (licensePhoto && result.vehicleId) {
+        const uploaded = await uploadLicensePhoto(result.vehicleId, licensePhoto)
+        if (!uploaded) {
+          // Used to be a console.warn and a redirect, leaving the garage with neither
+          // the άδεια nor the numbers. Stay here until one of the two is in.
+          setCreatedRequest({ clientId: result.clientId, vehicleId: result.vehicleId })
+          setLicensePhoto(null)
+          setHasLicensePhoto(false)
+          error(
+            'Η φωτογραφία της άδειας δεν στάλθηκε',
+            'Το αίτημά σου καταχωρήθηκε. Συμπλήρωσε τον αριθμό πλαισίου και κινητήρα (ή δοκίμασε άλλη φωτογραφία) για να ολοκληρωθεί.'
+          )
+          release()
           return
         }
-
-        if (result.success) {
-          // The photo goes up after the request exists: it needs the vehicle id the
-          // API just minted, and for a guest the auth cookie the same call just set.
-          // Failing here must not lose the request — the garage can still ask for
-          // the numbers — so it only warns.
-          if (licensePhoto && result.vehicleId) {
-            try {
-              const photoBody = new FormData()
-              photoBody.append('file', licensePhoto)
-              const photoResponse = await fetch(`/api/vehicles/${result.vehicleId}/license-photo/`, {
-                method: 'POST',
-                body: photoBody,
-              })
-              if (!photoResponse.ok) {
-                console.warn('License photo upload failed:', await photoResponse.text())
-              }
-            } catch (uploadError) {
-              console.warn('License photo upload failed:', uploadError)
-            }
-          }
-
-          const fuelText = savedData.fuelType === 'petrol' ? 'Βενζινη' : 'Πετρελαιο'
-          const transmissionText = savedData.isAutomatic ? 'Αυτοματο' : 'Χειροκινητο'
-          const driveText = savedData.is4x4 ? '4x4' : '2WD'
-
-          // A brand-new account was just registered inline and the server set
-          // its auth cookie, so pull the identity into AuthContext. Existing
-          // sessions are already there and need no second look.
-          if (!isLoggedIn && result.clientId) {
-            localStorage.setItem('clientId', result.clientId)
-            localStorage.setItem('userType', 'client')
-            refreshClient(result.clientId)
-          }
-
-          success(
-            'Επιτυχια!',
-            `${savedData.brand} ${savedData.model} (${savedData.modelYear}), ${savedData.engineCC}cc, ${fuelText}, ${transmissionText}, ${driveText}\n\nΣταλθηκε ειδοποιηση σε ${result.notificationsSent} συνεργεια μεσω SMS!\n\nΑνακατευθυνση στη σελιδα αιτηματων...`
-          )
-
-          // Redirect to requests page with clientId
-          if (result.clientId) {
-            router.push(`/requests/${result.clientId}/`)
-          } else if (client) {
-            // Fallback to the signed-in client
-            router.push(`/requests/${client.id}/`)
-          } else {
-            router.push('/requests/')
-          }
-        } else {
-          error('Σφαλμα', result.error || 'Αγνωστο σφαλμα')
-        }
-      } catch (err) {
-        console.error('Error submitting service request:', err)
-        error('Σφαλμα', 'Σφαλμα κατα την αποστολη. Παρακαλω δοκιμαστε ξανα.')
-      } finally {
-        setIsSubmitting(false)
       }
-    }
-  }
 
-  const handleGoBack = () => {
-    router.back()
+      if (result.duplicate) {
+        // An earlier attempt got through but its answer never arrived. Saying "στάλθηκε"
+        // again would read as a second request.
+        success(
+          'Το αίτημα είχε ήδη σταλεί',
+          'Δεν καταχωρήθηκε δεύτερη φορά — θα το βρεις στα αιτήματά σου.'
+        )
+      } else {
+        success(
+          'Το αίτημα στάλθηκε!',
+          `${carSummary} · ${getCategoryText(savedData.category)}\n\nΤα συνεργεία ειδοποιήθηκαν. Θα δεις τις προσφορές τους στα αιτήματά σου.`
+        )
+      }
+      navigate(`/requests/${result.clientId}/`)
+    } catch (err) {
+      console.error('Error submitting service request:', err)
+      if (createdFor) {
+        navigate(`/requests/${createdFor}/`)
+        return
+      }
+      error('Σφάλμα', 'Σφάλμα κατά την αποστολή. Παρακαλώ δοκιμάστε ξανά.')
+      release()
+    }
   }
 
   return (
@@ -295,10 +324,10 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
 
         {/* Page title */}
         <h1 className="text-[2rem] font-black tracking-[-0.02em] text-on-surface">
-          Τεχνικα Στοιχεια
+          Τεχνικά Στοιχεία
         </h1>
         <p className="mt-1 text-sm text-on-surface-variant leading-relaxed">
-          Συμπληρωστε τα προχωρημενα τεχνικα στοιχεια του οχηματος σας
+          Συμπληρώστε τα προχωρημένα τεχνικά στοιχεία του οχήματός σας
         </p>
 
         {/* Selected Vehicle summary card */}
@@ -309,10 +338,10 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
             </div>
             <div className="min-w-0">
               <p className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
-                ΕΠΙΛΕΓΜΕΝΟ ΟΧΗΜΑ
+                Επιλεγμένο Όχημα
               </p>
               <p className="text-sm font-bold text-on-surface">
-                {savedData.brand} {savedData.model} ({savedData.modelYear})
+                {carSummary}
               </p>
               <p className="text-xs text-on-surface-variant">
                 {savedData.engineCC}cc &middot; {getCategoryText(savedData.category)}
@@ -329,139 +358,29 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
         {/* Estimated cost card */}
         <EstimatedCostCard estimate={estimate} isLoading={isEstimatingPrice} />
 
+        {createdRequest && (
+          <div role="alert" className="mt-6 bg-error-container/60 border border-error/20 rounded-2xl p-4 flex items-start gap-3">
+            <Icon name="error" filled size="md" className="text-error flex-shrink-0" />
+            <div>
+              <p className="text-sm font-bold text-on-surface">Η φωτογραφία της άδειας δεν στάλθηκε</p>
+              <p className="text-xs text-on-surface-variant mt-1">
+                Το αίτημά σου καταχωρήθηκε. Συμπλήρωσε τον αριθμό πλαισίου και τον αριθμό κινητήρα — ή δοκίμασε άλλη φωτογραφία — για να το λάβουν πλήρες τα συνεργεία.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Main form card */}
         <div className="mt-6 space-y-6">
 
           {/* Email & Password for guest users */}
-          {mounted && authSettled && !isLoggedIn && (
-            <div className="space-y-5">
-              {/* Email */}
-              <div className="space-y-3">
-                <label className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
-                  Email <span className="text-error">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => {
-                      const raw = e.target.value
-                      const clean = raw.replace(/[^a-zA-Z0-9@._+\-]/g, '')
-                      setEmail(clean)
-                      setShowEmailHint(raw.length !== clean.length)
-                    }}
-                    placeholder="π.χ. example@email.com"
-                    className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 pr-12 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
-                  />
-                  <Icon name={isCheckingEmail ? 'progress_activity' : 'mail'} className={`absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/50 ${isCheckingEmail ? 'animate-spin' : ''}`} size="md" />
-                </div>
-                {showEmailHint && (
-                  <p className="text-xs text-error flex items-center gap-1">
-                    <Icon name="keyboard" size="sm" /> Χρησιμοποίησε λατινικούς χαρακτήρες — γύρισε το πληκτρολόγιο σε Αγγλικά.
-                  </p>
-                )}
-                {email && !isEmailValid(email) && (
-                  <p className="text-xs text-error flex items-center gap-1">
-                    <Icon name="error" size="sm" className="text-error" /> Μη έγκυρη διεύθυνση email
-                  </p>
-                )}
-                {emailExists && (
-                  <div className="bg-primary/5 border border-primary/10 rounded-xl p-4 space-y-3">
-                    <p className="text-sm text-on-surface">
-                      Αυτό το email χρησιμοποιείται ήδη. Συνδεθείτε για να συνεχίσετε.
-                    </p>
-                    <button
-                      onClick={() => setShowLoginModal(true)}
-                      className="w-full h-10 rounded-xl bg-primary text-white font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
-                    >
-                      <Icon name="login" size="sm" />
-                      Σύνδεση
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Password fields - only if email is valid and doesn't exist */}
-              {isEmailValid(email) && !emailExists && (
-                <>
-                  <div className="space-y-3">
-                    <label className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
-                      Κωδικός πρόσβασης <span className="text-error">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder={`Τουλάχιστον ${MIN_PASSWORD_LENGTH} χαρακτήρες`}
-                        className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 pr-12 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
-                      />
-                      <Icon name="lock" className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/50" size="md" />
-                    </div>
-                    {password && password.length < MIN_PASSWORD_LENGTH && (
-                      <p className="text-xs text-error flex items-center gap-1">
-                        <Icon name="error" size="sm" className="text-error" /> Τουλάχιστον {MIN_PASSWORD_LENGTH} χαρακτήρες
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-3">
-                    <label className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
-                      Επιβεβαίωση κωδικού <span className="text-error">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Επαναλάβετε τον κωδικό"
-                        className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 pr-12 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
-                      />
-                      <Icon name="lock" className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/50" size="md" />
-                    </div>
-                    {confirmPassword && password !== confirmPassword && (
-                      <p className="text-xs text-error flex items-center gap-1">
-                        <Icon name="error" size="sm" className="text-error" /> Οι κωδικοί δεν ταιριάζουν
-                      </p>
-                    )}
-                    {confirmPassword && password === confirmPassword && password.length >= MIN_PASSWORD_LENGTH && (
-                      <p className="text-xs text-green-600 flex items-center gap-1">
-                        <Icon name="check_circle" size="sm" className="text-green-600" /> Θα δημιουργηθεί ο λογαριασμός σας κατά την υποβολή
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Consent — required for GDPR */}
-                  <label className="flex items-start gap-2 cursor-pointer select-none pt-2">
-                    <input
-                      type="checkbox"
-                      checked={acceptedTerms}
-                      onChange={(e) => setAcceptedTerms(e.target.checked)}
-                      required
-                      className="mt-0.5 h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                    />
-                    <span className="text-xs text-on-surface-variant leading-snug">
-                      Έχω διαβάσει και αποδέχομαι τους{' '}
-                      <a href="/terms/" target="_blank" rel="noreferrer" className="text-primary underline">
-                        Όρους Χρήσης
-                      </a>
-                      {' '}και την{' '}
-                      <a href="/privacy/" target="_blank" rel="noreferrer" className="text-primary underline">
-                        Πολιτική Απορρήτου
-                      </a>
-                      .
-                    </span>
-                  </label>
-                </>
-              )}
-            </div>
-          )}
+          {mounted && <GuestAccountFields account={account} />}
 
           {/* Engine Number or License Photo */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <label className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
-                Κινητηρας η Αδεια
+                Κινητήρας ή Άδεια
               </label>
               <div className="relative">
                 <Icon
@@ -473,10 +392,10 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                 {showEngineInfo && (
                   <div className="absolute top-6 left-0 z-50 bg-surface-container-lowest border border-outline-variant/20 rounded-xl shadow-lg p-4 w-64">
                     <div className="text-left">
-                      <p className="text-sm font-bold text-on-surface mb-2">Που να βρειτε τον αριθμο κινητηρα:</p>
+                      <p className="text-sm font-bold text-on-surface mb-2">Πού θα βρείτε τον αριθμό κινητήρα:</p>
                       <Image
                         src="/images/engine-number-location.jpg"
-                        alt="Θεση αριθμου κινητηρα"
+                        alt="Θέση αριθμού κινητήρα"
                         width={300}
                         height={200}
                         className="w-full h-32 object-cover rounded-lg mb-2"
@@ -485,7 +404,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                         }}
                       />
                       <p className="text-xs text-secondary">
-                        Συνηθως βρισκεται στο μπλοκ του κινητηρα η στην αδεια κυκλοφοριας
+                        Συνήθως βρίσκεται στο μπλοκ του κινητήρα ή στην άδεια κυκλοφορίας
                       </p>
                     </div>
                   </div>
@@ -504,7 +423,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                     : 'flex-1 py-2.5 rounded-full font-bold text-xs text-on-surface-variant hover:bg-surface-variant text-center transition-all'
                 }
               >
-                Αριθμος Κινητηρα
+                Αριθμός Κινητήρα
               </button>
               <button
                 type="button"
@@ -515,23 +434,28 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                     : 'flex-1 py-2.5 rounded-full font-bold text-xs text-on-surface-variant hover:bg-surface-variant text-center transition-all'
                 }
               >
-                Φωτογραφια Αδειας Κυκλοφοριας
+                Φωτογραφία Άδειας Κυκλοφορίας
               </button>
             </div>
 
+            {licensePhotoError && (
+              <p role="alert" className="text-xs text-error flex items-start gap-1">
+                <Icon name="error" size="sm" className="text-error shrink-0" /> {licensePhotoError}
+              </p>
+            )}
+
             {!hasLicensePhoto ? (
-              <>
-                <input
-                  type="text"
-                  value={engineNumber}
-                  onChange={(e) => {
-                    const val = e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g, '')
-                    setEngineNumber(val)
-                  }}
-                  placeholder="π.χ. ABC123456"
-                  className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
-                />
-              </>
+              <input
+                type="text"
+                aria-label="Αριθμός κινητήρα"
+                value={engineNumber}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g, '')
+                  setEngineNumber(val)
+                }}
+                placeholder="π.χ. ABC123456"
+                className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
+              />
             ) : (
               <>
                 <div className="bg-tertiary/10 border border-tertiary/20 rounded-xl p-3 flex items-start gap-2">
@@ -548,7 +472,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                   </p>
                 </div>
                 {/* Show existing license photo from vehicle */}
-                {existingLicensePhotoUrl && !licensePhoto && (
+                {existingLicensePhotoUrl && !licensePhoto && !createdRequest && (
                   <div className="rounded-2xl overflow-hidden border-2 border-green-200 bg-green-50/50">
                     <div className="relative w-full h-48">
                       <Image
@@ -587,7 +511,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                   onChange={handleFileChange}
                   className="hidden"
                 />
-                {(!existingLicensePhotoUrl || licensePhoto) && (
+                {(!existingLicensePhotoUrl || licensePhoto || createdRequest) && (
                   <>
                     <div className="grid grid-cols-2 gap-3 md:hidden">
                       <label
@@ -595,14 +519,14 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                         className="flex flex-col items-center justify-center gap-2 rounded-2xl machined-gradient text-white py-5 cursor-pointer active:scale-95 transition-transform shadow-lg shadow-primary/20"
                       >
                         <Icon name="photo_camera" size="lg" filled />
-                        <span className="text-sm font-bold">Καμερα</span>
+                        <span className="text-sm font-bold">Κάμερα</span>
                       </label>
                       <label
                         htmlFor="license-photo"
                         className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-surface-container-highest text-on-surface py-5 cursor-pointer active:scale-95 transition-transform"
                       >
                         <Icon name="photo_library" size="lg" filled className="text-on-surface-variant" />
-                        <span className="text-sm font-bold">Συλλογη</span>
+                        <span className="text-sm font-bold">Συλλογή</span>
                       </label>
                     </div>
 
@@ -610,19 +534,24 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                       dragActive ? 'border-primary bg-primary/5' : 'border-outline-variant/30 hover:border-primary'
                     }`}>
                       <label htmlFor="license-photo" className="cursor-pointer">
-                        {licensePhoto ? (
+                        {isPreparingPhoto ? (
+                          <div className="text-on-surface-variant flex flex-col items-center">
+                            <Spinner size="md" className="text-primary mb-2" />
+                            <p className="text-sm font-bold">Επεξεργασία φωτογραφίας...</p>
+                          </div>
+                        ) : licensePhoto ? (
                           <div className="text-green-600">
                             <Icon name="photo" size="lg" className="mx-auto mb-2" />
                             <p className="text-sm font-bold">{licensePhoto.name}</p>
-                            <p className="text-xs text-on-surface-variant">Κανε κλικ για αλλαγη</p>
+                            <p className="text-xs text-on-surface-variant">Κάνε κλικ για αλλαγή</p>
                           </div>
                         ) : (
                           <div className="text-on-surface-variant">
                             <Icon name="cloud_upload" size="lg" className="mx-auto mb-2" />
                             <p className="text-sm font-bold">
-                              {dragActive ? 'Αφησε τη φωτογραφια' : 'Κανε κλικ η συρε τη φωτογραφια εδω'}
+                              {dragActive ? 'Άφησε τη φωτογραφία' : 'Κάνε κλικ ή σύρε τη φωτογραφία εδώ'}
                             </p>
-                            <p className="text-xs text-on-surface-variant">JPG, PNG μεχρι 10MB</p>
+                            <p className="text-xs text-on-surface-variant">JPG, PNG ή HEIC</p>
                           </div>
                         )}
                       </label>
@@ -630,10 +559,14 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
 
                     {/* On mobile the two buttons above replace the box, so the
                         chosen file needs its own confirmation line. */}
-                    {licensePhoto && (
+                    {(licensePhoto || isPreparingPhoto) && (
                       <div className="md:hidden flex items-center gap-2 rounded-xl bg-green-50 border border-green-100 px-4 py-3">
-                        <Icon name="check_circle" filled size="sm" className="text-green-600" />
-                        <p className="text-xs font-bold text-green-700 truncate">{licensePhoto.name}</p>
+                        {isPreparingPhoto
+                          ? <Spinner size="sm" className="text-green-600" />
+                          : <Icon name="check_circle" filled size="sm" className="text-green-600" />}
+                        <p className="text-xs font-bold text-green-700 truncate">
+                          {isPreparingPhoto ? 'Επεξεργασία φωτογραφίας...' : licensePhoto?.name}
+                        </p>
                       </div>
                     )}
                   </>
@@ -647,7 +580,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <label className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
-                Αριθμος Πλαισιου
+                Αριθμός Πλαισίου
               </label>
               <div className="relative">
                 <Icon
@@ -659,10 +592,10 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                 {showVinInfo && (
                   <div className="absolute top-6 left-0 z-50 bg-surface-container-lowest border border-outline-variant/20 rounded-xl shadow-lg p-4 w-64">
                     <div className="text-left">
-                      <p className="text-sm font-bold text-on-surface mb-2">Που να βρειτε τον αριθμο πλαισιου:</p>
+                      <p className="text-sm font-bold text-on-surface mb-2">Πού θα βρείτε τον αριθμό πλαισίου:</p>
                       <Image
                         src="/images/vin-number-location.jpg"
-                        alt="Θεση αριθμου πλαισιου VIN"
+                        alt="Θέση αριθμού πλαισίου VIN"
                         width={300}
                         height={200}
                         className="w-full h-32 object-cover rounded-lg mb-2"
@@ -671,7 +604,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
                         }}
                       />
                       <p className="text-xs text-secondary">
-                        Βρισκεται στο ντασμπορντ (κατω απο το παρμπριζ), στο πλαισιο της πορτας οδηγου, η στην αδεια κυκλοφοριας
+                        Βρίσκεται στο ταμπλό (κάτω από το παρμπρίζ), στο πλαίσιο της πόρτας του οδηγού ή στην άδεια κυκλοφορίας
                       </p>
                     </div>
                   </div>
@@ -681,6 +614,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
             <div className="relative">
               <input
                 type="text"
+                aria-label="Αριθμός πλαισίου"
                 value={vinNumber}
                 onChange={(e) => {
                   const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')
@@ -694,7 +628,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
             </div>
             {vinNumber && vinNumber.length > 0 && (
               <p className="text-xs text-on-surface-variant">
-                {vinNumber.length}/17 χαρακτηρες
+                {vinNumber.length}/17 χαρακτήρες
               </p>
             )}
           </div>
@@ -707,35 +641,24 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
             onClick={handleSubmit}
             disabled={!isFormValid}
             isLoading={isSubmitting}
+            label={createdRequest ? 'ΟΛΟΚΛΗΡΩΣΗ' : 'ΑΠΟΣΤΟΛΗ ΑΙΤΗΜΑΤΟΣ'}
           />
 
-          {/* Back link */}
-          <div className="mt-3 text-center">
-            <button
-              onClick={handleGoBack}
-              className="text-primary hover:text-primary-container font-bold text-sm transition-colors duration-200"
-            >
-              Επιστροφη
-            </button>
-          </div>
+          {/* Back link — once the request exists there is nothing to go back to. */}
+          {!createdRequest && (
+            <div className="mt-3 text-center">
+              <button
+                onClick={back}
+                disabled={isNavigating('__back__') || isSubmitting}
+                className="inline-flex items-center gap-1 text-primary hover:text-primary-container font-bold text-sm transition-colors duration-200 disabled:opacity-60"
+              >
+                {isNavigating('__back__') && <Spinner size="sm" />}
+                Επιστροφή
+              </button>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Login Modal */}
-      <LoginModal
-        isOpen={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-        email={email}
-        onLoginSuccess={(clientId) => {
-          setJustLoggedIn(true)
-          localStorage.removeItem('garageId')
-          localStorage.setItem('clientId', clientId)
-          // Sync the global AuthContext so the header (and any other
-          // consumer of useAuth) immediately reflects the logged-in state.
-          // Without this the header keeps showing "Σύνδεση" until reload.
-          void refreshClient(clientId)
-        }}
-      />
     </section>
   )
 }

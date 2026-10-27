@@ -149,7 +149,7 @@ export function useNewRequestNotifier() {
         const body = details.vehicle
           ? `${details.category} — ${details.vehicle}`
           : details.category
-        new Notification('Νεο αιτημα', { body, tag: 'next-service-new-request' })
+        new Notification('Νέο αίτημα', { body, tag: 'next-service-new-request' })
       } catch (error) {
         console.warn('[useNewRequestNotifier] Could not show browser notification:', error)
       }

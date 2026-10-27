@@ -26,7 +26,7 @@ flowchart TD
     AccountExists -->|Yes| CheckPendingData{Has Pending<br/>Registration Data?}
     AccountExists -->|No| ShowRegisterOption[Show Registration Option]
     
-    CheckPendingData -->|Yes| DeduplicateVehicle[POST /api/auth/register-with-vehicle<br/>Deduplicate Vehicle]
+    CheckPendingData -->|Yes| DeduplicateVehicle[Guest merge: POST /api/auth/register-from-requests/merge-with-password<br/>or emailed confirmation link<br/>Deduplicate Vehicle]
     CheckPendingData -->|No| NormalLogin[Store clientId<br/>in localStorage]
     
     DeduplicateVehicle --> MergeVehicles{Vehicle Match?}
@@ -40,7 +40,7 @@ flowchart TD
     NormalLogin --> StoreClientId
     
     ShowRegisterOption --> UserChoice{User Action?}
-    UserChoice -->|Register| RegisterNew[POST /api/auth/register<br/>or<br/>POST /api/auth/register-with-vehicle]
+    UserChoice -->|Register| RegisterNew[POST /api/auth/register]
     UserChoice -->|Try Another Email| EnterEmail
     
     RegisterNew --> CheckExistingEmail{Email Exists?}
@@ -147,10 +147,16 @@ flowchart TD
 
 #### Step 3: Handle Pending Registration Data
 
-If account found AND `localStorage` has `pendingRegistrationData`:
-- Check if data is less than 1 hour old
-- Call `POST /api/auth/register-with-vehicle`
-- Attempts vehicle deduplication:
+A guest (a Clients row with no email or password) who enters an email that
+already has an account is never signed in on that basis alone. They choose:
+- **Password:** `POST /api/auth/register-from-requests/merge-with-password` verifies
+  the account's password (login rate limits), merges, and switches the cookie.
+- **Email link:** `POST /api/auth/register-from-requests/send-confirmation` emails a
+  single-use, hashed, 1-hour link to `/confirm-account/`. Confirming merges and signs
+  in the browser that opened it; the waiting tab polls
+  `GET /api/auth/register-from-requests/status` and follows.
+
+The merge attempts vehicle deduplication:
   - Match by VIN Number
   - Match by Engine Number
   - If match found: Link existing vehicle
@@ -181,12 +187,10 @@ If account found AND `localStorage` has `pendingRegistrationData`:
 
 #### Option A: From Login Page (Account Not Found)
 
-**API:** `POST /api/auth/register` or `POST /api/auth/register-with-vehicle`
+**API:** `POST /api/auth/register`
 
-**If Pending Data Exists:**
-- Uses `register-with-vehicle` endpoint
-- Handles vehicle deduplication
-- Merges guest requests with new account
+Merging a guest's requests into an existing account goes through the guest merge
+flow above, never through registration.
 
 **If No Pending Data:**
 - Uses standard `register` endpoint
@@ -382,8 +386,11 @@ If account found AND `localStorage` has `pendingRegistrationData`:
 
 - `POST /api/auth/login` - Authenticate user
 - `POST /api/auth/register` - Create new account
-- `POST /api/auth/register-with-vehicle` - Register with vehicle deduplication
-- `POST /api/auth/register-from-requests` - Register from requests page
+- `POST /api/auth/register-from-requests` - Guest completes registration (email not yet taken)
+- `POST /api/auth/register-from-requests/merge-with-password` - Merge guest into existing account by password
+- `POST /api/auth/register-from-requests/send-confirmation` - Email a merge confirmation link
+- `GET /api/auth/register-from-requests/status` - Waiting tab polls the merge outcome
+- `POST /api/auth/confirm-account` - Consume the emailed link and merge
 - `GET /api/requests?clientId={id}` - Get all requests
 - `GET /api/requests/{requestId}` - Get request details
 - `PATCH /api/requests/{requestId}/accept-offer` - Accept offer

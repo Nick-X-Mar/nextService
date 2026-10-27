@@ -24,10 +24,13 @@ from constructs import Construct
 
 
 
-# Transition flag. True keeps the old API-key path working while the new app
-# build rolls out; flip to False (and redeploy) to make the Lambda authorizer
-# the only way in, which is what actually secures the chat channels.
-ALLOW_API_KEY = True
+# The API key is published to every browser (NEXT_PUBLIC_APPSYNC_API_KEY), so
+# accepting it as a credential let anyone read or forge any chat and the garage
+# feed. With this False the Lambda authorizer is the only way in.
+#
+# Deploy order: ship the app build that never falls back to the key FIRST
+# (Amplify), then deploy this stack. Flipping it back to True reopens the hole.
+ALLOW_API_KEY = False
 
 # Matches the value recorded in the DEPLOYED CloudFormation template, so a plain
 # `cdk deploy` produces no diff on this resource.
@@ -95,9 +98,10 @@ class AppSyncStack(Stack):
             environment={
                 "SERVICE_REQUESTS_TABLE": "ServiceRequests",
                 # Read when a garage subscribes to the `new-requests` /
-                # `request-updates` fan-out: those channels carry client names,
-                # phone numbers and presigned photo URLs, so only an approved
-                # garage may join them.
+                # `request-updates` fan-out, or to one of its own chat threads:
+                # those carry what quoting needs (first name, the car, presigned
+                # photo URLs) and client messages, so only an approved garage
+                # may join them.
                 "GARAGES_TABLE": "Garages",
                 # Must match the value the Next.js app signs with. Read from the
                 # deploy environment so it never lands in source control, and
@@ -128,23 +132,19 @@ class AppSyncStack(Stack):
             self, "ChatEventsApi",
             name="nextservice-chat-events",
             event_config=appsync.CfnApi.EventConfigProperty(
-                # ── TRANSITION STATE — see ALLOW_API_KEY below ──────────
-                # Both providers are accepted so the infrastructure and the app
-                # can be rolled out in either order without a window where chat
-                # is broken: the currently deployed app still sends an API key,
-                # and the new build sends a bearer token.
-                #
-                # THIS DOES NOT YET CLOSE THE HOLE. While API_KEY is accepted,
-                # anyone holding the public key can still subscribe to any
-                # channel. Set ALLOW_API_KEY = False and redeploy once the new
-                # app build is live in Amplify — that is the change that
-                # actually secures the chat.
+                # Lambda authorizer only (see ALLOW_API_KEY at the top). The
+                # API_KEY provider is listed only while that flag is True.
                 auth_providers=[
                     appsync.CfnApi.AuthProviderProperty(
                         auth_type="AWS_LAMBDA",
                         lambda_authorizer_config=appsync.CfnApi.LambdaAuthorizerConfigProperty(
                             authorizer_uri=self.authorizer_fn.function_arn,
-                            authorizer_result_ttl_in_seconds=300,
+                            # No caching. AppSync keys cached results on the
+                            # token alone, so a cached "allow" from the CONNECT
+                            # step (or from one channel) would be reused for
+                            # every channel that token later names, skipping the
+                            # per-channel check. See the authorizer's handler.
+                            authorizer_result_ttl_in_seconds=0,
                         ),
                     ),
                     *([appsync.CfnApi.AuthProviderProperty(auth_type="API_KEY")]
@@ -165,6 +165,11 @@ class AppSyncStack(Stack):
         )
 
         # API Key (valid for 365 days — the AWS hard maximum).
+        #
+        # No longer an accepted credential (ALLOW_API_KEY is False). The
+        # resource, its rotator and the NEXT_PUBLIC_APPSYNC_API_KEY Amplify
+        # variable are kept only because the Amplify stack still references the
+        # export; they can be removed together in a follow-up.
         # The key is auto-extended by the rotator Lambda below, so the value
         # never changes and live chat sessions don't drop.
         #

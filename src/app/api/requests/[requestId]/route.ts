@@ -4,10 +4,11 @@ import { GetCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { getByIdOrNull } from '@/utils/getById'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
-import { requireAuth, requireOwner } from '@/utils/requireAuth'
+import { requireActiveGarage, requireAuth, requireOwner } from '@/utils/requireAuth'
 import { generatePresignedUrls } from '@/utils/s3Service'
 import { withMetrics } from '@/utils/withMetrics'
 import { ServiceRequestStatus } from '@/types/statuses'
+import { garageClientView, garageVehicleView, resolveWinningGarageId } from '@/utils/garageClientView'
 
 async function _GET(
   request: NextRequest,
@@ -17,16 +18,23 @@ async function _GET(
     const auth = requireAuth(request)
     if (auth instanceof NextResponse) return auth
 
+    // A pending or deactivated garage still holds a garage session (it needs one
+    // for its own status screen), but this response carries the client's name,
+    // phone, VIN and άδεια — only an approved garage may read it.
+    if (auth.userType === 'garage') {
+      const active = await requireActiveGarage(request)
+      if (active instanceof NextResponse) return active
+    }
+
     const { requestId } = await params
     const { searchParams } = new URL(request.url)
-    // Optional query param: when a garage is the viewer, the UI passes
-    // ?viewerGarageId=... so we can audit the access. The route still
-    // works without it for client-side viewers.
+    // The UI passes ?viewerGarageId=... when a garage views the request. It
+    // must name the caller, but the audit below no longer depends on it.
     const viewerGarageId = searchParams.get('viewerGarageId') || undefined
 
     if (!requestId) {
       return NextResponse.json({
-        error: 'Request ID is required'
+        error: 'Λείπει το αναγνωριστικό αιτήματος'
       }, { status: 400 })
     }
 
@@ -38,7 +46,7 @@ async function _GET(
 
     if (!result.Item) {
       return NextResponse.json({
-        error: 'Service request not found'
+        error: 'Το αίτημα δεν βρέθηκε'
       }, { status: 404 })
     }
 
@@ -66,9 +74,15 @@ async function _GET(
     // the viewerGarageId to yourself was the *whole* test, so any garage could pull the
     // client's name, phone, plate, VIN and άδεια photo for any request id it had ever
     // seen — including long after the job went to a competitor.
+    //
+    // Reading it is not seeing the client, though: only the winner, from the
+    // acceptance on, gets the PII (see garageClientView). Everyone else who may
+    // read — a garage quoting, one that lost, one whose job was cancelled — gets
+    // the quoting view.
+    let isWinner = false
     if (auth.userType === 'garage') {
       const isOpenMarket = serviceRequest.status === ServiceRequestStatus.PENDING
-      const isWinner = serviceRequest.acceptedGarageId === auth.userId
+      isWinner = (await resolveWinningGarageId(serviceRequest)) === auth.userId
 
       if (!isOpenMarket && !isWinner) {
         const offersOnRequest = await dynamoDB.send(new QueryCommand({
@@ -99,78 +113,129 @@ async function _GET(
       rawPhotoUrls.length > 0 ? generatePresignedUrls(rawPhotoUrls) : Promise.resolve([])
     ])
 
+    const isOwner = auth.userType === 'client'
+    // Who may see the identifying fields: the owner, and the garage that won.
+    const seesPii = isOwner || isWinner
+
     // The άδεια κυκλοφορίας lives in a private bucket, so it travels as a
-    // short-lived presigned URL like the damage photos do.
-    const licensePhotoUrl = vehicle?.licensePhotoUrl
+    // short-lived presigned URL like the damage photos do — and is not even
+    // signed for a caller who may not see it.
+    const licensePhotoUrl = seesPii && vehicle?.licensePhotoUrl
       ? (await generatePresignedUrls([vehicle.licensePhotoUrl as string]))[0]
       : null
 
-    // GDPR audit log: when a garage views a request that contains client
-    // PII (name, phone) and vehicle PII (plate, VIN), record the access.
+    // GDPR audit log: record every garage view, with what it actually exposed.
     // This lets us answer "who saw my data?" and detect scraping behavior.
-    if (viewerGarageId) {
+    // Keyed on the session, not the query param: leaving the param off used to
+    // be enough to read the data without leaving a trace.
+    if (auth.userType === 'garage') {
       logEvent({
         eventName: EventName.GarageViewedRequestDetails,
         actorType: 'garage',
-        actorId: viewerGarageId,
-        garageId: viewerGarageId,
+        actorId: auth.userId,
+        garageId: auth.userId,
         clientId: serviceRequest.clientId,
         requestId,
         source: 'api/requests/[requestId]',
         metadata: {
-          fieldsExposed: [
-            'client.firstName',
-            'client.lastName',
-            'client.phoneNumber',
-            'vehicle.licensePlate',
-            'vehicle.vinNumber',
-            'vehicle.engineNumber'
-          ]
+          fieldsExposed: isWinner
+            ? [
+                'client.firstName',
+                'client.lastName',
+                'client.phoneNumber',
+                'client.email',
+                'vehicle.licensePlate',
+                'vehicle.vinNumber',
+                'vehicle.engineNumber',
+                'vehicle.licensePhoto'
+              ]
+            : ['client.firstName']
         }
       })
     }
+
+    // The owner's own details screen loads from here and needs the bookkeeping
+    // fields too; a garage gets only what it needs to quote and do the job.
+    const ownerOnly = isOwner
+      ? {
+          clientId: serviceRequest.clientId,
+          vehicleId: serviceRequest.vehicleId,
+          updatedAt: serviceRequest.updatedAt,
+          finalAmounts: serviceRequest.finalAmounts ?? null,
+          completionOutcome: serviceRequest.completionOutcome ?? null,
+          completedAt: serviceRequest.completedAt ?? null,
+          cancelledAt: serviceRequest.cancelledAt ?? null,
+          depositAmount: serviceRequest.depositAmount ?? null,
+          remainingAmount: serviceRequest.remainingAmount ?? null,
+        }
+      : {}
+
+    // The booking itself — when the car is due and at what price — is between
+    // the client and the garage that won. A garage that lost learns that it
+    // lost (from `status`), not when or for how much a competitor took the job.
+    const bookingFields = seesPii
+      ? {
+          appointmentDate: serviceRequest.appointmentDate,
+          appointmentTime: serviceRequest.appointmentTime ?? null,
+          appointmentPrice: serviceRequest.appointmentPrice,
+        }
+      : {}
 
     return NextResponse.json({
       success: true,
       request: {
         id: serviceRequest.id,
+        ...ownerOnly,
+        ...bookingFields,
         description: serviceRequest.description,
         category: serviceRequest.category,
         status: serviceRequest.status,
         createdAt: serviceRequest.createdAt,
         clientAvailabilityDates: serviceRequest.clientAvailabilityDates || [],
         photoUrls: presignedPhotoUrls,
+        // What the client was shown as a price hint. Not PII, and the offer page
+        // tells the garage about it.
+        estimatedCost: serviceRequest.estimatedCost ?? null,
+        // An opaque offer id: lets a garage tell "my offer lost, then the job was
+        // cancelled" from "my booking was cancelled" (garageOfferState) without
+        // saying whose offer won.
         acceptedOfferId: serviceRequest.acceptedOfferId,
         // Which garage actually got the job — the chats use it to decide who may
-        // still write once the appointment exists.
-        acceptedGarageId: serviceRequest.acceptedGarageId ?? null,
-        appointmentDate: serviceRequest.appointmentDate,
-        appointmentTime: serviceRequest.appointmentTime ?? null,
-        appointmentPrice: serviceRequest.appointmentPrice,
-        client: client
-          ? {
-              firstName: client.firstName,
-              lastName: client.lastName,
-              phoneNumber: client.phoneNumber
-            }
+        // still write once the appointment exists. A garage is told only whether
+        // that is itself, never which competitor it was.
+        acceptedGarageId: isOwner || serviceRequest.acceptedGarageId === auth.userId
+          ? serviceRequest.acceptedGarageId ?? null
           : null,
-        vehicle: vehicle
-          ? {
-              brand: vehicle.brand,
-              model: vehicle.model,
-              year: vehicle.year,
-              licensePlate: vehicle.licensePlate,
-              modelYear: vehicle.modelYear,
-              engineCC: vehicle.engineCC,
-              engineNumber: vehicle.engineNumber,
-              fuelType: vehicle.fuelType,
-              vinNumber: vehicle.vinNumber,
-              is4x4: vehicle.is4x4,
-              isAutomatic: vehicle.isAutomatic,
-              isTurbo: vehicle.isTurbo,
-              licensePhotoUrl
-            }
-          : null
+        client: isOwner
+          ? client
+            ? {
+                firstName: client.firstName,
+                lastName: client.lastName,
+                phoneNumber: client.phoneNumber
+              }
+            : null
+          : garageClientView(client, isWinner),
+        vehicle: !vehicle
+          ? null
+          : isOwner
+            ? {
+                brand: vehicle.brand,
+                model: vehicle.model,
+                year: vehicle.year,
+                licensePlate: vehicle.licensePlate,
+                modelYear: vehicle.modelYear,
+                engineCC: vehicle.engineCC,
+                engineNumber: vehicle.engineNumber,
+                fuelType: vehicle.fuelType,
+                vinNumber: vehicle.vinNumber,
+                is4x4: vehicle.is4x4,
+                isAutomatic: vehicle.isAutomatic,
+                isTurbo: vehicle.isTurbo,
+                licensePhotoUrl,
+                color: vehicle.color,
+                nickname: vehicle.nickname
+              }
+            : { ...garageVehicleView(vehicle, isWinner), licensePhotoUrl }
       }
     })
 
@@ -178,7 +243,7 @@ async function _GET(
     console.error('Error fetching service request:', error)
     return NextResponse.json(
       { 
-        error: 'Error fetching service request',
+        error: 'Σφάλμα κατά την ανάκτηση του αιτήματος',
         details: 'Internal server error'
       },
       { status: 500 }
@@ -195,7 +260,7 @@ async function _PATCH(
 
     if (!requestId) {
       return NextResponse.json(
-        { error: 'Request ID is required' },
+        { error: 'Λείπει το αναγνωριστικό αιτήματος' },
         { status: 400 }
       )
     }
@@ -205,7 +270,7 @@ async function _PATCH(
 
     if (!Array.isArray(clientAvailabilityDates)) {
       return NextResponse.json(
-        { error: 'clientAvailabilityDates must be an array of strings' },
+        { error: 'Οι ημερομηνίες πρέπει να δοθούν ως λίστα' },
         { status: 400 }
       )
     }
@@ -226,7 +291,7 @@ async function _PATCH(
 
     if (!serviceRequest) {
       return NextResponse.json(
-        { error: 'Service request not found' },
+        { error: 'Το αίτημα δεν βρέθηκε' },
         { status: 404 }
       )
     }
@@ -271,18 +336,32 @@ async function _PATCH(
       TableName: 'ServiceRequests',
       Key: { id: requestId },
       UpdateExpression: 'SET clientAvailabilityDates = :dates, updatedAt = :updatedAt',
+      // Ownership was checked on the read; hold it on the write too.
+      ConditionExpression: 'clientId = :clientId',
       ExpressionAttributeValues: {
         ':dates': normalizedDates,
+        ':clientId': ownerCheck.userId,
         ':updatedAt': new Date().toISOString()
       },
       ReturnValues: 'ALL_NEW'
     })
 
-    const updateResult = await dynamoDB.send(updateCommand)
+    let updateResult
+    try {
+      updateResult = await dynamoDB.send(updateCommand)
+    } catch (err) {
+      if (err instanceof Error && err.name === 'ConditionalCheckFailedException') {
+        return NextResponse.json(
+          { error: 'Το αίτημα άλλαξε στο μεταξύ. Ανανεώστε τη σελίδα.' },
+          { status: 409 }
+        )
+      }
+      throw err
+    }
 
     if (!updateResult.Attributes) {
       return NextResponse.json(
-        { error: 'Service request not found' },
+        { error: 'Το αίτημα δεν βρέθηκε' },
         { status: 404 }
       )
     }

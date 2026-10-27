@@ -6,16 +6,8 @@ import { gsap } from 'gsap'
 import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
 import { useNavigation } from '@/hooks/useNavigation'
-import { saveFormData } from '@/utils/formStorage'
-
-const categories = [
-  { icon: 'settings', label: 'Συμπλέκτης (Δίσκος-πλατό)', value: 'symplektis' },
-  { icon: 'conveyor_belt', label: 'Ιμάντας', value: 'imantas' },
-  { icon: 'format_paint', label: 'Ολική Βαφή', value: 'oliki-vafi' },
-  { icon: 'brush', label: 'Μερική Βαφή', value: 'meriki-vafi' },
-  { icon: 'sensors', label: 'Αισθητήρες', value: 'aisthitires' },
-  { icon: 'oil_barrel', label: 'Αλλαγή λαδιών', value: 'allagi-ladion' },
-]
+import { startNewRequest } from '@/utils/formStorage'
+import { SERVICE_CATEGORIES as categories } from '@/utils/categoryLabels'
 
 export default function HeroSection() {
   const { navigate } = useNavigation()
@@ -73,7 +65,7 @@ export default function HeroSection() {
     setPendingCategory(value)
     if (tlRef.current) tlRef.current.reverse()
     setIsOpen(false)
-    saveFormData({ category: value })
+    startNewRequest({ category: value })
     const clientId = localStorage.getItem('clientId')
     fetch('/api/track/', {
       method: 'POST',

@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test'
-import { registerClient, loginViaAPI, loginAsGarage, loginAsClient, TEST_GARAGE } from './helpers'
+import { registerClient, loginViaAPI, TEST_GARAGE } from './helpers'
+import { adminCookie, athensDatePlus } from './d-helpers'
+import { getServiceRequest } from './dynamo-helpers'
 
 const CLIENT_EMAIL = `e2e-${Date.now()}@test.com`
 const CLIENT_PASSWORD = 'TestPass123'
@@ -103,13 +105,14 @@ test.describe.serial('Full Flow: Registration → Request → Offer → Chat', (
         serviceRequestId,
         offerAmount: 120,
         benefits: ['Δωρεάν έλεγχος'],
-        availableDates: ['2026-04-15', '2026-04-16'],
+        availabilityDates: [athensDatePlus(14), athensDatePlus(15)],
       },
     })
     expect(resp.status()).toBe(200)
     const data = await resp.json()
     expect(data.success).toBe(true)
     expect(data.offer.offerAmount).toBe(120)
+    expect(data.offer.availabilityDates).toEqual([athensDatePlus(14), athensDatePlus(15)])
     offerId = data.offer.id
     console.log(`  Offer created: ${offerId} — 120€`)
   })
@@ -171,16 +174,12 @@ test.describe.serial('Full Flow: Registration → Request → Offer → Chat', (
     console.log(`  Offer ${offerId} is pending`)
   })
 
-  test('12. Cleanup: cancel service request', async ({ request }) => {
-    const { token } = await loginViaAPI(request, CLIENT_EMAIL, CLIENT_PASSWORD, 'client')
-    const resp = await request.patch(`/api/service-request/${serviceRequestId}`, {
-      headers: { Cookie: `auth-token=${token}` },
-      data: { status: 'cancelled' },
+  // Without this every run leaves a pending request in the test garage's feed.
+  test('12. Cleanup: admin cancels the request', async ({ request }) => {
+    const resp = await request.patch(`/api/admin/requests/${serviceRequestId}/cancel/`, {
+      headers: { Cookie: await adminCookie(request) },
     })
-    if (resp.status() === 200) {
-      console.log(`  Cleaned up: ${serviceRequestId} cancelled`)
-    } else {
-      console.log(`  Cleanup skipped (status ${resp.status()})`)
-    }
+    expect(resp.status(), await resp.text()).toBe(200)
+    expect((await getServiceRequest(serviceRequestId))?.status).toBe('cancelled')
   })
 })

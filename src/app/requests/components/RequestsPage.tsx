@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
+import LoadMoreButton from '@/components/LoadMoreButton'
 import AlertStack from '@/components/AlertStack'
 import { useNavigation } from '@/hooks/useNavigation'
 import { styles } from '../../../styles/styles'
@@ -11,8 +12,8 @@ import RequestCard from './RequestCard'
 import OfferSummaryCard from './OfferSummaryCard'
 import RequestDetailsModal from './RequestDetailsModal'
 import CancellationModal from './CancellationModal'
+import GuestAccountPanel from './GuestAccountPanel'
 import { useToast } from '../../../hooks/useToast'
-import { useUser } from '../../../contexts/UserContext'
 // Navigation is handled by AppShell
 import { ServiceRequestStatus, OfferStatus } from '../../../types/statuses'
 import type { ServiceRequest } from '../../../types/requests'
@@ -35,14 +36,20 @@ interface RequestsPageProps {
   clientId: string
 }
 
+// Keyed on the id so moving from one account's list to another's (a guest
+// whose requests were just merged into their account) starts from a clean
+// slate instead of keeping the previous identity's state and never refetching.
 export default function RequestsPage({ clientId }: RequestsPageProps) {
+  return <RequestsPageContent key={clientId} clientId={clientId} />
+}
+
+function RequestsPageContent({ clientId }: RequestsPageProps) {
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
 
   const initialTab: 'open' | 'appointment' | 'closed' =
     tabParam === 'appointment' ? 'appointment' : tabParam === 'closed' ? 'closed' : 'open'
   const { success, error } = useToast()
-  const { refreshUser } = useUser()
   const { navigate, isNavigating } = useNavigation()
   const [requests, setRequests] = useState<ServiceRequest[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -58,21 +65,17 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     setActiveTab(nextTab)
   }, [tabParam])
 
-  // Registration form state
-  const [showRegistrationForm, setShowRegistrationForm] = useState(false)
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phoneNumber: ''
-  })
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [garageMessagesMap, setGarageMessagesMap] = useState<Record<string, boolean>>({})
   const [offersMap, setOffersMap] = useState<Record<string, OfferSummary[]>>({})
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  // A guest whose requests now belong to an account: there is nothing left to list.
+  const [guestSessionEnded, setGuestSessionEnded] = useState(false)
 
   // Cancellation state
   const [cancelRequest, setCancelRequest] = useState<ServiceRequest | null>(null)
   const [cancelLoading, setCancelLoading] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
 
   // Check if clientId is valid (starts with 'client-')
   const isValidClientId = clientId && clientId.startsWith('client-')
@@ -120,6 +123,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
         setRequests(result.requests)
         setGarageMessagesMap(result.garageMessages || {})
         setOffersMap(result.offers || {})
+        setNextCursor(result.nextCursor || null)
       } else {
         console.error('API error:', result.error)
         setRequests([])
@@ -131,6 +135,32 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
       setIsLoading(false)
     }
   }, [clientId, isValidClientId])
+
+  // The list is paged (newest first) — without this a client with more than one
+  // page of history never saw their older requests at all.
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || isLoadingMore) return
+    setIsLoadingMore(true)
+    try {
+      const response = await fetch(
+        `/api/requests/?clientId=${clientId}&include=summary&cursor=${encodeURIComponent(nextCursor)}`
+      )
+      const result = response.ok ? await response.json() : null
+      if (!result?.success) throw new Error('Failed to fetch requests')
+
+      setRequests((prev) => {
+        const seen = new Set(prev.map((r) => r.id))
+        return [...prev, ...(result.requests as ServiceRequest[]).filter((r) => !seen.has(r.id))]
+      })
+      setGarageMessagesMap((prev) => ({ ...prev, ...(result.garageMessages || {}) }))
+      setOffersMap((prev) => ({ ...prev, ...(result.offers || {}) }))
+      setNextCursor(result.nextCursor || null)
+    } catch {
+      error('Σφάλμα', 'Δεν ήταν δυνατή η φόρτωση παλαιότερων αιτημάτων.')
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [clientId, error, isLoadingMore, nextCursor])
 
   // Load requests on component mount. AuthContext already handles auth state
   // — no need to re-fetch the client here. Just keep localStorage in sync.
@@ -291,17 +321,29 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
     navigate(chatHref(requestId))
   }
 
+  const openCancel = (request: ServiceRequest | null) => {
+    setCancelError(null)
+    setCancelRequest(request)
+  }
+
   const handleCancelAppointment = async () => {
     if (!cancelRequest) return
     setCancelLoading(true)
+    setCancelError(null)
     try {
       const res = await fetch(`/api/requests/${cancelRequest.id}/cancel/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        // 409: the appointment has started or the request changed meanwhile —
+        // the list is stale, so bring it up to date behind the message.
+        if (res.status === 409) loadRequests()
+        setCancelError(data.error || 'Δεν ήταν δυνατή η ακύρωση.')
+        return
+      }
 
       // Update local state
       setRequests((prev) =>
@@ -317,140 +359,12 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
       } else {
         success('Ακύρωση', 'Το ραντεβού ακυρώθηκε.')
       }
-      setCancelRequest(null)
+      openCancel(null)
     } catch {
-      error('Σφάλμα', 'Δεν ήταν δυνατή η ακύρωση.')
+      setCancelError('Δεν ήταν δυνατή η ακύρωση.')
     } finally {
       setCancelLoading(false)
     }
-  }
-
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-
-    try {
-      // Check if there's pending registration data from a service request
-      const pendingDataStr = localStorage.getItem('pendingRegistrationData')
-      let pendingData = null
-
-      if (pendingDataStr) {
-        pendingData = JSON.parse(pendingDataStr)
-        // Check if the data is not too old (within 1 hour)
-        const oneHourAgo = Date.now() - (60 * 60 * 1000)
-        if (pendingData.timestamp < oneHourAgo) {
-          // Data is too old, ignore it
-          pendingData = null
-          localStorage.removeItem('pendingRegistrationData')
-        }
-      }
-
-      let response
-
-      if (formData.email) {
-        // Use the new endpoint that handles email deduplication and vehicle merging
-        response = await fetch('/api/auth/register-from-requests/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            guestClientId: clientId,
-            email: formData.email,
-            firstName: formData.firstName,
-            lastName: formData.lastName,
-            phoneNumber: formData.phoneNumber
-          }),
-        })
-      } else {
-        // Use the regular client update endpoint (no email provided)
-        response = await fetch(`/api/clients/${clientId}/`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(formData),
-        })
-      }
-
-      if (response.ok) {
-        const data = await response.json()
-
-        // Clear pending registration data since we've processed it
-        if (pendingData) {
-          localStorage.removeItem('pendingRegistrationData')
-        }
-
-        // Update the user as registered
-        setIsRegisteredUser(true)
-        setShowRegistrationForm(false)
-
-        // If we used the new endpoint and got a different client ID, update localStorage
-        if (formData.email && data.client && data.client.id !== clientId) {
-          console.log('RequestsPage: Updating clientId from', clientId, 'to', data.client.id)
-          localStorage.removeItem('garageId')
-          localStorage.setItem('clientId', data.client.id)
-          console.log('RequestsPage: Calling refreshUser with new clientId:', data.client.id)
-          await refreshUser(data.client.id)
-
-          // Show success message before redirect
-          let message = 'Συνδεθήκατε επιτυχώς στον υπάρχοντα λογαριασμό σας!'
-          if (data.vehicleDeduplicated) {
-            message += ' Βρέθηκαν και συνδέθηκαν τα υπάρχοντα οχήματά σας.'
-          }
-          message += ' Τώρα θα λαμβάνετε ειδοποιήσεις.'
-
-          success('Επιτυχής Σύνδεση', message)
-
-          // Use a timeout to allow the success message to show before redirect
-          setTimeout(() => {
-            try {
-              window.location.href = `/requests/${data.client.id}/`
-            } catch (redirectError) {
-              console.error('Redirect failed:', redirectError)
-              // Fallback: reload the page with the new client ID
-              window.location.reload()
-            }
-          }, 1500)
-          return // Exit early to prevent further execution
-        } else {
-          // Refresh user context to update header
-          console.log('RequestsPage: Calling refreshUser for existing client:', data.client?.id || clientId)
-          await refreshUser(data.client?.id || clientId)
-        }
-
-        // Reload requests to show updated data
-        loadRequests()
-
-        let message = 'Τα στοιχεία σας αποθηκεύτηκαν επιτυχώς! Τώρα θα λαμβάνετε ειδοποιήσεις.'
-
-        if (formData.email && data.isExistingUser) {
-          message = 'Συνδεθήκατε επιτυχώς στον υπάρχοντα λογαριασμό σας!'
-          if (data.vehicleDeduplicated) {
-            message += ' Βρέθηκαν και συνδέθηκαν τα υπάρχοντα οχήματά σας.'
-          }
-          message += ' Τώρα θα λαμβάνετε ειδοποιήσεις.'
-        }
-
-        success('Επιτυχής Αποθήκευση', message)
-      } else {
-        const errorData = await response.json()
-        console.error('Registration error details:', errorData)
-        error('Σφάλμα Αποθήκευσης', errorData.error || 'Δεν ήταν δυνατή η αποθήκευση των στοιχείων')
-      }
-    } catch (err) {
-      console.error('Error updating client:', err)
-      error('Σφάλμα', 'Σφάλμα κατά την αποθήκευση των στοιχείων')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }))
   }
 
   // Tab data
@@ -490,126 +404,24 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
         {/* Renders nothing when there is nothing waiting on the user. */}
         <AlertStack className="mb-6" />
 
-        {/* Guest User Registration Prompt */}
-        {!isLoading && isRegisteredUser === false && requests.length > 0 && (
-          <div className="max-w-4xl mb-6">
-            <div className="bg-surface-container-lowest rounded-xl p-5 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-primary/20">
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                    <Icon name="notifications_active" filled className="text-primary" size="lg" />
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <p className="text-base font-bold text-on-surface mb-1">
-                    Εγγραφείτε για Ειδοποιήσεις
-                  </p>
-
-                  <p className="text-sm text-on-surface-variant mb-4">
-                    Ως επισκέπτης, μπορείτε να δείτε τα αιτήματά σας, αλλά για να λαμβάνετε{' '}
-                    <span className="text-primary font-bold">
-                      ειδοποιήσεις και ενημερώσεις άμεσα από τα συνεργεία
-                    </span>
-                    , παρακαλώ συμπληρώστε τα στοιχεία σας.
-                  </p>
-
-                  {!showRegistrationForm ? (
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <button
-                        onClick={() => setShowRegistrationForm(true)}
-                        className={`${styles.btnPrimary}`}
-                      >
-                        <Icon name="person_add" size="sm" />
-                        Συμπληρώστε Στοιχεία
-                      </button>
-                      <button
-                        onClick={() => navigate('/login/')}
-                        disabled={isNavigating('/login/')}
-                        className={`${styles.btnOutline}`}
-                      >
-                        {isNavigating('/login/') && <Spinner size="sm" />}
-                        Σύνδεση
-                      </button>
-                    </div>
-                  ) : (
-                    <form onSubmit={handleFormSubmit} className="space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className={styles.label}>Όνομα</label>
-                          <input
-                            type="text"
-                            value={formData.firstName}
-                            onChange={(e) => handleInputChange('firstName', e.target.value)}
-                            className={styles.input}
-                          />
-                        </div>
-                        <div>
-                          <label className={styles.label}>Επώνυμο</label>
-                          <input
-                            type="text"
-                            value={formData.lastName}
-                            onChange={(e) => handleInputChange('lastName', e.target.value)}
-                            className={styles.input}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className={styles.label}>Email *</label>
-                        <input
-                          type="email"
-                          value={formData.email}
-                          onChange={(e) => handleInputChange('email', e.target.value)}
-                          className={styles.input}
-                          placeholder="example@email.com"
-                          required
-                        />
-                        <p className="text-xs text-on-surface-variant mt-1">
-                          Απαραίτητο για ειδοποιήσεις και ενημερώσεις
-                        </p>
-                      </div>
-                      <div>
-                        <label className={styles.label}>
-                          <Icon name="phone" size="sm" className="inline mr-1 align-text-bottom" />
-                          Τηλέφωνο
-                        </label>
-                        <input
-                          type="tel"
-                          value={formData.phoneNumber}
-                          onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                          className={styles.input}
-                          placeholder="6912345678"
-                        />
-                        <p className="text-xs text-on-surface-variant mt-1">
-                          Προαιρετικό για SMS ειδοποιήσεις
-                        </p>
-                      </div>
-                      <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                        <button
-                          type="submit"
-                          disabled={isSubmitting || !formData.email}
-                          className={`${styles.btnPrimary} flex-1 justify-center ${
-                            isSubmitting || !formData.email ? 'opacity-50 cursor-not-allowed' : ''
-                          }`}
-                        >
-                          {isSubmitting ? <Spinner size="sm" /> : <Icon name="save" size="sm" />}
-                          {isSubmitting ? 'Αποθήκευση...' : 'Αποθήκευση Στοιχείων'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowRegistrationForm(false)}
-                          className={`${styles.btnOutline} justify-center`}
-                        >
-                          Ακύρωση
-                        </button>
-                      </div>
-                    </form>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+        {isRegisteredUser === false && (
+          <GuestAccountPanel
+            guestId={clientId}
+            onRegistered={() => {
+              setIsRegisteredUser(true)
+              loadRequests()
+            }}
+            onSessionEnded={() => {
+              setGuestSessionEnded(true)
+              setRequests([])
+              setOffersMap({})
+              setGarageMessagesMap({})
+              setNextCursor(null)
+            }}
+          />
         )}
 
+        {!guestSessionEnded && (<>
         {/* Sticky tab bar */}
         <div className="sticky top-16 z-40 bg-surface/80 backdrop-blur-md -mx-5 px-5 py-3 mb-6">
           <div className="flex items-center justify-between border-b border-outline-variant/20">
@@ -647,7 +459,7 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
                     onChatClick={() => handleChatClick(request.id)}
                     onCancelClick={
                       request.status === ServiceRequestStatus.APPOINTMENT
-                        ? () => setCancelRequest(request)
+                        ? () => openCancel(request)
                         : undefined
                     }
                     pendingAction={
@@ -684,148 +496,12 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
             /* Empty states */
             requests.length === 0 && !isLoading ? (
               isRegisteredUser === false ? (
-                /* Unauthenticated user prompt */
-                <div className="text-center py-16">
-                  <div className="max-w-sm mx-auto">
-                    <div className="mx-auto w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6">
-                      <Icon name="notifications_active" filled className="text-primary" size="xl" />
-                    </div>
-                    <h3 className="text-xl font-bold text-on-surface mb-2">
-                      Μείνετε Ενημερωμένοι!
-                    </h3>
-                    <p className="text-sm text-on-surface-variant mb-6 leading-relaxed">
-                      Ως επισκέπτης, μπορείτε να δείτε τα αιτήματά σας, αλλά για να λαμβάνετε
-                      <strong className="text-primary"> ειδοποιήσεις και ενημερώσεις άμεσα από τα συνεργεία</strong>,
-                      παρακαλώ εγγραφείτε ή συνδεθείτε.
-                    </p>
-
-                    <div className="bg-surface-container-lowest rounded-xl p-4 border border-outline-variant/10 mb-6 text-left">
-                      <div className="flex items-start gap-3">
-                        <Icon name="info" className="text-blue-600 flex-shrink-0 mt-0.5" size="md" />
-                        <div>
-                          <h4 className="text-sm font-bold text-on-surface mb-2">Πλεονεκτήματα εγγραφής:</h4>
-                          <ul className="text-xs text-on-surface-variant space-y-1.5">
-                            <li className="flex items-center gap-1.5">
-                              <Icon name="check" size="sm" className="text-green-600" />
-                              Άμεσες ειδοποιήσεις για προσφορές
-                            </li>
-                            <li className="flex items-center gap-1.5">
-                              <Icon name="check" size="sm" className="text-green-600" />
-                              Ενημερώσεις κατάστασης σε πραγματικό χρόνο
-                            </li>
-                            <li className="flex items-center gap-1.5">
-                              <Icon name="check" size="sm" className="text-green-600" />
-                              Ιστορικό όλων των αιτημάτων σας
-                            </li>
-                            <li className="flex items-center gap-1.5">
-                              <Icon name="check" size="sm" className="text-green-600" />
-                              Προσωποποιημένη εξυπηρέτηση
-                            </li>
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-
-                    {!showRegistrationForm ? (
-                      <>
-                        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                          <button
-                            onClick={() => setShowRegistrationForm(true)}
-                            className={styles.btnPrimary}
-                          >
-                            <Icon name="person_add" size="sm" />
-                            Συμπληρώστε Στοιχεία
-                          </button>
-                          <button
-                            onClick={() => navigate('/login/')}
-                            disabled={isNavigating('/login/')}
-                            className={styles.btnOutline}
-                          >
-                            {isNavigating('/login/') && <Spinner size="sm" />}
-                            Σύνδεση
-                          </button>
-                        </div>
-                        <p className="text-xs text-on-surface-variant mt-4">
-                          Μπορείτε να συνεχίσετε χωρίς εγγραφή, αλλά θα χάσετε τις άμεσες ειδοποιήσεις.
-                        </p>
-                      </>
-                    ) : (
-                      <form onSubmit={handleFormSubmit} className="max-w-md mx-auto space-y-4 text-left">
-                        <h4 className="text-sm font-bold text-on-surface">Συμπληρώστε τα στοιχεία σας</h4>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <label className={styles.label}>Όνομα *</label>
-                            <input
-                              type="text"
-                              value={formData.firstName}
-                              onChange={(e) => handleInputChange('firstName', e.target.value)}
-                              className={styles.input}
-                              required
-                            />
-                          </div>
-                          <div>
-                            <label className={styles.label}>Επώνυμο</label>
-                            <input
-                              type="text"
-                              value={formData.lastName}
-                              onChange={(e) => handleInputChange('lastName', e.target.value)}
-                              className={styles.input}
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className={styles.label}>Email</label>
-                          <input
-                            type="email"
-                            value={formData.email}
-                            onChange={(e) => handleInputChange('email', e.target.value)}
-                            className={styles.input}
-                            placeholder="example@email.com"
-                          />
-                        </div>
-
-                        <div>
-                          <label className={styles.label}>
-                            <Icon name="phone" size="sm" className="inline mr-1 align-text-bottom" />
-                            Τηλέφωνο *
-                          </label>
-                          <input
-                            type="tel"
-                            value={formData.phoneNumber}
-                            onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                            className={styles.input}
-                            placeholder="6912345678"
-                            required
-                          />
-                          <p className="text-xs text-on-surface-variant mt-1">
-                            Απαραίτητο για SMS ειδοποιήσεις
-                          </p>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                          <button
-                            type="submit"
-                            disabled={isSubmitting || !formData.firstName || !formData.phoneNumber}
-                            className={`${styles.btnPrimary} flex-1 justify-center ${
-                              isSubmitting || !formData.firstName || !formData.phoneNumber ? 'opacity-50 cursor-not-allowed' : ''
-                            }`}
-                          >
-                            {isSubmitting ? <Spinner size="sm" /> : <Icon name="save" size="sm" />}
-                            {isSubmitting ? 'Αποθήκευση...' : 'Αποθήκευση Στοιχείων'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setShowRegistrationForm(false)}
-                            className={`${styles.btnOutline} justify-center`}
-                          >
-                            Ακύρωση
-                          </button>
-                        </div>
-                      </form>
-                    )}
+                /* Guest with nothing to list — the panel above carries the prompt. */
+                <div className="text-center py-12">
+                  <div className="mx-auto w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mb-4">
+                    <Icon name="inbox" className="text-on-surface-variant" size="lg" />
                   </div>
+                  <p className="text-sm text-on-surface-variant">Δεν υπάρχουν αιτήματα</p>
                 </div>
               ) : (
                 /* Authenticated user with no requests */
@@ -867,6 +543,17 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
           )}
         </div>
 
+        {/* The list is newest-first per page, so older requests only appear
+            after asking for them; the tabs then re-sort what has loaded. */}
+        <LoadMoreButton
+          onClick={loadMore}
+          loading={isLoadingMore}
+          hasMore={!!nextCursor}
+          label="Παλαιότερα αιτήματα"
+          className="mt-6"
+        />
+        </>)}
+
       </div>
 
       {/* Request Details Modal */}
@@ -885,10 +572,11 @@ export default function RequestsPage({ clientId }: RequestsPageProps) {
       {cancelRequest && (
         <CancellationModal
           isOpen={!!cancelRequest}
-          onClose={() => setCancelRequest(null)}
+          onClose={() => openCancel(null)}
           request={cancelRequest}
           onConfirm={handleCancelAppointment}
           isLoading={cancelLoading}
+          error={cancelError}
         />
       )}
     </section>

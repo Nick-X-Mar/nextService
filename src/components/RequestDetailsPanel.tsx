@@ -6,7 +6,7 @@ import { styles } from '../styles/styles'
 import { ServiceRequestStatus } from '../types/statuses'
 import type { ServiceRequest } from '../types/requests'
 import Icon from '@/components/ui/Icon'
-import { getCategoryText } from '@/utils/categoryLabels'
+import { REQUEST_CATEGORIES, getCategoryText } from '@/utils/categoryLabels'
 
 interface RequestDetailsPanelProps {
   request: ServiceRequest
@@ -179,10 +179,14 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
                 onChange={(e) => setEditData({ ...editData, category: e.target.value })}
                 className={`${styles.select} mt-1`}
               >
-                <option value="service">Συντήρηση</option>
-                <option value="fanopeia">Φανοποιεία</option>
-                <option value="oils">Λάδια & Υγρά</option>
-                <option value="disk">Δισκόφρενα</option>
+                {/* An older request's category (e.g. `fanopeia`) stays selectable
+                    rather than silently showing as the first option. */}
+                {editData.category && !REQUEST_CATEGORIES.includes(editData.category) && (
+                  <option value={editData.category}>{getCategoryText(editData.category)}</option>
+                )}
+                {REQUEST_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{getCategoryText(c)}</option>
+                ))}
               </select>
             ) : (
               <p className="text-sm font-medium text-on-surface mt-1">{getCategoryText(request.category)}</p>
@@ -261,20 +265,24 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
                 )}
               </div>
 
-              {/* License Plate */}
-              <div>
-                <label className={styles.label}>Αριθμός Κυκλοφορίας</label>
-                {isEditing && allowEdit ? (
-                  <input
-                    type="text"
-                    value={editData.licensePlate}
-                    onChange={(e) => setEditData({ ...editData, licensePlate: e.target.value })}
-                    className={`${styles.input} mt-1`}
-                  />
-                ) : (
-                  <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.licensePlate}</p>
-                )}
-              </div>
+              {/* License Plate. Plate, engine number and VIN are winner-only: a
+                  garage that has not won the job is sent none of them, so read-only
+                  rows without a value are left out rather than shown empty. */}
+              {((isEditing && allowEdit) || request.vehicle.licensePlate) && (
+                <div>
+                  <label className={styles.label}>Αριθμός Κυκλοφορίας</label>
+                  {isEditing && allowEdit ? (
+                    <input
+                      type="text"
+                      value={editData.licensePlate}
+                      onChange={(e) => setEditData({ ...editData, licensePlate: e.target.value })}
+                      className={`${styles.input} mt-1`}
+                    />
+                  ) : (
+                    <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.licensePlate}</p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Technical Specifications */}
@@ -296,34 +304,38 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
               </div>
 
               {/* Engine Number */}
-              <div>
-                <label className={styles.label}>Αριθμός Κινητήρα</label>
-                {isEditing && allowEdit ? (
-                  <input
-                    type="text"
-                    value={editData.engineNumber}
-                    onChange={(e) => setEditData({ ...editData, engineNumber: e.target.value })}
-                    className={`${styles.input} mt-1`}
-                  />
-                ) : (
-                  <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.engineNumber}</p>
-                )}
-              </div>
+              {((isEditing && allowEdit) || request.vehicle.engineNumber) && (
+                <div>
+                  <label className={styles.label}>Αριθμός Κινητήρα</label>
+                  {isEditing && allowEdit ? (
+                    <input
+                      type="text"
+                      value={editData.engineNumber}
+                      onChange={(e) => setEditData({ ...editData, engineNumber: e.target.value })}
+                      className={`${styles.input} mt-1`}
+                    />
+                  ) : (
+                    <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.engineNumber}</p>
+                  )}
+                </div>
+              )}
 
               {/* VIN Number */}
-              <div>
-                <label className={styles.label}>Αριθμός Πλαισίου</label>
-                {isEditing && allowEdit ? (
-                  <input
-                    type="text"
-                    value={editData.vinNumber}
-                    onChange={(e) => setEditData({ ...editData, vinNumber: e.target.value })}
-                    className={`${styles.input} mt-1`}
-                  />
-                ) : (
-                  <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.vinNumber}</p>
-                )}
-              </div>
+              {((isEditing && allowEdit) || request.vehicle.vinNumber) && (
+                <div>
+                  <label className={styles.label}>Αριθμός Πλαισίου</label>
+                  {isEditing && allowEdit ? (
+                    <input
+                      type="text"
+                      value={editData.vinNumber}
+                      onChange={(e) => setEditData({ ...editData, vinNumber: e.target.value })}
+                      className={`${styles.input} mt-1`}
+                    />
+                  ) : (
+                    <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.vinNumber}</p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Fuel Type and Transmission */}

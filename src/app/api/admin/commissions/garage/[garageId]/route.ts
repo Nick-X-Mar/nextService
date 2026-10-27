@@ -4,7 +4,8 @@ import { GetCommand, QueryCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb
 import { withMetrics } from '@/utils/withMetrics'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { DEPOSIT_PERCENT } from '@/lib/stripe-server'
-import { commissionBasis } from '@/lib/commission-basis'
+import { commissionLine, roundCents, sumCents, type CommissionLine } from '@/lib/commission-basis'
+import { athensToday } from '@/utils/athensTime'
 import type { CompletionAmounts } from '@/types/reviews'
 
 interface AppointmentRow {
@@ -13,7 +14,7 @@ interface AppointmentRow {
   clientName: string
   vehicleLabel: string
   category: string
-  /** What the garage quoted when the client booked. */
+  /** What the garage quoted when the client booked, VAT included. */
   appointmentPrice: number
   /** What it declared it actually charged, net of VAT. Null when never declared. */
   declaredNet: number | null
@@ -22,6 +23,8 @@ interface AppointmentRow {
   declaredVat: number | null
   /** Which of the two the commission below was calculated on. */
   basis: 'declared' | 'quoted'
+  /** The net figure the commission was taken from — the declared net, or the quote's net. */
+  basisAmount: number
   commission: number
 }
 
@@ -42,9 +45,9 @@ function isValidMonth(value: string | null): value is string {
   return !!value && /^\d{4}-(0[1-9]|1[0-2])$/.test(value)
 }
 
+/** The Athens month — the server runs in UTC, which is still last month for the first hours of the 1st. */
 function currentMonth(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  return athensToday().slice(0, 7)
 }
 
 async function _GET(
@@ -79,7 +82,9 @@ async function _GET(
         TableName: 'ServiceRequests',
         IndexName: 'StatusIndex',
         KeyConditionExpression: '#status = :status',
-        FilterExpression: 'begins_with(appointmentDate, :monthPrefix) AND attribute_exists(appointmentPrice)',
+        FilterExpression:
+          'begins_with(appointmentDate, :monthPrefix) AND ' +
+          '(attribute_exists(appointmentPrice) OR attribute_exists(finalAmounts))',
         ExpressionAttributeNames: { '#status': 'status' },
         ExpressionAttributeValues: {
           ':status': ServiceRequestStatus.COMPLETED,
@@ -112,18 +117,23 @@ async function _GET(
       }
     }
 
-    const garageRequests = completedItems.filter((r) => {
+    // The same per-job lines the overview sums (src/lib/commission-basis.ts):
+    // no-shows, work not done and jobs with no usable amount bill nothing and
+    // are left out of both.
+    const garageRequests: { r: Record<string, unknown>; line: CommissionLine }[] = []
+    for (const r of completedItems) {
       const offerId = typeof r.acceptedOfferId === 'string' ? r.acceptedOfferId : null
-      if (!offerId) return false
-      return offerToGarage[offerId] === garageId
-    })
+      if (!offerId || offerToGarage[offerId] !== garageId) continue
+      const line = commissionLine(r as Parameters<typeof commissionLine>[0], DEPOSIT_PERCENT)
+      if (line) garageRequests.push({ r, line })
+    }
 
     // Resolve client names + vehicle info
     const clientIds = Array.from(new Set(
-      garageRequests.map((r) => r.clientId).filter((v): v is string => typeof v === 'string')
+      garageRequests.map(({ r }) => r.clientId).filter((v): v is string => typeof v === 'string')
     ))
     const vehicleIds = Array.from(new Set(
-      garageRequests.map((r) => r.vehicleId).filter((v): v is string => typeof v === 'string')
+      garageRequests.map(({ r }) => r.vehicleId).filter((v): v is string => typeof v === 'string')
     ))
 
     const clientNames: Record<string, string> = {}
@@ -162,15 +172,9 @@ async function _GET(
       }
     }
 
-    const factor = DEPOSIT_PERCENT / 100
-
-    const appointments: AppointmentRow[] = garageRequests.map((r) => {
+    const appointments: AppointmentRow[] = garageRequests.map(({ r, line }) => {
       const quoted = typeof r.appointmentPrice === 'number' ? r.appointmentPrice : 0
-      // Commission is charged on what the garage says it actually took, net of
-      // VAT — see src/lib/commission-basis.ts.
-      const basis = commissionBasis(r as Parameters<typeof commissionBasis>[0])
       const declared = (r as { finalAmounts?: CompletionAmounts }).finalAmounts
-      const commission = Math.round(basis.amount * factor * 100) / 100
       const clientId = typeof r.clientId === 'string' ? r.clientId : ''
       const vehicleId = typeof r.vehicleId === 'string' ? r.vehicleId : ''
       return {
@@ -181,22 +185,22 @@ async function _GET(
         category: typeof r.serviceCategory === 'string'
           ? r.serviceCategory
           : (typeof r.category === 'string' ? r.category : '-'),
-        appointmentPrice: Math.round(quoted * 100) / 100,
+        appointmentPrice: roundCents(quoted),
         declaredNet: declared?.net ?? null,
         declaredGross: declared?.gross ?? null,
         declaredVat: declared?.vat ?? null,
-        basis: basis.source,
-        commission,
+        basis: line.source,
+        basisAmount: line.basisAmount,
+        commission: line.commission,
       }
     })
 
     appointments.sort((a, b) => a.appointmentDate.localeCompare(b.appointmentDate))
 
-    const totalRevenue = appointments.reduce(
-      (s, a) => s + (a.declaredNet ?? a.appointmentPrice),
-      0
-    )
-    const totalCommission = appointments.reduce((s, a) => s + a.commission, 0)
+    // Summed from the rows exactly as listed, the same way the overview sums
+    // them, so the totals here equal that garage's line there.
+    const totalRevenue = sumCents(appointments.map((a) => a.basisAmount))
+    const totalCommission = sumCents(appointments.map((a) => a.commission))
 
     const response: GarageCommissionsResponse = {
       month,
@@ -205,8 +209,8 @@ async function _GET(
       commissionPercent: DEPOSIT_PERCENT,
       totals: {
         appointmentCount: appointments.length,
-        totalRevenue: Math.round(totalRevenue * 100) / 100,
-        commission: Math.round(totalCommission * 100) / 100,
+        totalRevenue,
+        commission: totalCommission,
       },
       appointments,
     }

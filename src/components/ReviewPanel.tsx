@@ -6,6 +6,8 @@ import Spinner from '@/components/Spinner'
 import StarRating from '@/components/StarRating'
 import { useToast } from '@/hooks/useToast'
 import { useAsyncTask } from '@/hooks/useAsyncTask'
+import { useNotifications } from '@/contexts/NotificationsContext'
+import { REVIEW_WINDOW_DAYS } from '@/types/reviews'
 
 interface ReviewView {
   rating: number
@@ -33,6 +35,10 @@ interface ReviewState {
  * Reviews stay hidden until both parties have written, so nobody can read the
  * other's rating and answer it. The panel says so explicitly rather than
  * silently showing an empty space, which reads like a bug.
+ *
+ * Mount it only on a completed job — the client's request page and the
+ * garage's chat for that job. Submitting clears the matching "αξιολόγησε"
+ * alert straight away rather than at the next poll.
  */
 export default function ReviewPanel({
   requestId,
@@ -51,6 +57,7 @@ export default function ReviewPanel({
   const [tags, setTags] = useState<string[]>([])
   const { success, error: showError } = useToast()
   const { run, isPending } = useAsyncTask()
+  const { refresh: refreshNotifications } = useNotifications()
 
   const load = useCallback(async () => {
     try {
@@ -81,6 +88,7 @@ export default function ReviewPanel({
         return
       }
       success('Ευχαριστούμε για την αξιολόγηση!')
+      refreshNotifications()
       await load()
     })
 
@@ -197,11 +205,12 @@ export default function ReviewPanel({
         </div>
       )}
 
+      {/* On a completed job the only way to be unable to review without
+          having reviewed is that the window has closed. This used to tell a
+          garage to wait for the garage to close the job. */}
       {!state.canReview && !state.mine && (
         <p className="text-sm text-on-surface-variant">
-          {state.theirsExists
-            ? 'Η προθεσμία αξιολόγησης έχει περάσει.'
-            : 'Η αξιολόγηση ανοίγει μόλις το συνεργείο δηλώσει ότι ολοκληρώθηκε η εργασία.'}
+          Η προθεσμία αξιολόγησης ({REVIEW_WINDOW_DAYS} ημέρες) έχει περάσει.
         </p>
       )}
     </div>

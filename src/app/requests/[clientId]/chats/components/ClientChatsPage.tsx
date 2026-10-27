@@ -1,510 +1,178 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Image from 'next/image'
 import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
 import { useNavigation } from '@/hooks/useNavigation'
-import { ServiceRequestStatus } from '../../../../../types/statuses'
-import type { ServiceRequest } from '../../../../../types/requests'
+import { useToast } from '@/hooks/useToast'
+import { styles } from '@/styles/styles'
+import { ServiceRequestStatus } from '@/types/statuses'
 import { getCategoryText } from '@/utils/categoryLabels'
 
-interface ChatRequest extends Omit<ServiceRequest, 'vehicle'> {
-  vehicle?: {
-    brand: string
-    model: string
-    modelYear: string
-  }
-  lastMessage?: {
-    content: string
-    timestamp: string
-    sender: 'client' | 'garage'
-  }
-  unreadCount?: number
-}
-
-interface UnsuccessfulConversation {
+/** One row of `GET /api/chat/client-threads` — see `clientThreads` on the server. */
+interface ClientThreadView {
   requestId: string
   garageId: string
   garageName: string
-  garageLogoUrl?: string
-  request: ChatRequest
-  lastMessage?: {
-    content: string
-    timestamp: string
-    sender: 'client' | 'garage'
-  }
-  unreadCount?: number
+  garageLogoUrl: string | null
+  status: string
+  bucket: 'open' | 'appointment' | 'history'
+  unread: number
+  lastMessage: { message: string; timestamp: string; senderType: 'client' | 'garage' } | null
+  category: string | null
+  vehicle: { brand?: string; model?: string; modelYear?: string } | null
+  appointmentDate: string | null
 }
 
 interface ClientChatsPageProps {
   clientId: string
 }
 
-type TabType = 'pending' | 'appointments' | 'unsuccessful'
+type TabType = 'open' | 'appointment' | 'history'
 
+const TABS: { key: TabType; label: string; empty: [string, string] }[] = [
+  {
+    key: 'open',
+    label: 'Ανοιχτά',
+    empty: [
+      'Δεν υπάρχουν ανοιχτές συνομιλίες',
+      'Όταν ένα συνεργείο σάς γράψει για ένα αίτημα, η συνομιλία θα εμφανιστεί εδώ.',
+    ],
+  },
+  {
+    key: 'appointment',
+    label: 'Ραντεβού',
+    empty: [
+      'Δεν υπάρχουν ραντεβού',
+      'Όταν αποδεχτείτε μια προσφορά, η συνομιλία με το συνεργείο θα εμφανιστεί εδώ.',
+    ],
+  },
+  {
+    key: 'history',
+    label: 'Ιστορικό',
+    empty: [
+      'Δεν υπάρχει ιστορικό',
+      'Εδώ μένουν, μόνο για ανάγνωση, οι συνομιλίες με συνεργεία που δεν ανέλαβαν την εργασία και όσες αφορούν ακυρωμένα αιτήματα.',
+    ],
+  },
+]
+
+function formatLastMessageTime(timestamp: string) {
+  const date = new Date(timestamp)
+  const diffInHours = (Date.now() - date.getTime()) / (1000 * 60 * 60)
+  return diffInHours < 24
+    ? date.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit' })
+    : date.toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit' })
+}
+
+/** 'YYYY-MM-DD' as an Athens calendar date, whatever zone the browser is in. */
+function formatAppointmentDate(date: string) {
+  const [y, m, d] = date.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString('el-GR', {
+    timeZone: 'Europe/Athens',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    weekday: 'long',
+  })
+}
+
+function initials(name: string) {
+  return name.split(' ').map((w) => w.charAt(0)).join('').toUpperCase().slice(0, 2)
+}
+
+function StatusChip({ thread }: { thread: ClientThreadView }) {
+  if (thread.bucket === 'history') {
+    return thread.status === ServiceRequestStatus.CANCELLED
+      ? <span className={styles.statusCancelled}>Ακυρώθηκε</span>
+      : <span className="text-[0.65rem] font-black uppercase tracking-[0.1em] text-secondary bg-surface-container px-2 py-1 rounded-sm">Μόνο ανάγνωση</span>
+  }
+  switch (thread.status) {
+    case ServiceRequestStatus.PENDING:
+      return <span className={styles.statusPending}>Ενεργό</span>
+    case ServiceRequestStatus.APPOINTMENT:
+      return <span className={styles.statusAppointment}>Ραντεβού</span>
+    case ServiceRequestStatus.COMPLETED:
+      return <span className={styles.statusCompleted}>Ολοκληρώθηκε</span>
+    default:
+      return null
+  }
+}
+
+/**
+ * The client's conversations, one row per garage per request.
+ *
+ * Rendered from the endpoint the Μηνύματα badge is counted by, so every
+ * conversation behind the badge is a row here and opening it clears it.
+ */
 export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
   const { navigate, isNavigating } = useNavigation()
-  const [activeTab, setActiveTab] = useState<TabType>('pending')
-  const [pendingConversations, setPendingConversations] = useState<ChatRequest[]>([])
-  const [appointments, setAppointments] = useState<ChatRequest[]>([])
-  const [unsuccessfulConversations, setUnsuccessfulConversations] = useState<UnsuccessfulConversation[]>([])
+  const { error } = useToast()
+  const [threads, setThreads] = useState<Record<TabType, ClientThreadView[]>>({
+    open: [],
+    appointment: [],
+    history: [],
+  })
+  const [activeTab, setActiveTab] = useState<TabType>('open')
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
 
-  const loadPendingConversations = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/requests/?clientId=${clientId}`)
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch requests')
-      }
-
-      const result = await response.json()
-
-      if (result.success) {
-        // Filter requests with status PENDING that have messages
-        const pendingRequests = result.requests.filter((request: ChatRequest) =>
-          request.status === ServiceRequestStatus.PENDING
-        )
-
-        // For each request, check if it has messages
-        const requestsWithMessages = await Promise.all(
-          pendingRequests.map(async (request: ChatRequest) => {
-            try {
-              const chatResponse = await fetch(`/api/chat/${request.id}/messages/`)
-              if (chatResponse.ok) {
-                const chatData = await chatResponse.json()
-                if (chatData.messages && chatData.messages.length > 0) {
-                  const lastMessage = chatData.messages[chatData.messages.length - 1]
-                  return {
-                    ...request,
-                    lastMessage: {
-                      content: lastMessage.message || lastMessage.content || '',
-                      timestamp: lastMessage.timestamp,
-                      sender: lastMessage.senderType || lastMessage.sender || 'garage'
-                    },
-                    unreadCount: chatData.messages.filter((msg: { senderType?: string; sender?: string; read?: boolean }) =>
-                      (msg.senderType === 'garage' || msg.sender === 'garage') && !msg.read
-                    ).length
-                  }
-                }
-              }
-            } catch (error) {
-              console.error(`Error fetching messages for request ${request.id}:`, error)
-            }
-            return null
-          })
-        )
-
-        setPendingConversations(requestsWithMessages.filter((r): r is ChatRequest => r !== null))
-      } else {
-        console.error('API error:', result.error)
-        setPendingConversations([])
-      }
-    } catch (error) {
-      console.error('Error loading pending conversations:', error)
-      setPendingConversations([])
-    }
-  }, [clientId])
-
-  const loadAppointments = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/requests/?clientId=${clientId}`)
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch requests')
-      }
-
-      const result = await response.json()
-
-      if (result.success) {
-        // Filter requests with status APPOINTMENT that have appointmentDate
-        const appointmentRequests = result.requests.filter((request: ChatRequest) =>
-          request.status === ServiceRequestStatus.APPOINTMENT &&
-          request.appointmentDate
-        )
-
-        // For each request, get the last message
-        const requestsWithMessages = await Promise.all(
-          appointmentRequests.map(async (request: ChatRequest) => {
-            try {
-              const chatResponse = await fetch(`/api/chat/${request.id}/messages/`)
-              if (chatResponse.ok) {
-                const chatData = await chatResponse.json()
-                if (chatData.messages && chatData.messages.length > 0) {
-                  const lastMessage = chatData.messages[chatData.messages.length - 1]
-                  return {
-                    ...request,
-                    lastMessage: {
-                      content: lastMessage.message || lastMessage.content || '',
-                      timestamp: lastMessage.timestamp,
-                      sender: lastMessage.senderType || lastMessage.sender || 'garage'
-                    },
-                    unreadCount: chatData.messages.filter((msg: { senderType?: string; sender?: string; read?: boolean }) =>
-                      (msg.senderType === 'garage' || msg.sender === 'garage') && !msg.read
-                    ).length
-                  }
-                }
-              }
-            } catch (error) {
-              console.error(`Error fetching messages for request ${request.id}:`, error)
-            }
-            return request
-          })
-        )
-
-        // Sort: Future appointments first (ascending), then past appointments (descending)
-        const now = new Date()
-        const future = requestsWithMessages.filter((r) =>
-          r.appointmentDate && new Date(r.appointmentDate) >= now
-        ).sort((a, b) => {
-          const dateA = new Date(a.appointmentDate || '').getTime()
-          const dateB = new Date(b.appointmentDate || '').getTime()
-          return dateA - dateB
-        })
-
-        const past = requestsWithMessages.filter((r) =>
-          r.appointmentDate && new Date(r.appointmentDate) < now
-        ).sort((a, b) => {
-          const dateA = new Date(a.appointmentDate || '').getTime()
-          const dateB = new Date(b.appointmentDate || '').getTime()
-          return dateB - dateA
-        })
-
-        setAppointments([...future, ...past])
-      } else {
-        console.error('API error:', result.error)
-        setAppointments([])
-      }
-    } catch (error) {
-      console.error('Error loading appointments:', error)
-      setAppointments([])
-    }
-  }, [clientId])
-
-  const loadUnsuccessfulConversations = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/requests/?clientId=${clientId}`)
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch requests')
-      }
-
-      const result = await response.json()
-
-      if (result.success) {
-        // Filter requests with acceptedOfferId
-        const requestsWithAcceptedOffer = result.requests.filter((request: ChatRequest) =>
-          request.acceptedOfferId
-        )
-
-        const unsuccessfulConversationsList: UnsuccessfulConversation[] = []
-
-        // For each request with accepted offer, find garages that chatted but didn't get accepted
-        await Promise.all(
-          requestsWithAcceptedOffer.map(async (request: ChatRequest) => {
-            try {
-              // Get all offers for this request
-              const offersResponse = await fetch(`/api/offers/?serviceRequestId=${request.id}`)
-              if (!offersResponse.ok) return
-
-              const offersData = await offersResponse.json()
-              if (!offersData.success || !offersData.offers) return
-
-              // Find the accepted offer's garageId
-              const acceptedOffer = offersData.offers.find((offer: { id: string; garageId: string }) =>
-                offer.id === request.acceptedOfferId
-              )
-              if (!acceptedOffer) return
-
-              const acceptedGarageId = acceptedOffer.garageId
-
-              // Get all garages that sent messages for this request
-              const garagesResponse = await fetch(`/api/chat/${request.id}/garages/`)
-              if (!garagesResponse.ok) return
-
-              const garagesData = await garagesResponse.json()
-              if (!garagesData.success || !garagesData.garages) return
-
-              // Filter garages that have messages but their offer was not accepted
-              const unsuccessfulGarages = garagesData.garages.filter((garage: { id: string; companyName?: string; logoUrl?: string }) =>
-                garage.id !== acceptedGarageId
-              )
-
-              // Get messages for each unsuccessful garage to get last message
-              for (const garage of unsuccessfulGarages) {
-                try {
-                  const messagesResponse = await fetch(`/api/chat/${request.id}/messages/`)
-                  if (messagesResponse.ok) {
-                    const messagesData = await messagesResponse.json()
-                    if (messagesData.messages) {
-                      // Filter messages from this garage
-                      interface MsgLite { senderType?: string; sender?: string; senderId?: string; timestamp: string; message?: string; content?: string; read?: boolean }
-                      const garageMessages = (messagesData.messages as MsgLite[]).filter((msg) =>
-                        msg.senderType === 'garage' && msg.senderId === garage.id
-                      )
-
-                      if (garageMessages.length > 0) {
-                        const lastMessage = garageMessages.sort((a, b) =>
-                          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-                        )[0]
-
-                        unsuccessfulConversationsList.push({
-                          requestId: request.id,
-                          garageId: garage.id,
-                          garageName: garage.companyName || 'Συνεργείο',
-                          garageLogoUrl: garage.logoUrl,
-                          request: {
-                            ...request,
-                            vehicle: request.vehicle
-                          },
-                          lastMessage: {
-                            content: lastMessage.message || lastMessage.content || '',
-                            timestamp: lastMessage.timestamp,
-                            sender: (lastMessage.senderType === 'client' ? 'client' : 'garage') as 'client' | 'garage'
-                          },
-                          unreadCount: garageMessages.filter((msg) =>
-                            (msg.senderType === 'garage' || msg.sender === 'garage') && !msg.read
-                          ).length
-                        })
-                      }
-                    }
-                  }
-                } catch (error) {
-                  console.error(`Error fetching messages for garage ${garage.id}:`, error)
-                }
-              }
-            } catch (error) {
-              console.error(`Error processing request ${request.id}:`, error)
-            }
-          })
-        )
-
-        setUnsuccessfulConversations(unsuccessfulConversationsList)
-      } else {
-        console.error('API error:', result.error)
-        setUnsuccessfulConversations([])
-      }
-    } catch (error) {
-      console.error('Error loading unsuccessful conversations:', error)
-      setUnsuccessfulConversations([])
-    }
-  }, [clientId])
-
-  const loadAllData = useCallback(async () => {
-    setIsLoading(true)
-    await Promise.all([
-      loadPendingConversations(),
-      loadAppointments(),
-      loadUnsuccessfulConversations()
-    ])
-    setIsLoading(false)
-  }, [loadPendingConversations, loadAppointments, loadUnsuccessfulConversations])
-
   useEffect(() => {
-    loadAllData()
-  }, [loadAllData])
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/chat/client-threads/', { cache: 'no-store' })
+        if (!res.ok) throw new Error(`client-threads ${res.status}`)
+        const data = await res.json()
+        if (cancelled) return
+        const loaded = {
+          open: (data.open ?? []) as ClientThreadView[],
+          appointment: (data.appointments ?? []) as ClientThreadView[],
+          history: (data.history ?? []) as ClientThreadView[],
+        }
+        setThreads(loaded)
+        // Land on whichever list holds something new.
+        if (!loaded.open.some((t) => t.unread > 0) && loaded.appointment.some((t) => t.unread > 0)) {
+          setActiveTab('appointment')
+        }
+      } catch (err) {
+        console.error('Error loading conversations:', err)
+        if (!cancelled) error('Σφάλμα', 'Δεν ήταν δυνατή η φόρτωση των συνομιλιών')
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [clientId, error])
 
-  const formatAppointmentDate = (dateString: string) => {
-    const date = new Date(`${dateString}T00:00:00`)
-    return date.toLocaleDateString('el-GR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      weekday: 'long'
-    })
-  }
-
-  const formatLastMessageTime = (timestamp: string) => {
-    const date = new Date(timestamp)
-    const now = new Date()
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
-
-    if (diffInHours < 24) {
-      return date.toLocaleTimeString('el-GR', {
-        hour: '2-digit',
-        minute: '2-digit'
-      })
-    } else {
-      return date.toLocaleDateString('el-GR', {
-        day: '2-digit',
-        month: '2-digit'
-      })
-    }
-  }
-
-  const chatHref = (requestId: string, garageId?: string) =>
-    garageId
-      ? `/requests/${clientId}/chats/${requestId}/?garageId=${garageId}`
-      : `/requests/${clientId}/chats/${requestId}/`
-
-  const handleChatClick = (requestId: string, garageId?: string) => {
-    // Navigate to the individual chat page for this request
-    navigate(chatHref(requestId, garageId))
-  }
-
-  const isPastAppointment = (appointmentDate?: string) => {
-    if (!appointmentDate) return false
-    return new Date(appointmentDate) < new Date()
-  }
-
-  const renderRequestCard = (
-    request: ChatRequest | UnsuccessfulConversation,
-    isCompleted: boolean = false,
-    garageName?: string
-  ) => {
-    const isUnsuccessful = 'garageName' in request
-    const chatRequest = isUnsuccessful ? request.request : request
-    const lastMessage = isUnsuccessful ? request.lastMessage : request.lastMessage
-    const unreadCount = isUnsuccessful ? request.unreadCount : request.unreadCount
-    const hasUnread = unreadCount && unreadCount > 0
-
-    // Get thumbnail from photos or photoUrls
-    const thumbnailUrl = chatRequest.photos?.[0]?.s3Url || chatRequest.photoUrls?.[0]
-
-    const vehicleName = chatRequest.vehicle
-      ? `${chatRequest.vehicle.brand} ${chatRequest.vehicle.model}`
-      : 'Αίτημα'
-    const vehicleYear = chatRequest.vehicle?.modelYear || ''
-
-    const isOpening = isNavigating(
-      chatHref(chatRequest.id, isUnsuccessful ? request.garageId : undefined)
+  const visible = useMemo(() => {
+    const q = searchQuery.trim().toLocaleLowerCase('el')
+    if (!q) return threads[activeTab]
+    return threads[activeTab].filter((t) =>
+      [
+        t.garageName,
+        t.vehicle?.brand,
+        t.vehicle?.model,
+        getCategoryText(t.category ?? ''),
+        t.lastMessage?.message,
+      ]
+        .filter(Boolean)
+        .some((field) => String(field).toLocaleLowerCase('el').includes(q))
     )
+  }, [threads, activeTab, searchQuery])
 
-    const isActive = !isCompleted
-    const statusLabel = isActive ? 'ΕΝΕΡΓΟ' : 'ΟΛΟΚΛΗΡΩΘΗΚΕ'
-    const statusClasses = isActive
-      ? 'bg-primary/10 text-primary'
-      : 'bg-secondary-container text-on-secondary-container'
+  const chatHref = (t: ClientThreadView) =>
+    `/requests/${clientId}/chats/${t.requestId}/?garageId=${t.garageId}`
 
-    return (
-      <div
-        key={isUnsuccessful ? `${request.requestId}-${request.garageId}` : request.id}
-        className={`${
-          isActive
-            ? 'bg-surface-container-lowest border-l-4 border-primary shadow-[0_4px_24px_rgba(27,28,28,0.02)]'
-            : 'bg-surface-container-low border-l-4 border-transparent opacity-80'
-        } p-5 rounded-xl transition-all duration-200 cursor-pointer hover:shadow-md active:scale-[0.99]`}
-        onClick={() => handleChatClick(
-          chatRequest.id,
-          isUnsuccessful ? request.garageId : undefined
-        )}
-      >
-        <div className="flex items-start gap-4">
-          {/* Vehicle Thumbnail */}
-          <div className="flex-shrink-0">
-            {thumbnailUrl ? (
-              <Image
-                src={thumbnailUrl}
-                alt={vehicleName}
-                width={64}
-                height={64}
-                className={`w-16 h-16 rounded-lg object-cover ${isCompleted ? 'grayscale' : ''}`}
-              />
-            ) : (
-              <div className={`w-16 h-16 rounded-lg bg-surface-container flex items-center justify-center ${isCompleted ? 'grayscale' : ''}`}>
-                <Icon name="directions_car" size="lg" className="text-on-surface-variant" />
-              </div>
-            )}
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            {/* Title Row: Vehicle name + Status badge */}
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2 min-w-0">
-                <h3 className="font-bold text-lg text-on-surface truncate">
-                  {isUnsuccessful && garageName ? garageName : vehicleName}
-                  {vehicleYear && !isUnsuccessful ? ` ${vehicleYear}` : ''}
-                </h3>
-              </div>
-              {isOpening ? (
-                <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0 ml-2 bg-primary/10 text-primary">
-                  <Spinner size="sm" />
-                  Άνοιγμα…
-                </span>
-              ) : (
-                <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full flex-shrink-0 ml-2 ${statusClasses}`}>
-                  {statusLabel}
-                </span>
-              )}
-            </div>
-
-            {/* Service type */}
-            <p className="text-xs text-on-surface-variant uppercase tracking-wide mb-2">
-              {getCategoryText(chatRequest.category)}
-            </p>
-
-            {/* Bottom section: message/offer info + date */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 min-w-0">
-                {lastMessage ? (
-                  <p className={`text-sm truncate ${hasUnread ? 'text-on-surface font-medium' : 'text-on-surface-variant'}`}>
-                    {lastMessage.sender === 'client' ? 'Εσείς: ' : ''}
-                    {lastMessage.content}
-                  </p>
-                ) : (
-                  <p className="text-sm text-on-surface-variant italic">
-                    Αναμονή για προσφορές...
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                {hasUnread && (
-                  <div className="bg-primary text-on-primary text-[10px] font-bold h-5 min-w-5 px-1 rounded-full flex items-center justify-center">
-                    {unreadCount}
-                  </div>
-                )}
-                {lastMessage && (
-                  <span className="text-xs text-on-surface-variant">
-                    {formatLastMessageTime(lastMessage.timestamp)}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Appointment date badge */}
-            {chatRequest.status === ServiceRequestStatus.APPOINTMENT && chatRequest.appointmentDate && (
-              <div className="mt-2 flex items-center gap-1.5 bg-surface-container rounded-lg px-2.5 py-1.5 w-fit">
-                <Icon name="calendar_month" size="sm" className="text-primary" />
-                <span className="text-[11px] font-bold text-on-surface">
-                  {formatAppointmentDate(chatRequest.appointmentDate)}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  const renderEmptyState = (message: string, description: string) => (
-    <div className="text-center py-16">
-      <div className="mx-auto w-20 h-20 bg-surface-container rounded-full flex items-center justify-center mb-5">
-        <Icon name="chat_bubble_outline" size="xl" className="text-on-surface-variant" />
-      </div>
-      <h3 className="text-lg font-bold text-on-surface mb-2">{message}</h3>
-      <p className="text-sm text-on-surface-variant mb-8 max-w-sm mx-auto">{description}</p>
-      <button
-        onClick={() => navigate(`/requests/${clientId}/`)}
-        disabled={isNavigating(`/requests/${clientId}/`)}
-        className="inline-flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded-full font-medium text-sm hover:opacity-90 transition-opacity mx-auto disabled:opacity-70"
-      >
-        {isNavigating(`/requests/${clientId}/`)
-          ? <Spinner size="sm" />
-          : <Icon name="list_alt" size="sm" />}
-        Δείτε τα Αιτήματά σας
-      </button>
-    </div>
-  )
+  const requestsHref = `/requests/${clientId}/`
 
   if (isLoading) {
     return (
       <section className="bg-surface">
         <div className="max-w-2xl mx-auto px-4 pt-2 pb-4">
           <div className="text-center py-20">
-            <div className="animate-spin w-8 h-8 border-3 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+            <div className={styles.loadingSpinner}></div>
             <p className="text-sm text-on-surface-variant">Φόρτωση συνομιλιών...</p>
           </div>
         </div>
@@ -512,20 +180,13 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
     )
   }
 
+  const tab = TABS.find((t) => t.key === activeTab)!
+
   return (
     <section className="bg-surface">
       <div className="max-w-2xl mx-auto px-4 pt-2 pb-4">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-on-surface">
-            Μηνύματα
-          </h1>
-          <button className="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center">
-            <Icon name="tune" size="md" className="text-on-surface-variant" />
-          </button>
-        </div>
+        <h1 className="text-2xl font-bold text-on-surface mb-6">Μηνύματα</h1>
 
-        {/* Search Bar */}
         <div className="mb-5">
           <div className="relative">
             <Icon name="search" size="md" className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant" />
@@ -539,91 +200,148 @@ export default function ClientChatsPage({ clientId }: ClientChatsPageProps) {
           </div>
         </div>
 
-        {/* Status Filter Chips */}
-        <div className="flex items-center gap-2 mb-6">
-          <button
-            onClick={() => setActiveTab('pending')}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-              activeTab === 'pending'
-                ? 'bg-primary text-on-primary'
-                : 'bg-secondary-container text-on-secondary-container'
-            }`}
-          >
-            Όλα
-          </button>
-          <button
-            onClick={() => setActiveTab('appointments')}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-              activeTab === 'appointments'
-                ? 'bg-primary text-on-primary'
-                : 'bg-secondary-container text-on-secondary-container'
-            }`}
-          >
-            Ενεργά
-          </button>
-          <button
-            onClick={() => setActiveTab('unsuccessful')}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-              activeTab === 'unsuccessful'
-                ? 'bg-primary text-on-primary'
-                : 'bg-secondary-container text-on-secondary-container'
-            }`}
-          >
-            Ολοκληρωμένα
-          </button>
+        <div className="flex items-center gap-2 mb-6 overflow-x-auto no-scrollbar" role="tablist">
+          {TABS.map(({ key, label }) => {
+            const unread = threads[key].filter((t) => t.unread > 0).length
+            const selected = activeTab === key
+            return (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => setActiveTab(key)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all active:scale-95 flex items-center gap-2 whitespace-nowrap ${
+                  selected ? 'bg-primary text-on-primary' : 'bg-secondary-container text-on-secondary-container'
+                }`}
+              >
+                {label}
+                {unread > 0 && (
+                  <span
+                    className={`text-[10px] font-bold h-5 min-w-5 px-1 rounded-full flex items-center justify-center ${
+                      selected ? 'bg-on-primary text-primary' : 'bg-primary text-on-primary'
+                    }`}
+                    aria-label={`${unread} με νέα μηνύματα`}
+                  >
+                    {unread}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
 
-        {/* Request Cards List */}
-        {activeTab === 'pending' && (
-          <>
-            {pendingConversations.length > 0 ? (
-              <div className="space-y-3">
-                {pendingConversations.map((request) =>
-                  renderRequestCard(request, false)
-                )}
-              </div>
-            ) : (
-              renderEmptyState(
-                'Δεν υπάρχουν εκκρεμείς συνομιλίες',
-                'Δεν έχετε ακόμα συνομιλίες σε αναμονή. Όταν ένα συνεργείο απαντήσει στο αίτημά σας, θα εμφανιστεί εδώ.'
-              )
-            )}
-          </>
-        )}
+        {visible.length > 0 ? (
+          <div className="space-y-3">
+            {visible.map((thread) => {
+              const href = chatHref(thread)
+              const opening = isNavigating(href)
+              const hasUnread = thread.unread > 0
+              const readOnly = thread.bucket === 'history'
+              const vehicleName = thread.vehicle
+                ? [thread.vehicle.brand, thread.vehicle.model].filter(Boolean).join(' ')
+                : ''
+              return (
+                <div
+                  key={`${thread.requestId}-${thread.garageId}`}
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => navigate(href)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') navigate(href) }}
+                  data-request-id={thread.requestId}
+                  data-garage-id={thread.garageId}
+                  className={`${
+                    readOnly
+                      ? 'bg-surface-container-low border-l-4 border-transparent opacity-80'
+                      : 'bg-surface-container-lowest border-l-4 border-primary shadow-[0_4px_24px_rgba(27,28,28,0.02)]'
+                  } p-5 rounded-xl transition-all duration-200 cursor-pointer hover:shadow-md active:scale-[0.99]`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0">
+                      {opening ? (
+                        <div className="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center">
+                          <Spinner size="md" className="text-primary" />
+                        </div>
+                      ) : thread.garageLogoUrl ? (
+                        <Image
+                          src={thread.garageLogoUrl}
+                          alt={thread.garageName}
+                          width={48}
+                          height={48}
+                          className={`w-12 h-12 rounded-full object-cover ${readOnly ? 'grayscale' : ''}`}
+                        />
+                      ) : (
+                        <div className={`w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary-container flex items-center justify-center ${readOnly ? 'grayscale' : ''}`}>
+                          <span className="text-on-primary font-bold text-xs">{initials(thread.garageName)}</span>
+                        </div>
+                      )}
+                    </div>
 
-        {activeTab === 'appointments' && (
-          <>
-            {appointments.length > 0 ? (
-              <div className="space-y-3">
-                {appointments.map((request) => {
-                  const isPast = isPastAppointment(request.appointmentDate)
-                  return renderRequestCard(request, isPast)
-                })}
-              </div>
-            ) : (
-              renderEmptyState(
-                'Δεν υπάρχουν ραντεβού',
-                'Δεν έχετε προγραμματισμένα ραντεβού. Όταν αποδεχτείτε μια προσφορά, θα εμφανιστεί εδώ.'
-              )
-            )}
-          </>
-        )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <h3 className="font-bold text-base text-on-surface truncate">{thread.garageName}</h3>
+                        <StatusChip thread={thread} />
+                      </div>
 
-        {activeTab === 'unsuccessful' && (
-          <>
-            {unsuccessfulConversations.length > 0 ? (
-              <div className="space-y-3">
-                {unsuccessfulConversations.map((conversation) =>
-                  renderRequestCard(conversation, true, conversation.garageName)
-                )}
-              </div>
-            ) : (
-              renderEmptyState(
-                'Δεν υπάρχουν ολοκληρωμένες συνομιλίες',
-                'Όλες οι συνομιλίες σας έχουν οδηγήσει σε ραντεβού ή είναι ακόμα σε αναμονή.'
+                      <p className="text-xs text-on-surface-variant uppercase tracking-wide mb-2 truncate">
+                        {[vehicleName, thread.vehicle?.modelYear].filter(Boolean).join(' ')}
+                        {vehicleName ? ' · ' : ''}
+                        {getCategoryText(thread.category ?? '')}
+                      </p>
+
+                      <div className="flex items-center justify-between">
+                        <p className={`text-sm truncate min-w-0 ${hasUnread ? 'text-on-surface font-medium' : 'text-on-surface-variant'}`}>
+                          {thread.lastMessage?.senderType === 'client' ? 'Εσείς: ' : ''}
+                          {thread.lastMessage?.message}
+                        </p>
+                        <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                          {hasUnread && (
+                            <div className="bg-primary text-on-primary text-[10px] font-bold h-5 min-w-5 px-1 rounded-full flex items-center justify-center">
+                              {thread.unread}
+                            </div>
+                          )}
+                          {thread.lastMessage && (
+                            <span className="text-xs text-on-surface-variant">
+                              {formatLastMessageTime(thread.lastMessage.timestamp)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {thread.status === ServiceRequestStatus.APPOINTMENT && thread.appointmentDate && !readOnly && (
+                        <div className="mt-2 flex items-center gap-1.5 bg-surface-container rounded-lg px-2.5 py-1.5 w-fit">
+                          <Icon name="calendar_month" size="sm" className="text-primary" />
+                          <span className="text-[11px] font-bold text-on-surface">
+                            {formatAppointmentDate(thread.appointmentDate)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               )
-            )}
-          </>
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <div className="mx-auto w-20 h-20 bg-surface-container rounded-full flex items-center justify-center mb-5">
+              <Icon name="chat_bubble_outline" size="xl" className="text-on-surface-variant" />
+            </div>
+            <h3 className="text-lg font-bold text-on-surface mb-2">
+              {searchQuery.trim() ? 'Δεν βρέθηκαν συνομιλίες' : tab.empty[0]}
+            </h3>
+            <p className="text-sm text-on-surface-variant mb-8 max-w-sm mx-auto">
+              {searchQuery.trim() ? 'Δοκιμάστε άλλη αναζήτηση.' : tab.empty[1]}
+            </p>
+            <button
+              onClick={() => navigate(requestsHref)}
+              disabled={isNavigating(requestsHref)}
+              className="inline-flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded-full font-medium text-sm hover:opacity-90 transition-opacity mx-auto disabled:opacity-70 active:scale-95"
+            >
+              {isNavigating(requestsHref) ? <Spinner size="sm" /> : <Icon name="list_alt" size="sm" />}
+              Δείτε τα Αιτήματά σας
+            </button>
+          </div>
         )}
       </div>
     </section>

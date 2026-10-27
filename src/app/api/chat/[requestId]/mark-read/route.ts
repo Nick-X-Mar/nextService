@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
-import { requireAuth } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
+import { requireChatParticipant } from '@/utils/chatService'
 import { invalidateUnread } from '@/utils/unreadCache'
 
 async function _POST(
@@ -10,7 +10,7 @@ async function _POST(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
-    const auth = requireAuth(request)
+    const auth = await requireChatParticipant(request)
     if (auth instanceof NextResponse) return auth
     if (auth.userType !== 'client' && auth.userType !== 'garage') {
       return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
@@ -45,8 +45,10 @@ async function _POST(
       if (requestResult.Item.clientId !== auth.userId) {
         return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
       }
-      const { garageId } = await request.json()
-      if (!garageId) {
+      // Malformed or empty body → 400, the same as a missing garageId.
+      const body: unknown = await request.json().catch(() => null)
+      const garageId = body && typeof body === 'object' ? (body as { garageId?: unknown }).garageId : undefined
+      if (typeof garageId !== 'string' || !garageId) {
         return NextResponse.json({ error: 'Garage ID is required' }, { status: 400 })
       }
       field = 'clientReadAt'

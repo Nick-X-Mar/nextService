@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import StatCard from '../../components/StatCard'
 import DataTable, { type Column } from '../../components/DataTable'
+import { athensToday } from '@/utils/athensTime'
+import { getCategoryText } from '@/utils/categoryLabels'
 
 interface AppointmentRow {
   requestId: string
@@ -12,7 +14,11 @@ interface AppointmentRow {
   clientName: string
   vehicleLabel: string
   category: string
+  /** The quote, VAT included. */
   appointmentPrice: number
+  /** The net figure the commission was taken from. */
+  basisAmount: number
+  basis: 'declared' | 'quoted'
   commission: number
 }
 
@@ -35,8 +41,7 @@ const MONTH_LABELS = [
 ]
 
 function currentMonth(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  return athensToday().slice(0, 7)
 }
 
 function lastNMonths(n: number): { value: string; label: string }[] {
@@ -120,13 +125,26 @@ export default function GarageCommissionsPage({ params }: { params: Promise<{ ga
     {
       key: 'category',
       header: 'Κατηγορία',
-      render: (item) => item.category,
+      render: (item) => getCategoryText(item.category),
     },
     {
       key: 'appointmentPrice',
-      header: 'Τιμή Ραντεβού',
+      header: 'Προσφορά (με ΦΠΑ)',
       sortable: true,
       render: (item) => formatEUR(item.appointmentPrice),
+    },
+    {
+      key: 'basisAmount',
+      header: 'Βάση προμήθειας (χωρίς ΦΠΑ)',
+      sortable: true,
+      render: (item) => (
+        <div>
+          <span>{formatEUR(item.basisAmount)}</span>
+          <p className="text-[11px] text-on-surface/50">
+            {item.basis === 'declared' ? 'Δηλωμένο ποσό' : 'Βάσει προσφοράς'}
+          </p>
+        </div>
+      ),
     },
     {
       key: 'commission',
@@ -174,7 +192,9 @@ export default function GarageCommissionsPage({ params }: { params: Promise<{ ga
           <h1 className="text-2xl font-bold font-headline text-on-surface">
             {data?.garageName ?? 'Συνεργείο'}
           </h1>
-          <p className="text-sm text-on-surface/60 mt-1">Προμήθειες — {monthLabel}</p>
+          <p className="text-sm text-on-surface/60 mt-1">
+            Προμήθειες — {monthLabel}. Δεν περιλαμβάνονται ραντεβού όπου ο πελάτης δεν ήρθε ή η εργασία δεν έγινε.
+          </p>
         </div>
         <select
           value={month}
@@ -190,13 +210,13 @@ export default function GarageCommissionsPage({ params }: { params: Promise<{ ga
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <StatCard
           icon="event_available"
-          label="Ραντεβού"
+          label="Εργασίες"
           value={loading ? '...' : (data?.totals.appointmentCount ?? 0)}
           color="primary"
         />
         <StatCard
           icon="payments"
-          label="Συνολικά Έσοδα"
+          label="Καθαρά έσοδα (χωρίς ΦΠΑ)"
           value={loading ? '...' : formatEUR(data?.totals.totalRevenue ?? 0)}
           color="secondary"
         />
@@ -208,13 +228,13 @@ export default function GarageCommissionsPage({ params }: { params: Promise<{ ga
         />
       </div>
 
-      <h2 className="text-lg font-semibold text-on-surface mb-3">Αναλυτικά Ραντεβού</h2>
+      <h2 className="text-lg font-semibold text-on-surface mb-3">Ανάλυση ανά εργασία</h2>
       <DataTable
         columns={columns}
         data={data?.appointments ?? []}
         keyField="requestId"
         loading={loading}
-        emptyMessage="Δεν υπάρχουν ολοκληρωμένα ραντεβού για αυτόν τον μήνα"
+        emptyMessage="Δεν υπάρχουν ολοκληρωμένες εργασίες για αυτόν τον μήνα"
       />
     </div>
   )

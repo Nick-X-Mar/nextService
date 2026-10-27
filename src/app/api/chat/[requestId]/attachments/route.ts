@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand } from '@aws-sdk/lib-dynamodb'
-import { requireAuth } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
-import { createChatMessage, resolveThread, isChatPermissionError } from '@/utils/chatService'
+import {
+  createChatMessage,
+  resolveThread,
+  isChatPermissionError,
+  requireChatParticipant,
+} from '@/utils/chatService'
 import type { ChatAttachment } from '@/utils/chatAttachments'
 import {
   uploadMultipleFilesToS3,
@@ -37,20 +41,13 @@ async function _POST(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
-    const auth = requireAuth(request)
+    const auth = await requireChatParticipant(request)
     if (auth instanceof NextResponse) return auth
 
     if (!checkAttachmentRate(auth.userId)) {
       return NextResponse.json(
         { error: 'Πολλά αρχεία. Δοκιμάστε ξανά αργότερα.' },
         { status: 429 }
-      )
-    }
-
-    if (!isS3Configured()) {
-      return NextResponse.json(
-        { error: 'S3 service not configured.' },
-        { status: 500 }
       )
     }
 
@@ -76,18 +73,19 @@ async function _POST(
       return NextResponse.json({ error: 'Request not found' }, { status: 404 })
     }
 
-    const thread = resolveThread(auth, requestResult.Item, requestedGarageId)
+    // resolveThread also refuses a message with no garage: it would have no
+    // thread to belong to, and the per-garage read filter could never scope it.
+    const thread = await resolveThread(auth, requestResult.Item, requestedGarageId)
     if (isChatPermissionError(thread)) {
-      return NextResponse.json({ error: thread.error }, { status: thread.status })
+      return NextResponse.json({ error: thread.error, code: thread.code }, { status: thread.status })
     }
 
-    // Without a garage the message has no thread to belong to, so it would be
-    // stored where the per-garage read filter can never scope it. A photo with
-    // no addressee is exactly the "visible to nobody" case being fixed here.
-    if (!thread.garageId) {
+    // After the permission check, so a refused write is reported as what it
+    // is — and never gets as far as storage.
+    if (!isS3Configured()) {
       return NextResponse.json(
-        { error: 'Επιλέξτε συνεργείο πριν στείλετε φωτογραφία' },
-        { status: 400 }
+        { error: 'S3 service not configured.' },
+        { status: 500 }
       )
     }
 

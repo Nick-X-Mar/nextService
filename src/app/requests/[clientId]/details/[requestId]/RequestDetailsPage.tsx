@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNotifications } from '@/contexts/NotificationsContext'
-import { useRouter } from 'next/navigation'
+import { useNavigation } from '@/hooks/useNavigation'
+import Spinner from '@/components/Spinner'
 import Icon from '@/components/ui/Icon'
 import RequestDetailsContent from '../../../components/RequestDetailsContent'
 import { ServiceRequestStatus } from '../../../../../types/statuses'
@@ -29,24 +30,33 @@ export default function RequestDetailsPage({ clientId, requestId }: RequestDetai
       .catch(() => { /* a stale banner is not worth interrupting the page for */ })
   }, [requestId, refreshNotifications])
 
-  const router = useRouter()
+  // A real link, not router.back(): opened from an email or a notification there is
+  // no history to go back to, and the button did nothing.
+  const { navigate, isNavigating } = useNavigation()
+  const requestsHref = `/requests/${clientId}/`
   const [request, setRequest] = useState<ServiceRequest | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // The request is read by id. It used to be looked up in the client's requests
+  // list, which is paginated at 20 — anything older was "not found" from a link
+  // in an email or a notification.
   const loadRequest = useCallback(async () => {
     try {
-      const response = await fetch(`/api/requests/?clientId=${clientId}`)
-      if (!response.ok) throw new Error('Failed to fetch requests')
+      const response = await fetch(`/api/requests/${requestId}/`)
+      if (response.status === 404) {
+        setError('Το αίτημα δεν βρέθηκε.')
+        return
+      }
+      if (response.status === 401 || response.status === 403) {
+        setError('Δεν έχετε πρόσβαση σε αυτό το αίτημα.')
+        return
+      }
+      if (!response.ok) throw new Error('Failed to fetch request')
 
       const result = await response.json()
-      if (result.success) {
-        const found = result.requests.find((r: ServiceRequest) => r.id === requestId)
-        if (found) {
-          setRequest(found)
-        } else {
-          setError('Το αίτημα δεν βρέθηκε.')
-        }
+      if (result.success && result.request) {
+        setRequest(result.request)
       } else {
         setError('Σφάλμα κατά τη φόρτωση του αιτήματος.')
       }
@@ -55,7 +65,7 @@ export default function RequestDetailsPage({ clientId, requestId }: RequestDetai
     } finally {
       setIsLoading(false)
     }
-  }, [clientId, requestId])
+  }, [requestId])
 
   useEffect(() => {
     loadRequest()
@@ -134,11 +144,12 @@ export default function RequestDetailsPage({ clientId, requestId }: RequestDetai
       <section className="bg-surface min-h-screen">
         <div className="px-5 max-w-4xl mx-auto pt-6 pb-4">
           <button
-            onClick={() => router.back()}
-            className="flex items-center gap-1 text-sm font-bold text-on-surface-variant hover:text-on-surface transition-colors mb-6"
+            onClick={() => navigate(requestsHref)}
+            disabled={isNavigating(requestsHref)}
+            className="flex items-center gap-1 text-sm font-bold text-on-surface-variant hover:text-on-surface transition-colors mb-6 disabled:opacity-60"
           >
-            <Icon name="arrow_back" size="sm" />
-            Πίσω
+            {isNavigating(requestsHref) ? <Spinner size="sm" /> : <Icon name="arrow_back" size="sm" />}
+            Πίσω στα αιτήματα
           </button>
           <div className="text-center py-16">
             <div className="mx-auto w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
@@ -156,10 +167,11 @@ export default function RequestDetailsPage({ clientId, requestId }: RequestDetai
       <div className="px-5 max-w-4xl mx-auto pt-6 pb-8">
         {/* Back button */}
         <button
-          onClick={() => router.back()}
-          className="flex items-center gap-1 text-sm font-bold text-on-surface-variant hover:text-on-surface transition-colors mb-6"
+          onClick={() => navigate(requestsHref)}
+          disabled={isNavigating(requestsHref)}
+          className="flex items-center gap-1 text-sm font-bold text-on-surface-variant hover:text-on-surface transition-colors mb-6 disabled:opacity-60"
         >
-          <Icon name="arrow_back" size="sm" />
+          {isNavigating(requestsHref) ? <Spinner size="sm" /> : <Icon name="arrow_back" size="sm" />}
           Πίσω στα αιτήματα
         </button>
 

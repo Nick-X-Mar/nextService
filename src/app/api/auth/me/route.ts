@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthFromRequest } from '@/utils/auth'
+import { clearAuthCookie, getAuthFromRequest } from '@/utils/auth'
 import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand } from '@aws-sdk/lib-dynamodb'
 import { withMetrics } from '@/utils/withMetrics'
+import { PENDING_MERGE_FIELDS } from '../_lib/guestMerge'
+
+// Never leaves the server: credentials, reset state and the pending-merge
+// token (whose hash alone must not reach the browser that asked for it).
+const PRIVATE_FIELDS = new Set<string>([
+  'passwordHash',
+  'passwordResetTokenHash',
+  'passwordResetExpiresAt',
+  ...PENDING_MERGE_FIELDS,
+])
 
 async function _GET(request: NextRequest) {
   try {
@@ -20,12 +30,17 @@ async function _GET(request: NextRequest) {
     }))
 
     const user = result.Item
-    if (!user) {
-      return NextResponse.json({ authenticated: false }, { status: 401 })
+    // A guest folded into an account survives only as a tombstone. Its session
+    // has nothing left behind it, so end it rather than keep a ghost signed in.
+    if (!user || user.mergedInto) {
+      const response = NextResponse.json({ authenticated: false }, { status: 401 })
+      if (user?.mergedInto) clearAuthCookie(response)
+      return response
     }
 
-    // Strip sensitive fields
-    const { passwordHash: _passwordHash, passwordResetTokenHash: _passwordResetTokenHash, passwordResetExpiresAt: _passwordResetExpiresAt, ...safeUser } = user
+    const safeUser = Object.fromEntries(
+      Object.entries(user).filter(([key]) => !PRIVATE_FIELDS.has(key))
+    )
 
     return NextResponse.json({
       authenticated: true,

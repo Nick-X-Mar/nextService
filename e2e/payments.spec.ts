@@ -1,12 +1,17 @@
 import { test, expect } from '@playwright/test'
 import { registerClient, loginViaAPI, TEST_GARAGE } from './helpers'
+import { athensDatePlus } from './d-helpers'
+import { getOffer, getServiceRequest } from './dynamo-helpers'
 
 const CLIENT_EMAIL = `e2e-pay-${Date.now()}@test.com`
 const CLIENT_PASSWORD = 'TestPass123'
+const APPOINTMENT_DATE = athensDatePlus(21)
 
 let clientId: string
 let serviceRequestId: string
 let offerId: string
+/** Learnt from the first accept: this env either demands a deposit or does not. */
+let paymentsEnabled: boolean | null = null
 
 test.describe.serial('Payments & Cancellation flow', () => {
 
@@ -38,11 +43,28 @@ test.describe.serial('Payments & Cancellation flow', () => {
     const garageLogin = await loginViaAPI(request, TEST_GARAGE.email, TEST_GARAGE.password, 'garage')
     const offerResp = await request.post('/api/offers', {
       headers: { Cookie: `auth-token=${garageLogin.token}` },
-      data: { serviceRequestId, offerAmount: 300, benefits: ['Εγγύηση 1 έτος'] },
+      data: {
+        serviceRequestId,
+        offerAmount: 300,
+        benefits: ['Εγγύηση 1 έτος'],
+        availabilityDates: [APPOINTMENT_DATE],
+      },
     })
     const offerData = await offerResp.json()
     expect(offerData.success).toBe(true)
     offerId = offerData.offer.id
+  })
+
+  test('Cannot cancel a pending request (only appointment)', async ({ request }) => {
+    // Runs before any accept, so the request really is still pending here.
+    expect((await getServiceRequest(serviceRequestId))?.status).toBe('pending')
+
+    const login = await loginViaAPI(request, CLIENT_EMAIL, CLIENT_PASSWORD, 'client')
+    const resp = await request.patch(`/api/requests/${serviceRequestId}/cancel`, {
+      headers: { Cookie: `auth-token=${login.token}` },
+    })
+    expect(resp.status()).toBe(409)
+    expect((await getServiceRequest(serviceRequestId))?.status).toBe('pending')
   })
 
   test('Accept offer without paymentIntentId fails when payments enabled', async ({ request }) => {
@@ -51,17 +73,19 @@ test.describe.serial('Payments & Cancellation flow', () => {
       headers: { Cookie: `auth-token=${login.token}` },
       data: {
         offerId,
-        appointmentDate: '2026-04-20',
+        appointmentDate: APPOINTMENT_DATE,
       },
     })
-    // Should fail — missing paymentIntentId when payments are enabled
     const data = await resp.json()
-    // Could be 400 or success:false
-    if (resp.status() === 200 && data.success) {
-      // If payments aren't enforced in dev, that's ok — we still accepted
-      expect(data.request.status).toBe('appointment')
+    paymentsEnabled = resp.status() !== 200
+    if (paymentsEnabled) {
+      // A deposit is required, so nothing may have been booked.
+      expect(resp.status()).toBe(400)
+      expect((await getServiceRequest(serviceRequestId))?.status).toBe('pending')
     } else {
-      expect(resp.status()).toBeGreaterThanOrEqual(400)
+      expect(data.request.status).toBe('appointment')
+      // The price is the offer's, whatever the client sent.
+      expect(data.request.appointmentPrice).toBe(300)
     }
   })
 
@@ -71,17 +95,17 @@ test.describe.serial('Payments & Cancellation flow', () => {
       headers: { Cookie: `auth-token=${login.token}` },
       data: {
         offerId,
-        appointmentDate: '2026-04-20',
+        appointmentDate: APPOINTMENT_DATE,
         paymentIntentId: 'pi_fake_12345',
       },
     })
-    const data = await resp.json()
-    if (resp.status() === 200 && data.success) {
-      // Payments disabled in this env — fake intent is ignored, offer accepts.
-      expect(data.request.status).toBe('appointment')
-    } else {
-      // Payments enabled — Stripe rejects the fake intent.
+    if (paymentsEnabled) {
+      // Stripe rejects the fake intent.
       expect(resp.status()).toBeGreaterThanOrEqual(400)
+    } else {
+      // Payments are off, so the previous step already booked it — a second
+      // accept on a booked request is a conflict, not a re-booking.
+      expect(resp.status()).toBe(409)
     }
   })
 
@@ -105,19 +129,22 @@ test.describe.serial('Payments & Cancellation flow', () => {
     expect(data.transactions.length).toBe(0)
   })
 
-  test('Cannot cancel a pending request (only appointment)', async ({ request }) => {
+  test('Cancelling the appointment closes the request and the accepted offer', async ({ request }) => {
+    test.skip(paymentsEnabled !== false, 'needs the booking made with payments off')
+
     const login = await loginViaAPI(request, CLIENT_EMAIL, CLIENT_PASSWORD, 'client')
     const resp = await request.patch(`/api/requests/${serviceRequestId}/cancel`, {
       headers: { Cookie: `auth-token=${login.token}` },
     })
-    // Pending requests can't be cancelled via cancel endpoint — only appointment status
-    const data = await resp.json()
-    if (resp.status() === 200 && data.success) {
-      // Some implementations allow cancelling pending
-      console.log('  Pending cancellation allowed')
-    } else {
-      expect(resp.status()).toBeGreaterThanOrEqual(400)
-    }
+    expect(resp.status(), await resp.text()).toBe(200)
+    expect((await getServiceRequest(serviceRequestId))?.status).toBe('cancelled')
+    expect((await getOffer(offerId))?.status).toBe('rejected')
+
+    // And it is final: a second cancel finds nothing to cancel.
+    const again = await request.patch(`/api/requests/${serviceRequestId}/cancel`, {
+      headers: { Cookie: `auth-token=${login.token}` },
+    })
+    expect(again.status()).toBe(409)
   })
 
   test('Wallet requires auth', async ({ request }) => {

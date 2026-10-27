@@ -65,12 +65,9 @@ GITHUB_TOKEN_SECRET_NAME = "nextservice/github-token"
 # Create once (see `aws secretsmanager create-secret` example in the infra README).
 AUTH_SECRETS_NAME = "nextservice/auth-secrets"
 
-# Public URL used in email CTA buttons. Override per-stage via CDK context:
-# `cdk deploy -c app_url=https://staging.nextservice.gr`
-APP_URL = "https://nextservice.gr"
-
 # Public-facing origin used for SEO: canonical URLs, OG/Twitter tags, sitemap,
-# robots, JSON-LD. Must match the URL users and Google actually hit.
+# robots, JSON-LD — and every link the app emails (reset, account
+# confirmation). Must match the URL users and Google actually hit.
 # When cutting over to the real domain, change this + GITHUB_BRANCH together.
 # Override per-deploy via: `cdk deploy -c site_url=https://...`
 SITE_URL = "https://dev.d3ku6yajf4j6y8.amplifyapp.com"
@@ -83,8 +80,13 @@ app = cdk.App()
 
 # Allow `cdk deploy -c stage=production` to override the default
 stage = app.node.try_get_context("stage") or STAGE
-app_url = app.node.try_get_context("app_url") or APP_URL
 site_url = app.node.try_get_context("site_url") or SITE_URL
+# Origin of the CTA links in the Lambda-sent emails (new-request broadcast,
+# completion reminder). It follows site_url so the app's emails and the
+# Lambdas' never point at different sites — before the cutover
+# `nextservice.gr` is still the old WordPress site, where these links 404.
+# Override only on purpose: `cdk deploy -c app_url=https://...`
+app_url = app.node.try_get_context("app_url") or site_url
 
 # Bucket name is computed once here and passed to both stacks as a plain string
 # (no CFN Fn::ImportValue), so changing it later doesn't block updates across

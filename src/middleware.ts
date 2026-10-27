@@ -12,6 +12,30 @@ const SESSION_MAX_AGE_SEC = (() => {
   return n * mult
 })()
 
+/**
+ * A session token is re-issued only once it is this old — at most an hour,
+ * and at most half the session for a short SESSION_EXPIRY.
+ *
+ * Re-issuing on every request used to put a Set-Cookie on every response, and
+ * one of those can land after a newer cookie and overwrite it. That is exactly
+ * what a guest merge produced: a notifications poll still in flight from the
+ * guest tab came back with a refreshed GUEST cookie after the merge had set the
+ * account's, and the user was bounced to the login page. With the threshold a
+ * response carries a cookie about once an hour per session instead of every
+ * 30s, so that overwrite needs the one hourly refresh to be in flight at the
+ * very moment of the merge.
+ *
+ * Sliding still holds: an active user's cookie never has less than
+ * SESSION_EXPIRY minus this left, so idling out still takes ~SESSION_EXPIRY.
+ */
+const REFRESH_AFTER_SEC = Math.min(60 * 60, Math.floor(SESSION_MAX_AGE_SEC / 2))
+
+function isDueForRefresh(issuedAt: unknown): boolean {
+  // A token without `iat` predates this check; refresh it once to get one.
+  if (typeof issuedAt !== 'number') return true
+  return Math.floor(Date.now() / 1000) - issuedAt >= REFRESH_AFTER_SEC
+}
+
 function getSecret(): Uint8Array {
   const key = process.env.JWT_SECRET
   if (!key) {
@@ -184,8 +208,9 @@ export async function middleware(request: NextRequest) {
       const response = NextResponse.next()
       // Sliding session on page views too, so someone browsing their own area
       // never expires mid-session.
-      const refreshed = await issueRefreshedToken(userId, userType)
-      applySlidingCookie(response, refreshed)
+      if (isDueForRefresh(payload.iat)) {
+        applySlidingCookie(response, await issueRefreshedToken(userId, userType))
+      }
       return response
     } catch {
       return NextResponse.redirect(loginUrl)
@@ -214,9 +239,8 @@ export async function middleware(request: NextRequest) {
           requestHeaders.set('x-user-id', userId)
           requestHeaders.set('x-user-type', userType)
           const response = NextResponse.next({ request: { headers: requestHeaders } })
-          if (!isAuthRoute) {
-            const refreshed = await issueRefreshedToken(userId, userType)
-            applySlidingCookie(response, refreshed)
+          if (!isAuthRoute && isDueForRefresh(payload.iat)) {
+            applySlidingCookie(response, await issueRefreshedToken(userId, userType))
           }
           return response
         }
@@ -269,9 +293,10 @@ export async function middleware(request: NextRequest) {
       request: { headers: requestHeaders },
     })
 
-    // Sliding session: every authenticated request extends the cookie window
-    const refreshed = await issueRefreshedToken(userId, userType)
-    applySlidingCookie(response, refreshed)
+    // Sliding session, re-issued at most hourly (see REFRESH_AFTER_SEC).
+    if (isDueForRefresh(payload.iat)) {
+      applySlidingCookie(response, await issueRefreshedToken(userId, userType))
+    }
 
     return response
   } catch {

@@ -11,6 +11,7 @@ import { broadcastRequestUpdate } from '@/utils/requestBroadcast'
 import { invalidateUnread } from '@/utils/unreadCache'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { createReview, DuplicateReviewError } from '@/utils/reviewService'
+import { DECLARABLE_VAT_RATES } from '@/lib/commission-basis'
 import {
   DEFAULT_VAT_RATE,
   isCompletionDue,
@@ -68,6 +69,13 @@ async function _POST(
   { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
+    // Deliberately not requireActiveGarage. Closing a job is not marketplace
+    // activity: it is the garage reporting on work it was already booked for,
+    // and the assignment check below limits it to exactly those jobs. A garage
+    // deactivated with appointments still on its books must still be able to
+    // say what happened — otherwise those jobs can never reach COMPLETED, their
+    // commission is never billed, and the client never gets to review them.
+    // Accept refuses inactive garages, so a never-approved one holds no jobs.
     const garageId = requireGarage(request)
     if (garageId instanceof NextResponse) return garageId
 
@@ -76,9 +84,14 @@ async function _POST(
     }
 
     const { requestId } = await params
-    const body = await request.json()
+    const body = (await request.json().catch(() => null)) ?? {}
 
-    const outcome: CompletionOutcome = OUTCOMES.includes(body.outcome) ? body.outcome : 'completed'
+    // Never defaulted: the outcome decides whether commission is charged, so
+    // a typo must not quietly become "the work was done".
+    if (!OUTCOMES.includes(body.outcome)) {
+      return NextResponse.json({ error: 'Δήλωσε αν έγινε η εργασία.' }, { status: 400 })
+    }
+    const outcome: CompletionOutcome = body.outcome
 
     const res = await dynamoDB.send(
       new GetCommand({ TableName: 'ServiceRequests', Key: { id: requestId } })
@@ -115,7 +128,7 @@ async function _POST(
     // Amounts only make sense when work was actually done.
     let amounts
     if (outcome === 'completed') {
-      const declared = Number(body.amount)
+      const declared = typeof body.amount === 'number' ? body.amount : NaN
       if (!Number.isFinite(declared) || declared <= 0) {
         return NextResponse.json(
           { error: 'Δήλωσε το ποσό που χρέωσες.' },
@@ -125,11 +138,23 @@ async function _POST(
       if (declared > 1_000_000) {
         return NextResponse.json({ error: 'Μη έγκυρο ποσό.' }, { status: 400 })
       }
+      // Only the rates the completion form offers: the rate sets how much of
+      // a gross figure counts as net, i.e. how much commission is charged.
+      const vatRate = body.vatRate === undefined || body.vatRate === null
+        ? DEFAULT_VAT_RATE
+        : Number(body.vatRate)
+      if (!DECLARABLE_VAT_RATES.includes(vatRate)) {
+        return NextResponse.json({ error: 'Μη έγκυρος συντελεστής ΦΠΑ.' }, { status: 400 })
+      }
       const enteredAs = body.vatIncluded === false ? 'net' : 'gross'
-      const vatRate = Number.isFinite(Number(body.vatRate))
-        ? Math.max(0, Math.min(100, Number(body.vatRate)))
-        : DEFAULT_VAT_RATE
       amounts = splitVat(declared, enteredAs, vatRate)
+      // A fraction of a cent rounds to a zero net — nothing to bill on.
+      if (amounts.net <= 0) {
+        return NextResponse.json(
+          { error: 'Δήλωσε το ποσό που χρέωσες.' },
+          { status: 400 }
+        )
+      }
     }
 
     const now = new Date().toISOString()

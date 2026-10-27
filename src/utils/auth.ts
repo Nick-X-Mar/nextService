@@ -4,7 +4,8 @@ import { NextRequest, NextResponse } from 'next/server'
 export const TOKEN_COOKIE_NAME = 'auth-token'
 
 // Session window: user stays logged in as long as they are active within this window.
-// Every authenticated request refreshes the cookie (sliding session) — see middleware.
+// The cookie slides: an authenticated request re-issues it once the token is at
+// least min(1h, SESSION_EXPIRY/2) old, not on every request — see middleware.
 const SESSION_EXPIRY = process.env.SESSION_EXPIRY || '2d'
 const SESSION_MAX_AGE_SEC = (() => {
   const m = SESSION_EXPIRY.match(/^(\d+)([smhd])$/)

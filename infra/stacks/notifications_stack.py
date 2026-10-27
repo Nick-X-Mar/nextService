@@ -197,6 +197,7 @@ class NotificationsStack(Stack):
                 "SES_CONFIG_SET": SES_CONFIG_SET_NAME,
                 "APP_URL": app_url,
                 "GARAGES_TABLE": "Garages",
+                "VEHICLES_TABLE": "Vehicles",
                 "EMAIL_LOGS_TABLE": "EmailLogs",
                 "NOTIFICATIONS_ENABLED": "true" if notifications_enabled else "false",
                 "SEND_CONCURRENCY": "10",
@@ -213,11 +214,20 @@ class NotificationsStack(Stack):
         )
 
         # ── IAM permissions ─────────────────────────────────────
-        # DynamoDB: Scan Garages, Put+Update EmailLogs
+        # DynamoDB: Scan Garages, Get Vehicles, Put+Update EmailLogs
         self.broadcast_fn.add_to_role_policy(iam.PolicyStatement(
             sid="ScanGarages",
             actions=["dynamodb:Scan"],
             resources=[garages_table_arn],
+        ))
+        # The request row carries only `vehicleId`; the email names the car,
+        # so the Lambda reads that one vehicle per new request.
+        self.broadcast_fn.add_to_role_policy(iam.PolicyStatement(
+            sid="ReadVehicles",
+            actions=["dynamodb:GetItem"],
+            resources=[
+                f"arn:aws:dynamodb:{self.region}:{self.account}:table/Vehicles",
+            ],
         ))
         self.broadcast_fn.add_to_role_policy(iam.PolicyStatement(
             sid="WriteEmailLogs",

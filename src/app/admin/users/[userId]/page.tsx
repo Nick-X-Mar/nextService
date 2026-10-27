@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
+import Spinner from '@/components/Spinner'
+import { useNavigation } from '@/hooks/useNavigation'
 import StatCard from '../../components/StatCard'
 
 interface UserDetail {
@@ -26,7 +28,7 @@ interface UserDetail {
 
 export default function UserDetailPage() {
   const { userId } = useParams<{ userId: string }>()
-  const router = useRouter()
+  const { back, isNavigating } = useNavigation()
   const [user, setUser] = useState<UserDetail | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -49,8 +51,8 @@ export default function UserDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      <div className="flex items-center justify-center py-20 text-primary">
+        <Spinner size="lg" />
       </div>
     )
   }
@@ -59,7 +61,14 @@ export default function UserDetailPage() {
     return (
       <div className="text-center py-20">
         <p className="text-on-surface/60">User not found</p>
-        <button onClick={() => router.back()} className="text-primary text-sm mt-2">Go back</button>
+        <button
+          onClick={back}
+          disabled={isNavigating()}
+          className="text-primary text-sm mt-2 inline-flex items-center gap-1.5"
+        >
+          {isNavigating() && <Spinner size="sm" />}
+          Go back
+        </button>
       </div>
     )
   }
@@ -67,10 +76,13 @@ export default function UserDetailPage() {
   return (
     <div>
       <button
-        onClick={() => router.back()}
+        onClick={back}
+        disabled={isNavigating()}
         className="flex items-center gap-1 text-sm text-on-surface/60 hover:text-on-surface mb-4"
       >
-        <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+        {isNavigating()
+          ? <Spinner size="sm" />
+          : <span className="material-symbols-outlined text-[18px]">arrow_back</span>}
         Back to users
       </button>
 

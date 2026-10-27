@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
+import Spinner from '@/components/Spinner'
+import { useNavigation } from '@/hooks/useNavigation'
+import { athensToday } from '@/utils/athensTime'
 
 interface GarageBreakdown {
   garageId: string
@@ -14,6 +16,8 @@ interface GarageBreakdown {
   appointmentCount: number
   totalRevenue: number
   commission: number
+  /** How many of `appointmentCount` rest on a declared amount rather than the quote. */
+  declaredCount: number
 }
 
 interface CommissionsStats {
@@ -34,8 +38,7 @@ const MONTH_LABELS = [
 ]
 
 function currentMonth(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  return athensToday().slice(0, 7)
 }
 
 function lastNMonths(n: number): { value: string; label: string }[] {
@@ -55,7 +58,7 @@ function formatEUR(amount: number): string {
 }
 
 export default function CommissionsPage() {
-  const router = useRouter()
+  const { navigate, isNavigating } = useNavigation()
   const [month, setMonth] = useState<string>(currentMonth())
   const [data, setData] = useState<CommissionsStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -89,6 +92,8 @@ export default function CommissionsPage() {
     }))
   }, [data])
 
+  const garageHref = (garageId: string) => `/admin/commissions/${garageId}?month=${month}`
+
   const columns: Column<GarageBreakdown>[] = [
     {
       key: 'garageName',
@@ -100,13 +105,24 @@ export default function CommissionsPage() {
     },
     {
       key: 'appointmentCount',
-      header: 'Ραντεβού',
+      header: 'Εργασίες',
       sortable: true,
-      render: (item) => item.appointmentCount,
+      render: (item) => (
+        <div>
+          <span>{item.appointmentCount}</span>
+          {item.declaredCount < item.appointmentCount && (
+            // These rows are billed on the quote because the garage never
+            // declared what it charged — an estimate, not a settled figure.
+            <p className="text-[11px] text-on-surface/50">
+              {item.appointmentCount - item.declaredCount} βάσει προσφοράς
+            </p>
+          )}
+        </div>
+      ),
     },
     {
       key: 'totalRevenue',
-      header: 'Συνολικά Έσοδα',
+      header: 'Καθαρά έσοδα',
       sortable: true,
       render: (item) => formatEUR(item.totalRevenue),
     },
@@ -121,9 +137,12 @@ export default function CommissionsPage() {
     {
       key: 'actions',
       header: '',
-      render: () => (
-        <span className="material-symbols-outlined text-[18px] text-on-surface/40">chevron_right</span>
-      ),
+      render: (item) =>
+        isNavigating(garageHref(item.garageId)) ? (
+          <Spinner size="sm" className="text-primary" />
+        ) : (
+          <span className="material-symbols-outlined text-[18px] text-on-surface/40">chevron_right</span>
+        ),
     },
   ]
 
@@ -138,7 +157,9 @@ export default function CommissionsPage() {
         <div>
           <h1 className="text-2xl font-bold font-headline text-on-surface">Προμήθειες Συνεργείων</h1>
           <p className="text-sm text-on-surface/60 mt-1">
-            Υπολογισμός 15% επί ολοκληρωμένων ραντεβού — οφειλές προς εξόφληση στο τέλος του μήνα
+            Υπολογισμός {data?.commissionPercent ?? 15}% επί της καθαρής αξίας (χωρίς ΦΠΑ) των ολοκληρωμένων
+            εργασιών — οφειλές προς εξόφληση στο τέλος του μήνα. Δεν χρεώνονται ραντεβού όπου ο πελάτης δεν ήρθε
+            ή η εργασία δεν έγινε.
           </p>
         </div>
         <select
@@ -155,13 +176,13 @@ export default function CommissionsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard
           icon="event_available"
-          label="Ολοκληρωμένα Ραντεβού"
+          label="Ολοκληρωμένες εργασίες"
           value={loading ? '...' : (data?.totals.appointmentCount ?? 0)}
           color="primary"
         />
         <StatCard
           icon="payments"
-          label="Συνολικά Έσοδα"
+          label="Καθαρά έσοδα (χωρίς ΦΠΑ)"
           value={loading ? '...' : formatEUR(data?.totals.totalRevenue ?? 0)}
           color="secondary"
         />
@@ -224,7 +245,7 @@ export default function CommissionsPage() {
         keyField="garageId"
         loading={loading}
         emptyMessage="Δεν υπάρχουν ολοκληρωμένα ραντεβού για αυτόν τον μήνα"
-        onRowClick={(item) => router.push(`/admin/commissions/${item.garageId}?month=${month}`)}
+        onRowClick={(item) => navigate(garageHref(item.garageId))}
       />
     </div>
   )

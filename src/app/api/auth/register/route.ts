@@ -9,6 +9,7 @@ import { signToken, setAuthCookie } from '@/utils/auth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
 import { randomUUID } from 'crypto'
+import { GUEST_PLACEHOLDER_NAME } from '../_lib/guestMerge'
 
 const checkRegisterRate = createRateLimiter('register', 3, 3600000)
 
@@ -54,11 +55,15 @@ async function _POST(request: NextRequest) {
       Limit: 1
     }))
 
+    // Saying so is deliberate. The signup forms already learn it before submit
+    // from /api/auth/check-email (rate limited, boolean only) so they can offer
+    // a login instead, and a vaguer answer here would protect nothing while
+    // leaving the user stuck. Both endpoints disclose the same single fact.
     if (existingResult.Items && existingResult.Items.length > 0) {
       return NextResponse.json({
         success: false,
-        error: 'Υπάρχει ήδη λογαριασμός με αυτό το email',
-        isExistingUser: true
+        code: 'EMAIL_EXISTS',
+        error: 'Υπάρχει ήδη λογαριασμός με αυτό το email'
       }, { status: 409 })
     }
 
@@ -68,7 +73,12 @@ async function _POST(request: NextRequest) {
     const nowIso = new Date().toISOString()
     const clientData = {
       id: clientId,
-      firstName: firstName || normalizedEmail.split('@')[0],
+      // Never derived from the address: the first name is what garages see
+      // before they win a job, and an email's local part is most of the email.
+      firstName:
+        typeof firstName === 'string' && firstName.trim()
+          ? firstName.trim().slice(0, 100)
+          : GUEST_PLACEHOLDER_NAME,
       email: normalizedEmail,
       passwordHash,
       isActive: true,

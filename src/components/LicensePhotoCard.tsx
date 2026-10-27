@@ -11,7 +11,9 @@ import { styles } from '@/styles/styles'
  * always rendered from a fresh fetch rather than cached anywhere.
  */
 export default function LicensePhotoCard({ url }: { url?: string | null }) {
-  if (!url) return null
+  // Only a presigned https URL is renderable. A raw S3 key (what an unsigned
+  // response carries) makes next/image throw and takes the whole page down with it.
+  if (!url || !url.startsWith('https://')) return null
 
   return (
     <div className={styles.card}>

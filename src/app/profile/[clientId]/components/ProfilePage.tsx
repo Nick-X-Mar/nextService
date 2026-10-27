@@ -43,7 +43,7 @@ interface Vehicle {
   vinNumber?: string
   color?: string
   nickname?: string
-  licensePhotoUrl?: string
+  licensePhotoUrl?: string | null
   isActive?: boolean
   createdAt?: string
   updatedAt?: string

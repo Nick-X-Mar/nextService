@@ -52,12 +52,22 @@ export async function queryIndexOrScan<T>(args: {
     // Anything other than "that index isn't there" is a real failure.
     if (name !== 'ValidationException' && name !== 'ResourceNotFoundException') throw error
     console.warn(`[indexQuery] ${table}.${indexName} missing — falling back to scan`)
-    const res = await dynamoDB.send(new ScanCommand({
-      TableName: table,
-      FilterExpression: scanFilterExpression,
-      ExpressionAttributeValues: expressionAttributeValues,
-      ...(expressionAttributeNames ? { ExpressionAttributeNames: expressionAttributeNames } : {}),
-    }))
-    return (res.Items ?? []) as T[]
+    // A Scan filters each 1MB page separately, so a single call misses any
+    // match beyond the first page — for a uniqueness check (ΑΦΜ, email) that
+    // reads as "free" when it isn't. Page until done, or until `limit` matches.
+    const items: T[] = []
+    let startKey: Record<string, unknown> | undefined
+    do {
+      const res = await dynamoDB.send(new ScanCommand({
+        TableName: table,
+        FilterExpression: scanFilterExpression,
+        ExpressionAttributeValues: expressionAttributeValues,
+        ...(expressionAttributeNames ? { ExpressionAttributeNames: expressionAttributeNames } : {}),
+        ...(startKey ? { ExclusiveStartKey: startKey } : {}),
+      }))
+      items.push(...((res.Items ?? []) as T[]))
+      startKey = res.LastEvaluatedKey
+    } while (startKey && !(limit && items.length >= limit))
+    return limit ? items.slice(0, limit) : items
   }
 }

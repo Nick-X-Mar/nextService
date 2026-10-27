@@ -40,7 +40,7 @@ async function _POST(request: NextRequest) {
     }
 
     if (!['client', 'garage'].includes(userType)) {
-      return NextResponse.json({ error: 'Invalid user type' }, { status: 400 })
+      return NextResponse.json({ error: 'Μη έγκυρος τύπος λογαριασμού' }, { status: 400 })
     }
 
     const clientIP = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'

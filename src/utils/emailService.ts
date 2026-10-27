@@ -101,7 +101,8 @@ async function sendEmailInternal(input: SendEmailInput): Promise<void> {
   // Templates are deterministic — the admin app can re-render from the
   // template name + ids if it ever needs the actual content. Keeping the
   // log row PII-free reduces blast radius if the table ever leaks.
-  const baseRecord: EmailLogRecord = {
+  const linkOrigin = originOf(rendered.ctaUrl)
+  const baseRecord: EmailLogRecord & { linkOrigin?: string } = {
     emailId,
     to,
     from: FROM_ADDRESS,
@@ -113,7 +114,11 @@ async function sendEmailInternal(input: SendEmailInput): Promise<void> {
     sentAt,
     ...(clientId ? { clientId } : {}),
     ...(garageId ? { garageId } : {}),
-    ...(requestId ? { requestId } : {})
+    ...(requestId ? { requestId } : {}),
+    // Which site the mail's button pointed at — the origin only, since the
+    // full URL often carries a single-use token. Makes a mis-provisioned
+    // SITE_URL visible from /admin/emails instead of from users' inboxes.
+    ...(linkOrigin ? { linkOrigin } : {})
   }
 
   await writeEmailLog(baseRecord)
@@ -175,6 +180,15 @@ async function sendEmailInternal(input: SendEmailInput): Promise<void> {
     const errorMessage = err instanceof Error ? err.message : 'Unknown SES error'
     console.error('[emailService] SES send failed:', templateName, errorMessage)
     await updateEmailLog(emailId, { status: 'failed', errorMessage })
+  }
+}
+
+function originOf(url: string | undefined): string | undefined {
+  if (!url) return undefined
+  try {
+    return new URL(url).origin
+  } catch {
+    return undefined
   }
 }
 

@@ -72,7 +72,7 @@ export default function EstimatedCostCard({ estimate, isLoading }: EstimatedCost
           {isLoading || !estimate ? (
             <div className="flex items-center gap-2 text-primary">
               <Spinner size="sm" />
-              <p className="text-sm font-medium">Υπολογισμος...</p>
+              <p className="text-sm font-medium">Υπολογισμός...</p>
             </div>
           ) : (
             <p className="text-xl font-black text-primary">{estimate.estimatedCost}€</p>

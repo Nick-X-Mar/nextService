@@ -1,6 +1,7 @@
 import { test, expect, type APIRequestContext } from '@playwright/test'
 import { registerClient, loginViaAPI, TEST_GARAGE } from './helpers'
 import { ageAppointment, getGarage, getServiceRequest } from './dynamo-helpers'
+import { athensDatePlus } from './d-helpers'
 
 /**
  * Appointment → completion → two-way review.
@@ -13,7 +14,7 @@ import { ageAppointment, getGarage, getServiceRequest } from './dynamo-helpers'
  */
 
 const PASSWORD = 'TestPass123'
-const FUTURE_DATES = ['2027-04-15', '2027-04-16']
+const FUTURE_DATES = [athensDatePlus(30), athensDatePlus(31)]
 
 let clientId = ''
 let clientToken = ''
@@ -57,7 +58,7 @@ test.describe.serial('Completion and reviews', () => {
         serviceRequestId: requestId,
         offerAmount: 200,
         benefits: ['Δωρεάν έλεγχος'],
-        availableDates: FUTURE_DATES,
+        availabilityDates: FUTURE_DATES,
       },
     })
     expect(offer.status()).toBe(200)
@@ -69,7 +70,6 @@ test.describe.serial('Completion and reviews', () => {
         offerId,
         appointmentDate: FUTURE_DATES[0],
         appointmentTime: '10:00',
-        appointmentPrice: 200,
       },
     })
     expect(accept.status()).toBe(200)
@@ -77,6 +77,7 @@ test.describe.serial('Completion and reviews', () => {
     const stored = await getServiceRequest(requestId)
     expect(stored?.status).toBe('appointment')
     expect(stored?.acceptedGarageId).toBe(TEST_GARAGE.id)
+    expect(stored?.appointmentDate).toBe(FUTURE_DATES[0])
   })
 
   test('A future appointment cannot be closed yet', async ({ request }) => {
@@ -149,6 +150,16 @@ test.describe.serial('Completion and reviews', () => {
       data: { outcome: 'completed', amount: 100 },
     })
     expect(resp.status()).toBe(409)
+  })
+
+  test('A completed job cannot be reopened by accepting its offer again', async ({ request }) => {
+    const resp = await request.patch(`/api/requests/${requestId}/accept-offer/`, {
+      headers: { Cookie: `auth-token=${clientToken}` },
+      data: { offerId, appointmentDate: FUTURE_DATES[1], appointmentTime: '10:00' },
+    })
+    expect(resp.status()).toBe(409)
+    const stored = await getServiceRequest(requestId)
+    expect(stored?.status).toBe('completed')
   })
 
   test("The client cannot read the garage's review before writing their own", async ({ request }) => {
@@ -236,18 +247,21 @@ test.describe.serial('Completion and reviews', () => {
     const gt = await freshGarageToken(request)
     const offer = await request.post('/api/offers', {
       headers: { Cookie: `auth-token=${gt}` },
-      data: { serviceRequestId: rid, offerAmount: 90, benefits: [], availableDates: FUTURE_DATES },
+      data: { serviceRequestId: rid, offerAmount: 90, benefits: [], availabilityDates: FUTURE_DATES },
     })
     const oid = (await offer.json()).offer.id
-    await request.patch(`/api/requests/${rid}/accept-offer/`, {
+    const accept = await request.patch(`/api/requests/${rid}/accept-offer/`, {
       headers: { Cookie: `auth-token=${token}` },
-      data: { offerId: oid, appointmentDate: FUTURE_DATES[0], appointmentTime: '10:00', appointmentPrice: 90 },
+      data: { offerId: oid, appointmentDate: FUTURE_DATES[0], appointmentTime: '10:00' },
     })
+    expect(accept.status(), await accept.text()).toBe(200)
     await ageAppointment(rid, 1)
-    await request.post(`/api/requests/${rid}/complete/`, {
+    const complete = await request.post(`/api/requests/${rid}/complete/`, {
       headers: { Cookie: `auth-token=${gt}` },
       data: { outcome: 'completed', amount: 90 },
     })
+    // Otherwise the 400 below could come from "not completed yet".
+    expect(complete.status(), await complete.text()).toBe(200)
 
     const resp = await request.post(`/api/requests/${rid}/review/`, {
       headers: { Cookie: `auth-token=${token}` },

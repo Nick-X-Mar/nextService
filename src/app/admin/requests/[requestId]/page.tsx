@@ -9,6 +9,7 @@ import { el } from 'date-fns/locale'
 import 'react-day-picker/dist/style.css'
 import RequestTimeline from './components/RequestTimeline'
 import Spinner from '@/components/Spinner'
+import { isCommissionable } from '@/lib/commission-basis'
 
 interface RequestDetail {
   id: string
@@ -304,9 +305,13 @@ export default function RequestDetailPage() {
                   </div>
                 )}
               </div>
+            ) : isCommissionable(data) ? (
+              <p className="text-xs text-green-800">
+                Δεν δηλώθηκε ποσό — η προμήθεια υπολογίζεται στην καθαρή αξία (χωρίς ΦΠΑ) της προσφοράς.
+              </p>
             ) : (
               <p className="text-xs text-green-800">
-                Δεν δηλώθηκε ποσό — η προμήθεια υπολογίζεται στην τιμή της προσφοράς.
+                Δεν έγινε εργασία, οπότε δεν χρεώνεται προμήθεια.
               </p>
             )}
 

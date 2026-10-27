@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import sharp from 'sharp'
 import { getOfferBySlug } from '@/lib/offers'
 import { loadLogoDataUri } from '@/lib/og-logo'
+import { getCategoryText } from '@/utils/categoryLabels'
 
 export const runtime = 'nodejs'
 export const alt = 'NextService προσφορά'
@@ -78,7 +79,7 @@ export default async function Image({ params }: Params) {
   const title = offer?.title ?? 'NextService'
   const subtitle = offer?.subtitle ?? ''
   const price = offer?.price ?? ''
-  const category = offer?.category === 'fanopeia' ? 'Φανοποιεία' : 'Service'
+  const category = offer ? getCategoryText(offer.category) : 'Service'
 
   const img = new ImageResponse(
     (

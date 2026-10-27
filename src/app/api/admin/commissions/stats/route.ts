@@ -4,7 +4,8 @@ import { QueryCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb'
 import { withMetrics } from '@/utils/withMetrics'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { DEPOSIT_PERCENT } from '@/lib/stripe-server'
-import { commissionBasis } from '@/lib/commission-basis'
+import { commissionLine, sumCents } from '@/lib/commission-basis'
+import { athensToday } from '@/utils/athensTime'
 
 interface GarageBreakdown {
   garageId: string
@@ -36,9 +37,9 @@ function isValidMonth(value: string | null): value is string {
   return !!value && /^\d{4}-(0[1-9]|1[0-2])$/.test(value)
 }
 
+/** The Athens month — the server runs in UTC, which is still last month for the first hours of the 1st. */
 function currentMonth(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  return athensToday().slice(0, 7)
 }
 
 async function _GET(request: NextRequest) {
@@ -57,7 +58,9 @@ async function _GET(request: NextRequest) {
         TableName: 'ServiceRequests',
         IndexName: 'StatusIndex',
         KeyConditionExpression: '#status = :status',
-        FilterExpression: 'begins_with(appointmentDate, :monthPrefix) AND attribute_exists(appointmentPrice)',
+        FilterExpression:
+          'begins_with(appointmentDate, :monthPrefix) AND ' +
+          '(attribute_exists(appointmentPrice) OR attribute_exists(finalAmounts))',
         ExpressionAttributeNames: { '#status': 'status' },
         ExpressionAttributeValues: {
           ':status': ServiceRequestStatus.COMPLETED,
@@ -90,15 +93,16 @@ async function _GET(request: NextRequest) {
       }
     }
 
-    // Aggregate per garage.
+    // Aggregate per garage, from the same per-job lines the garage's detail
+    // page lists (src/lib/commission-basis.ts), so the two always agree.
     //
     // Revenue is what the garage declared it actually charged, net of VAT —
-    // not the price it quoted. See src/lib/commission-basis.ts. `declaredCount`
-    // is surfaced so the admin can see how much of a month's figure rests on
-    // real declarations rather than on the fallback.
+    // not the price it quoted. `declaredCount` is surfaced so the admin can see
+    // how much of a month's figure rests on real declarations rather than on
+    // the fallback.
     const aggregateByGarage = new Map<
       string,
-      { appointmentCount: number; totalRevenue: number; declaredCount: number }
+      { revenues: number[]; commissions: number[]; declaredCount: number }
     >()
 
     for (const r of completedItems) {
@@ -106,14 +110,13 @@ async function _GET(request: NextRequest) {
       if (!offerId) continue
       const garageId = offerToGarage[offerId]
       if (!garageId) continue
-      const basis = commissionBasis(r as Parameters<typeof commissionBasis>[0])
-      if (basis.amount <= 0) continue
+      const line = commissionLine(r as Parameters<typeof commissionLine>[0], DEPOSIT_PERCENT)
+      if (!line) continue
 
-      const entry =
-        aggregateByGarage.get(garageId) ?? { appointmentCount: 0, totalRevenue: 0, declaredCount: 0 }
-      entry.appointmentCount += 1
-      entry.totalRevenue += basis.amount
-      if (basis.source === 'declared') entry.declaredCount += 1
+      const entry = aggregateByGarage.get(garageId) ?? { revenues: [], commissions: [], declaredCount: 0 }
+      entry.revenues.push(line.basisAmount)
+      entry.commissions.push(line.commission)
+      if (line.source === 'declared') entry.declaredCount += 1
       aggregateByGarage.set(garageId, entry)
     }
 
@@ -136,41 +139,27 @@ async function _GET(request: NextRequest) {
       }
     }
 
-    const factor = DEPOSIT_PERCENT / 100
-
     const byGarage: GarageBreakdown[] = garageIds.map((garageId) => {
       const agg = aggregateByGarage.get(garageId)!
-      const totalRevenue = Math.round(agg.totalRevenue * 100) / 100
-      const commission = Math.round(agg.totalRevenue * factor * 100) / 100
       return {
         garageId,
         garageName: garageNames[garageId] || garageId,
-        appointmentCount: agg.appointmentCount,
-        totalRevenue,
-        commission,
+        appointmentCount: agg.revenues.length,
+        totalRevenue: sumCents(agg.revenues),
+        commission: sumCents(agg.commissions),
         declaredCount: agg.declaredCount,
       }
     })
 
     byGarage.sort((a, b) => b.commission - a.commission)
 
-    const totals = byGarage.reduce(
-      (acc, g) => {
-        acc.appointmentCount += g.appointmentCount
-        acc.totalRevenue += g.totalRevenue
-        acc.commission += g.commission
-        return acc
-      },
-      { appointmentCount: 0, totalRevenue: 0, commission: 0 }
-    )
-
     const response: CommissionsStatsResponse = {
       month,
       commissionPercent: DEPOSIT_PERCENT,
       totals: {
-        appointmentCount: totals.appointmentCount,
-        totalRevenue: Math.round(totals.totalRevenue * 100) / 100,
-        commission: Math.round(totals.commission * 100) / 100,
+        appointmentCount: byGarage.reduce((n, g) => n + g.appointmentCount, 0),
+        totalRevenue: sumCents(byGarage.map((g) => g.totalRevenue)),
+        commission: sumCents(byGarage.map((g) => g.commission)),
         activeGaragesCount: byGarage.length,
       },
       byGarage,

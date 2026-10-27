@@ -7,10 +7,16 @@ import { useToast } from '@/hooks/useToast'
 import { useAsyncTask } from '@/hooks/useAsyncTask'
 import {
   CLIENT_REVIEW_TAGS,
-  DEFAULT_VAT_RATE,
   splitVat,
   type CompletionOutcome,
 } from '@/types/reviews'
+import { DECLARABLE_VAT_RATES } from '@/lib/commission-basis'
+
+/**
+ * The rate the declared amount is split at. Sent explicitly because the server
+ * accepts only the rates this form offers — see DECLARABLE_VAT_RATES.
+ */
+const VAT_RATE = DECLARABLE_VAT_RATES[0]
 
 /**
  * What the garage fills in once an appointment has passed.
@@ -48,11 +54,17 @@ export default function CompletionModal({
   const [tags, setTags] = useState<string[]>([])
   const { success, error: showError } = useToast()
   const { run, isPending } = useAsyncTask()
+  const submitting = isPending()
+  // Closing mid-request would let `onCompleted` land on an unmounted modal
+  // and leave the garage unsure whether the job was recorded.
+  const close = () => {
+    if (!submitting) onClose()
+  }
 
   const parsed = Number(amount.replace(',', '.'))
   const breakdown = useMemo(() => {
     if (!Number.isFinite(parsed) || parsed <= 0) return null
-    return splitVat(parsed, vatIncluded ? 'gross' : 'net', DEFAULT_VAT_RATE)
+    return splitVat(parsed, vatIncluded ? 'gross' : 'net', VAT_RATE)
   }, [parsed, vatIncluded])
 
   const submit = () =>
@@ -67,7 +79,7 @@ export default function CompletionModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           outcome,
-          ...(outcome === 'completed' ? { amount: parsed, vatIncluded } : {}),
+          ...(outcome === 'completed' ? { amount: parsed, vatIncluded, vatRate: VAT_RATE } : {}),
           notes,
           ...(rating > 0 ? { rating, comment, tags } : {}),
         }),
@@ -75,6 +87,12 @@ export default function CompletionModal({
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         showError(data.error || 'Δεν καταχωρήθηκε. Δοκίμασε ξανά.')
+        // 409: the job was closed or cancelled elsewhere, so this form can no
+        // longer succeed — refresh the list instead of leaving it open.
+        if (res.status === 409) {
+          onCompleted()
+          onClose()
+        }
         return
       }
       if (data.reviewError) {
@@ -95,7 +113,7 @@ export default function CompletionModal({
   ]
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Ολοκλήρωση εργασίας" size="lg">
+    <Modal isOpen={isOpen} onClose={close} title="Ολοκλήρωση εργασίας" size="lg">
       <div className="space-y-6">
         {vehicleLabel && (
           <p className="text-sm text-secondary">
@@ -114,6 +132,7 @@ export default function CompletionModal({
                 key={option.value}
                 type="button"
                 onClick={() => setOutcome(option.value)}
+                disabled={submitting}
                 className={`flex flex-col items-center gap-1 rounded-xl border p-3 text-xs font-bold transition-colors active:scale-95 ${
                   outcome === option.value
                     ? 'border-primary bg-primary/5 text-primary'
@@ -164,6 +183,7 @@ export default function CompletionModal({
                   key={String(option.value)}
                   type="button"
                   onClick={() => setVatIncluded(option.value)}
+                  disabled={submitting}
                   className={`flex-1 rounded-lg border px-3 py-2 text-xs font-bold transition-colors active:scale-95 ${
                     vatIncluded === option.value
                       ? 'border-primary bg-primary/5 text-primary'
@@ -250,18 +270,19 @@ export default function CompletionModal({
         <div className="flex gap-2 pt-2">
           <button
             type="button"
-            onClick={onClose}
-            className="flex-1 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-2.5 text-sm font-bold text-on-surface transition-colors hover:bg-surface-container"
+            onClick={close}
+            disabled={submitting}
+            className="flex-1 rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-4 py-2.5 text-sm font-bold text-on-surface transition-colors hover:bg-surface-container active:scale-95 disabled:opacity-50"
           >
             Άκυρο
           </button>
           <button
             type="button"
             onClick={submit}
-            disabled={isPending()}
+            disabled={submitting}
             className="flex-1 rounded-lg bg-gradient-to-br from-primary to-primary-container px-4 py-2.5 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {isPending() ? <Spinner size="sm" /> : <Icon name="task_alt" size="sm" />}
+            {submitting ? <Spinner size="sm" /> : <Icon name="task_alt" size="sm" />}
             Καταχώρηση
           </button>
         </div>

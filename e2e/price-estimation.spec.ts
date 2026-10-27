@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { freshClient, getRow } from './b-helpers'
 
 /**
  * The estimate only answers for a car we have already quoted: same brand/model, model
@@ -64,5 +65,36 @@ test.describe('Price Estimation API', () => {
   test('No auth required (public endpoint)', async ({ request }) => {
     const resp = await request.post('/api/price-estimation', { data: PEUGEOT_206 })
     expect(resp.status()).toBe(200)
+  })
+})
+
+test.describe('Estimate on bodywork and on the stored request', () => {
+  // A real meriki-vafi row of price-examples.json; bodywork skips the engine gate.
+  const PUNTO_BODYWORK = { category: 'meriki-vafi', brand: 'Fiat', model: 'Punto', modelYear: '1997' }
+
+  test('Bodywork is priced without any engine details', async ({ request }) => {
+    const resp = await request.post('/api/price-estimation/', { data: PUNTO_BODYWORK })
+    const data = await resp.json()
+    expect(data.estimation?.estimatedCost).toBeGreaterThan(0)
+  })
+
+  test('The request stores the server\'s estimate, not the one the browser sends', async ({ playwright, request }) => {
+    const { api } = await freshClient(playwright, 'estimate')
+    const expected = (await (await request.post('/api/price-estimation/', { data: PEUGEOT_206 })).json()).estimation
+
+    const priced = await (await api.post('/api/service-request/', {
+      data: { ...PEUGEOT_206, estimatedCost: 1 },
+    })).json()
+    expect((await getRow('ServiceRequests', priced.serviceRequestId))?.estimatedCost).toBe(expected.estimatedCost)
+
+    const bodywork = await (await api.post('/api/service-request/', { data: PUNTO_BODYWORK })).json()
+    const bodyworkExpected = (await (await request.post('/api/price-estimation/', { data: PUNTO_BODYWORK })).json()).estimation
+    expect((await getRow('ServiceRequests', bodywork.serviceRequestId))?.estimatedCost).toBe(bodyworkExpected.estimatedCost)
+
+    // A car we have never quoted carries no estimate at all, whatever was sent.
+    const unpriced = await (await api.post('/api/service-request/', {
+      data: { ...PEUGEOT_206, brand: 'Ferrari', model: 'F40', estimatedCost: 999 },
+    })).json()
+    expect((await getRow('ServiceRequests', unpriced.serviceRequestId))?.estimatedCost).toBeUndefined()
   })
 })
