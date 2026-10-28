@@ -8,7 +8,9 @@ import {
   parseCommissionPercent,
   roundCents,
   sumCents,
+  commissionBasis,
   type CommissionRateSource,
+  type OutcomeReviewStatus,
 } from '@/lib/commission-basis'
 import { athensToday } from '@/utils/athensTime'
 import type { CompletionAmounts } from '@/types/reviews'
@@ -35,6 +37,31 @@ interface AppointmentRow {
   /** The rate this job was billed at: frozen at completion, else the garage's rate, else the default. */
   commissionPercent: number
   rateSource: CommissionRateSource
+  /** The appointment day came and the garage has not declared: billed on the agreed price meanwhile. */
+  undeclared: boolean
+}
+
+/** A job the garage closed as not having happened — to check with the client. */
+interface FlaggedRow {
+  requestId: string
+  appointmentDate: string
+  appointmentTime: string
+  clientName: string
+  /** The client's mobile and email, so the admin can call and ask. */
+  clientPhone: string
+  clientEmail: string
+  vehicleLabel: string
+  category: string
+  outcome: 'no_show' | 'not_done'
+  /** What the garage wrote when it closed the job, if anything. */
+  garageNotes: string
+  appointmentPrice: number
+  /** What the job bills if the claim is rejected: the quote's net at the job's rate. */
+  commissionIfBilled: number
+  reviewStatus: OutcomeReviewStatus
+  reviewedAt?: string
+  reviewedBy?: string
+  reviewNote?: string
 }
 
 interface GarageCommissionsResponse {
@@ -53,6 +80,7 @@ interface GarageCommissionsResponse {
     commission: number
   }
   appointments: AppointmentRow[]
+  flagged: FlaggedRow[]
 }
 
 function isValidMonth(value: string | null): value is string {
@@ -78,27 +106,29 @@ async function _GET(
     const monthParam = searchParams.get('month')
     const month = isValidMonth(monthParam) ? monthParam : currentMonth()
 
-    const { jobs, garages } = await billedJobsForMonth(month, garageId)
+    const { jobs, flagged, garages } = await billedJobsForMonth(month, garageId)
     const garage = garages.get(garageId)
     const garageName = (garage?.companyName as string) || (garage?.email as string) || garageId
-    const garageRequests = jobs.map((job) => ({ r: job.request, line: job.line, percent: job.percent, rateSource: job.rateSource }))
+    const garageRequests = jobs.map((job) => ({ r: job.request, line: job.line, percent: job.percent, rateSource: job.rateSource, undeclared: job.undeclared }))
+    const everyRow = [...garageRequests.map(({ r }) => r), ...flagged.map((f) => f.request)]
 
     // Resolve client names + vehicle info
     const clientIds = Array.from(new Set(
-      garageRequests.map(({ r }) => r.clientId).filter((v): v is string => typeof v === 'string')
+      everyRow.map((r) => r.clientId).filter((v): v is string => typeof v === 'string')
     ))
     const vehicleIds = Array.from(new Set(
-      garageRequests.map(({ r }) => r.vehicleId).filter((v): v is string => typeof v === 'string')
+      everyRow.map((r) => r.vehicleId).filter((v): v is string => typeof v === 'string')
     ))
 
     const clientNames: Record<string, string> = {}
+    const clientContacts: Record<string, { phone: string; email: string }> = {}
     for (let i = 0; i < clientIds.length; i += 100) {
       const batch = clientIds.slice(i, i + 100)
       const res = await dynamoDB.send(new BatchGetCommand({
         RequestItems: {
           Clients: {
             Keys: batch.map((id) => ({ id })),
-            ProjectionExpression: 'id, firstName, lastName, email, anonymizedAt',
+            ProjectionExpression: 'id, firstName, lastName, email, phoneNumber, anonymizedAt',
           },
         },
       }))
@@ -106,6 +136,7 @@ async function _GET(
         const name = [c.firstName, c.lastName].filter(Boolean).join(' ').trim()
         // A closed account keeps its jobs, not its name.
         clientNames[c.id] = c.anonymizedAt ? 'Διαγραμμένος πελάτης' : (name || c.email || c.id)
+        clientContacts[c.id] = { phone: (c.phoneNumber as string) || '', email: (c.email as string) || '' }
       }
     }
 
@@ -128,7 +159,10 @@ async function _GET(
       }
     }
 
-    const appointments: AppointmentRow[] = garageRequests.map(({ r, line, percent, rateSource }) => {
+    const categoryOf = (r: Record<string, unknown>) =>
+      typeof r.serviceCategory === 'string' ? r.serviceCategory : (typeof r.category === 'string' ? r.category : '-')
+
+    const appointments: AppointmentRow[] = garageRequests.map(({ r, line, percent, rateSource, undeclared }) => {
       const quoted = typeof r.appointmentPrice === 'number' ? r.appointmentPrice : 0
       const declared = (r as { finalAmounts?: CompletionAmounts }).finalAmounts
       const clientId = typeof r.clientId === 'string' ? r.clientId : ''
@@ -138,9 +172,7 @@ async function _GET(
         appointmentDate: typeof r.appointmentDate === 'string' ? r.appointmentDate : '',
         clientName: clientNames[clientId] || '-',
         vehicleLabel: vehicleLabels[vehicleId] || '-',
-        category: typeof r.serviceCategory === 'string'
-          ? r.serviceCategory
-          : (typeof r.category === 'string' ? r.category : '-'),
+        category: categoryOf(r),
         appointmentPrice: roundCents(quoted),
         declaredNet: declared?.net ?? null,
         declaredGross: declared?.gross ?? null,
@@ -150,8 +182,34 @@ async function _GET(
         commission: line.commission,
         commissionPercent: percent,
         rateSource,
+        undeclared,
       }
     })
+
+    const flaggedRows: FlaggedRow[] = flagged.map(({ request: r, reviewStatus, percent }) => {
+      const clientId = typeof r.clientId === 'string' ? r.clientId : ''
+      const review = r.outcomeReview as { reviewedAt?: string; reviewedBy?: string; note?: string } | undefined
+      const quoteNet = commissionBasis({ appointmentPrice: r.appointmentPrice as number | undefined }).amount
+      return {
+        requestId: r.id as string,
+        appointmentDate: (r.appointmentDate as string) || '',
+        appointmentTime: (r.appointmentTime as string) || '',
+        clientName: clientNames[clientId] || '-',
+        clientPhone: clientContacts[clientId]?.phone || '',
+        clientEmail: clientContacts[clientId]?.email || '',
+        vehicleLabel: vehicleLabels[r.vehicleId as string] || '-',
+        category: categoryOf(r),
+        outcome: r.completionOutcome as 'no_show' | 'not_done',
+        garageNotes: (r.completionNotes as string) || '',
+        appointmentPrice: roundCents(typeof r.appointmentPrice === 'number' ? r.appointmentPrice : 0),
+        commissionIfBilled: roundCents(roundCents(quoteNet) * (percent / 100)),
+        reviewStatus,
+        ...(review?.reviewedAt ? { reviewedAt: review.reviewedAt } : {}),
+        ...(review?.reviewedBy ? { reviewedBy: review.reviewedBy } : {}),
+        ...(review?.note ? { reviewNote: review.note } : {}),
+      }
+    })
+    flaggedRows.sort((a, b) => a.appointmentDate.localeCompare(b.appointmentDate))
 
     appointments.sort((a, b) => a.appointmentDate.localeCompare(b.appointmentDate))
 
@@ -175,6 +233,7 @@ async function _GET(
         commission: totalCommission,
       },
       appointments,
+      flagged: flaggedRows,
     }
 
     return NextResponse.json(response)

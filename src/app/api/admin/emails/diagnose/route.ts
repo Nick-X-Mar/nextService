@@ -293,7 +293,7 @@ async function _GET(_request: NextRequest): Promise<NextResponse> {
       `${result.pipelineHealth.stuckQueued} email(s) stuck at status="queued" — SES send never completed (Lambda cold-shutdown or timeout)`
     )
     next.push(
-      'Check Amplify SSR logs for emailService timeouts. The fire-and-forget pattern in sendEmail() can drop sends when the Lambda exits before the promise resolves.'
+      'Check Amplify SSR logs for emailService timeouts or SES errors.'
     )
   }
   if (result.pipelineHealth.stuckSent > 0) {

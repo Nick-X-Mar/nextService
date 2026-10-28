@@ -118,7 +118,7 @@ async function _PATCH(
     // instead of after the summary cache expires.
     invalidateUnread('garage', offer.garageId as string)
 
-    logEvent({
+    await logEvent({
       eventName: EventName.OfferClientAvailabilityProposed,
       actorType: 'client',
       actorId: clientId,

@@ -129,7 +129,7 @@ async function _PATCH(
       if (typeof offer.garageId === 'string') invalidateUnread('garage', offer.garageId)
     }
 
-    logEvent({
+    await logEvent({
       eventName: EventName.AppointmentCancelled,
       actorType: 'admin',
       actorId: 'admin',
@@ -141,7 +141,7 @@ async function _PATCH(
     })
 
     // Drop the card from any garage dashboard that's currently displaying it.
-    void broadcastRequestUpdate(requestId, ServiceRequestStatus.CANCELLED, 'admin_cancelled')
+    await broadcastRequestUpdate(requestId, ServiceRequestStatus.CANCELLED, 'admin_cancelled')
 
     return NextResponse.json({ success: true })
   } catch (error) {

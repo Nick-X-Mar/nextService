@@ -110,7 +110,7 @@ async function _POST(request: NextRequest) {
     const displayName =
       userType === 'garage' ? user.companyName || '' : user.firstName || ''
 
-    logEvent({
+    await logEvent({
       eventName: EventName.PasswordResetRequested,
       actorType: userType === 'garage' ? 'garage' : 'client',
       actorId: user.id,
@@ -119,7 +119,7 @@ async function _POST(request: NextRequest) {
       metadata: { email: normalizedEmail, expiresAt }
     })
 
-    sendEmail({
+    await sendEmail({
       to: normalizedEmail,
       templateName: EmailTemplate.PasswordReset,
       variables: { resetPath, displayName },

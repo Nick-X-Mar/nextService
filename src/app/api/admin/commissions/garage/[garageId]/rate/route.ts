@@ -54,7 +54,7 @@ async function _PUT(
       throw err
     }
 
-    logEvent({
+    await logEvent({
       eventName: EventName.GarageCommissionRateChanged,
       actorType: 'admin',
       actorId: request.headers.get('x-admin-id') || 'admin',

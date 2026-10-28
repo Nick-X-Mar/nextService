@@ -212,7 +212,7 @@ async function _PATCH(
           ]
         }))
 
-        logEvent({
+        await logEvent({
           eventName: EventName.WalletCredited,
           actorType: 'system',
           clientId,
@@ -254,7 +254,7 @@ async function _PATCH(
     if (garageId) invalidateUnread('garage', garageId)
 
     // Log cancellation event
-    logEvent({
+    await logEvent({
       eventName: EventName.AppointmentCancelled,
       actorType: 'client',
       actorId: clientId,
@@ -272,7 +272,7 @@ async function _PATCH(
     })
 
     // Send cancellation emails
-    void notifyCancellationParticipants({
+    await notifyCancellationParticipants({
       clientId,
       garageId,
       requestId,
@@ -323,7 +323,7 @@ async function notifyCancellationParticipants(args: {
     const garageName = (garageRes.Item?.companyName as string) || 'συνεργείο'
 
     if (clientEmail) {
-      sendEmail({
+      await sendEmail({
         to: clientEmail,
         templateName: EmailTemplate.CancellationConfirmationClient,
         variables: {
@@ -341,7 +341,7 @@ async function notifyCancellationParticipants(args: {
     }
 
     if (garageEmail && args.garageId) {
-      sendEmail({
+      await sendEmail({
         to: garageEmail,
         templateName: EmailTemplate.CancellationNotificationGarage,
         variables: {

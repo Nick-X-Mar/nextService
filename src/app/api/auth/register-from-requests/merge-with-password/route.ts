@@ -86,7 +86,7 @@ async function _POST(request: NextRequest) {
       )
     }
 
-    logEvent({
+    await logEvent({
       eventName: EventName.GuestMergedIntoAccount,
       actorType: 'client',
       actorId: accountId,

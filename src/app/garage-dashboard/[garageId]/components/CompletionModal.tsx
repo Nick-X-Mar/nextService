@@ -146,6 +146,15 @@ export default function CompletionModal({
           </div>
         </div>
 
+        {outcome !== 'completed' && (
+          // Said up front: the commission is waived only after a check with the client.
+          <p className="flex items-start gap-2 rounded-xl bg-surface-container-low p-3 text-xs text-on-surface-variant">
+            <Icon name="info" size="sm" className="text-primary shrink-0" />
+            Θα επικοινωνήσουμε με τον πελάτη για επιβεβαίωση. Αν η εργασία έγινε τελικά, χρεώνεται κανονικά με την
+            τιμή της προσφοράς.
+          </p>
+        )}
+
         {outcome === 'completed' && (
           <div className="space-y-3">
             <div>

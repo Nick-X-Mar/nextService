@@ -160,9 +160,9 @@ async function _POST(
     const now = new Date().toISOString()
     const notes = typeof body.notes === 'string' ? body.notes.slice(0, 2000).trim() : ''
 
-    // The rate is frozen on the job as it closes: the garage's agreed rate
-    // today, or the default. Changing that rate later must not re-price a
-    // month that has already been invoiced.
+    // The rate was frozen on the job when it was booked. Bookings made before
+    // that freeze it now, from the garage's rate today. Either way a later
+    // rate change never re-prices a month that is already invoiced.
     const garageRow = (await dynamoDB.send(
       new GetCommand({ TableName: 'Garages', Key: { id: garageId }, ProjectionExpression: 'commissionPercent' })
     )).Item
@@ -177,7 +177,10 @@ async function _POST(
             'SET #status = :completed, completedAt = :now, completedBy = :by, ' +
             // Backfill on the way past, so the row stops needing the fallback.
             'acceptedGarageId = :garage, ' +
-            'completionOutcome = :outcome, commissionPercent = :rate, updatedAt = :now' +
+            'completionOutcome = :outcome, commissionPercent = if_not_exists(commissionPercent, :rate), updatedAt = :now' +
+            // A garage saying the job did not happen is checked with the client
+            // before the commission is waived (admin → Προμήθειες).
+            (outcome === 'completed' ? '' : ', outcomeReview = :review') +
             (amounts ? ', finalAmounts = :amounts' : '') +
             (notes ? ', completionNotes = :notes' : ''),
           // Re-checked at write time: two tabs, or a retry after a slow
@@ -192,6 +195,7 @@ async function _POST(
             ':garage': garageId,
             ':outcome': outcome,
             ':rate': commissionPercent,
+            ...(outcome === 'completed' ? {} : { ':review': { status: 'pending' } }),
             ...(amounts ? { ':amounts': amounts } : {}),
             ...(notes ? { ':notes': notes } : {}),
           },
@@ -225,7 +229,7 @@ async function _POST(
       }
     }
 
-    logEvent({
+    await logEvent({
       eventName: EventName.ServiceCompleted,
       actorType: 'garage',
       actorId: garageId,
@@ -245,7 +249,7 @@ async function _POST(
     invalidateUnread('garage', garageId)
     invalidateUnread('client', serviceRequest.clientId as string)
 
-    void broadcastRequestUpdate(requestId, ServiceRequestStatus.COMPLETED, 'garage_completed')
+    await broadcastRequestUpdate(requestId, ServiceRequestStatus.COMPLETED, 'garage_completed')
 
     return NextResponse.json({
       success: true,

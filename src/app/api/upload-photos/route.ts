@@ -211,7 +211,7 @@ async function _POST(request: NextRequest) {
       throw error
     }
 
-    logEvent({
+    await logEvent({
       eventName: EventName.DamagePhotosUploaded,
       actorType: 'client',
       requestId: serviceRequestId,
@@ -222,7 +222,7 @@ async function _POST(request: NextRequest) {
     // Garage dashboards render the request card the moment it is created,
     // which is before these photos exist. Push the now-complete photo set so
     // the open dashboards stop showing a photoless card until someone reloads.
-    void broadcastRequestPhotos(serviceRequestId)
+    await broadcastRequestPhotos(serviceRequestId)
 
     return NextResponse.json({
       success: true,

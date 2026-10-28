@@ -153,7 +153,7 @@ async function _POST(request: NextRequest) {
     )
 
     // Log event
-    logEvent({
+    await logEvent({
       eventName: EventName.PaymentInitiated,
       actorType: 'client',
       actorId: clientId,

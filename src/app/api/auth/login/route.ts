@@ -95,7 +95,7 @@ async function _POST(request: NextRequest) {
     if (userType === 'garage') {
       // Check if garage is validated/active
       if (!user.isActive) {
-        logEvent({
+        await logEvent({
           eventName: EventName.GarageLoginPendingValidation,
           actorType: 'garage',
           actorId: user.id,
@@ -117,7 +117,7 @@ async function _POST(request: NextRequest) {
         return pendingResponse
       }
 
-      logEvent({
+      await logEvent({
         eventName: EventName.GarageLogin,
         actorType: 'garage',
         actorId: user.id,
@@ -141,7 +141,7 @@ async function _POST(request: NextRequest) {
       setAuthCookie(response, token)
       return response
     } else {
-      logEvent({
+      await logEvent({
         eventName: EventName.ClientLogin,
         actorType: 'client',
         actorId: user.id,

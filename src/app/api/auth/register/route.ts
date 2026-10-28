@@ -90,7 +90,7 @@ async function _POST(request: NextRequest) {
       Item: clientData
     }))
 
-    logEvent({
+    await logEvent({
       eventName: EventName.ClientRegistered,
       actorType: 'client',
       actorId: clientId,

@@ -14,16 +14,50 @@ import {
 export const DECLARABLE_VAT_RATES: readonly number[] = [DEFAULT_VAT_RATE]
 
 /**
+ * A garage's "it did not happen" (`no_show` / `not_done`) is checked with the
+ * client before the commission is waived. `pending` until an admin decides:
+ * `confirmed` — it really did not happen, nothing is billed; `rejected` — the
+ * client says it did, and the job is billed like any other.
+ */
+export type OutcomeReviewStatus = 'pending' | 'confirmed' | 'rejected'
+
+export interface OutcomeReview {
+  status: OutcomeReviewStatus
+  reviewedAt?: string
+  reviewedBy?: string
+  note?: string
+}
+
+type BillableFields = { completionOutcome?: CompletionOutcome; outcomeReview?: OutcomeReview }
+
+/** Closed as not having happened: a no-show, or work not done. */
+export function isDeclaredNotDone(request: BillableFields): boolean {
+  const outcome = request.completionOutcome
+  return outcome !== undefined && outcome !== 'completed'
+}
+
+/**
+ * The review state of a job closed as not having happened. Rows closed before
+ * reviews existed carry none and count as `pending`, so they surface for a
+ * check rather than staying unbilled unseen.
+ */
+export function outcomeReviewStatus(request: BillableFields): OutcomeReviewStatus | null {
+  if (!isDeclaredNotDone(request)) return null
+  return request.outcomeReview?.status ?? 'pending'
+}
+
+/**
  * Whether a closed job is billed commission at all.
  *
  * Every outcome is stored as COMPLETED, so the status alone cannot tell a
- * finished job from a client who never turned up or work that was never done
- * — and neither of those earned the garage anything to take a share of.
- * Rows closed before outcomes were recorded carry none and stay billable.
+ * finished job from a client who never turned up or work that was never done.
+ * Those two bill nothing — unless an admin, having checked with the client,
+ * found that the job did happen. Rows closed before outcomes were recorded
+ * carry none and stay billable.
  */
-export function isCommissionable(request: { completionOutcome?: CompletionOutcome }): boolean {
-  const outcome = request.completionOutcome
-  return outcome === undefined || outcome === 'completed'
+export function isCommissionable(request: BillableFields): boolean {
+  if (!isDeclaredNotDone(request)) return true
+  return outcomeReviewStatus(request) === 'rejected'
 }
 
 /**
@@ -126,7 +160,7 @@ export interface CommissionLine {
  * on the overview did not match the rows it opened onto.
  */
 export function commissionLine(
-  request: Parameters<typeof commissionBasis>[0] & { completionOutcome?: CompletionOutcome },
+  request: Parameters<typeof commissionBasis>[0] & BillableFields,
   commissionPercent: number
 ): CommissionLine | null {
   if (!isCommissionable(request)) return null

@@ -18,6 +18,10 @@ interface GarageBreakdown {
   commission: number
   /** How many of `appointmentCount` rest on a declared amount rather than the quote. */
   declaredCount: number
+  /** Billed on the agreed price: the appointment day came and the garage has not declared. */
+  undeclaredCount: number
+  /** Said not to have happened, still to check with the client — not billed meanwhile. */
+  pendingReviewCount: number
   /** The garage's rate today. */
   commissionPercent: number
   hasCustomRate: boolean
@@ -33,6 +37,8 @@ interface CommissionsStats {
     totalRevenue: number
     commission: number
     activeGaragesCount: number
+    undeclaredCount: number
+    pendingReviewCount: number
   }
   byGarage: GarageBreakdown[]
 }
@@ -124,6 +130,12 @@ export default function CommissionsPage() {
             // declared what it charged — an estimate, not a settled figure.
             <p className="text-[11px] text-on-surface/50">
               {item.appointmentCount - item.declaredCount} βάσει προσφοράς
+              {item.undeclaredCount > 0 && ` (${item.undeclaredCount} χωρίς δήλωση)`}
+            </p>
+          )}
+          {item.pendingReviewCount > 0 && (
+            <p className="text-[11px] font-bold text-tertiary">
+              {item.pendingReviewCount} προς έλεγχο
             </p>
           )}
         </div>
@@ -182,10 +194,10 @@ export default function CommissionsPage() {
         <div>
           <h1 className="text-2xl font-bold font-headline text-on-surface">Προμήθειες Συνεργείων</h1>
           <p className="text-sm text-on-surface/60 mt-1">
-            Προμήθεια επί της καθαρής αξίας (χωρίς ΦΠΑ) των ολοκληρωμένων εργασιών, με το συμφωνημένο ποσοστό
-            κάθε συνεργείου ή την προεπιλογή {formatPercent(data?.defaultCommissionPercent ?? 15)}. Κάθε εργασία
-            κρατά το ποσοστό που ίσχυε όταν ολοκληρώθηκε. Δεν χρεώνονται ραντεβού όπου ο πελάτης δεν ήρθε ή η
-            εργασία δεν έγινε.
+            Κάθε ραντεβού χρεώνεται από την ημέρα του, με το ποσοστό που ίσχυε όταν κλείστηκε — το συμφωνημένο
+            του συνεργείου ή την προεπιλογή {formatPercent(data?.defaultCommissionPercent ?? 15)} — επί της καθαρής
+            αξίας (χωρίς ΦΠΑ): του ποσού που δήλωσε το συνεργείο, ή της προσφοράς όσο δεν έχει δηλώσει. Όσα
+            δηλώθηκε ότι δεν έγιναν δεν χρεώνονται, εκτός αν ο έλεγχος με τον πελάτη δείξει ότι έγιναν.
           </p>
         </div>
         <select
@@ -263,6 +275,17 @@ export default function CommissionsPage() {
           </ResponsiveContainer>
         )}
       </div>
+
+      {(data?.totals.pendingReviewCount ?? 0) > 0 && (
+        <div className="flex items-start gap-3 rounded-xl border border-tertiary/20 bg-tertiary/5 p-4 mb-4" data-testid="pending-review-banner">
+          <span className="material-symbols-outlined text-tertiary">flag</span>
+          <p className="text-sm text-on-surface">
+            <span className="font-bold">{data?.totals.pendingReviewCount} εργασίες</span> δηλώθηκαν από το συνεργείο ότι
+            δεν έγιναν (ο πελάτης δεν ήρθε ή η εργασία δεν έγινε). Δεν χρεώνονται μέχρι να το επιβεβαιώσετε με τον
+            πελάτη — ανοίξτε το συνεργείο για τα στοιχεία επικοινωνίας.
+          </p>
+        </div>
+      )}
 
       <h2 className="text-lg font-semibold text-on-surface mb-3">Αναλυτικά ανά Συνεργείο</h2>
       <DataTable

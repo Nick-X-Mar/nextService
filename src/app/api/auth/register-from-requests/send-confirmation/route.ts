@@ -157,7 +157,7 @@ async function _POST(request: NextRequest) {
     // A path: the template puts SITE_URL in front of every link it sends.
     const confirmPath = `/confirm-account/?g=${encodeURIComponent(guestId)}&t=${rawToken}`
 
-    logEvent({
+    await logEvent({
       eventName: EventName.GuestMergeRequested,
       actorType: 'client',
       actorId: guestId,
@@ -166,7 +166,7 @@ async function _POST(request: NextRequest) {
       metadata: { targetClientId: accountId, expiresAt },
     })
 
-    sendEmail({
+    await sendEmail({
       to: account.email as string,
       templateName: EmailTemplate.AccountMergeConfirmation,
       variables: { confirmPath },

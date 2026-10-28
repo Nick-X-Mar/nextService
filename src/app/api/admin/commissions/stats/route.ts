@@ -21,6 +21,10 @@ interface GarageBreakdown {
    * well below the count is reporting estimates, not settled figures.
    */
   declaredCount: number
+  /** Billed on the agreed price because the appointment day came and the garage has not declared yet. */
+  undeclaredCount: number
+  /** Jobs the garage said did not happen, still to be checked with the client. Not billed meanwhile. */
+  pendingReviewCount: number
   /** The garage's rate today — what a job it completes now is billed at. */
   commissionPercent: number
   /** True when that rate is an agreed one, not the default. */
@@ -41,6 +45,8 @@ interface CommissionsStatsResponse {
     totalRevenue: number
     commission: number
     activeGaragesCount: number
+    undeclaredCount: number
+    pendingReviewCount: number
   }
   byGarage: GarageBreakdown[]
 }
@@ -60,17 +66,30 @@ async function _GET(request: NextRequest) {
     const monthParam = searchParams.get('month')
     const month = isValidMonth(monthParam) ? monthParam : currentMonth()
 
-    const { jobs, garages } = await billedJobsForMonth(month)
+    const { jobs, flagged, garages } = await billedJobsForMonth(month)
 
     // Summed from the same per-job lines a garage's detail page lists, so the
     // two always agree. Revenue is the net the commission was taken from.
-    const byGarageId = new Map<string, { revenues: number[]; commissions: number[]; declaredCount: number }>()
+    type Agg = { revenues: number[]; commissions: number[]; declaredCount: number; undeclaredCount: number; pendingReviewCount: number }
+    const byGarageId = new Map<string, Agg>()
+    const entryFor = (garageId: string): Agg => {
+      const existing = byGarageId.get(garageId)
+      if (existing) return existing
+      const fresh: Agg = { revenues: [], commissions: [], declaredCount: 0, undeclaredCount: 0, pendingReviewCount: 0 }
+      byGarageId.set(garageId, fresh)
+      return fresh
+    }
     for (const job of jobs) {
-      const entry = byGarageId.get(job.garageId) ?? { revenues: [], commissions: [], declaredCount: 0 }
+      const entry = entryFor(job.garageId)
       entry.revenues.push(job.line.basisAmount)
       entry.commissions.push(job.line.commission)
       if (job.line.source === 'declared') entry.declaredCount += 1
-      byGarageId.set(job.garageId, entry)
+      if (job.undeclared) entry.undeclaredCount += 1
+    }
+    // A garage whose only jobs this month are awaiting review still gets a
+    // line, or the check would never be seen.
+    for (const f of flagged) {
+      if (f.reviewStatus === 'pending') entryFor(f.garageId).pendingReviewCount += 1
     }
 
     const byGarage: GarageBreakdown[] = Array.from(byGarageId, ([garageId, agg]) => {
@@ -84,6 +103,8 @@ async function _GET(request: NextRequest) {
         totalRevenue,
         commission,
         declaredCount: agg.declaredCount,
+        undeclaredCount: agg.undeclaredCount,
+        pendingReviewCount: agg.pendingReviewCount,
         commissionPercent: garageCommissionPercent(garage),
         hasCustomRate: parseCommissionPercent(garage?.commissionPercent) !== null,
         effectivePercent: totalRevenue > 0 ? Math.round((commission / totalRevenue) * 10000) / 100 : 0,
@@ -98,7 +119,9 @@ async function _GET(request: NextRequest) {
         appointmentCount: byGarage.reduce((n, g) => n + g.appointmentCount, 0),
         totalRevenue: sumCents(byGarage.map((g) => g.totalRevenue)),
         commission: sumCents(byGarage.map((g) => g.commission)),
-        activeGaragesCount: byGarage.length,
+        activeGaragesCount: byGarage.filter((g) => g.appointmentCount > 0).length,
+        undeclaredCount: byGarage.reduce((n, g) => n + g.undeclaredCount, 0),
+        pendingReviewCount: byGarage.reduce((n, g) => n + g.pendingReviewCount, 0),
       },
       byGarage,
     }

@@ -173,7 +173,7 @@ async function _POST(request: NextRequest, { params }: { params: Promise<{ reque
       party.direction === 'client_to_garage' ? party.clientId : party.garageId
     )
 
-    logEvent({
+    await logEvent({
       eventName: EventName.ServiceCompleted,
       actorType: party.direction === 'client_to_garage' ? 'client' : 'garage',
       actorId: party.direction === 'client_to_garage' ? party.clientId : party.garageId,

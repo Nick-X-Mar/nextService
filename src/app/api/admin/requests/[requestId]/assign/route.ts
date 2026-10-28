@@ -128,7 +128,7 @@ async function _POST(
     if (typeof sr.clientId === 'string') invalidateUnread('client', sr.clientId)
     invalidateUnread('garage', garageId)
 
-    logEvent({
+    await logEvent({
       eventName: EventName.OfferCreated,
       actorType: 'admin',
       actorId: 'admin',
@@ -150,7 +150,7 @@ async function _POST(
         const clientEmail = clientRes.Item?.email as string | undefined
         if (!clientEmail) return
 
-        sendEmail({
+        await sendEmail({
           to: clientEmail,
           templateName: EmailTemplate.NewOfferReceived,
           variables: {

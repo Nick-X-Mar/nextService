@@ -26,6 +26,27 @@ interface AppointmentRow {
   commissionPercent: number
   /** `job`: frozen when it was completed · `garage`/`default`: an older job, billed at today's rate. */
   rateSource: 'job' | 'garage' | 'default'
+  /** The appointment day came and the garage has not declared — billed on the agreed price meanwhile. */
+  undeclared: boolean
+}
+
+interface FlaggedRow {
+  requestId: string
+  appointmentDate: string
+  appointmentTime: string
+  clientName: string
+  clientPhone: string
+  clientEmail: string
+  vehicleLabel: string
+  category: string
+  outcome: 'no_show' | 'not_done'
+  garageNotes: string
+  appointmentPrice: number
+  commissionIfBilled: number
+  reviewStatus: 'pending' | 'confirmed' | 'rejected'
+  reviewedAt?: string
+  reviewedBy?: string
+  reviewNote?: string
 }
 
 interface GarageCommissionsData {
@@ -44,6 +65,7 @@ interface GarageCommissionsData {
     commission: number
   }
   appointments: AppointmentRow[]
+  flagged: FlaggedRow[]
 }
 
 const MONTH_LABELS = [
@@ -92,6 +114,7 @@ export default function GarageCommissionsPage({ params }: { params: Promise<{ ga
   const [month, setMonth] = useState<string>(initialMonth)
   const [data, setData] = useState<GarageCommissionsData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [reload, setReload] = useState(0)
 
   const monthOptions = useMemo(() => lastNMonths(12), [])
 
@@ -110,7 +133,7 @@ export default function GarageCommissionsPage({ params }: { params: Promise<{ ga
     }
     fetchData()
     return () => { cancelled = true }
-  }, [garageId, month])
+  }, [garageId, month, reload])
 
   function changeMonth(value: string) {
     setMonth(value)
@@ -155,8 +178,8 @@ export default function GarageCommissionsPage({ params }: { params: Promise<{ ga
       render: (item) => (
         <div>
           <span>{formatEUR(item.basisAmount)}</span>
-          <p className="text-[11px] text-on-surface/50">
-            {item.basis === 'declared' ? 'Δηλωμένο ποσό' : 'Βάσει προσφοράς'}
+          <p className={`text-[11px] ${item.undeclared ? 'font-bold text-tertiary' : 'text-on-surface/50'}`}>
+            {item.basis === 'declared' ? 'Δηλωμένο ποσό' : item.undeclared ? 'Δεν έχει δηλωθεί — βάσει προσφοράς' : 'Βάσει προσφοράς'}
           </p>
         </div>
       ),
@@ -254,6 +277,20 @@ export default function GarageCommissionsPage({ params }: { params: Promise<{ ga
           garageId={garageId}
           data={data}
           onSaved={(rate) => setData((d) => (d ? { ...d, ...rate } : d))}
+        />
+      )}
+
+      {data && data.flagged.length > 0 && (
+        <FlaggedJobs
+          rows={data.flagged}
+          onReviewed={(requestId, review) => {
+            setData((d) => d && {
+              ...d,
+              flagged: d.flagged.map((f) => (f.requestId === requestId ? { ...f, ...review } : f)),
+            })
+            // The billed rows and totals follow the decision.
+            setReload((n) => n + 1)
+          }}
         />
       )}
 
@@ -357,6 +394,121 @@ function CommissionRateCard({
             Επαναφορά στην προεπιλογή
           </button>
         )}
+      </div>
+      {error && <p role="alert" className="text-xs text-error mt-2">{error}</p>}
+    </div>
+  )
+}
+
+const OUTCOME_LABEL: Record<FlaggedRow['outcome'], string> = {
+  no_show: 'Ο πελάτης δεν ήρθε',
+  not_done: 'Η εργασία δεν έγινε',
+}
+
+/**
+ * Jobs the garage closed as not having happened. Not billed until an admin
+ * has checked with the client: "Επιβεβαιώθηκε" waives the commission for good,
+ * "Έγινε κανονικά" bills the job on its agreed price. Either can be changed.
+ */
+function FlaggedJobs({
+  rows,
+  onReviewed,
+}: {
+  rows: FlaggedRow[]
+  onReviewed: (requestId: string, review: Pick<FlaggedRow, 'reviewStatus' | 'reviewedAt' | 'reviewedBy' | 'reviewNote'>) => void
+}) {
+  const { run, isPending } = useAsyncTask()
+  const [error, setError] = useState('')
+
+  const decide = (row: FlaggedRow, decision: 'confirmed' | 'rejected') =>
+    run(`${decision}-${row.requestId}`, async () => {
+      setError('')
+      const res = await fetch(`/api/admin/commissions/review/${row.requestId}/`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(json.error || 'Η αποθήκευση απέτυχε')
+        return
+      }
+      const r = json.outcomeReview as { status: FlaggedRow['reviewStatus']; reviewedAt?: string; reviewedBy?: string; note?: string }
+      onReviewed(row.requestId, { reviewStatus: r.status, reviewedAt: r.reviewedAt, reviewedBy: r.reviewedBy, reviewNote: r.note })
+    })
+
+  return (
+    <div className="bg-surface-container-lowest rounded-xl border border-tertiary/20 p-5 mb-6" data-testid="flagged-jobs">
+      <h3 className="font-bold text-on-surface flex items-center gap-2">
+        <span className="material-symbols-outlined text-tertiary text-[20px]">flag</span>
+        Δηλώθηκε ότι δεν έγιναν — προς έλεγχο
+      </h3>
+      <p className="text-xs text-on-surface/50 mt-1 mb-4">
+        Δεν χρεώνονται μέχρι να το επιβεβαιώσετε με τον πελάτη. Αν ο πελάτης πει ότι η εργασία έγινε, χρεώνεται με
+        την τιμή της προσφοράς.
+      </p>
+      <div className="space-y-3">
+        {rows.map((row) => (
+          <div key={row.requestId} className="rounded-lg border border-outline-variant/20 p-4" data-testid="flagged-job">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="text-sm">
+                <p className="font-bold text-on-surface">
+                  {OUTCOME_LABEL[row.outcome]} · {formatDate(row.appointmentDate)}{row.appointmentTime ? ` ${row.appointmentTime}` : ''}
+                </p>
+                <p className="text-on-surface/70">
+                  {row.vehicleLabel} · {getCategoryText(row.category)} · προσφορά {formatEUR(row.appointmentPrice)} ·
+                  προμήθεια αν χρεωθεί {formatEUR(row.commissionIfBilled)}
+                </p>
+                <p className="text-on-surface/70 mt-1">
+                  Πελάτης: <span className="font-medium text-on-surface">{row.clientName}</span>
+                  {row.clientPhone && (
+                    <> · <a href={`tel:${row.clientPhone}`} className="text-primary hover:underline">{row.clientPhone}</a></>
+                  )}
+                  {row.clientEmail && (
+                    <> · <a href={`mailto:${row.clientEmail}`} className="text-primary hover:underline">{row.clientEmail}</a></>
+                  )}
+                </p>
+                {row.garageNotes && <p className="text-xs text-on-surface/60 mt-1">Σημείωση συνεργείου: {row.garageNotes}</p>}
+              </div>
+              <div className="text-right">
+                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold ${
+                  row.reviewStatus === 'pending'
+                    ? 'bg-amber-100 text-amber-800'
+                    : row.reviewStatus === 'confirmed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                }`}>
+                  {row.reviewStatus === 'pending' ? 'Προς έλεγχο' : row.reviewStatus === 'confirmed' ? 'Επιβεβαιώθηκε — χωρίς χρέωση' : 'Έγινε — χρεώνεται'}
+                </span>
+                {row.reviewedAt && (
+                  <p className="text-[11px] text-on-surface/50 mt-1">
+                    {new Date(row.reviewedAt).toLocaleDateString('el-GR')}{row.reviewedBy ? ` · ${row.reviewedBy}` : ''}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {row.reviewStatus !== 'confirmed' && (
+                <button
+                  onClick={() => decide(row, 'confirmed')}
+                  disabled={isPending()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant/30 px-3 py-1.5 text-xs font-bold text-on-surface hover:bg-surface-container disabled:opacity-50"
+                >
+                  {isPending(`confirmed-${row.requestId}`) && <Spinner size="sm" />}
+                  Επιβεβαιώθηκε — χωρίς χρέωση
+                </button>
+              )}
+              {row.reviewStatus !== 'rejected' && (
+                <button
+                  onClick={() => decide(row, 'rejected')}
+                  disabled={isPending()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary text-on-primary px-3 py-1.5 text-xs font-bold disabled:opacity-50"
+                >
+                  {isPending(`rejected-${row.requestId}`) && <Spinner size="sm" />}
+                  Έγινε κανονικά — χρέωση
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
       {error && <p role="alert" className="text-xs text-error mt-2">{error}</p>}
     </div>

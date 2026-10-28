@@ -16,6 +16,7 @@ import { withMetrics } from '@/utils/withMetrics'
 import { broadcastRequestUpdate } from '@/utils/requestBroadcast'
 import { invalidateUnread } from '@/utils/unreadCache'
 import { rejectPendingOffersOn } from '@/app/api/offers/offerWrites'
+import { garageCommissionPercent } from '@/lib/commission-basis'
 
 const checkAcceptRate = createRateLimiter('accept-offer', 5, 3600000)
 
@@ -321,6 +322,16 @@ async function _PATCH(
 
     const updatedAt = new Date().toISOString()
 
+    // The commission is agreed with the booking: the garage's rate at this
+    // moment is frozen on the job. A rate changed later applies to the next
+    // booking, never to one already made.
+    const garageRate = (await dynamoDB.send(new GetCommand({
+      TableName: 'Garages',
+      Key: { id: acceptedGarageId },
+      ProjectionExpression: 'commissionPercent',
+    }))).Item
+    const commissionPercent = garageCommissionPercent(garageRate)
+
     const requestSetParts = [
       '#status = :appointment',
       'acceptedOfferId = :acceptedOfferId',
@@ -330,6 +341,7 @@ async function _PATCH(
       'appointmentDate = :appointmentDate',
       'appointmentTime = :appointmentTime',
       'appointmentPrice = :appointmentPrice',
+      'commissionPercent = :commissionPercent',
       'updatedAt = :updatedAt'
     ]
     const requestValues: Record<string, unknown> = {
@@ -340,6 +352,7 @@ async function _PATCH(
       ':appointmentDate': appointmentDate,
       ':appointmentTime': appointmentTime ?? null,
       ':appointmentPrice': agreedPrice,
+      ':commissionPercent': commissionPercent,
       ':updatedAt': updatedAt
     }
 
@@ -481,7 +494,7 @@ async function _PATCH(
       if (typeof offer.garageId === 'string') invalidateUnread('garage', offer.garageId)
     }
 
-    logEvent({
+    await logEvent({
       eventName: EventName.OfferAccepted,
       actorType: 'client',
       actorId: acceptedClientId,
@@ -493,7 +506,7 @@ async function _PATCH(
       metadata: { appointmentDate, appointmentPrice: agreedPrice }
     })
 
-    logEvent({
+    await logEvent({
       eventName: EventName.AppointmentScheduled,
       actorType: 'system',
       clientId: acceptedClientId,
@@ -505,7 +518,7 @@ async function _PATCH(
     })
 
     for (const offer of rejectedOffers) {
-      logEvent({
+      await logEvent({
         eventName: EventName.OfferRejected,
         actorType: 'system',
         actorId: acceptedClientId,
@@ -521,10 +534,10 @@ async function _PATCH(
     // Tell every garage dashboard listening on the realtime channel to drop
     // this request from their list — once an offer is accepted it's no longer
     // available to anyone else.
-    void broadcastRequestUpdate(requestId, ServiceRequestStatus.APPOINTMENT, 'offer_accepted')
+    await broadcastRequestUpdate(requestId, ServiceRequestStatus.APPOINTMENT, 'offer_accepted')
 
     // Fire both confirmation emails (best-effort, never block).
-    void notifyAcceptanceParticipants({
+    await notifyAcceptanceParticipants({
       clientId: acceptedClientId,
       garageId: acceptedGarageId,
       requestId,
@@ -608,7 +621,7 @@ async function notifyAcceptanceParticipants(args: {
     const garageName = (garageRes.Item?.companyName as string) || 'συνεργείο'
 
     if (clientEmail) {
-      sendEmail({
+      await sendEmail({
         to: clientEmail,
         templateName: EmailTemplate.AppointmentConfirmationClient,
         variables: {
@@ -627,7 +640,7 @@ async function notifyAcceptanceParticipants(args: {
 
     // Payment confirmation email (when deposit was paid)
     if (clientEmail && args.depositAmount !== undefined) {
-      sendEmail({
+      await sendEmail({
         to: clientEmail,
         templateName: EmailTemplate.PaymentConfirmationClient,
         variables: {
@@ -646,7 +659,7 @@ async function notifyAcceptanceParticipants(args: {
     }
 
     if (garageEmail && args.garageId) {
-      sendEmail({
+      await sendEmail({
         to: garageEmail,
         templateName: EmailTemplate.OfferAcceptedGarage,
         variables: {

@@ -429,10 +429,12 @@ test.describe('Commissions', () => {
     expect(legacyResp.status()).toBe(200)
     await makeLegacyCompletion(legacy.requestId)
 
-    // The no-show and the legacy job only: the overview moves by exactly the
-    // legacy job.
+    // All three were already billed from their appointment day, undeclared.
+    // Declared a no-show, one leaves the bill (until an admin checks it); the
+    // legacy job stays on it.
     const afterNoShow = await stats()
-    expect(afterNoShow.appointmentCount).toBe(before.appointmentCount + 1)
+    expect(afterNoShow.appointmentCount).toBe(before.appointmentCount - 1)
+    expect(afterNoShow.pendingReviewCount).toBe((before.pendingReviewCount ?? 0) + 1)
 
     const doneResp = await complete(request, done.garage, done.requestId, {
       outcome: 'completed', amount: 186, vatIncluded: true,
@@ -630,6 +632,94 @@ test.describe('Commission rates', () => {
     const afterReset = await detail(custom.id, month)
     expect(afterReset.totals.commission).toBe(10 + 20 + 15) // the legacy job follows today's rate
     expect(afterReset.hasCustomRate).toBe(false)
+  })
+})
+
+test.describe('Commission from the appointment day', () => {
+  test('a booking bills at the rate agreed when it was made, from its day, declared or not — and a claimed no-show waits for an admin', async ({ request }) => {
+    test.slow()
+    const c = await client(request)
+    const admin = await adminCookie(request)
+    const shop = await newGarage(request, { prefix: 'billing-day' })
+    const setRate = (commissionPercent: number) =>
+      request.put(`/api/admin/commissions/garage/${shop.id}/rate/`, { headers: { Cookie: admin }, data: { commissionPercent } })
+    const book = async (description: string) => {
+      const date = athensDatePlus(30)
+      const requestId = await createRequest(request, c, description)
+      const offerId = await createOffer(request, shop.token, requestId, 124, [date])
+      const accept = await acceptOffer(request, c, requestId, { offerId, appointmentDate: date, appointmentTime: '10:00' })
+      expect(accept.status(), await accept.text()).toBe(200)
+      return requestId
+    }
+    const review = (requestId: string, decision: unknown, cookie = admin) =>
+      request.put(`/api/admin/commissions/review/${requestId}/`, { headers: { Cookie: cookie }, data: { decision } })
+    const detail = async (month: string) => {
+      const resp = await request.get(`/api/admin/commissions/garage/${shop.id}/?month=${month}`, { headers: { Cookie: admin } })
+      expect(resp.status()).toBe(200)
+      return resp.json()
+    }
+
+    // Booked at 10%; the rate then rises. The booking keeps the 10% it was made at.
+    expect((await setRate(10)).status()).toBe(200)
+    const undeclared = await book('E2E billing: undeclared')
+    expect((await getServiceRequest(undeclared))?.commissionPercent).toBe(10)
+    expect((await setRate(20)).status()).toBe(200)
+    const noShow = await book('E2E billing: claimed no-show')
+    const future = await book('E2E billing: still ahead')
+
+    const month = (await ageAppointment(undeclared, 2)).slice(0, 7)
+    expect((await ageAppointment(noShow, 2)).slice(0, 7)).toBe(month)
+
+    // The day has come and the garage has said nothing: billed on the quote's net (124 → 100).
+    let page = await detail(month)
+    const ids = (rows: { requestId: string }[]) => rows.map((r) => r.requestId)
+    expect(ids(page.appointments)).toEqual(expect.arrayContaining([undeclared, noShow]))
+    expect(ids(page.appointments)).not.toContain(future)
+    expect(page.appointments.find((a: { requestId: string }) => a.requestId === undeclared)).toMatchObject({
+      undeclared: true, basis: 'quoted', basisAmount: 100, commissionPercent: 10, rateSource: 'job', commission: 10,
+    })
+
+    // The garage says the client never came: off the bill, onto the review list.
+    const closed = await complete(request, shop.token, noShow, { outcome: 'no_show' })
+    expect(closed.status(), await closed.text()).toBe(200)
+    page = await detail(month)
+    expect(ids(page.appointments)).not.toContain(noShow)
+    expect(page.flagged).toHaveLength(1)
+    expect(page.flagged[0]).toMatchObject({
+      requestId: noShow, outcome: 'no_show', reviewStatus: 'pending', clientEmail: c.email, commissionIfBilled: 20,
+    })
+
+    // Only an admin decides, and only with a real decision.
+    expect((await review(noShow, 'rejected', `auth-token=${shop.token}`)).status()).toBe(401)
+    expect((await review(noShow, 'maybe')).status()).toBe(400)
+    expect((await review(undeclared, 'confirmed')).status()).toBe(409) // not closed as not done
+
+    // The client says the job happened: billed, at the 20% the booking was made at.
+    expect((await review(noShow, 'rejected')).status()).toBe(200)
+    page = await detail(month)
+    expect(page.appointments.find((a: { requestId: string }) => a.requestId === noShow)).toMatchObject({
+      commissionPercent: 20, commission: 20, basisAmount: 100,
+    })
+    expect(page.flagged[0].reviewStatus).toBe('rejected')
+
+    // Changed mind: it really did not happen. Off the bill again.
+    expect((await review(noShow, 'confirmed')).status()).toBe(200)
+    page = await detail(month)
+    expect(ids(page.appointments)).not.toContain(noShow)
+    expect(page.flagged[0].reviewStatus).toBe('confirmed')
+
+    // The garage finally declares the undeclared job: now billed on what it charged, at its own 10%.
+    const declared = await complete(request, shop.token, undeclared, { outcome: 'completed', amount: 200, vatIncluded: false })
+    expect(declared.status(), await declared.text()).toBe(200)
+    page = await detail(month)
+    expect(page.appointments.find((a: { requestId: string }) => a.requestId === undeclared)).toMatchObject({
+      undeclared: false, basis: 'declared', basisAmount: 200, commissionPercent: 10, commission: 20,
+    })
+    expect(page.totals).toMatchObject({ appointmentCount: 1, commission: 20 })
+
+    const overview = await request.get(`/api/admin/commissions/stats/?month=${month}`, { headers: { Cookie: admin } })
+    const line = (await overview.json()).byGarage.find((g: { garageId: string }) => g.garageId === shop.id)
+    expect(line).toMatchObject({ appointmentCount: 1, commission: 20, undeclaredCount: 0, pendingReviewCount: 0 })
   })
 })
 

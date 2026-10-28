@@ -99,7 +99,7 @@ async function _POST(request: NextRequest) {
       return refusal(409, 'MERGE_CONFLICT', 'Η σύνδεση των αιτημάτων δεν ολοκληρώθηκε. Δοκιμάστε ξανά.')
     }
 
-    logEvent({
+    await logEvent({
       eventName: EventName.GuestMergedIntoAccount,
       actorType: 'client',
       actorId: accountId,

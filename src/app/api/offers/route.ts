@@ -142,7 +142,7 @@ async function _POST(request: NextRequest) {
     if (typeof serviceRequest.clientId === 'string') invalidateUnread('client', serviceRequest.clientId)
     invalidateUnread('garage', garageId)
 
-    logEvent({
+    await logEvent({
       eventName: EventName.OfferCreated,
       actorType: 'garage',
       actorId: garageId,
@@ -154,7 +154,7 @@ async function _POST(request: NextRequest) {
     })
 
     // Email the client that owns this request. Best-effort lookup — never block.
-    void notifyClientAboutNewOffer({
+    await notifyClientAboutNewOffer({
       clientId: serviceRequest.clientId as string | undefined,
       serviceRequestId,
       garageId,
@@ -386,7 +386,7 @@ async function _PUT(request: NextRequest) {
     invalidateUnread('garage', garageId)
     await invalidateRequestOwner(serviceRequestId)
 
-    logEvent({
+    await logEvent({
       eventName: EventName.OfferUpdated,
       actorType: 'garage',
       actorId: garageId,
@@ -448,7 +448,7 @@ async function notifyClientAboutNewOffer(args: {
     const clientEmail = clientRes.Item?.email as string | undefined
     if (!clientEmail) return
 
-    sendEmail({
+    await sendEmail({
       to: clientEmail,
       templateName: EmailTemplate.NewOfferReceived,
       variables: {

@@ -36,7 +36,7 @@ async function _POST(request: NextRequest) {
     const auth = getAuth(request)
     const clientId = auth?.userType === 'client' ? auth.userId : undefined
 
-    logEvent({
+    await logEvent({
       eventName,
       actorType: 'client',
       actorId: clientId,

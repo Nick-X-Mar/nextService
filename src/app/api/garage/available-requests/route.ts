@@ -25,7 +25,7 @@ async function _GET(request: NextRequest) {
     const garageId = await requireActiveGarage(request)
     if (garageId instanceof NextResponse) return garageId
 
-    logEvent({
+    await logEvent({
       eventName: EventName.GarageViewedAvailableRequests,
       actorType: 'garage',
       actorId: garageId,

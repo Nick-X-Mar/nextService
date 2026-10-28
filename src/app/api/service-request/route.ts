@@ -487,7 +487,7 @@ async function _POST(request: NextRequest) {
       )
     }
 
-    logEvent({
+    await logEvent({
       eventName: EventName.ServiceRequestSubmitted,
       actorType: 'client',
       actorId: clientId,
@@ -507,7 +507,7 @@ async function _POST(request: NextRequest) {
     // address straight from the body; for logged-in clients we'd need to look
     // it up — skip if we don't have it locally to avoid an extra DB hit.
     if (newClient) {
-      sendEmail({
+      await sendEmail({
         to: newClient.email as string,
         templateName: EmailTemplate.RequestConfirmation,
         variables: {
@@ -523,9 +523,12 @@ async function _POST(request: NextRequest) {
     }
 
     // Fan-out the new request to any garage dashboards listening on the
-    // shared AppSync channel. Don't await — broadcasting must never block
-    // the response, and failures are logged inside the helper.
-    void broadcastNewRequest(serviceRequestId)
+    // shared AppSync channel. Awaited: on Amplify the SSR function is frozen
+    // the moment it responds, so an un-awaited publish never left — the
+    // dashboards only ever saw new requests on their 30s poll. The helper
+    // swallows its own errors and the publish has a 4s timeout, so this can
+    // neither fail the request nor hang it.
+    await broadcastNewRequest(serviceRequestId)
 
     const response = NextResponse.json({
       success: true,

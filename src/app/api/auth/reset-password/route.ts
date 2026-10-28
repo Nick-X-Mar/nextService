@@ -126,7 +126,7 @@ async function _POST(request: NextRequest) {
       throw err
     }
 
-    logEvent({
+    await logEvent({
       eventName: EventName.PasswordResetCompleted,
       actorType: userType === 'garage' ? 'garage' : 'client',
       actorId: user.id,

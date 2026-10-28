@@ -388,7 +388,7 @@ export async function createChatMessage(args: {
 
   await dynamoDB.send(new PutCommand({ TableName: 'ChatMessages', Item: messageData }))
 
-  logEvent({
+  await logEvent({
     eventName: EventName.ChatMessageSent,
     actorType: auth.userType,
     actorId: auth.userId,
@@ -406,7 +406,7 @@ export async function createChatMessage(args: {
     },
   })
 
-  notifyByEmail({
+  await notifyByEmail({
     requestId,
     request,
     senderType: auth.userType,
@@ -505,7 +505,7 @@ async function notifyByEmail(args: {
       ? `/requests/${clientId}/chats/${requestId}/?garageId=${garageId}`
       : `/garage-dashboard/${garageId}/chat/${requestId}/`
 
-  sendEmail({
+  await sendEmail({
     to: email,
     templateName: EmailTemplate.NewChatMessage,
     variables: { senderName, chatUrl },

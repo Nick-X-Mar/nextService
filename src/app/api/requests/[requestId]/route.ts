@@ -129,7 +129,7 @@ async function _GET(
     // Keyed on the session, not the query param: leaving the param off used to
     // be enough to read the data without leaving a trace.
     if (auth.userType === 'garage') {
-      logEvent({
+      await logEvent({
         eventName: EventName.GarageViewedRequestDetails,
         actorType: 'garage',
         actorId: auth.userId,
@@ -368,7 +368,7 @@ async function _PATCH(
 
     const updatedRequest = updateResult.Attributes
 
-    logEvent({
+    await logEvent({
       eventName: EventName.ClientAvailabilityDatesSubmitted,
       actorType: 'client',
       actorId: updatedRequest.clientId,

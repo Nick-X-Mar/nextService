@@ -45,7 +45,7 @@ async function _POST(
     // Re-approving an already active garage must not mail it again.
     const wasActive = garage?.isActive === true
     if (!wasActive) {
-      logEvent({
+      await logEvent({
         eventName: EventName.GarageValidated,
         actorType: 'admin',
         actorId: request.headers.get('x-admin-id') || 'admin',
@@ -55,7 +55,7 @@ async function _POST(
       })
 
       if (garage?.email) {
-        sendEmail({
+        await sendEmail({
           to: garage.email as string,
           templateName: EmailTemplate.GarageActivated,
           variables: {

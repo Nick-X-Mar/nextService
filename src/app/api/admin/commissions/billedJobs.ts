@@ -1,11 +1,14 @@
 import { BatchGetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ServiceRequestStatus } from '@/types/statuses'
+import { hasAppointmentStarted } from '@/lib/appointment-window'
 import {
   commissionLine,
+  outcomeReviewStatus,
   resolveCommissionPercent,
   type CommissionLine,
   type CommissionRateSource,
+  type OutcomeReviewStatus,
 } from '@/lib/commission-basis'
 
 type Row = Record<string, unknown>
@@ -17,49 +20,59 @@ export interface BilledJob {
   /** The rate this job was billed at, and where it came from. */
   percent: number
   rateSource: CommissionRateSource
+  /**
+   * The appointment day has come and the garage has not said how it went.
+   * Billed on the agreed price until it does.
+   */
+  undeclared: boolean
+}
+
+/** A job the garage closed as not having happened, waiting on (or past) an admin's check. */
+export interface FlaggedJob {
+  request: Row
+  garageId: string
+  reviewStatus: OutcomeReviewStatus
+  percent: number
 }
 
 /**
- * Every completed job of a month that bills commission, with the garage it
- * belongs to and its line. The overview and a garage's detail page are both
- * built from this, so their figures cannot drift apart.
+ * Every job of a month that bills commission, with the garage it belongs to
+ * and its line — plus the jobs a garage said did not happen, for review. The
+ * overview and a garage's detail page are both built from this, so their
+ * figures cannot drift apart.
+ *
+ * Billing starts on the appointment day: a booking whose slot has started is
+ * billed on the agreed price even before the garage declares anything, and on
+ * the declared amount once it does. A garage that never declares therefore
+ * still owes the commission.
  *
  * A job belongs to the month of its appointment (YYYY-MM of `appointmentDate`,
- * an Athens date), not the day it was closed: a job booked for the 31st and
- * declared on the 2nd is that month's work.
+ * an Athens date), not the day it was closed.
  */
 export async function billedJobsForMonth(
   month: string,
-  onlyGarageId?: string
-): Promise<{ jobs: BilledJob[]; garages: Map<string, Row> }> {
-  const completed: Row[] = []
-  let lastKey: Record<string, unknown> | undefined
-  do {
-    const result = await dynamoDB.send(new QueryCommand({
-      TableName: 'ServiceRequests',
-      IndexName: 'StatusIndex',
-      KeyConditionExpression: '#status = :status',
-      FilterExpression:
-        'begins_with(appointmentDate, :monthPrefix) AND ' +
-        '(attribute_exists(appointmentPrice) OR attribute_exists(finalAmounts))',
-      ExpressionAttributeNames: { '#status': 'status' },
-      ExpressionAttributeValues: {
-        ':status': ServiceRequestStatus.COMPLETED,
-        ':monthPrefix': `${month}-`,
-      },
-      ExclusiveStartKey: lastKey,
-    }))
-    completed.push(...((result.Items as Row[] | undefined) || []))
-    lastKey = result.LastEvaluatedKey
-  } while (lastKey)
+  onlyGarageId?: string,
+  now: Date = new Date()
+): Promise<{ jobs: BilledJob[]; flagged: FlaggedJob[]; garages: Map<string, Row> }> {
+  const [completed, booked] = await Promise.all([
+    monthRows(ServiceRequestStatus.COMPLETED, month),
+    monthRows(ServiceRequestStatus.APPOINTMENT, month),
+  ])
+  const due = booked.filter((r) =>
+    hasAppointmentStarted(r.appointmentDate as string | undefined, r.appointmentTime as string | undefined, now)
+  )
+  const candidates = [
+    ...completed.map((r) => ({ r, undeclared: false })),
+    ...due.map((r) => ({ r, undeclared: true })),
+  ]
 
   // The garage: `acceptedGarageId` on every row booked or closed since it
   // existed; the accepted offer's garage for the older ones. A row resolved
   // through neither is left out — there is nobody to bill.
   const legacyOfferIds = Array.from(new Set(
-    completed
-      .filter((r) => typeof r.acceptedGarageId !== 'string')
-      .map((r) => r.acceptedOfferId)
+    candidates
+      .filter(({ r }) => typeof r.acceptedGarageId !== 'string')
+      .map(({ r }) => r.acceptedOfferId)
       .filter((v): v is string => typeof v === 'string')
   ))
   const offerToGarage = new Map<string, string>()
@@ -71,9 +84,10 @@ export async function billedJobsForMonth(
       ? r.acceptedGarageId
       : offerToGarage.get(r.acceptedOfferId as string)
 
-  const owned = completed
-    .map((r) => ({ r, garageId: garageOf(r) }))
-    .filter((x): x is { r: Row; garageId: string } => !!x.garageId && (!onlyGarageId || x.garageId === onlyGarageId))
+  const owned = candidates
+    .map((c) => ({ ...c, garageId: garageOf(c.r) }))
+    .filter((x): x is { r: Row; undeclared: boolean; garageId: string } =>
+      !!x.garageId && (!onlyGarageId || x.garageId === onlyGarageId))
 
   const garages = new Map<string, Row>()
   const garageIds = Array.from(new Set(owned.map((x) => x.garageId)))
@@ -83,12 +97,37 @@ export async function billedJobsForMonth(
   }
 
   const jobs: BilledJob[] = []
-  for (const { r, garageId } of owned) {
+  const flagged: FlaggedJob[] = []
+  for (const { r, undeclared, garageId } of owned) {
     const { percent, source } = resolveCommissionPercent(r, garages.get(garageId))
+    const review = outcomeReviewStatus(r as Parameters<typeof outcomeReviewStatus>[0])
+    if (review) flagged.push({ request: r, garageId, reviewStatus: review, percent })
     const line = commissionLine(r as Parameters<typeof commissionLine>[0], percent)
-    if (line) jobs.push({ request: r, garageId, line, percent, rateSource: source })
+    if (line) jobs.push({ request: r, garageId, line, percent, rateSource: source, undeclared })
   }
-  return { jobs, garages }
+  return { jobs, flagged, garages }
+}
+
+/** One status's rows for a month, every page of them. */
+async function monthRows(status: string, month: string): Promise<Row[]> {
+  const rows: Row[] = []
+  let lastKey: Record<string, unknown> | undefined
+  do {
+    const result = await dynamoDB.send(new QueryCommand({
+      TableName: 'ServiceRequests',
+      IndexName: 'StatusIndex',
+      KeyConditionExpression: '#status = :status',
+      FilterExpression:
+        'begins_with(appointmentDate, :monthPrefix) AND ' +
+        '(attribute_exists(appointmentPrice) OR attribute_exists(finalAmounts))',
+      ExpressionAttributeNames: { '#status': 'status' },
+      ExpressionAttributeValues: { ':status': status, ':monthPrefix': `${month}-` },
+      ExclusiveStartKey: lastKey,
+    }))
+    rows.push(...((result.Items as Row[] | undefined) || []))
+    lastKey = result.LastEvaluatedKey
+  } while (lastKey)
+  return rows
 }
 
 /** BatchGet in pages of 100, retrying whatever DynamoDB hands back unprocessed. */

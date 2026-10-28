@@ -128,7 +128,7 @@ async function _POST(request: NextRequest) {
     await anonymizeRow(tableName, user, userType === 'client' ? CLIENT_KEEPS : GARAGE_KEEPS)
     if (userType === 'garage') invalidateGarageActive(userId)
 
-    logEvent({
+    await logEvent({
       eventName: EventName.AccountDeleted,
       actorType: userType,
       actorId: userId,
@@ -210,7 +210,7 @@ async function closeClient(clientId: string, summary: CloseSummary): Promise<Nex
         }))
         summary.requestsCancelled++
         await rejectPendingOffers(requestId, summary)
-        broadcastRequestUpdate(requestId, ServiceRequestStatus.CANCELLED, 'account_closed').catch(() => {})
+        await broadcastRequestUpdate(requestId, ServiceRequestStatus.CANCELLED, 'account_closed')
       } catch (err) {
         // Accepted a moment ago: it is a booking now, refuse rather than strand the garage.
         if (err instanceof ConditionalCheckFailedException) return upcomingAppointmentRefusal()

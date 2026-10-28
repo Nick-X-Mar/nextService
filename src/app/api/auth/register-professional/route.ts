@@ -198,7 +198,7 @@ async function _POST(request: NextRequest) {
 
     await dynamoDB.send(putCommand)
 
-    logEvent({
+    await logEvent({
       eventName: EventName.GarageRegistered,
       actorType: 'garage',
       actorId: garageId,
@@ -208,7 +208,7 @@ async function _POST(request: NextRequest) {
     })
 
     // Welcome the new garage and let them know we're reviewing.
-    sendEmail({
+    await sendEmail({
       to: garageData.email,
       templateName: EmailTemplate.WelcomeGarage,
       variables: { companyName: garageData.companyName, garageId },
@@ -219,7 +219,7 @@ async function _POST(request: NextRequest) {
     // Notify admin so we don't miss new garages waiting for validation.
     const adminEmail = process.env.ADMIN_EMAIL
     if (adminEmail) {
-      sendEmail({
+      await sendEmail({
         to: adminEmail,
         templateName: EmailTemplate.AdminNewGarageValidation,
         variables: {

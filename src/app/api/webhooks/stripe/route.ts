@@ -63,7 +63,7 @@ async function _POST(request: NextRequest) {
           if (typeof clientId === 'string') invalidateUnread('client', clientId)
         }
 
-        logEvent({
+        await logEvent({
           eventName: EventName.PaymentSucceeded,
           actorType: 'system',
           clientId: pi.metadata?.clientId,
@@ -92,7 +92,7 @@ async function _POST(request: NextRequest) {
           })
         )
 
-        logEvent({
+        await logEvent({
           eventName: EventName.PaymentFailed,
           actorType: 'system',
           clientId: pi.metadata?.clientId,

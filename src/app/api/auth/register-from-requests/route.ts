@@ -165,7 +165,7 @@ async function _POST(request: NextRequest) {
       throw err
     }
 
-    logEvent({
+    await logEvent({
       eventName: EventName.GuestRegisteredFromRequest,
       actorType: 'client',
       actorId: guestId,

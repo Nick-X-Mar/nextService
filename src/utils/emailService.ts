@@ -74,13 +74,15 @@ export interface SendEmailInput {
 }
 
 /**
- * Send an email and write a record to EmailLogs. Fire-and-forget from the
- * caller's perspective: never throws, errors are logged. The admin app
- * reads from EmailLogs to render its monitoring dashboard.
+ * Send an email and write a record to EmailLogs. Never rejects: errors are
+ * logged. The admin app reads from EmailLogs to render its monitoring dashboard.
+ *
+ * **Await it.** On Amplify the SSR function is frozen the moment the route
+ * responds, so a send left running in the background may never leave — mails
+ * sat in EmailLogs as "queued" for good. One SES call is ~100ms.
  */
-export function sendEmail(input: SendEmailInput): void {
-  // We deliberately don't await — the API route should respond instantly.
-  void sendEmailInternal(input).catch((err) => {
+export function sendEmail(input: SendEmailInput): Promise<void> {
+  return sendEmailInternal(input).catch((err) => {
     console.error('[emailService] Unhandled send error:', input.templateName, err)
   })
 }

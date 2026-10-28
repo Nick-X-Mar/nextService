@@ -52,7 +52,7 @@ async function _POST(request: NextRequest): Promise<NextResponse> {
   // contains a clickable link, so we can verify both the open pixel and
   // the click-tracking redirect work.
   const before = Date.now()
-  sendEmail({
+  await sendEmail({
     to,
     templateName: EmailTemplate.WelcomeGarage,
     variables: { companyName: `Pipeline test ${new Date().toISOString()}` },

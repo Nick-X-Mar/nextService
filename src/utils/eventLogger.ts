@@ -11,9 +11,9 @@ const EVENT_LOGS_TABLE = process.env.EVENT_LOGS_TABLE || 'EventLogs'
 const EVENT_LOG_TTL_SECONDS = 365 * 24 * 60 * 60
 
 /**
- * Fire-and-forget event logger. Writes a single record to the EventLogs
- * DynamoDB table. NEVER throws — failures are swallowed and logged so the
- * caller's main flow is never affected.
+ * Event logger. Writes a single record to the EventLogs DynamoDB table.
+ * NEVER rejects — failures are swallowed and logged so the caller's main flow
+ * is never affected.
  *
  * Usage from API routes:
  *
@@ -26,10 +26,11 @@ const EVENT_LOG_TTL_SECONDS = 365 * 24 * 60 * 60
  *     metadata: { category: body.category }
  *   })
  *
- * Notice: no `await`. The DB write happens in the background; the route
- * responds immediately.
+ * **Await it** in a route handler. On Amplify the SSR function is frozen the
+ * moment it responds, so a write left running in the background may never
+ * land — the funnel would silently miss events. It is one PutItem.
  */
-export function logEvent(input: LogEventInput): void {
+export function logEvent(input: LogEventInput): Promise<void> {
   const record: EventLogRecord = {
     ...input,
     eventId: randomUUID(),
@@ -46,10 +47,10 @@ export function logEvent(input: LogEventInput): void {
   // time get cleaned up automatically by DynamoDB within ~48h.
   item.expiresAt = Math.floor(Date.now() / 1000) + EVENT_LOG_TTL_SECONDS
 
-  ensureEventLogsTable()
-    .then(() =>
-      dynamoDB.send(new PutCommand({ TableName: EVENT_LOGS_TABLE, Item: item }))
-    )
+  return ensureEventLogsTable()
+    .then(async () => {
+      await dynamoDB.send(new PutCommand({ TableName: EVENT_LOGS_TABLE, Item: item }))
+    })
     .catch((err) => {
       console.error('[eventLogger] Failed to write event:', input.eventName, err)
     })
