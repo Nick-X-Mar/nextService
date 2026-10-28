@@ -71,8 +71,8 @@ export async function clientsWithEmail(email: string) {
   return res.Items ?? []
 }
 
-export async function getRow(table: string, id: string) {
-  const res = await db.send(new GetCommand({ TableName: table, Key: { id } }))
+export async function getRow(table: string, id: string, keyName = 'id') {
+  const res = await db.send(new GetCommand({ TableName: table, Key: { [keyName]: id } }))
   return res.Item
 }
 

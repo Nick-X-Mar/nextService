@@ -27,7 +27,8 @@ interface PageProps {
  * in next.config.ts. This still enumerates every one of them at build time so
  * the pages stay statically rendered.
  */
-export const revalidate = 300
+// An admin edit reaches every server within a minute (see src/app/page.tsx).
+export const revalidate = 60
 
 export async function generateStaticParams() {
   const areas = await getAllAreas()

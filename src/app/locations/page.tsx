@@ -10,7 +10,8 @@ import AreaGrid from './components/AreaGrid'
 
 const URL = `${SITE_URL}/locations/`
 
-export const revalidate = 300
+// An admin edit reaches every server within a minute (see src/app/page.tsx).
+export const revalidate = 60
 
 export async function generateMetadata(): Promise<Metadata> {
   const page = await getSitePage('locations')

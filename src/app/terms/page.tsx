@@ -12,12 +12,13 @@ const URL = `${SITE_URL}/terms/`
  * Copy lives in the SiteContent table so it can be corrected without a deploy
  * — which matters most here, where the text is a legal document.
  *
- * The page stays statically rendered and is regenerated at most every five
- * minutes; an admin save also calls `revalidatePath`, so an edit is live
- * immediately rather than at the end of the window. Keeping it static is
+ * The page stays statically rendered and is regenerated at most every
+ * minute. An admin save also calls `revalidatePath`, but on Amplify that only
+ * reaches the server that handled the save — the others catch up at the end of
+ * the window, which is why the window is short. Keeping it static is
  * deliberate: this repo treats static generation as load-bearing for SEO.
  */
-export const revalidate = 300
+export const revalidate = 60
 
 export async function generateMetadata(): Promise<Metadata> {
   const page = await getSitePage('terms')

@@ -1,4 +1,4 @@
-import { GetCommand, PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { DeleteCommand, GetCommand, PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ensureSiteContentTable, SITE_CONTENT_TABLE_NAME } from '@/utils/ensureSiteContentTable'
 import { createTtlCache } from '@/utils/ttlCache'
@@ -124,11 +124,15 @@ export async function saveAreaContent(area: AreaContent): Promise<void> {
   areaCache.invalidate('all')
 }
 
-/** Drops a page back to its compiled-in copy. */
+/**
+ * Drops a page back to its compiled-in copy by deleting its override. It used
+ * to write the compiled-in copy as a row, which froze it: every later fix to
+ * the shipped text (src/data/content/pages.ts) stayed hidden behind that row.
+ */
 export async function resetSitePage(pageKey: SitePageKey): Promise<void> {
   await ensureSiteContentTable()
   await dynamoDB.send(
-    new PutCommand({ TableName: SITE_CONTENT_TABLE_NAME, Item: { ...defaultPage(pageKey) } })
+    new DeleteCommand({ TableName: SITE_CONTENT_TABLE_NAME, Key: { pageKey } })
   )
   pageCache.invalidate(pageKey)
 }

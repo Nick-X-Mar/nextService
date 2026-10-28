@@ -67,7 +67,7 @@ export default function AdminContentPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold font-headline text-on-surface">Περιεχόμενο</h1>
         <p className="text-sm text-on-surface/60 mt-1">
-          Τα κείμενα των δημόσιων σελίδων. Οι αλλαγές εμφανίζονται αμέσως — δεν χρειάζεται deploy.
+          Τα κείμενα των δημόσιων σελίδων. Οι αλλαγές εμφανίζονται στο site μέσα σε 1–2 λεπτά — δεν χρειάζεται deploy.
         </p>
       </div>
 

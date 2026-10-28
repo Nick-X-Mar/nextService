@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import LandingPage from './landing-page/LandingPage'
-import { faqs } from '@/data/faq'
+import { collectFaqItems, getSitePage } from '@/lib/site-content'
+import { toPlainText } from '@/components/content/RichText'
 import { SITE_URL } from '@/lib/site-url'
 import { faqJsonLd, graphJsonLd, jsonLdScript } from '@/lib/seo'
 
@@ -35,11 +36,25 @@ export const metadata: Metadata = {
   },
 }
 
+/**
+ * Static, regenerated at most every minute — like the other admin-editable
+ * pages. Without it the page was built once per deploy, so the homepage FAQ
+ * (admin → Περιεχόμενο → Αρχική) never changed on the live site.
+ */
+export const revalidate = 60
+
 // Organization + WebSite are emitted site-wide from the root layout.
-export default function Home() {
+export default async function Home() {
+  // The FAQ schema follows the FAQ the page shows — the admin's copy, not the
+  // shipped one — so the two never disagree. Markup is stripped for it.
+  const page = await getSitePage('home-faq')
+  const items = collectFaqItems(page.blocks).map((item) => ({
+    question: toPlainText(item.question),
+    answer: toPlainText(item.answer),
+  }))
   return (
     <>
-      <script {...jsonLdScript(graphJsonLd([faqJsonLd(faqs)]))} />
+      <script {...jsonLdScript(graphJsonLd([faqJsonLd(items)]))} />
       <LandingPage />
     </>
   )

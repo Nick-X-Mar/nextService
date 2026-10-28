@@ -1,4 +1,5 @@
 import { test, expect, type APIRequestContext } from '@playwright/test'
+import { getRow } from './b-helpers'
 
 /**
  * The content CMS: an admin edits a public page's copy and the change is live
@@ -99,8 +100,30 @@ test.describe.serial('Admin content CMS', () => {
     const html = await publicPage.text()
     expect(html).toContain('Το πρόβλημα που λύνουμε')
     expect(html).not.toContain('E2E CMS')
+
+    // The override is gone, not replaced by a copy of the shipped text — a
+    // copy would freeze it, hiding every later fix to src/data/content/pages.ts.
+    expect(await getRow('SiteContent', 'about', 'pageKey')).toBeUndefined()
   })
 
+
+  test('The homepage FAQ follows the admin, in the page and in its FAQ schema', async ({ request }) => {
+    const current = await request.get('/api/admin/content/pages/home-faq/', { headers: { Cookie: adminCookie } })
+    const { page } = await current.json()
+    const marker = `E2E αρχική ${Date.now()}`
+    const faq = page.blocks.find((b: { type: string }) => b.type === 'faq')
+    faq.items[0].answer = `${faq.items[0].answer} ${marker}`
+    const saved = await request.put('/api/admin/content/pages/home-faq/', { headers: { Cookie: adminCookie }, data: page })
+    expect(saved.status(), await saved.text()).toBe(200)
+    try {
+      const html = await (await request.get('/')).text()
+      // Once in the rendered FAQ, once in the FAQPage JSON-LD built from the same copy.
+      expect(html.split(marker).length - 1).toBeGreaterThanOrEqual(2)
+    } finally {
+      await request.delete('/api/admin/content/pages/home-faq/', { headers: { Cookie: adminCookie } })
+    }
+    expect(await (await request.get('/')).text()).not.toContain(marker)
+  })
 
   test('A javascript: link is refused rather than stored', async ({ request }) => {
     const current = await request.get('/api/admin/content/pages/contact/', {
