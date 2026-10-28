@@ -333,9 +333,7 @@
       },
       {
        "Action": [
-        "dynamodb:CreateTable",
         "dynamodb:DescribeTable",
-        "dynamodb:UpdateTimeToLive",
         "dynamodb:DescribeTimeToLive"
        ],
        "Effect": "Allow",
@@ -351,7 +349,7 @@
         "arn:aws:dynamodb:eu-central-1:766671488262:table/SiteContent",
         "arn:aws:dynamodb:eu-central-1:766671488262:table/Reviews"
        ],
-       "Sid": "DynamoDBCreateTable"
+       "Sid": "DynamoDBDescribeTable"
       },
       {
        "Action": [

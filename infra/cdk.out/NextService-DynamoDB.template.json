@@ -18,6 +18,7 @@
      }
     ],
     "BillingMode": "PAY_PER_REQUEST",
+    "DeletionProtectionEnabled": true,
     "GlobalSecondaryIndexes": [
      {
       "IndexName": "EmailIndex",
@@ -83,6 +84,7 @@
      }
     ],
     "BillingMode": "PAY_PER_REQUEST",
+    "DeletionProtectionEnabled": true,
     "GlobalSecondaryIndexes": [
      {
       "IndexName": "TINIndex",
@@ -160,6 +162,7 @@
      }
     ],
     "BillingMode": "PAY_PER_REQUEST",
+    "DeletionProtectionEnabled": true,
     "GlobalSecondaryIndexes": [
      {
       "IndexName": "ClientVehiclesIndex",
@@ -233,6 +236,7 @@
      }
     ],
     "BillingMode": "PAY_PER_REQUEST",
+    "DeletionProtectionEnabled": true,
     "GlobalSecondaryIndexes": [
      {
       "IndexName": "ClientRequestsIndex",
@@ -329,6 +333,7 @@
      }
     ],
     "BillingMode": "PAY_PER_REQUEST",
+    "DeletionProtectionEnabled": true,
     "GlobalSecondaryIndexes": [
      {
       "IndexName": "ServiceRequestOffersIndex",
@@ -422,6 +427,7 @@
      }
     ],
     "BillingMode": "PAY_PER_REQUEST",
+    "DeletionProtectionEnabled": true,
     "GlobalSecondaryIndexes": [
      {
       "IndexName": "RequestMessagesIndex",
@@ -503,6 +509,7 @@
      }
     ],
     "BillingMode": "PAY_PER_REQUEST",
+    "DeletionProtectionEnabled": true,
     "GlobalSecondaryIndexes": [
      {
       "IndexName": "EmailIndex",
@@ -552,6 +559,7 @@
      }
     ],
     "BillingMode": "PAY_PER_REQUEST",
+    "DeletionProtectionEnabled": true,
     "GlobalSecondaryIndexes": [
      {
       "IndexName": "StatusIndex",
@@ -585,6 +593,586 @@
    "DeletionPolicy": "Retain",
    "Metadata": {
     "aws:cdk:path": "NextService-DynamoDB/ErrorResolutionsTable/Resource"
+   }
+  },
+  "EventLogsTable64C44991": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "eventId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "garageId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "timestamp",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "requestId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "clientId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "eventName",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "DeletionProtectionEnabled": true,
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "GarageTimelineIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "garageId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "timestamp",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "RequestTimelineIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "requestId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "timestamp",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "ClientTimelineIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "clientId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "timestamp",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "EventNameIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "eventName",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "timestamp",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "eventId",
+      "KeyType": "HASH"
+     }
+    ],
+    "PointInTimeRecoverySpecification": {
+     "PointInTimeRecoveryEnabled": true
+    },
+    "TableName": "EventLogs",
+    "TimeToLiveSpecification": {
+     "AttributeName": "expiresAt",
+     "Enabled": true
+    }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "NextService-DynamoDB/EventLogsTable/Resource"
+   }
+  },
+  "EmailLogsTable267785E2": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "emailId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "status",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "sentAt",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "templateName",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "to",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "DeletionProtectionEnabled": true,
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "StatusIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "status",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "sentAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "TemplateIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "templateName",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "sentAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "RecipientIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "to",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "sentAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "emailId",
+      "KeyType": "HASH"
+     }
+    ],
+    "PointInTimeRecoverySpecification": {
+     "PointInTimeRecoveryEnabled": true
+    },
+    "TableName": "EmailLogs",
+    "TimeToLiveSpecification": {
+     "AttributeName": "expiresAt",
+     "Enabled": true
+    }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "NextService-DynamoDB/EmailLogsTable/Resource"
+   }
+  },
+  "HotDealsTable7ABC3DA0": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "dealId",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "DeletionProtectionEnabled": true,
+    "KeySchema": [
+     {
+      "AttributeName": "dealId",
+      "KeyType": "HASH"
+     }
+    ],
+    "PointInTimeRecoverySpecification": {
+     "PointInTimeRecoveryEnabled": true
+    },
+    "TableName": "HotDeals"
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "NextService-DynamoDB/HotDealsTable/Resource"
+   }
+  },
+  "PaymentsTable48A42630": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "paymentId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "clientId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "createdAt",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "requestId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "garageId",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "DeletionProtectionEnabled": true,
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "ClientPaymentsIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "clientId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "createdAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "RequestPaymentIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "requestId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "createdAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "GaragePaymentsIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "garageId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "createdAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "paymentId",
+      "KeyType": "HASH"
+     }
+    ],
+    "PointInTimeRecoverySpecification": {
+     "PointInTimeRecoveryEnabled": true
+    },
+    "TableName": "Payments",
+    "TimeToLiveSpecification": {
+     "AttributeName": "expiresAt",
+     "Enabled": true
+    }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "NextService-DynamoDB/PaymentsTable/Resource"
+   }
+  },
+  "PerformanceMetricsTable78D14351": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "endpoint",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "timestamp",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "statusCode",
+      "AttributeType": "N"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "DeletionProtectionEnabled": true,
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "StatusCodeIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "statusCode",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "timestamp",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "endpoint",
+      "KeyType": "HASH"
+     },
+     {
+      "AttributeName": "timestamp",
+      "KeyType": "RANGE"
+     }
+    ],
+    "PointInTimeRecoverySpecification": {
+     "PointInTimeRecoveryEnabled": true
+    },
+    "TableName": "PerformanceMetrics"
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "NextService-DynamoDB/PerformanceMetricsTable/Resource"
+   }
+  },
+  "SiteContentTable0C4C4AFB": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "pageKey",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "DeletionProtectionEnabled": true,
+    "KeySchema": [
+     {
+      "AttributeName": "pageKey",
+      "KeyType": "HASH"
+     }
+    ],
+    "PointInTimeRecoverySpecification": {
+     "PointInTimeRecoveryEnabled": true
+    },
+    "TableName": "SiteContent"
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "NextService-DynamoDB/SiteContentTable/Resource"
+   }
+  },
+  "WalletTransactionsTable86F59B54": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "transactionId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "clientId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "createdAt",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "DeletionProtectionEnabled": true,
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "ClientWalletIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "clientId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "createdAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "transactionId",
+      "KeyType": "HASH"
+     }
+    ],
+    "PointInTimeRecoverySpecification": {
+     "PointInTimeRecoveryEnabled": true
+    },
+    "TableName": "WalletTransactions",
+    "TimeToLiveSpecification": {
+     "AttributeName": "expiresAt",
+     "Enabled": true
+    }
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "NextService-DynamoDB/WalletTransactionsTable/Resource"
+   }
+  },
+  "ReviewsTable1E51AE49": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "reviewId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "requestId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "createdAt",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "clientId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "garageId",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "DeletionProtectionEnabled": true,
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "RequestReviewsIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "requestId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "createdAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "ClientReviewsIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "clientId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "createdAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     },
+     {
+      "IndexName": "GarageReviewsIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "garageId",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "createdAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "reviewId",
+      "KeyType": "HASH"
+     }
+    ],
+    "PointInTimeRecoverySpecification": {
+     "PointInTimeRecoveryEnabled": true
+    },
+    "TableName": "Reviews"
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "NextService-DynamoDB/ReviewsTable/Resource"
    }
   },
   "CDKMetadata": {

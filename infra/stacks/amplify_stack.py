@@ -161,13 +161,15 @@ class AmplifyStack(Stack):
             resources=dynamo_resources,
         ))
 
-        # DynamoDB — create/describe for auto-provisioned tables
+        # DynamoDB — describe only. Every table is owned by the DynamoDB stack
+        # (PITR, deletion protection); the app's ensure*Table helpers just
+        # check that a table is there and create nothing in AWS. A server that
+        # could CreateTable would quietly rebuild a missing table with no
+        # backups instead of failing loudly.
         self.amplify_role.add_to_policy(iam.PolicyStatement(
-            sid="DynamoDBCreateTable",
+            sid="DynamoDBDescribeTable",
             actions=[
-                "dynamodb:CreateTable",
                 "dynamodb:DescribeTable",
-                "dynamodb:UpdateTimeToLive",
                 "dynamodb:DescribeTimeToLive",
             ],
             resources=[

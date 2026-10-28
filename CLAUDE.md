@@ -102,7 +102,7 @@ SEO: `sitemap.ts`, `robots.ts`, `opengraph-image.tsx` (the OG routes read fonts/
 - `src/contexts/UserContext.tsx` — user-level state
 - `src/contexts/NotificationsContext.tsx` — the one poller (30s) for unread counts + alerts, plus the garage's live new-request bell
 - `src/utils/dynamoService.ts` — DynamoDB client factory (local endpoint vs explicit creds vs `.aws/` profile vs IAM role)
-- `src/utils/ensure*Table.ts` — runtime table auto-creation for the newer tables (Admin, HotDeals, Payments/Wallet, Events, EmailLogs, Performance, ErrorResolutions, SiteContent, Reviews)
+- `src/utils/ensure*Table.ts` — create the newer tables in DynamoDB Local (in AWS they are CDK-owned and these only describe them)
 - `src/utils/eventLogger.ts` — funnel events → `EventLogs` (365-day TTL)
 - `src/utils/performanceService.ts`, `withMetrics.ts` — API latency metrics
 - `src/utils/errorFingerprint.ts`, `errorGroups.ts` — admin error grouping
@@ -159,7 +159,7 @@ Lambdas in `infra/lambdas/` are self-contained `index.mjs` files (only the AWS S
 
 ## Data (DynamoDB)
 
-Single-region (`eu-central-1`), table names are literal (no stage prefix). CDK-managed tables: **Clients, Garages, Vehicles, ServiceRequests, Offers, ChatMessages, AdminUsers, ErrorResolutions**. Created at runtime by `ensure*Table.ts` helpers: **EventLogs, EmailLogs, HotDeals, Payments, WalletTransactions, PerformanceMetrics, SiteContent, Reviews**.
+Single-region (`eu-central-1`), table names are literal (no stage prefix). **All 16 tables are owned by `NextService-DynamoDB`**, every one with PITR (35 days) and `deletion_protection=True`: Clients, Garages, Vehicles, ServiceRequests, Offers, ChatMessages, AdminUsers, ErrorResolutions, and — imported with `cdk import` on 2026-10-28, having been created by the app — EventLogs, EmailLogs, HotDeals, Payments, WalletTransactions, PerformanceMetrics, SiteContent, Reviews (the `_app_table()` helper). The `ensure*Table.ts` helpers now matter only for DynamoDB Local: the Amplify role has no `CreateTable`. A new table goes in the stack first, with the same shape in its `ensure*` spec; changing an imported table's keys/indexes in CDK must match what the helpers create locally.
 
 `Reviews` GSIs: `GarageReviewsIndex`, `ClientReviewsIndex`, `RequestReviewsIndex`. Its partition key is `<requestId>#<direction>`, which is what makes a second review per job per side structurally impossible rather than merely checked. Rating aggregates live on the `Garages`/`Clients` rows as `ratingCount` + `ratingSum` only — the average is derived on read (`ratingAverage()` in `src/types/reviews.ts`).
 

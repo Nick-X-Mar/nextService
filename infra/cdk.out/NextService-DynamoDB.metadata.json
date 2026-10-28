@@ -63,6 +63,70 @@
       }
     }
   ],
+  "/NextService-DynamoDB/EventLogsTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "EventLogsTable64C44991"
+      }
+    }
+  ],
+  "/NextService-DynamoDB/EmailLogsTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "EmailLogsTable267785E2"
+      }
+    }
+  ],
+  "/NextService-DynamoDB/HotDealsTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "HotDealsTable7ABC3DA0"
+      }
+    }
+  ],
+  "/NextService-DynamoDB/PaymentsTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "PaymentsTable48A42630"
+      }
+    }
+  ],
+  "/NextService-DynamoDB/PerformanceMetricsTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "PerformanceMetricsTable78D14351"
+      }
+    }
+  ],
+  "/NextService-DynamoDB/SiteContentTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "SiteContentTable0C4C4AFB"
+      }
+    }
+  ],
+  "/NextService-DynamoDB/WalletTransactionsTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "WalletTransactionsTable86F59B54"
+      }
+    }
+  ],
+  "/NextService-DynamoDB/ReviewsTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "ReviewsTable1E51AE49"
+      }
+    }
+  ],
   "/NextService-DynamoDB/ClientsTableArn": [
     {
       "type": "aws:cdk:logicalId",
@@ -175,6 +239,54 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "ErrorResolutionsTable69530338"
+    }
+  ],
+  "/NextService-DynamoDB/EventLogsTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "EventLogsTable64C44991"
+    }
+  ],
+  "/NextService-DynamoDB/EmailLogsTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "EmailLogsTable267785E2"
+    }
+  ],
+  "/NextService-DynamoDB/HotDealsTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "HotDealsTable7ABC3DA0"
+    }
+  ],
+  "/NextService-DynamoDB/PaymentsTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PaymentsTable48A42630"
+    }
+  ],
+  "/NextService-DynamoDB/PerformanceMetricsTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PerformanceMetricsTable78D14351"
+    }
+  ],
+  "/NextService-DynamoDB/SiteContentTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SiteContentTable0C4C4AFB"
+    }
+  ],
+  "/NextService-DynamoDB/WalletTransactionsTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "WalletTransactionsTable86F59B54"
+    }
+  ],
+  "/NextService-DynamoDB/ReviewsTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ReviewsTable1E51AE49"
     }
   ],
   "/NextService-DynamoDB/CDKMetadata/Default": [

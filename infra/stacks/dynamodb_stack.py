@@ -22,6 +22,9 @@ class DynamoDBStack(Stack):
             ),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.RETAIN,
+            # DynamoDB itself refuses DeleteTable until this is switched off —
+            # by console, CLI or code alike.
+            deletion_protection=True,
             point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
                 point_in_time_recovery_enabled=True,
             ),
@@ -50,6 +53,9 @@ class DynamoDBStack(Stack):
             ),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.RETAIN,
+            # DynamoDB itself refuses DeleteTable until this is switched off —
+            # by console, CLI or code alike.
+            deletion_protection=True,
             point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
                 point_in_time_recovery_enabled=True,
             ),
@@ -93,6 +99,9 @@ class DynamoDBStack(Stack):
             ),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.RETAIN,
+            # DynamoDB itself refuses DeleteTable until this is switched off —
+            # by console, CLI or code alike.
+            deletion_protection=True,
             point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
                 point_in_time_recovery_enabled=True,
             ),
@@ -127,6 +136,9 @@ class DynamoDBStack(Stack):
             ),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.RETAIN,
+            # DynamoDB itself refuses DeleteTable until this is switched off —
+            # by console, CLI or code alike.
+            deletion_protection=True,
             point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
                 point_in_time_recovery_enabled=True,
             ),
@@ -172,6 +184,9 @@ class DynamoDBStack(Stack):
             ),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.RETAIN,
+            # DynamoDB itself refuses DeleteTable until this is switched off —
+            # by console, CLI or code alike.
+            deletion_protection=True,
             point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
                 point_in_time_recovery_enabled=True,
             ),
@@ -216,6 +231,9 @@ class DynamoDBStack(Stack):
             ),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.RETAIN,
+            # DynamoDB itself refuses DeleteTable until this is switched off —
+            # by console, CLI or code alike.
+            deletion_protection=True,
             point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
                 point_in_time_recovery_enabled=True,
             ),
@@ -269,6 +287,9 @@ class DynamoDBStack(Stack):
             ),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.RETAIN,
+            # DynamoDB itself refuses DeleteTable until this is switched off —
+            # by console, CLI or code alike.
+            deletion_protection=True,
             point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
                 point_in_time_recovery_enabled=True,
             ),
@@ -294,6 +315,9 @@ class DynamoDBStack(Stack):
             ),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.RETAIN,
+            # DynamoDB itself refuses DeleteTable until this is switched off —
+            # by console, CLI or code alike.
+            deletion_protection=True,
             point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
                 point_in_time_recovery_enabled=True,
             ),
@@ -307,6 +331,61 @@ class DynamoDBStack(Stack):
                 name="resolvedAt", type=dynamodb.AttributeType.STRING
             ),
             projection_type=dynamodb.ProjectionType.ALL,
+        )
+
+        # ── Tables the app used to create itself ────────────────
+        # These were created at runtime by src/utils/ensure*Table.ts, so they
+        # had no backups and nothing kept them in step with the code. The ones
+        # that existed were imported into this stack as they stood
+        # (`cdk import`, 2026-10-28); their shape here must keep matching the
+        # code's. In AWS the app can no longer create tables (see the Amplify
+        # role) — the ensure*Table helpers create them for DynamoDB Local only.
+        S = dynamodb.AttributeType.STRING
+        N = dynamodb.AttributeType.NUMBER
+
+        self.event_logs_table = self._app_table(
+            "EventLogsTable", "EventLogs", ("eventId", S), ttl="expiresAt",
+            indexes=[
+                ("GarageTimelineIndex", ("garageId", S), ("timestamp", S)),
+                ("RequestTimelineIndex", ("requestId", S), ("timestamp", S)),
+                ("ClientTimelineIndex", ("clientId", S), ("timestamp", S)),
+                ("EventNameIndex", ("eventName", S), ("timestamp", S)),
+            ],
+        )
+        self.email_logs_table = self._app_table(
+            "EmailLogsTable", "EmailLogs", ("emailId", S), ttl="expiresAt",
+            indexes=[
+                ("StatusIndex", ("status", S), ("sentAt", S)),
+                ("TemplateIndex", ("templateName", S), ("sentAt", S)),
+                ("RecipientIndex", ("to", S), ("sentAt", S)),
+            ],
+        )
+        self.hot_deals_table = self._app_table("HotDealsTable", "HotDeals", ("dealId", S))
+        self.payments_table = self._app_table(
+            "PaymentsTable", "Payments", ("paymentId", S), ttl="expiresAt",
+            indexes=[
+                ("ClientPaymentsIndex", ("clientId", S), ("createdAt", S)),
+                ("RequestPaymentIndex", ("requestId", S), ("createdAt", S)),
+                ("GaragePaymentsIndex", ("garageId", S), ("createdAt", S)),
+            ],
+        )
+        self.performance_table = self._app_table(
+            "PerformanceMetricsTable", "PerformanceMetrics", ("endpoint", S), sort=("timestamp", S),
+            indexes=[("StatusCodeIndex", ("statusCode", N), ("timestamp", S))],
+        )
+        self.site_content_table = self._app_table("SiteContentTable", "SiteContent", ("pageKey", S))
+        # Never created in AWS before payments were switched on; the stack makes it.
+        self.wallet_transactions_table = self._app_table(
+            "WalletTransactionsTable", "WalletTransactions", ("transactionId", S), ttl="expiresAt",
+            indexes=[("ClientWalletIndex", ("clientId", S), ("createdAt", S))],
+        )
+        self.reviews_table = self._app_table(
+            "ReviewsTable", "Reviews", ("reviewId", S),
+            indexes=[
+                ("RequestReviewsIndex", ("requestId", S), ("createdAt", S)),
+                ("ClientReviewsIndex", ("clientId", S), ("createdAt", S)),
+                ("GarageReviewsIndex", ("garageId", S), ("createdAt", S)),
+            ],
         )
 
         # ── Outputs ─────────────────────────────────────────────
@@ -328,3 +407,38 @@ class DynamoDBStack(Stack):
         CfnOutput(self, "ServiceRequestsStreamArn",
                   value=self.service_requests_table.table_stream_arn or "",
                   export_name="NextService-ServiceRequestsStreamArn")
+
+    def _app_table(
+        self,
+        construct_id: str,
+        table_name: str,
+        partition: tuple,
+        *,
+        sort: tuple | None = None,
+        indexes: list | None = None,
+        ttl: str | None = None,
+    ) -> dynamodb.Table:
+        """One of the tables the app used to create for itself, as it exists."""
+        table = dynamodb.Table(
+            self, construct_id,
+            table_name=table_name,
+            partition_key=dynamodb.Attribute(name=partition[0], type=partition[1]),
+            sort_key=dynamodb.Attribute(name=sort[0], type=sort[1]) if sort else None,
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.RETAIN,
+            # DynamoDB itself refuses DeleteTable until this is switched off —
+            # by console, CLI or code alike.
+            deletion_protection=True,
+            point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
+                point_in_time_recovery_enabled=True,
+            ),
+            time_to_live_attribute=ttl,
+        )
+        for name, pk, sk in indexes or []:
+            table.add_global_secondary_index(
+                index_name=name,
+                partition_key=dynamodb.Attribute(name=pk[0], type=pk[1]),
+                sort_key=dynamodb.Attribute(name=sk[0], type=sk[1]),
+                projection_type=dynamodb.ProjectionType.ALL,
+            )
+        return table
