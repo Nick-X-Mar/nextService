@@ -388,6 +388,40 @@ test.describe('A garage that has not been approved', () => {
   })
 })
 
+test.describe('A garage that has only quoted', () => {
+  test('is a thread the client can open and write the first message in', async ({ page, request }) => {
+    const client = await newClient(request, 'first-word')
+    const quoting = await newGarage(request, { prefix: 'first-word' })
+    const requestId = await newRequest(request, client, { brand: 'Kia', model: 'Picanto' })
+    await makeOffer(request, quoting, requestId)
+
+    // Nobody has written yet. The offer card's "Συνομιλία" links here, and the
+    // page used to say "Δεν υπάρχουν συνομιλίες" with no way to write.
+    const list = await request.get(`/api/chat/${requestId}/garages/`, { headers: cookie(client.token) })
+    expect(list.status()).toBe(200)
+    const garages = (await list.json()).garages as { id: string; hasUnreadMessages: boolean }[]
+    expect(garages.map((g) => g.id)).toEqual([quoting.id])
+    expect(garages[0].hasUnreadMessages).toBe(false)
+
+    await loginAsClient(page, request, client.email, PASSWORD)
+    await page.goto(`/requests/${client.clientId}/chats/${requestId}/?garageId=${quoting.id}`)
+    const composer = page.getByPlaceholder('Γράψτε μήνυμα...')
+    await expect(composer).toBeVisible({ timeout: 30_000 })
+    await composer.fill('Καλησπέρα, έχετε διαθεσιμότητα;')
+    const sent = page.waitForResponse((r) => r.url().includes('/messages/') && r.request().method() === 'POST')
+    await composer.press('Enter')
+    expect((await sent).status()).toBe(200)
+
+    // A deactivated garage's offer alone opens nothing: it cannot be chatted with.
+    const other = await newGarage(request, { prefix: 'first-word-off' })
+    const second = await newRequest(request, client, { brand: 'Kia', model: 'Rio' })
+    await makeOffer(request, other, second)
+    await setGarageActive(other.id, false)
+    const none = await request.get(`/api/chat/${second}/garages/`, { headers: cookie(client.token) })
+    expect((await none.json()).garages).toEqual([])
+  })
+})
+
 /**
  * The badge and the lists are built from one definition. Before, the summary
  * counted unread client messages on every request a garage had touched, while

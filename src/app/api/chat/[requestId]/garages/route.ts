@@ -67,21 +67,41 @@ async function _GET(
       `chat-garages:${requestId}`
     )) as unknown as ChatMessageItem[]
 
-    if (messages.length === 0) {
-      return NextResponse.json({
-        success: true,
-        garages: []
-      })
-    }
-
     // A thread exists once either side has written in it — including one the
     // client opened from an offer before the garage replied. Listing only the
     // garages that had written made such a deep link land on another thread.
     const threadOf = (item: ChatMessageItem) =>
       item.senderType === 'garage' ? item.senderId : item.garageId
-    const garageIds = [...new Set(
+
+    const status = requestResult.Item.status
+    const winnerId =
+      status && status !== ServiceRequestStatus.PENDING && status !== ServiceRequestStatus.CANCELLED
+        ? await resolveWinner(requestResult.Item)
+        : null
+
+    // A garage that has quoted is a thread the client can open before anyone
+    // has written — that is what the offer card's "Συνομιλία" button links to.
+    // Listed only while the client could actually write in it; without this the
+    // page said "Δεν υπάρχουν συνομιλίες" and the first message could never be
+    // sent.
+    const offerGarageIds = (await collectAll<Record<string, unknown>>(
+      (startKey) => dynamoDB.send(new QueryCommand({
+        TableName: 'Offers',
+        IndexName: 'ServiceRequestOffersIndex',
+        KeyConditionExpression: 'serviceRequestId = :requestId',
+        ExpressionAttributeValues: { ':requestId': requestId },
+        ProjectionExpression: 'garageId',
+        ExclusiveStartKey: startKey,
+      })),
+      `chat-garages-offers:${requestId}`
+    ))
+      .map((offer) => offer.garageId)
+      .filter((id): id is string => typeof id === 'string' && threadWriteState(status, id, winnerId).canWrite)
+
+    const messageGarageIds = new Set(
       messages.map(threadOf).filter((id): id is string => !!id)
-    )]
+    )
+    const garageIds = [...new Set([...messageGarageIds, ...offerGarageIds])]
 
     if (garageIds.length === 0) {
       return NextResponse.json({
@@ -89,12 +109,6 @@ async function _GET(
         garages: []
       })
     }
-
-    const status = requestResult.Item.status
-    const winnerId =
-      status && status !== ServiceRequestStatus.PENDING && status !== ServiceRequestStatus.CANCELLED
-        ? await resolveWinner(requestResult.Item)
-        : null
 
     // Get garage details — fetch all garages in parallel
     const garageResults = await Promise.all(
@@ -118,6 +132,8 @@ async function _GET(
     for (const garageResult of garageResults) {
       const garage = garageResult.Item
       if (!garage) continue
+      // An offer alone opens a thread only with a garage that can still chat.
+      if (!messageGarageIds.has(garage.id as string) && garage.isActive !== true) continue
 
       // Get last message and unread count for this garage
       const garageMessages = messages
