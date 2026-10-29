@@ -8,8 +8,7 @@ import {
 } from '@aws-sdk/client-dynamodb'
 import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
-
-const HOT_DEALS_TABLE = process.env.HOT_DEALS_TABLE || 'HotDeals'
+import { TABLES } from '@/lib/tables'
 
 const isLocal =
   process.env.NODE_ENV === 'development' && !!process.env.DYNAMODB_ENDPOINT
@@ -51,7 +50,7 @@ function getRawClient(): DynamoDBClient {
 }
 
 const spec: CreateTableCommandInput = {
-  TableName: HOT_DEALS_TABLE,
+  TableName: TABLES.HotDeals,
   AttributeDefinitions: [
     { AttributeName: 'dealId', AttributeType: 'S' }
   ],
@@ -80,7 +79,7 @@ let ready: Promise<void> | null = null
 export function ensureHotDealsTable(): Promise<void> {
   if (!ready) ready = (async () => {
     const client = getRawClient()
-    const name = HOT_DEALS_TABLE
+    const name = TABLES.HotDeals
 
     try {
       const desc = await client.send(new DescribeTableCommand({ TableName: name }))
@@ -105,4 +104,3 @@ export function ensureHotDealsTable(): Promise<void> {
   return ready
 }
 
-export const HOT_DEALS_TABLE_NAME = HOT_DEALS_TABLE

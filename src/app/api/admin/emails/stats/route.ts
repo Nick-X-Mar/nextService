@@ -3,6 +3,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { QueryCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { ensureEmailLogsTable } from '@/utils/ensureEventTables'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 // Status → display bucket. Mirrored on the admin UI so KPI cards, stats
 // breakdowns, and list badges all agree. Keep in sync with:
@@ -42,7 +43,7 @@ async function _GET(request: NextRequest) {
     const counts = await Promise.all(
       TRACKED_STATUSES.map((status) =>
         dynamoDB.send(new QueryCommand({
-          TableName: 'EmailLogs',
+          TableName: TABLES.EmailLogs,
           IndexName: 'StatusIndex',
           KeyConditionExpression: '#status = :status AND sentAt BETWEEN :from AND :to',
           ExpressionAttributeNames: { '#status': 'status' },
@@ -100,7 +101,7 @@ async function _GET(request: NextRequest) {
 
     // Template breakdown — single scan, project only what we need.
     const scanResult = await dynamoDB.send(new ScanCommand({
-      TableName: 'EmailLogs',
+      TableName: TABLES.EmailLogs,
       FilterExpression: 'sentAt BETWEEN :from AND :to',
       ExpressionAttributeValues: { ':from': fromISO, ':to': toISO },
       ProjectionExpression: 'templateName, #status',

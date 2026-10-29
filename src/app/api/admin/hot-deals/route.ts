@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand, PutCommand } from '@aws-sdk/lib-dynamodb'
-import { ensureHotDealsTable, HOT_DEALS_TABLE_NAME } from '@/utils/ensureHotDealsTable'
+import { ensureHotDealsTable } from '@/utils/ensureHotDealsTable'
 import { randomUUID } from 'crypto'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 // GET — list all deals (sorted by sortOrder)
 async function _GET() {
@@ -11,7 +12,7 @@ async function _GET() {
     await ensureHotDealsTable()
 
     const result = await dynamoDB.send(new ScanCommand({
-      TableName: HOT_DEALS_TABLE_NAME
+      TableName: TABLES.HotDeals
     }))
 
     const items = (result.Items || []).sort(
@@ -63,7 +64,7 @@ async function _POST(request: NextRequest) {
     }
 
     await dynamoDB.send(new PutCommand({
-      TableName: HOT_DEALS_TABLE_NAME,
+      TableName: TABLES.HotDeals,
       Item: deal
     }))
 

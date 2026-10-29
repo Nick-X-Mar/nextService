@@ -5,8 +5,7 @@ import { ensureEventLogsTable } from '@/utils/ensureEventTables'
 import { EventName } from '@/types/events'
 import { withMetrics } from '@/utils/withMetrics'
 import { createTtlCache } from '@/utils/ttlCache'
-
-const EVENT_LOGS_TABLE = process.env.EVENT_LOGS_TABLE || 'EventLogs'
+import { TABLES } from '@/lib/tables'
 
 // Sankey nodes are the lifecycle states a request can pass through. The link
 // values are how many requests transitioned between two adjacent states.
@@ -49,7 +48,7 @@ async function fetchSubmittedRequestIds(fromIso: string, toIso: string): Promise
 
   for (let i = 0; i < 50; i++) {
     const res = await dynamoDB.send(new QueryCommand({
-      TableName: EVENT_LOGS_TABLE,
+      TableName: TABLES.EventLogs,
       IndexName: 'EventNameIndex',
       KeyConditionExpression: 'eventName = :name AND #ts BETWEEN :from AND :to',
       ExpressionAttributeNames: { '#ts': 'timestamp' },
@@ -77,7 +76,7 @@ async function fetchRequestTimeline(requestId: string): Promise<RequestEvent[]> 
 
   for (let i = 0; i < 5; i++) {
     const res = await dynamoDB.send(new QueryCommand({
-      TableName: EVENT_LOGS_TABLE,
+      TableName: TABLES.EventLogs,
       IndexName: 'RequestTimelineIndex',
       KeyConditionExpression: 'requestId = :rid',
       ExpressionAttributeValues: { ':rid': requestId },

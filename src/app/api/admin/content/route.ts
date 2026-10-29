@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ensureSiteContentTable, SITE_CONTENT_TABLE_NAME } from '@/utils/ensureSiteContentTable'
+import { ensureSiteContentTable } from '@/utils/ensureSiteContentTable'
 import { getAdminFromRequest } from '@/utils/adminAuth'
 import { withMetrics } from '@/utils/withMetrics'
 import { getAllAreas } from '@/lib/site-content'
 import { SITE_PAGE_KEYS, SITE_PAGE_LABELS } from '@/types/siteContent'
+import { TABLES } from '@/lib/tables'
 
 /**
  * Index for the content editor: every editable page and area, and whether it
@@ -21,7 +22,7 @@ async function _GET(request: NextRequest) {
     await ensureSiteContentTable()
     const stored = await dynamoDB.send(
       new ScanCommand({
-        TableName: SITE_CONTENT_TABLE_NAME,
+        TableName: TABLES.SiteContent,
         ProjectionExpression: 'pageKey, updatedAt, updatedBy',
       })
     )

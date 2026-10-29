@@ -22,8 +22,7 @@ import { OfferStatus, ServiceRequestStatus } from '@/types/statuses'
 import { hasAppointmentStarted } from '@/lib/appointment-window'
 import { broadcastRequestUpdate } from '@/utils/requestBroadcast'
 import { withMetrics } from '@/utils/withMetrics'
-
-const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
+import { TABLES } from '@/lib/tables'
 
 /** What a closed client's chat messages read as once their text is gone. */
 const REMOVED_MESSAGE = 'Το μήνυμα διαγράφηκε'
@@ -94,7 +93,7 @@ async function _POST(request: NextRequest) {
       )
     }
 
-    const tableName = userType === 'garage' ? 'Garages' : 'Clients'
+    const tableName = userType === 'garage' ? TABLES.Garages : TABLES.Clients
     const user = (await dynamoDB.send(new GetCommand({ TableName: tableName, Key: { id: userId } }))).Item
     if (!user || user.anonymizedAt) {
       return NextResponse.json({ error: 'Ο λογαριασμός δεν βρέθηκε' }, { status: 404 })
@@ -171,7 +170,7 @@ const isUpcoming = (r: Row) =>
 
 async function closeClient(clientId: string, summary: CloseSummary): Promise<NextResponse | null> {
   const requests = await queryAll({
-    TableName: 'ServiceRequests',
+    TableName: TABLES.ServiceRequests,
     IndexName: 'ClientRequestsIndex',
     KeyConditionExpression: 'clientId = :c',
     ExpressionAttributeValues: { ':c': clientId },
@@ -179,7 +178,7 @@ async function closeClient(clientId: string, summary: CloseSummary): Promise<Nex
   if (requests.some(isUpcoming)) return upcomingAppointmentRefusal()
 
   const vehicles = await queryAll({
-    TableName: 'Vehicles',
+    TableName: TABLES.Vehicles,
     IndexName: 'ClientVehiclesIndex',
     KeyConditionExpression: 'clientId = :c',
     ExpressionAttributeValues: { ':c': clientId },
@@ -195,7 +194,7 @@ async function closeClient(clientId: string, summary: CloseSummary): Promise<Nex
     if (req.status === ServiceRequestStatus.PENDING) {
       try {
         await dynamoDB.send(new UpdateCommand({
-          TableName: 'ServiceRequests',
+          TableName: TABLES.ServiceRequests,
           Key: { id: requestId },
           UpdateExpression: 'SET #s = :cancelled, cancelledAt = :now, cancelledBy = :by, cancelReason = :why, updatedAt = :now',
           ConditionExpression: '#s = :pending',
@@ -222,7 +221,7 @@ async function closeClient(clientId: string, summary: CloseSummary): Promise<Nex
 
     // Their side of every conversation: the text, the photos and the name go.
     const messages = await queryAll({
-      TableName: 'ChatMessages',
+      TableName: TABLES.ChatMessages,
       IndexName: 'RequestMessagesIndex',
       KeyConditionExpression: 'requestId = :r',
       ExpressionAttributeValues: { ':r': requestId },
@@ -231,7 +230,7 @@ async function closeClient(clientId: string, summary: CloseSummary): Promise<Nex
       if (msg.senderType !== 'client') continue
       s3Keys.push(...attachmentKeys(msg))
       await dynamoDB.send(new UpdateCommand({
-        TableName: 'ChatMessages',
+        TableName: TABLES.ChatMessages,
         Key: { id: msg.id },
         UpdateExpression: 'SET message = :removed, senderName = :anon, anonymizedAt = :now REMOVE attachments',
         ExpressionAttributeValues: { ':removed': REMOVED_MESSAGE, ':anon': 'Πελάτης', ':now': now },
@@ -242,7 +241,7 @@ async function closeClient(clientId: string, summary: CloseSummary): Promise<Nex
     // The job stays — category, car, dates, prices, outcome — without the
     // free text and photos that could say who it was for.
     await dynamoDB.send(new UpdateCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: requestId },
       UpdateExpression: 'SET anonymizedAt = :now, updatedAt = :now REMOVE description, photoUrls, photos',
       ExpressionAttributeValues: { ':now': now },
@@ -253,7 +252,7 @@ async function closeClient(clientId: string, summary: CloseSummary): Promise<Nex
   for (const vehicle of vehicles) {
     const key = s3KeyOf(vehicle.licensePhotoUrl)
     if (key) s3Keys.push(key)
-    await anonymizeRow('Vehicles', vehicle, VEHICLE_KEEPS)
+    await anonymizeRow(TABLES.Vehicles, vehicle, VEHICLE_KEEPS)
     summary.vehiclesAnonymized++
   }
 
@@ -263,7 +262,7 @@ async function closeClient(clientId: string, summary: CloseSummary): Promise<Nex
 
 async function closeGarage(garageId: string, summary: CloseSummary): Promise<NextResponse | null> {
   const offers = await queryAll({
-    TableName: 'Offers',
+    TableName: TABLES.Offers,
     IndexName: 'GarageOffersIndex',
     KeyConditionExpression: 'garageId = :g',
     ExpressionAttributeValues: { ':g': garageId },
@@ -275,7 +274,7 @@ async function closeGarage(garageId: string, summary: CloseSummary): Promise<Nex
     .map((o) => o.serviceRequestId as string)
   for (const requestId of acceptedRequestIds) {
     const req = (await dynamoDB.send(new GetCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: requestId },
       ProjectionExpression: '#s, appointmentDate, appointmentTime',
       ExpressionAttributeNames: { '#s': 'status' },
@@ -289,7 +288,7 @@ async function closeGarage(garageId: string, summary: CloseSummary): Promise<Nex
     if (offer.status !== OfferStatus.PENDING) continue
     try {
       await dynamoDB.send(new UpdateCommand({
-        TableName: 'Offers',
+        TableName: TABLES.Offers,
         Key: { id: offer.id },
         UpdateExpression: 'SET #s = :expired, withdrawnAt = :now, updatedAt = :now',
         ConditionExpression: '#s = :pending',
@@ -304,7 +303,7 @@ async function closeGarage(garageId: string, summary: CloseSummary): Promise<Nex
 
   // Off the marketplace for good; the activate route refuses a closed garage.
   await dynamoDB.send(new UpdateCommand({
-    TableName: 'Garages',
+    TableName: TABLES.Garages,
     Key: { id: garageId },
     UpdateExpression: 'SET isActive = :f, deactivatedAt = :now',
     ExpressionAttributeValues: { ':f': false, ':now': now },
@@ -314,7 +313,7 @@ async function closeGarage(garageId: string, summary: CloseSummary): Promise<Nex
 
 async function rejectPendingOffers(requestId: string, summary: CloseSummary): Promise<void> {
   const offers = await queryAll({
-    TableName: 'Offers',
+    TableName: TABLES.Offers,
     IndexName: 'ServiceRequestOffersIndex',
     KeyConditionExpression: 'serviceRequestId = :r',
     ExpressionAttributeValues: { ':r': requestId },
@@ -325,7 +324,7 @@ async function rejectPendingOffers(requestId: string, summary: CloseSummary): Pr
     if (offer.status !== OfferStatus.PENDING) continue
     try {
       await dynamoDB.send(new UpdateCommand({
-        TableName: 'Offers',
+        TableName: TABLES.Offers,
         Key: { id: offer.id },
         UpdateExpression: 'SET #s = :rejected, updatedAt = :now',
         ConditionExpression: '#s = :pending',
@@ -346,7 +345,7 @@ async function rejectPendingOffers(requestId: string, summary: CloseSummary): Pr
  * new registration.
  */
 async function anonymizeRow(table: string, row: Row, keeps: Set<string>): Promise<void> {
-  const isAccount = table === 'Clients' || table === 'Garages'
+  const isAccount = table === TABLES.Clients || table === TABLES.Garages
   // The fields SET below cannot also be removed in the same expression.
   const setHere = new Set(['anonymizedAt', 'updatedAt', ...(isAccount ? ['isActive'] : [])])
   const remove = Object.keys(row).filter((k) => !keeps.has(k) && !setHere.has(k))
@@ -368,12 +367,12 @@ async function anonymizeRow(table: string, row: Row, keeps: Set<string>): Promis
 /** The mail log holds the address each message went to — operational only, so it goes. */
 async function wipeEmailLogs(attrName: 'clientId' | 'garageId', value: string, summary: CloseSummary): Promise<void> {
   const emails = await scanAll({
-    TableName: EMAIL_LOGS_TABLE,
+    TableName: TABLES.EmailLogs,
     FilterExpression: `${attrName} = :v`,
     ExpressionAttributeValues: { ':v': value },
     ProjectionExpression: 'emailId',
   })
-  await batchDelete(EMAIL_LOGS_TABLE, 'emailId', emails.map((i) => i.emailId as string))
+  await batchDelete(TABLES.EmailLogs, 'emailId', emails.map((i) => i.emailId as string))
   summary.emailLogs += emails.length
 }
 

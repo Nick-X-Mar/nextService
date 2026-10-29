@@ -10,6 +10,7 @@ import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
 import { ensureEmailLogsTable } from '@/utils/ensureEventTables'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 // What "the pipeline is healthy" means here:
 //   1. SES Configuration Set "nextservice-main" exists
@@ -181,7 +182,7 @@ async function _GET(_request: NextRequest): Promise<NextResponse> {
   try {
     const scan = await dynamoDB.send(
       new ScanCommand({
-        TableName: 'EmailLogs',
+        TableName: TABLES.EmailLogs,
         FilterExpression: 'sentAt >= :since',
         ExpressionAttributeValues: { ':since': since },
         ProjectionExpression: '#status, sentAt, deliveredAt',

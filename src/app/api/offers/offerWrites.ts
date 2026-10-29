@@ -4,6 +4,7 @@ import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
 import { collectAll } from '@/utils/pagination'
 import { OfferStatus, ServiceRequestStatus } from '@/types/statuses'
+import { TABLES } from '@/lib/tables'
 
 /**
  * The writes every path that files an offer must go through — the garage's own
@@ -57,7 +58,7 @@ async function findLegacyOffer(serviceRequestId: string, garageId: string) {
   const offers = await collectAll<Record<string, unknown>>(
     (startKey) =>
       dynamoDB.send(new QueryCommand({
-        TableName: 'Offers',
+        TableName: TABLES.Offers,
         IndexName: 'ServiceRequestOffersIndex',
         KeyConditionExpression: 'serviceRequestId = :serviceRequestId',
         FilterExpression: 'garageId = :garageId',
@@ -87,7 +88,7 @@ export function isTransactionCancelled(error: unknown): boolean {
 
 export async function isRequestOpen(serviceRequestId: string): Promise<boolean> {
   const res = await dynamoDB.send(new GetCommand({
-    TableName: 'ServiceRequests',
+    TableName: TABLES.ServiceRequests,
     Key: { id: serviceRequestId },
     ProjectionExpression: '#status',
     ExpressionAttributeNames: { '#status': 'status' },
@@ -100,7 +101,7 @@ export async function isRequestOpen(serviceRequestId: string): Promise<boolean> 
 export function requestStillOpen(serviceRequestId: string) {
   return {
     ConditionCheck: {
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: serviceRequestId },
       ConditionExpression: '#status = :open',
       ExpressionAttributeNames: { '#status': 'status' },
@@ -131,7 +132,7 @@ export async function putNewOffer(
   try {
     await dynamoDB.send(new TransactWriteCommand({
       TransactItems: [
-        { Put: { TableName: 'Offers', Item: offer, ConditionExpression: 'attribute_not_exists(id)' } },
+        { Put: { TableName: TABLES.Offers, Item: offer, ConditionExpression: 'attribute_not_exists(id)' } },
         requestStillOpen(offer.serviceRequestId),
       ],
     }))
@@ -142,7 +143,7 @@ export async function putNewOffer(
     if (failed === 1) return { ok: false, code: 'REQUEST_NOT_OPEN' }
 
     const [stored, open] = await Promise.all([
-      dynamoDB.send(new GetCommand({ TableName: 'Offers', Key: { id: offer.id }, ConsistentRead: true })),
+      dynamoDB.send(new GetCommand({ TableName: TABLES.Offers, Key: { id: offer.id }, ConsistentRead: true })),
       isRequestOpen(offer.serviceRequestId),
     ])
     if (stored.Item) return { ok: false, code: 'OFFER_EXISTS', offerId: offer.id }
@@ -180,7 +181,7 @@ async function closeIfRequestMovedOn(offerId: string, serviceRequestId: string):
 export async function rejectPendingOffer(offerId: string, updatedAt: string): Promise<boolean> {
   try {
     await dynamoDB.send(new UpdateCommand({
-      TableName: 'Offers',
+      TableName: TABLES.Offers,
       Key: { id: offerId },
       UpdateExpression: 'SET #status = :rejected, updatedAt = :updatedAt',
       ConditionExpression: '#status = :pending',
@@ -210,7 +211,7 @@ export async function rejectPendingOffersOn(
   const offers = await collectAll<Record<string, unknown>>(
     (startKey) =>
       dynamoDB.send(new QueryCommand({
-        TableName: 'Offers',
+        TableName: TABLES.Offers,
         IndexName: 'ServiceRequestOffersIndex',
         KeyConditionExpression: 'serviceRequestId = :serviceRequestId',
         ExpressionAttributeValues: { ':serviceRequestId': serviceRequestId },

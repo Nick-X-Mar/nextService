@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PutCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
-import {
-  ensureErrorResolutionsTable,
-  ERROR_RESOLUTIONS_TABLE
-} from '@/utils/ensureErrorResolutionsTable'
+import { ensureErrorResolutionsTable } from '@/utils/ensureErrorResolutionsTable'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 const FINGERPRINT_RE = /^err_[a-f0-9]{8}$/
 
@@ -41,7 +39,7 @@ async function _POST(request: NextRequest, context: RouteContext) {
 
   await dynamoDB.send(
     new PutCommand({
-      TableName: ERROR_RESOLUTIONS_TABLE,
+      TableName: TABLES.ErrorResolutions,
       Item: {
         fingerprint,
         status,
@@ -67,7 +65,7 @@ async function _DELETE(_request: NextRequest, context: RouteContext) {
 
   await dynamoDB.send(
     new DeleteCommand({
-      TableName: ERROR_RESOLUTIONS_TABLE,
+      TableName: TABLES.ErrorResolutions,
       Key: { fingerprint }
     })
   )

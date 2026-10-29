@@ -9,6 +9,7 @@ import { withMetrics } from '@/utils/withMetrics'
 import { broadcastRequestUpdate } from '@/utils/requestBroadcast'
 import { invalidateUnread } from '@/utils/unreadCache'
 import { rejectPendingOffersOn } from '@/app/api/offers/offerWrites'
+import { TABLES } from '@/lib/tables'
 
 async function _PATCH(
   request: NextRequest,
@@ -19,7 +20,7 @@ async function _PATCH(
 
     // Verify request exists
     const reqResult = await dynamoDB.send(new GetCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: requestId }
     }))
     const sr = reqResult.Item
@@ -64,7 +65,7 @@ async function _PATCH(
         TransactItems: [
           {
             Update: {
-              TableName: 'ServiceRequests',
+              TableName: TABLES.ServiceRequests,
               Key: { id: requestId },
               UpdateExpression: 'SET #status = :status, cancelledAt = :now, updatedAt = :now',
               ConditionExpression: '#status = :previous',
@@ -79,7 +80,7 @@ async function _PATCH(
           ...(acceptedOfferId
             ? [{
                 Update: {
-                  TableName: 'Offers',
+                  TableName: TABLES.Offers,
                   Key: { id: acceptedOfferId },
                   UpdateExpression: 'SET #status = :rejected, updatedAt = :now',
                   // Exists and belongs to this request — an update on a missing

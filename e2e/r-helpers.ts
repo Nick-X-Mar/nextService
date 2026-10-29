@@ -1,5 +1,6 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { TABLES } from '../src/lib/tables'
 
 /**
  * Fixtures for the realtime / auth hardening specs (agent R).
@@ -71,7 +72,7 @@ export async function putReview(review: {
   const reviewId = `${review.requestId}#${review.direction}`
   await ddb.send(
     new PutCommand({
-      TableName: 'Reviews',
+      TableName: TABLES.Reviews,
       Item: { reviewId, ...review, status: 'published', revealAt: now, createdAt: now },
       ConditionExpression: 'attribute_not_exists(reviewId)',
     })
@@ -80,7 +81,7 @@ export async function putReview(review: {
 }
 
 export async function getReview(reviewId: string): Promise<Record<string, unknown> | undefined> {
-  const res = await ddb.send(new GetCommand({ TableName: 'Reviews', Key: { reviewId }, ConsistentRead: true }))
+  const res = await ddb.send(new GetCommand({ TableName: TABLES.Reviews, Key: { reviewId }, ConsistentRead: true }))
   return res.Item
 }
 
@@ -91,7 +92,7 @@ export async function clientEmailLogs(clientId: string, templateName: string): P
   do {
     const page = await ddb.send(
       new ScanCommand({
-        TableName: 'EmailLogs',
+        TableName: TABLES.EmailLogs,
         FilterExpression: 'clientId = :c AND templateName = :t',
         ExpressionAttributeValues: { ':c': clientId, ':t': templateName },
         ExclusiveStartKey,

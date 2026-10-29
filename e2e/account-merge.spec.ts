@@ -12,6 +12,7 @@ import {
 import { getReview, hoursAgo, putReview, setFields } from './r-helpers'
 import { TEST_GARAGE } from './helpers'
 import { newGarage, postMessage } from './E-helpers'
+import { TABLES } from '../src/lib/tables'
 
 /**
  * A guest (a session whose Clients row has no credentials) folding its requests
@@ -47,18 +48,18 @@ test.describe.serial('Guest → account merge', () => {
   test('Setup: a victim account and an attacker guest', async () => {
     victim = await createClientWithRequest(email('victim'), PASSWORD)
     await setClientFields(victim.clientId, { lastName: 'Παπαδοπούλου', phoneNumber: '6900000001' })
-    victimBefore = (await getRow('Clients', victim.clientId))!
+    victimBefore = (await getRow(TABLES.Clients, victim.clientId))!
     attacker = await newGuest('attacker')
   })
 
   const expectVictimUntouched = async () => {
-    const row = await getRow('Clients', victim.clientId)
+    const row = await getRow(TABLES.Clients, victim.clientId)
     expect(row).toBeTruthy()
     expect(row!.firstName).toBe(victimBefore.firstName)
     expect(row!.lastName).toBe(victimBefore.lastName)
     expect(row!.phoneNumber).toBe(victimBefore.phoneNumber)
     expect(row!.passwordHash).toBe(victimBefore.passwordHash)
-    expect((await getRow('ServiceRequests', victim.requestId))?.clientId).toBe(victim.clientId)
+    expect((await getRow(TABLES.ServiceRequests, victim.requestId))?.clientId).toBe(victim.clientId)
   }
 
   test('Attack: victim email + any guestClientId, no session → nothing happens', async () => {
@@ -74,7 +75,7 @@ test.describe.serial('Guest → account merge', () => {
     expect(res.status).toBe(401)
     expect(res.authToken).toBeNull()
     await expectVictimUntouched()
-    expect(await getRow('Clients', attacker.clientId)).toBeTruthy()
+    expect(await getRow(TABLES.Clients, attacker.clientId)).toBeTruthy()
   })
 
   test("Attack: the attacker's own guest session + victim email → no victim session, no changes", async () => {
@@ -89,11 +90,11 @@ test.describe.serial('Guest → account merge', () => {
     await expectVictimUntouched()
 
     // Nothing deleted, nothing moved: the guest is still a guest with its request.
-    const guestRow = await getRow('Clients', attacker.clientId)
+    const guestRow = await getRow(TABLES.Clients, attacker.clientId)
     expect(guestRow).toBeTruthy()
     expect(guestRow!.email).toBeUndefined()
     expect(guestRow!.mergedInto).toBeUndefined()
-    expect((await getRow('ServiceRequests', attacker.requestId))?.clientId).toBe(attacker.clientId)
+    expect((await getRow(TABLES.ServiceRequests, attacker.requestId))?.clientId).toBe(attacker.clientId)
   })
 
   test("Another client's id as guestClientId is rejected", async () => {
@@ -118,7 +119,7 @@ test.describe.serial('Guest → account merge', () => {
     }
     await expectVictimUntouched()
     // The victim never gained an email-less twin, and was not overwritten.
-    expect((await getRow('Clients', victim.clientId))!.email).toBe(email('victim'))
+    expect((await getRow(TABLES.Clients, victim.clientId))!.email).toBe(email('victim'))
   })
 
   test('A registered account cannot be rewritten through this route', async () => {
@@ -129,7 +130,7 @@ test.describe.serial('Guest → account merge', () => {
     })
     expect(res.status).toBe(409)
     expect(res.data.code).toBe('NOT_GUEST')
-    expect((await getRow('Clients', victim.clientId))!.email).toBe(email('victim'))
+    expect((await getRow(TABLES.Clients, victim.clientId))!.email).toBe(email('victim'))
   })
 
   test('Password path: a wrong password is rejected and moves nothing', async () => {
@@ -140,8 +141,8 @@ test.describe.serial('Guest → account merge', () => {
     })
     expect(res.status).toBe(401)
     expect(res.authToken).toBeNull()
-    expect((await getRow('ServiceRequests', attacker.requestId))?.clientId).toBe(attacker.clientId)
-    expect((await getRow('Clients', attacker.clientId))!.mergedInto).toBeUndefined()
+    expect((await getRow(TABLES.ServiceRequests, attacker.requestId))?.clientId).toBe(attacker.clientId)
+    expect((await getRow(TABLES.Clients, attacker.clientId))!.mergedInto).toBeUndefined()
     await expectVictimUntouched()
   })
 
@@ -166,20 +167,20 @@ test.describe.serial('Guest → account merge', () => {
 
     // Same car → the request now points at the owner's vehicle, which picked up
     // the plate only the guest knew; the duplicate is gone.
-    const movedSame = await getRow('ServiceRequests', guest.requestId)
+    const movedSame = await getRow(TABLES.ServiceRequests, guest.requestId)
     expect(movedSame?.clientId).toBe(owner.clientId)
     expect(movedSame?.vehicleId).toBe(owner.vehicleId)
-    expect(await getRow('Vehicles', guest.vehicleId)).toBeUndefined()
-    expect((await getRow('Vehicles', owner.vehicleId))?.licensePlate).toBe('ΙΚΧ1234')
+    expect(await getRow(TABLES.Vehicles, guest.vehicleId)).toBeUndefined()
+    expect((await getRow(TABLES.Vehicles, owner.vehicleId))?.licensePlate).toBe('ΙΚΧ1234')
 
     // A different car moves across as it is.
-    const movedOther = await getRow('ServiceRequests', extra.requestId)
+    const movedOther = await getRow(TABLES.ServiceRequests, extra.requestId)
     expect(movedOther?.clientId).toBe(owner.clientId)
     expect(movedOther?.vehicleId).toBe(extra.vehicleId)
-    expect((await getRow('Vehicles', extra.vehicleId))?.clientId).toBe(owner.clientId)
+    expect((await getRow(TABLES.Vehicles, extra.vehicleId))?.clientId).toBe(owner.clientId)
 
     // The guest row is a tombstone, and its old session is over.
-    const tomb = await getRow('Clients', guest.clientId)
+    const tomb = await getRow(TABLES.Clients, guest.clientId)
     expect(tomb?.mergedInto).toBe(owner.clientId)
     expect(tomb?.mergedAt).toBeTruthy()
     const ghost = await api('/api/auth/me/', { cookie: guest.token })
@@ -221,7 +222,7 @@ test.describe.serial('Guest → account merge', () => {
     expect((await api('/api/auth/register-from-requests/status/', { cookie: guest.token })).data).toEqual({
       status: 'expired',
     })
-    expect((await getRow('ServiceRequests', guest.requestId))?.clientId).toBe(guest.clientId)
+    expect((await getRow(TABLES.ServiceRequests, guest.requestId))?.clientId).toBe(guest.clientId)
 
     // A re-send mints a new link; the old one is dead even though it is "known".
     const resent = await api('/api/auth/register-from-requests/send-confirmation/', {
@@ -245,8 +246,8 @@ test.describe.serial('Guest → account merge', () => {
     })
     expect(first.status).toBe(200)
     expect(first.authToken).toBeTruthy()
-    expect((await getRow('ServiceRequests', guest.requestId))?.clientId).toBe(owner.clientId)
-    expect((await getRow('Clients', guest.clientId))?.mergedInto).toBe(owner.clientId)
+    expect((await getRow(TABLES.ServiceRequests, guest.requestId))?.clientId).toBe(owner.clientId)
+    expect((await getRow(TABLES.Clients, guest.clientId))?.mergedInto).toBe(owner.clientId)
 
     // …and never again.
     const second = await api('/api/auth/confirm-account/', {
@@ -330,7 +331,7 @@ test.describe.serial('Guest → account merge', () => {
     const mail = await context.newPage()
     await mail.goto(`/confirm-account/?g=${guest.clientId}&t=${token}`)
     // Nothing is spent by merely opening the page (mail scanners do that).
-    expect((await getRow('Clients', guest.clientId))?.mergedInto).toBeUndefined()
+    expect((await getRow(TABLES.Clients, guest.clientId))?.mergedInto).toBeUndefined()
     await mail.getByRole('button', { name: 'Επιβεβαίωση' }).click()
     await expect(mail.getByTestId('confirm-account-done')).toBeVisible()
 
@@ -363,7 +364,7 @@ test.describe.serial('Guest → account merge', () => {
     await page.getByTestId('guest-registration').getByRole('button', { name: 'Ολοκλήρωση εγγραφής' }).click()
     await expect(page.getByTestId('guest-registration')).toBeHidden()
 
-    const row = await getRow('Clients', guest.clientId)
+    const row = await getRow(TABLES.Clients, guest.clientId)
     expect(row?.email).toBe(email('free-new'))
     expect(row?.firstName).toBe('Μαρία')
     expect(row?.acceptedTermsAt).toBeTruthy()
@@ -393,7 +394,7 @@ test.describe.serial('Guest → account merge: edge cases', () => {
       body: { email: email(tag('named-new')), password: PASSWORD, acceptedTerms: true },
     })
     expect(kept.status).toBe(200)
-    expect((await getRow('Clients', named.clientId))?.firstName).toBe('Γιώργος')
+    expect((await getRow(TABLES.Clients, named.clientId))?.firstName).toBe('Γιώργος')
 
     // One still on the placeholder keeps it — garages see the first name
     // before they win a job, so it is not filled from the address.
@@ -404,14 +405,14 @@ test.describe.serial('Guest → account merge: edge cases', () => {
       body: { email: email(tag('placeholder-new')), password: PASSWORD, acceptedTerms: true },
     })
     expect(res.status).toBe(200)
-    const row = await getRow('Clients', placeholder.clientId)
+    const row = await getRow(TABLES.Clients, placeholder.clientId)
     expect(row?.firstName).toBe('Επισκέπτης')
     expect(row?.firstName).not.toBe(email(tag('placeholder-new')).split('@')[0])
   })
 
   test('A merge carries reviews, the rating aggregate and the wallet — exactly once', async () => {
     const owner = await createClientWithRequest(email(tag('totals-owner')), PASSWORD)
-    await setFields('Clients', { id: owner.clientId }, { ratingCount: 1, ratingSum: 5, walletBalance: 10 })
+    await setFields(TABLES.Clients, { id: owner.clientId }, { ratingCount: 1, ratingSum: 5, walletBalance: 10 })
     const guest = await newGuest(tag('totals'))
     const about = await putReview({
       requestId: guest.requestId,
@@ -427,7 +428,7 @@ test.describe.serial('Guest → account merge: edge cases', () => {
       direction: 'client_to_garage',
       rating: 5,
     })
-    await setFields('Clients', { id: guest.clientId }, { ratingCount: 2, ratingSum: 9, walletBalance: 15 })
+    await setFields(TABLES.Clients, { id: guest.clientId }, { ratingCount: 2, ratingSum: 9, walletBalance: 15 })
 
     // Two merges racing for the same account — the retry case, compressed.
     const merge = () =>
@@ -441,11 +442,11 @@ test.describe.serial('Guest → account merge: edge cases', () => {
 
     expect((await getReview(about))?.clientId).toBe(owner.clientId)
     expect((await getReview(by))?.clientId).toBe(owner.clientId)
-    const account = await getRow('Clients', owner.clientId)
+    const account = await getRow(TABLES.Clients, owner.clientId)
     expect(account?.ratingCount).toBe(3)
     expect(account?.ratingSum).toBe(14)
     expect(account?.walletBalance).toBe(25)
-    const tomb = await getRow('Clients', guest.clientId)
+    const tomb = await getRow(TABLES.Clients, guest.clientId)
     expect(tomb?.mergedInto).toBe(owner.clientId)
     expect(tomb?.ratingCount).toBeUndefined()
     expect(tomb?.walletBalance).toBeUndefined()
@@ -463,7 +464,7 @@ test.describe.serial('Guest → account merge: edge cases', () => {
     const { token } = await plantMergeToken(guest.clientId)
 
     // Opened 25 hours ago, the merge died right after it claimed the guest.
-    await setFields('Clients', { id: guest.clientId }, {
+    await setFields(TABLES.Clients, { id: guest.clientId }, {
       mergeRequestedAt: hoursAgo(25.5),
       mergeExpiresAt: hoursAgo(24.5),
       mergeConfirmedAt: hoursAgo(25),
@@ -474,7 +475,7 @@ test.describe.serial('Guest → account merge: edge cases', () => {
     expect(late.status).toBe(410)
     expect(late.data.code).toBe('EXPIRED')
     expect(late.authToken).toBeNull()
-    expect((await getRow('ServiceRequests', guest.requestId))?.clientId).toBe(guest.clientId)
+    expect((await getRow(TABLES.ServiceRequests, guest.requestId))?.clientId).toBe(guest.clientId)
     // The waiting page is told, and offers a new link…
     expect((await api('/api/auth/register-from-requests/status/', { cookie: guest.token })).data).toEqual({
       status: 'expired',
@@ -489,7 +490,7 @@ test.describe.serial('Guest → account merge: edge cases', () => {
     expect(resent.status).toBe(200)
     const fresh = await plantMergeToken(guest.clientId)
     // Opened two hours ago — past the hour, inside the day: still good.
-    await setFields('Clients', { id: guest.clientId }, {
+    await setFields(TABLES.Clients, { id: guest.clientId }, {
       mergeExpiresAt: hoursAgo(1),
       mergeConfirmedAt: hoursAgo(2),
       mergeClaimedAt: hoursAgo(2),
@@ -500,13 +501,13 @@ test.describe.serial('Guest → account merge: edge cases', () => {
     })
     expect(finished.status).toBe(200)
     expect(finished.authToken).toBeTruthy()
-    expect((await getRow('ServiceRequests', guest.requestId))?.clientId).toBe(owner.clientId)
+    expect((await getRow(TABLES.ServiceRequests, guest.requestId))?.clientId).toBe(owner.clientId)
   })
 
   test('While a merge into that account is running, a re-send says so', async () => {
     const owner = await createClientWithRequest(email(tag('running-owner')), PASSWORD)
     const guest = await newGuest(tag('running'))
-    await setFields('Clients', { id: guest.clientId }, {
+    await setFields(TABLES.Clients, { id: guest.clientId }, {
       mergingInto: owner.clientId,
       mergeClaimedAt: new Date().toISOString(),
     })

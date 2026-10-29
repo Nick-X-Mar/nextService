@@ -18,6 +18,7 @@ import {
   splitVat,
   type CompletionOutcome,
 } from '@/types/reviews'
+import { TABLES } from '@/lib/tables'
 
 /**
  * The garage confirms what happened after the appointment.
@@ -55,7 +56,7 @@ async function resolveAssignedGarage(
 
   const offer = await dynamoDB.send(
     new GetCommand({
-      TableName: 'Offers',
+      TableName: TABLES.Offers,
       Key: { id: offerId },
       ProjectionExpression: 'garageId',
     })
@@ -94,7 +95,7 @@ async function _POST(
     const outcome: CompletionOutcome = body.outcome
 
     const res = await dynamoDB.send(
-      new GetCommand({ TableName: 'ServiceRequests', Key: { id: requestId } })
+      new GetCommand({ TableName: TABLES.ServiceRequests, Key: { id: requestId } })
     )
     const serviceRequest = res.Item
     if (!serviceRequest) {
@@ -164,14 +165,14 @@ async function _POST(
     // that freeze it now, from the garage's rate today. Either way a later
     // rate change never re-prices a month that is already invoiced.
     const garageRow = (await dynamoDB.send(
-      new GetCommand({ TableName: 'Garages', Key: { id: garageId }, ProjectionExpression: 'commissionPercent' })
+      new GetCommand({ TableName: TABLES.Garages, Key: { id: garageId }, ProjectionExpression: 'commissionPercent' })
     )).Item
     const commissionPercent = garageCommissionPercent(garageRow)
 
     try {
       await dynamoDB.send(
         new UpdateCommand({
-          TableName: 'ServiceRequests',
+          TableName: TABLES.ServiceRequests,
           Key: { id: requestId },
           UpdateExpression:
             'SET #status = :completed, completedAt = :now, completedBy = :by, ' +

@@ -3,6 +3,7 @@ import { requireClient } from '@/utils/requireAuth'
 import { loadClientWorkspace, clientThreads, type ClientThread } from '@/utils/clientThreads'
 import { batchGetById } from '@/utils/batchGetById'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 /**
  * The client's conversations, one row per (request, garage), ready to render.
@@ -20,7 +21,7 @@ async function _GET(request: NextRequest) {
     if (clientId instanceof NextResponse) return clientId
 
     const threads = clientThreads(await loadClientWorkspace(clientId))
-    const garages = await batchGetById('Garages', threads.map((t) => t.garageId), {
+    const garages = await batchGetById(TABLES.Garages, threads.map((t) => t.garageId), {
       projection: 'id, companyName, logoUrl',
     })
 

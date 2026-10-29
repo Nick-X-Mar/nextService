@@ -7,6 +7,7 @@ import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { ServiceRequestStatus } from '@/types/statuses'
 import type { OutcomeReview } from '@/lib/commission-basis'
+import { TABLES } from '@/lib/tables'
 
 /**
  * PUT /api/admin/commissions/review/[requestId]
@@ -41,7 +42,7 @@ async function _PUT(
 
     try {
       await dynamoDB.send(new UpdateCommand({
-        TableName: 'ServiceRequests',
+        TableName: TABLES.ServiceRequests,
         Key: { id: requestId },
         UpdateExpression: 'SET outcomeReview = :review',
         // Only a job closed as not having happened has anything to review.

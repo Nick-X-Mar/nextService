@@ -6,6 +6,7 @@ import { collectAll } from '@/utils/pagination'
 import { requireActiveGarage } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
 import { garageClientView, isWinningGarage } from '@/utils/garageClientView'
+import { TABLES } from '@/lib/tables'
 
 async function _GET(request: NextRequest) {
   try {
@@ -18,7 +19,7 @@ async function _GET(request: NextRequest) {
     const items = await collectAll<Record<string, unknown>>(
       (startKey) =>
         dynamoDB.send(new QueryCommand({
-          TableName: 'Offers',
+          TableName: TABLES.Offers,
           IndexName: 'GarageOffersIndex',
           KeyConditionExpression: 'garageId = :garageId',
           ExpressionAttributeValues: { ':garageId': garageId },
@@ -38,13 +39,13 @@ async function _GET(request: NextRequest) {
     // Batched rather than three point reads per offer: the dashboard fetches
     // this list for its badges and again for whichever tab is open. Rows
     // missing clientId/vehicleId are skipped by the batch, not fatal to it.
-    const requests = await batchGetById('ServiceRequests', items.map((o) => o.serviceRequestId as string))
+    const requests = await batchGetById(TABLES.ServiceRequests, items.map((o) => o.serviceRequestId as string))
     const requestRows = [...requests.values()]
     const [clients, vehicles] = await Promise.all([
-      batchGetById('Clients', requestRows.map((r) => r.clientId as string | undefined), {
+      batchGetById(TABLES.Clients, requestRows.map((r) => r.clientId as string | undefined), {
         projection: 'id, firstName, lastName, phoneNumber, email',
       }),
-      batchGetById('Vehicles', requestRows.map((r) => r.vehicleId as string | undefined), {
+      batchGetById(TABLES.Vehicles, requestRows.map((r) => r.vehicleId as string | undefined), {
         projection: 'id, brand, #model, #year, modelYear, licensePlate',
         names: { '#model': 'model', '#year': 'year' },
       }),

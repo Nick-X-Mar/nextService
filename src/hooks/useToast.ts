@@ -1,48 +1,22 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useContext } from 'react'
+import { ToastContext, type ToastApi } from '@/components/ToastProvider'
 
-export interface ToastOptions {
-  type: 'success' | 'error' | 'info' | 'warning'
-  title: string
-  message?: string
-  duration?: number
+export type { ToastOptions } from '@/components/ToastProvider'
+
+const alertText = (title: string, message?: string) => `${title}${message ? `\n${message}` : ''}`
+
+// Only reachable outside <ToastProvider> (it wraps the whole app in the root
+// layout), so a stray call still reaches the user instead of vanishing.
+const fallback: ToastApi = {
+  showToast: ({ title, message }) => alert(alertText(title, message)),
+  success: (title, message) => alert(alertText(title, message)),
+  error: (title, message) => alert(alertText(title, message)),
+  info: (title, message) => alert(alertText(title, message)),
+  warning: (title, message) => alert(alertText(title, message)),
 }
 
-export function useToast() {
-  const showToast = useCallback((options: ToastOptions) => {
-    if (typeof window !== 'undefined') {
-      const windowWithToast = window as Window & { showToast?: (options: ToastOptions) => void }
-      if (windowWithToast.showToast) {
-        windowWithToast.showToast(options)
-        return
-      }
-    }
-    // Fallback to browser alert if toast system not available
-    alert(`${options.title}${options.message ? `\n${options.message}` : ''}`)
-  }, [])
-
-  const success = useCallback((title: string, message?: string) => {
-    showToast({ type: 'success', title, message })
-  }, [showToast])
-
-  const error = useCallback((title: string, message?: string) => {
-    showToast({ type: 'error', title, message })
-  }, [showToast])
-
-  const info = useCallback((title: string, message?: string) => {
-    showToast({ type: 'info', title, message })
-  }, [showToast])
-
-  const warning = useCallback((title: string, message?: string) => {
-    showToast({ type: 'warning', title, message })
-  }, [showToast])
-
-  return {
-    showToast,
-    success,
-    error,
-    info,
-    warning
-  }
+export function useToast(): ToastApi {
+  return useContext(ToastContext) ?? fallback
 }

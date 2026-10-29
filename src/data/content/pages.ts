@@ -221,8 +221,7 @@ const contact: SitePage = {
 // The legal texts describe what the platform actually does — who sees which
 // data and when, how offers lock, what is charged to whom. Change one of those
 // behaviours and the matching paragraph here must change in the same edit
-// (and LEGAL_TEXT_DATE with it). Fields in [ΚΕΦΑΛΑΙΑ] are company details the
-// operator has to supply; nothing else in these texts is a placeholder.
+// (and LEGAL_TEXT_DATE with it). Nothing in these texts is a placeholder.
 const LEGAL_UPDATED = `${LEGAL_TEXT_DATE}T00:00:00.000Z`
 
 const terms: SitePage = {
@@ -238,7 +237,7 @@ const terms: SitePage = {
     b.heading('terms-1-h', '1. Ποιοι είμαστε'),
     b.paragraph(
       'terms-1-p',
-      'Η πλατφόρμα NextService (nextservice.gr, στο εξής «η Πλατφόρμα») λειτουργεί από την εταιρεία [ΕΠΩΝΥΜΙΑ ΕΤΑΙΡΕΙΑΣ], ΑΦΜ [ΑΦΜ], ΔΟΥ [ΔΟΥ], με έδρα [ΔΙΕΥΘΥΝΣΗ ΕΔΡΑΣ] (στο εξής «το NextService» ή «εμείς»). Επικοινωνία: [info@nextservice.gr](mailto:info@nextservice.gr). Οι παρόντες όροι ισχύουν για κάθε χρήστη: για τους ιδιοκτήτες οχημάτων («Πελάτες») και για τα συνεργεία αυτοκινήτων («Συνεργεία»). Με τη δημιουργία λογαριασμού ή τη χρήση της Πλατφόρμας τους αποδέχεστε. Αν δεν συμφωνείτε, μη χρησιμοποιείτε την Πλατφόρμα.',
+      'Η πλατφόρμα NextService (nextservice.gr, στο εξής «η Πλατφόρμα») λειτουργεί από την εταιρεία Webproposal Ε.Ε., ΑΦΜ 803150730, ΔΟΥ ΚΕΦΟΔΕ Αττικής, αρ. ΓΕΜΗ 190750903000, με έδρα Τσαγκάρη 18, 151 27 Μελίσσια Αττικής (στο εξής «το NextService» ή «εμείς»). Επικοινωνία: [info@nextservice.gr](mailto:info@nextservice.gr). Οι παρόντες όροι ισχύουν για κάθε χρήστη: για τους ιδιοκτήτες οχημάτων («Πελάτες») και για τα συνεργεία αυτοκινήτων («Συνεργεία»). Με τη δημιουργία λογαριασμού ή τη χρήση της Πλατφόρμας τους αποδέχεστε. Αν δεν συμφωνείτε, μη χρησιμοποιείτε την Πλατφόρμα.',
     ),
     b.heading('terms-2-h', '2. Ο ρόλος της Πλατφόρμας'),
     b.paragraph(
@@ -354,7 +353,7 @@ const privacy: SitePage = {
     b.heading('privacy-1-h', '1. Υπεύθυνος επεξεργασίας'),
     b.paragraph(
       'privacy-1-p',
-      'Υπεύθυνος για την επεξεργασία των δεδομένων σας είναι η εταιρεία [ΕΠΩΝΥΜΙΑ ΕΤΑΙΡΕΙΑΣ], ΑΦΜ [ΑΦΜ], με έδρα [ΔΙΕΥΘΥΝΣΗ ΕΔΡΑΣ], που λειτουργεί την πλατφόρμα NextService (nextservice.gr). Για οτιδήποτε αφορά τα δεδομένα σας: [info@nextservice.gr](mailto:info@nextservice.gr).',
+      'Υπεύθυνος για την επεξεργασία των δεδομένων σας είναι η εταιρεία Webproposal Ε.Ε., ΑΦΜ 803150730, ΔΟΥ ΚΕΦΟΔΕ Αττικής, αρ. ΓΕΜΗ 190750903000, με έδρα Τσαγκάρη 18, 151 27 Μελίσσια Αττικής, που λειτουργεί την πλατφόρμα NextService (nextservice.gr). Για οτιδήποτε αφορά τα δεδομένα σας: [info@nextservice.gr](mailto:info@nextservice.gr).',
     ),
     b.heading('privacy-2-h', '2. Ποια δεδομένα συλλέγουμε'),
     b.paragraph('privacy-2-p1', '**Αν είστε Πελάτης (ιδιοκτήτης οχήματος):**'),

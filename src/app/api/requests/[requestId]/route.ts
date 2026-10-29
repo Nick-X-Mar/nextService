@@ -9,6 +9,7 @@ import { generatePresignedUrls } from '@/utils/s3Service'
 import { withMetrics } from '@/utils/withMetrics'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { garageClientView, garageVehicleView, resolveWinningGarageId } from '@/utils/garageClientView'
+import { TABLES } from '@/lib/tables'
 
 async function _GET(
   request: NextRequest,
@@ -40,7 +41,7 @@ async function _GET(
 
     // Get service request details
     const result = await dynamoDB.send(new GetCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: requestId }
     }))
 
@@ -86,7 +87,7 @@ async function _GET(
 
       if (!isOpenMarket && !isWinner) {
         const offersOnRequest = await dynamoDB.send(new QueryCommand({
-          TableName: 'Offers',
+          TableName: TABLES.Offers,
           IndexName: 'ServiceRequestOffersIndex',
           KeyConditionExpression: 'serviceRequestId = :requestId',
           ExpressionAttributeValues: { ':requestId': requestId },
@@ -108,8 +109,8 @@ async function _GET(
     // getByIdOrNull rather than a bare GetCommand: a row missing clientId or
     // vehicleId would otherwise throw and fail this whole Promise.all.
     const [client, vehicle, presignedPhotoUrls] = await Promise.all([
-      getByIdOrNull('Clients', serviceRequest.clientId as string | undefined),
-      getByIdOrNull('Vehicles', serviceRequest.vehicleId as string | undefined),
+      getByIdOrNull(TABLES.Clients, serviceRequest.clientId as string | undefined),
+      getByIdOrNull(TABLES.Vehicles, serviceRequest.vehicleId as string | undefined),
       rawPhotoUrls.length > 0 ? generatePresignedUrls(rawPhotoUrls) : Promise.resolve([])
     ])
 
@@ -284,7 +285,7 @@ async function _PATCH(
 
     // Fetch the request to verify ownership
     const fetchResult = await dynamoDB.send(new GetCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: requestId }
     }))
     const serviceRequest = fetchResult.Item
@@ -333,7 +334,7 @@ async function _PATCH(
     }
 
     const updateCommand = new UpdateCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: requestId },
       UpdateExpression: 'SET clientAvailabilityDates = :dates, updatedAt = :updatedAt',
       // Ownership was checked on the read; hold it on the write too.
@@ -381,8 +382,8 @@ async function _PATCH(
     // Fetch client + vehicle + presigned photo URLs in parallel.
     const rawPatchPhotoUrls = updatedRequest.photoUrls || []
     const [client, vehicle, presignedPatchPhotoUrls] = await Promise.all([
-      getByIdOrNull('Clients', updatedRequest.clientId as string | undefined),
-      getByIdOrNull('Vehicles', updatedRequest.vehicleId as string | undefined),
+      getByIdOrNull(TABLES.Clients, updatedRequest.clientId as string | undefined),
+      getByIdOrNull(TABLES.Vehicles, updatedRequest.vehicleId as string | undefined),
       rawPatchPhotoUrls.length > 0 ? generatePresignedUrls(rawPatchPhotoUrls) : Promise.resolve([])
     ])
 

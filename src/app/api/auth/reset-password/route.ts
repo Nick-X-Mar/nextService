@@ -8,6 +8,7 @@ import { createRateLimiter } from '@/utils/rateLimit'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
@@ -60,7 +61,7 @@ async function _POST(request: NextRequest) {
       )
     }
 
-    const tableName = userType === 'garage' ? 'Garages' : 'Clients'
+    const tableName = userType === 'garage' ? TABLES.Garages : TABLES.Clients
     const tokenHash = hashToken(token)
 
     // Find user by reset token hash. A scan is acceptable — password reset is

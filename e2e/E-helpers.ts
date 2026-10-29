@@ -4,6 +4,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { registerClient, loginViaAPI, setAuthCookie } from './helpers'
 import { athensToday } from '../src/utils/athensTime'
+import { TABLES } from '../src/lib/tables'
 
 /**
  * Fixtures for the chat, notification and broadcast specs.
@@ -65,7 +66,7 @@ export async function newGarage(
   const email = `e2e-${prefix}-${unique()}@test.com`
   const now = new Date().toISOString()
   await ddb.send(new PutCommand({
-    TableName: 'Garages',
+    TableName: TABLES.Garages,
     Item: {
       id,
       email,
@@ -172,7 +173,7 @@ export async function insertMessage(row: {
 }) {
   const now = new Date().toISOString()
   await ddb.send(new PutCommand({
-    TableName: 'ChatMessages',
+    TableName: TABLES.ChatMessages,
     Item: { id: `msg-e2e-${unique()}`, senderName: 'E2E', timestamp: now, createdAt: now, ...row },
   }))
 }
@@ -180,7 +181,7 @@ export async function insertMessage(row: {
 /** Registration takes no name; the winner-only name rule needs one. */
 export async function setClientName(clientId: string, firstName: string, lastName: string) {
   await ddb.send(new UpdateCommand({
-    TableName: 'Clients',
+    TableName: TABLES.Clients,
     Key: { id: clientId },
     UpdateExpression: 'SET firstName = :f, lastName = :l',
     ExpressionAttributeValues: { ':f': firstName, ':l': lastName },
@@ -190,7 +191,7 @@ export async function setClientName(clientId: string, firstName: string, lastNam
 /** An admin's deactivation, without the admin UI. */
 export async function setGarageActive(garageId: string, isActive: boolean) {
   await ddb.send(new UpdateCommand({
-    TableName: 'Garages',
+    TableName: TABLES.Garages,
     Key: { id: garageId },
     UpdateExpression: 'SET isActive = :a',
     ExpressionAttributeValues: { ':a': isActive },
@@ -200,7 +201,7 @@ export async function setGarageActive(garageId: string, isActive: boolean) {
 /** EmailLogs rows addressed to one recipient for one template (local mail is logged as `skipped`). */
 export async function emailsTo(to: string, templateName: string): Promise<Record<string, unknown>[]> {
   const res = await ddb.send(new QueryCommand({
-    TableName: 'EmailLogs',
+    TableName: TABLES.EmailLogs,
     IndexName: 'RecipientIndex',
     KeyConditionExpression: '#to = :to',
     FilterExpression: 'templateName = :t',
@@ -213,7 +214,7 @@ export async function emailsTo(to: string, templateName: string): Promise<Record
 /** Moves an appointment's slot into the past (request and accepted offer) so it can be closed. */
 export async function ageAppointment(requestId: string, offerId: string, daysAgo = 2): Promise<string> {
   const date = athensDatePlus(-daysAgo)
-  for (const [table, id] of [['ServiceRequests', requestId], ['Offers', offerId]] as const) {
+  for (const [table, id] of [[TABLES.ServiceRequests, requestId], [TABLES.Offers, offerId]] as const) {
     await ddb.send(new UpdateCommand({
       TableName: table,
       Key: { id },

@@ -3,6 +3,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 async function _GET(request: NextRequest) {
   try {
@@ -25,7 +26,7 @@ async function _GET(request: NextRequest) {
       }
 
       return dynamoDB.send(new QueryCommand({
-        TableName: 'ServiceRequests',
+        TableName: TABLES.ServiceRequests,
         IndexName: 'StatusIndex',
         KeyConditionExpression: keyCondition,
         ExpressionAttributeNames: { '#status': 'status' },

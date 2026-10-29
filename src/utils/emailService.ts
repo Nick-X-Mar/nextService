@@ -12,8 +12,8 @@ import type {
   EmailTemplateName,
   EventNameValue
 } from '@/types/events'
+import { TABLES } from '@/lib/tables'
 
-const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
 const FROM_ADDRESS = process.env.SES_FROM_ADDRESS || 'no-reply@nextservice.gr'
 const FROM_NAME = 'NextService'
 const SES_REGION = process.env.SES_REGION || process.env.REGION || 'eu-central-1'
@@ -208,7 +208,7 @@ async function writeEmailLog(record: EmailLogRecord): Promise<void> {
     }
     // Auto-cleanup after 180 days via DynamoDB TTL.
     item.expiresAt = Math.floor(Date.now() / 1000) + EMAIL_LOG_TTL_SECONDS
-    await dynamoDB.send(new PutCommand({ TableName: EMAIL_LOGS_TABLE, Item: item }))
+    await dynamoDB.send(new PutCommand({ TableName: TABLES.EmailLogs, Item: item }))
   } catch (err) {
     console.error('[emailService] Failed to write EmailLogs record:', err)
   }
@@ -239,7 +239,7 @@ async function updateEmailLog(
 
     await dynamoDB.send(
       new UpdateCommand({
-        TableName: EMAIL_LOGS_TABLE,
+        TableName: TABLES.EmailLogs,
         Key: { emailId },
         UpdateExpression: `SET ${sets.join(', ')}`,
         ExpressionAttributeNames: patch.status ? { '#s': 'status' } : undefined,

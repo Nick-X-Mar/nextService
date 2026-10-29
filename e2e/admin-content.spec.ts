@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext } from '@playwright/test'
 import { getRow } from './b-helpers'
+import { TABLES } from '../src/lib/tables'
 
 /**
  * The content CMS: an admin edits a public page's copy and the change is live
@@ -103,7 +104,38 @@ test.describe.serial('Admin content CMS', () => {
 
     // The override is gone, not replaced by a copy of the shipped text — a
     // copy would freeze it, hiding every later fix to src/data/content/pages.ts.
-    expect(await getRow('SiteContent', 'about', 'pageKey')).toBeUndefined()
+    expect(await getRow(TABLES.SiteContent, 'about', 'pageKey')).toBeUndefined()
+  })
+
+  test('Resetting from the editor asks first, in the app\'s own dialog', async ({ request, page: browserPage, baseURL }) => {
+    const current = await request.get('/api/admin/content/pages/about/', { headers: { Cookie: adminCookie } })
+    const { page } = await current.json()
+    const saved = await request.put('/api/admin/content/pages/about/', {
+      headers: { Cookie: adminCookie },
+      data: { ...page, meta: { ...page.meta, title: `E2E επιβεβαίωση ${Date.now()}` } },
+    })
+    expect(saved.status(), await saved.text()).toBe(200)
+
+    // A native confirm() would fail this test: nothing here accepts dialogs.
+    browserPage.on('dialog', (dialog) => {
+      throw new Error(`native dialog shown: ${dialog.message()}`)
+    })
+    await browserPage.context().addCookies([{ name: 'ns-admin-session', value: adminCookie.split('=')[1], url: baseURL! }])
+    await browserPage.goto('/admin/content/about/')
+
+    const resetButton = browserPage.getByRole('button', { name: 'Επαναφορά' })
+    const dialog = browserPage.getByRole('dialog', { name: 'Επαναφορά στο αρχικό κείμενο;' })
+
+    await resetButton.click()
+    await expect(dialog).toContainText('Οι αλλαγές σου θα χαθούν.')
+    await dialog.getByRole('button', { name: 'Άκυρο' }).click()
+    await expect(dialog).toBeHidden()
+    expect(await getRow(TABLES.SiteContent, 'about', 'pageKey')).toBeTruthy()
+
+    await resetButton.click()
+    await dialog.getByRole('button', { name: 'Επαναφορά' }).click()
+    await expect(dialog).toBeHidden()
+    await expect.poll(() => getRow(TABLES.SiteContent, 'about', 'pageKey')).toBeUndefined()
   })
 
 

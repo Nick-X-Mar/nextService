@@ -97,10 +97,11 @@ SEO: `sitemap.ts`, `robots.ts`, `opengraph-image.tsx` (the OG routes read fonts/
 
 ### Shared Code
 
-- `src/components/` — reusable UI (Button, Modal, Input, Spinner, Switch, Checkbox, Toast, SegmentedControl, LoadMoreButton, …) plus `layout/` (AppShell, Sidebar, TopHeader, BottomNav, Footer) and `ui/` (Icon, badge). Always reuse instead of creating one-off equivalents.
+- `src/components/` — reusable UI (Button, Modal, Input, Spinner, Switch, Checkbox, SegmentedControl, LoadMoreButton, …) plus `layout/` (AppShell, Sidebar, TopHeader, BottomNav, Footer) and `ui/` (Icon, badge). Always reuse instead of creating one-off equivalents.
 - `src/contexts/AuthContext.tsx` — auth state (client vs garage), persisted to localStorage
 - `src/contexts/UserContext.tsx` — user-level state
 - `src/contexts/NotificationsContext.tsx` — the one poller (30s) for unread counts + alerts, plus the garage's live new-request bell
+- `src/lib/tables.ts` — `TABLES`, every DynamoDB table name declared once. Never write a table name as a string literal (app, scripts and E2E helpers all import it). `TABLE_PREFIX` prefixes every name, for a second isolated set of tables on one endpoint; CDK does not provision it, so it stays unset in AWS (the region separates the stages).
 - `src/utils/dynamoService.ts` — DynamoDB client factory (local endpoint vs explicit creds vs `.aws/` profile vs IAM role)
 - `src/utils/ensure*Table.ts` — create the newer tables in DynamoDB Local (in AWS they are CDK-owned and these only describe them)
 - `src/utils/eventLogger.ts` — funnel events → `EventLogs` (365-day TTL)
@@ -109,7 +110,7 @@ SEO: `sitemap.ts`, `robots.ts`, `opengraph-image.tsx` (the OG routes read fonts/
 - `src/utils/emailService.ts`, `notificationService.ts`, `src/lib/email-templates/` — SES emails
 - `src/utils/s3Service.ts`, `formStorage.ts`, `rateLimit.ts`, `requireAuth.ts`, `ttlCache.ts`, `requestBroadcast.ts`
 - `src/lib/` — `appsync-service.ts` (browser socket), `appsync-publish.ts` (server-side HTTP publish — API routes never publish over the socket), `site-content.ts` + `content-validation.ts` (the page CMS), `commission-basis.ts`, `stripe-client.ts`, `stripe-server.ts`, `offers.ts`, `site-url.ts`
-- `src/hooks/` — `useRealtimeRequests`, `useNewRequestNotifier`, `useToast`
+- `src/hooks/` — `useRealtimeRequests`, `useNewRequestNotifier`, `useToast` + `useConfirm` (context hooks over `ToastProvider` / `ConfirmProvider`, mounted once in the root layout; never `window.confirm()` or `alert()`)
 - Real-time chat goes through `appSyncService` directly from the chat page components — there is no shared chat hook. (The old `websocket-service.ts` / `useRealtimeChat.ts` pair was deleted; it subscribed to a `chat-{id}-{garageId}` channel the API no longer publishes.)
 - **Real-time is an enhancement, never the delivery mechanism.** Both chat pages render a sent message from the POST response and de-dupe the echo on `id`. Never refetch-and-replace after a write: the message list is read from a GSI, which DynamoDB does not serve consistently, so a read moments after the write can legitimately miss the row. Gap-filling refetches (`onReconnect`) must merge.
 - **Await every side effect in a route handler** — `sendEmail`, `logEvent`, the `broadcast*` helpers. They never reject, but on Amplify the SSR function is frozen the moment it responds, so an un-awaited send/publish/write may never happen: new requests never reached dashboards live, and some emails stayed `queued` in EmailLogs forever.
@@ -208,7 +209,7 @@ IAM: the Amplify SSR role's DynamoDB permissions in `infra/stacks/amplify_stack.
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_PAYMENTS_ENABLED`, `NEXT_PUBLIC_PAYMENTS_REFUNDS_ENABLED`, `DEPOSIT_PERCENT`, `CANCELLATION_DEADLINE_DAYS`
 - `SES_FROM_ADDRESS`, `SES_REGION`, `SES_CONFIG_SET`, `NOTIFICATIONS_ENABLED`
 - `SITE_URL`, `NEXT_PUBLIC_APP_URL`
-- Table-name overrides: `ADMIN_USERS_TABLE`, `EVENT_LOGS_TABLE`, `EMAIL_LOGS_TABLE`, `HOT_DEALS_TABLE`, `PAYMENTS_TABLE`, `WALLET_TRANSACTIONS_TABLE`, `PERFORMANCE_TABLE`, `ERROR_RESOLUTIONS_TABLE`
+- `TABLE_PREFIX` and the per-table overrides (`ADMIN_USERS_TABLE`, `EVENT_LOGS_TABLE`, `EMAIL_LOGS_TABLE`, `HOT_DEALS_TABLE`, `PAYMENTS_TABLE`, `WALLET_TRANSACTIONS_TABLE`, `PERFORMANCE_TABLE`, `ERROR_RESOLUTIONS_TABLE`, `SITE_CONTENT_TABLE`, `REVIEWS_TABLE`) — all read only in `src/lib/tables.ts`; local-only (not in the `next.config.ts` env block)
 
 Local dev takes the DynamoDB-Local path only when `NODE_ENV=development` **and** `DYNAMODB_ENDPOINT` is set.
 

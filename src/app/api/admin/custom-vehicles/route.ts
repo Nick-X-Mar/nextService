@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 async function _GET() {
   try {
     // Scan Vehicles table for entries with custom brand or model
     const result = await dynamoDB.send(new ScanCommand({
-      TableName: 'Vehicles',
+      TableName: TABLES.Vehicles,
       FilterExpression: 'isBrandOther = :true OR isModelOther = :true',
       ExpressionAttributeValues: {
         ':true': true,

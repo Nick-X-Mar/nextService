@@ -3,6 +3,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand } from '@aws-sdk/lib-dynamodb'
 import { ensureEmailLogsTable } from '@/utils/ensureEventTables'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 async function _GET(
   _request: NextRequest,
@@ -14,7 +15,7 @@ async function _GET(
     const { emailId } = await params
 
     const result = await dynamoDB.send(new GetCommand({
-      TableName: 'EmailLogs',
+      TableName: TABLES.EmailLogs,
       Key: { emailId }
     }))
 

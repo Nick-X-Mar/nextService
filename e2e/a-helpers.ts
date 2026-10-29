@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'crypto'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, GetCommand, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { TABLES } from '../src/lib/tables'
 
 /**
  * Fixtures for the guest → account merge flow (agent A).
@@ -34,7 +35,7 @@ export async function getRow(table: string, id: string): Promise<Record<string, 
 export async function makeLegacyGuest(clientId: string): Promise<void> {
   await ddb.send(
     new UpdateCommand({
-      TableName: 'Clients',
+      TableName: TABLES.Clients,
       Key: { id: clientId },
       UpdateExpression: 'SET firstName = :guest REMOVE email, passwordHash, acceptedTermsAt, acceptedTermsVersion',
       ConditionExpression: 'attribute_exists(id)',
@@ -47,7 +48,7 @@ export async function setClientFields(clientId: string, fields: Record<string, s
   const names = Object.keys(fields)
   await ddb.send(
     new UpdateCommand({
-      TableName: 'Clients',
+      TableName: TABLES.Clients,
       Key: { id: clientId },
       UpdateExpression: `SET ${names.map((n) => `#${n} = :${n}`).join(', ')}`,
       ConditionExpression: 'attribute_exists(id)',
@@ -62,14 +63,14 @@ export async function setClientFields(clientId: string, fields: Record<string, s
  * token the test holds. Refuses unless the app actually stored a pending merge.
  */
 export async function plantMergeToken(guestId: string): Promise<{ token: string; stored: Record<string, unknown> }> {
-  const stored = await getRow('Clients', guestId)
+  const stored = await getRow(TABLES.Clients, guestId)
   if (!stored || typeof stored.mergeTokenHash !== 'string') {
     throw new Error(`No pending merge stored on ${guestId}`)
   }
   const token = randomBytes(32).toString('hex')
   await ddb.send(
     new UpdateCommand({
-      TableName: 'Clients',
+      TableName: TABLES.Clients,
       Key: { id: guestId },
       UpdateExpression: 'SET mergeTokenHash = :hash',
       ConditionExpression: 'mergeTokenHash = :current',
@@ -87,7 +88,7 @@ export async function ageMergeLink(guestId: string): Promise<void> {
   const past = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
   await ddb.send(
     new UpdateCommand({
-      TableName: 'Clients',
+      TableName: TABLES.Clients,
       Key: { id: guestId },
       UpdateExpression: 'SET mergeExpiresAt = :past, mergeRequestedAt = :past',
       ConditionExpression: 'attribute_exists(mergeTokenHash)',
@@ -183,7 +184,7 @@ export async function emailLogsFor(garageId: string, templateName: string): Prom
   do {
     const page = await ddb.send(
       new ScanCommand({
-        TableName: 'EmailLogs',
+        TableName: TABLES.EmailLogs,
         FilterExpression: 'garageId = :g AND templateName = :t',
         ExpressionAttributeValues: { ':g': garageId, ':t': templateName },
         ExclusiveStartKey,

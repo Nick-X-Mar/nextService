@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { BatchGetCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ensureReviewsTable, REVIEWS_TABLE_NAME } from '@/utils/ensureReviewsTable'
+import { ensureReviewsTable } from '@/utils/ensureReviewsTable'
 import { getAdminFromRequest } from '@/utils/adminAuth'
 import { withMetrics } from '@/utils/withMetrics'
 import { decodeCursor, encodeCursor, parseLimit } from '@/utils/pagination'
 import type { Review } from '@/types/reviews'
+import { TABLES } from '@/lib/tables'
 
 /**
  * Moderation queue.
@@ -43,7 +44,7 @@ async function _GET(request: NextRequest) {
 
     const res = await dynamoDB.send(
       new ScanCommand({
-        TableName: REVIEWS_TABLE_NAME,
+        TableName: TABLES.Reviews,
         ...(filters.length ? { FilterExpression: filters.join(' AND ') } : {}),
         ...(Object.keys(names).length ? { ExpressionAttributeNames: names } : {}),
         ...(Object.keys(values).length ? { ExpressionAttributeValues: values } : {}),
@@ -76,10 +77,10 @@ async function _GET(request: NextRequest) {
         }
       }
       const resolved = await dynamoDB.send(new BatchGetCommand({ RequestItems: requestItems }))
-      for (const g of resolved.Responses?.Garages || []) {
+      for (const g of resolved.Responses?.[TABLES.Garages] || []) {
         names_[g.id] = g.companyName || g.id
       }
-      for (const c of resolved.Responses?.Clients || []) {
+      for (const c of resolved.Responses?.[TABLES.Clients] || []) {
         names_[c.id] = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.id
       }
     }

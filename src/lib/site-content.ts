@@ -1,6 +1,6 @@
 import { DeleteCommand, GetCommand, PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ensureSiteContentTable, SITE_CONTENT_TABLE_NAME } from '@/utils/ensureSiteContentTable'
+import { ensureSiteContentTable } from '@/utils/ensureSiteContentTable'
 import { createTtlCache } from '@/utils/ttlCache'
 import {
   areaContentKey,
@@ -10,6 +10,7 @@ import {
 } from '@/types/siteContent'
 import { DEFAULT_PAGES } from '@/data/content/pages'
 import { areas as staticAreas } from '@/data/locations'
+import { TABLES } from '@/lib/tables'
 
 /**
  * Reads the admin-editable copy behind the marketing pages.
@@ -54,7 +55,7 @@ export async function getSitePage(pageKey: SitePageKey): Promise<SitePage> {
     return await pageCache.getOrCompute(pageKey, async () => {
       await ensureSiteContentTable()
       const res = await dynamoDB.send(
-        new GetCommand({ TableName: SITE_CONTENT_TABLE_NAME, Key: { pageKey } })
+        new GetCommand({ TableName: TABLES.SiteContent, Key: { pageKey } })
       )
       const stored = res.Item as SitePage | undefined
       if (!stored || !Array.isArray(stored.blocks)) return defaultPage(pageKey)
@@ -81,7 +82,7 @@ export async function getAllAreas(): Promise<AreaContent[]> {
       await ensureSiteContentTable()
       const res = await dynamoDB.send(
         new ScanCommand({
-          TableName: SITE_CONTENT_TABLE_NAME,
+          TableName: TABLES.SiteContent,
           FilterExpression: 'begins_with(pageKey, :prefix)',
           ExpressionAttributeValues: { ':prefix': 'area:' },
         })
@@ -109,7 +110,7 @@ export async function getAreaContent(slug: string): Promise<AreaContent | undefi
 /** Writes a page document and drops it from this container's cache. */
 export async function saveSitePage(page: SitePage): Promise<void> {
   await ensureSiteContentTable()
-  await dynamoDB.send(new PutCommand({ TableName: SITE_CONTENT_TABLE_NAME, Item: page }))
+  await dynamoDB.send(new PutCommand({ TableName: TABLES.SiteContent, Item: page }))
   pageCache.invalidate(page.pageKey)
 }
 
@@ -117,7 +118,7 @@ export async function saveAreaContent(area: AreaContent): Promise<void> {
   await ensureSiteContentTable()
   await dynamoDB.send(
     new PutCommand({
-      TableName: SITE_CONTENT_TABLE_NAME,
+      TableName: TABLES.SiteContent,
       Item: { ...area, pageKey: areaContentKey(area.slug) },
     })
   )
@@ -132,7 +133,7 @@ export async function saveAreaContent(area: AreaContent): Promise<void> {
 export async function resetSitePage(pageKey: SitePageKey): Promise<void> {
   await ensureSiteContentTable()
   await dynamoDB.send(
-    new DeleteCommand({ TableName: SITE_CONTENT_TABLE_NAME, Key: { pageKey } })
+    new DeleteCommand({ TableName: TABLES.SiteContent, Key: { pageKey } })
   )
   pageCache.invalidate(pageKey)
 }

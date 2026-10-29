@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { freshClient, getRow } from './b-helpers'
+import { TABLES } from '../src/lib/tables'
 
 /**
  * The estimate only answers for a car we have already quoted: same brand/model, model
@@ -85,17 +86,17 @@ test.describe('Estimate on bodywork and on the stored request', () => {
     const priced = await (await api.post('/api/service-request/', {
       data: { ...PEUGEOT_206, estimatedCost: 1 },
     })).json()
-    expect((await getRow('ServiceRequests', priced.serviceRequestId))?.estimatedCost).toBe(expected.estimatedCost)
+    expect((await getRow(TABLES.ServiceRequests, priced.serviceRequestId))?.estimatedCost).toBe(expected.estimatedCost)
 
     const bodywork = await (await api.post('/api/service-request/', { data: PUNTO_BODYWORK })).json()
     const bodyworkExpected = (await (await request.post('/api/price-estimation/', { data: PUNTO_BODYWORK })).json()).estimation
-    expect((await getRow('ServiceRequests', bodywork.serviceRequestId))?.estimatedCost).toBe(bodyworkExpected.estimatedCost)
+    expect((await getRow(TABLES.ServiceRequests, bodywork.serviceRequestId))?.estimatedCost).toBe(bodyworkExpected.estimatedCost)
 
     // A car we have never quoted carries no estimate at all, whatever was sent.
     const unpriced = await (await api.post('/api/service-request/', {
       data: { ...PEUGEOT_206, brand: 'Ferrari', model: 'F40', estimatedCost: 999 },
     })).json()
-    expect((await getRow('ServiceRequests', unpriced.serviceRequestId))?.estimatedCost).toBeUndefined()
+    expect((await getRow(TABLES.ServiceRequests, unpriced.serviceRequestId))?.estimatedCost).toBeUndefined()
   })
 })
 

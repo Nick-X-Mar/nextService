@@ -6,6 +6,7 @@ import Spinner from '@/components/Spinner'
 import { useAsyncTask } from '@/hooks/useAsyncTask'
 import type { HotDeal } from '@/types/hotDeals'
 import { REQUEST_CATEGORIES, getCategoryText } from '@/utils/categoryLabels'
+import { useConfirm } from '@/hooks/useConfirm'
 
 const emptyDeal: Partial<HotDeal> = {
   title: '', subtitle: '', description: '', price: '', priceNum: 0,
@@ -14,6 +15,7 @@ const emptyDeal: Partial<HotDeal> = {
 }
 
 export default function HotDealsAdminPage() {
+  const confirm = useConfirm()
   const [deals, setDeals] = useState<HotDeal[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<Partial<HotDeal> | null>(null)
@@ -68,7 +70,7 @@ export default function HotDealsAdminPage() {
   }
 
   async function handleDelete(dealId: string) {
-    if (!confirm('Delete this deal?')) return
+    if (!(await confirm({ title: 'Διαγραφή προσφοράς;', confirmLabel: 'Διαγραφή', danger: true }))) return
     try {
       await fetch(`/api/admin/hot-deals/${dealId}/`, { method: 'DELETE' })
       fetchDeals()

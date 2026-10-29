@@ -18,9 +18,7 @@ import {
 } from '@aws-sdk/client-dynamodb'
 import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
-
-const EVENT_LOGS_TABLE = process.env.EVENT_LOGS_TABLE || 'EventLogs'
-const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
+import { TABLES } from '@/lib/tables'
 
 // Local DynamoDB doesn't accept PAY_PER_REQUEST on all versions, so we
 // emit provisioned throughput there and PAY_PER_REQUEST on real AWS.
@@ -66,7 +64,7 @@ function getRawClient(): DynamoDBClient {
 }
 
 const eventLogsSpec: CreateTableCommandInput = {
-  TableName: EVENT_LOGS_TABLE,
+  TableName: TABLES.EventLogs,
   AttributeDefinitions: [
     { AttributeName: 'eventId', AttributeType: 'S' },
     { AttributeName: 'clientId', AttributeType: 'S' },
@@ -113,7 +111,7 @@ const eventLogsSpec: CreateTableCommandInput = {
 }
 
 const emailLogsSpec: CreateTableCommandInput = {
-  TableName: EMAIL_LOGS_TABLE,
+  TableName: TABLES.EmailLogs,
   AttributeDefinitions: [
     { AttributeName: 'emailId', AttributeType: 'S' },
     { AttributeName: 'to', AttributeType: 'S' },

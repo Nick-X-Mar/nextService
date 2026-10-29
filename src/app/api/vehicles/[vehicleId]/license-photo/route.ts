@@ -5,6 +5,7 @@ import { uploadFileToS3, validateFile, isS3Configured } from '@/utils/s3Service'
 import { requireAuth } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 const checkUploadRate = createRateLimiter('license-photo-upload', 20, 3600000)
 
@@ -47,7 +48,7 @@ async function _POST(
     // Consistent: the step-2 form uploads straight after the request created this
     // row, and an eventually consistent read can still miss it — a 404 on a fresh car.
     const vehicleRow = await dynamoDB.send(new GetCommand({
-      TableName: 'Vehicles',
+      TableName: TABLES.Vehicles,
       Key: { id: vehicleId },
       ConsistentRead: true,
     }))
@@ -90,7 +91,7 @@ async function _POST(
     // The key, not the public URL — the bucket is private and every reader gets a
     // short-lived presigned URL instead.
     await dynamoDB.send(new UpdateCommand({
-      TableName: 'Vehicles',
+      TableName: TABLES.Vehicles,
       Key: { id: vehicleId },
       UpdateExpression: 'SET licensePhotoUrl = :key, updatedAt = :now',
       ExpressionAttributeValues: {

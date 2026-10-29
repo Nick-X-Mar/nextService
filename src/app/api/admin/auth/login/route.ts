@@ -3,9 +3,10 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { verifyPassword } from '@/utils/passwordService'
 import { signAdminToken, setAdminCookie } from '@/utils/adminAuth'
-import { ensureAdminUsersTable, ADMIN_USERS_TABLE_NAME } from '@/utils/ensureAdminTables'
+import { ensureAdminUsersTable } from '@/utils/ensureAdminTables'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 const checkIPRate = createRateLimiter('admin-login-ip', 5, 3600000)
 const checkEmailRate = createRateLimiter('admin-login-email', 3, 3600000)
@@ -34,7 +35,7 @@ async function _POST(request: NextRequest) {
     const normalizedEmail = email.trim().toLowerCase()
 
     const result = await dynamoDB.send(new QueryCommand({
-      TableName: ADMIN_USERS_TABLE_NAME,
+      TableName: TABLES.AdminUsers,
       IndexName: 'EmailIndex',
       KeyConditionExpression: 'email = :email',
       ExpressionAttributeValues: { ':email': normalizedEmail }
@@ -57,7 +58,7 @@ async function _POST(request: NextRequest) {
 
     // Update last login
     await dynamoDB.send(new UpdateCommand({
-      TableName: ADMIN_USERS_TABLE_NAME,
+      TableName: TABLES.AdminUsers,
       Key: { adminId: admin.adminId },
       UpdateExpression: 'SET lastLoginAt = :now',
       ExpressionAttributeValues: { ':now': new Date().toISOString() }

@@ -7,6 +7,7 @@ import { EventName } from '@/types/events'
 import { signToken, setAuthCookie } from '@/utils/auth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 /** The fields this route reads off a Clients/Garages record. */
 interface AuthUser {
@@ -64,7 +65,7 @@ async function _POST(request: NextRequest) {
     // signups — and giving an unauthenticated caller a cheap way to burn read
     // capacity.
     const result = await dynamoDB.send(new QueryCommand({
-      TableName: userType === 'garage' ? 'Garages' : 'Clients',
+      TableName: userType === 'garage' ? TABLES.Garages : TABLES.Clients,
       IndexName: 'EmailIndex',
       KeyConditionExpression: 'email = :email',
       ExpressionAttributeValues: { ':email': normalizedEmail },

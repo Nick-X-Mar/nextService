@@ -4,6 +4,7 @@ import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { requireAuth, requireActiveGarage } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
 import { invalidateUnread } from '@/utils/unreadCache'
+import { TABLES } from '@/lib/tables'
 
 /**
  * Marks a standing notification as dealt with.
@@ -40,7 +41,7 @@ async function _POST(request: NextRequest) {
         return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
       }
       const req = await dynamoDB.send(new GetCommand({
-        TableName: 'ServiceRequests',
+        TableName: TABLES.ServiceRequests,
         Key: { id },
         ProjectionExpression: 'id, clientId',
       }))
@@ -48,7 +49,7 @@ async function _POST(request: NextRequest) {
         return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
       }
       await dynamoDB.send(new UpdateCommand({
-        TableName: 'ServiceRequests',
+        TableName: TABLES.ServiceRequests,
         Key: { id },
         UpdateExpression: 'SET clientOffersSeenAt = :now',
         ExpressionAttributeValues: { ':now': now },
@@ -60,7 +61,7 @@ async function _POST(request: NextRequest) {
       const garageId = await requireActiveGarage(request)
       if (garageId instanceof NextResponse) return garageId
       const offer = await dynamoDB.send(new GetCommand({
-        TableName: 'Offers',
+        TableName: TABLES.Offers,
         Key: { id },
         ProjectionExpression: 'id, garageId',
       }))
@@ -68,7 +69,7 @@ async function _POST(request: NextRequest) {
         return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
       }
       await dynamoDB.send(new UpdateCommand({
-        TableName: 'Offers',
+        TableName: TABLES.Offers,
         Key: { id },
         UpdateExpression:
           kind === 'accepted' ? 'SET garageSeenAcceptedAt = :now' : 'SET garageSeenDatesAt = :now',

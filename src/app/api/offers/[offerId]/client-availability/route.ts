@@ -8,6 +8,7 @@ import { requireClient } from '@/utils/requireAuth'
 import { parseAvailabilityDates } from '@/utils/availabilitySlots'
 import { invalidateUnread } from '@/utils/unreadCache'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 const MAX_CLIENT_DATES = 5
 
@@ -59,13 +60,13 @@ async function _PATCH(
     // used to be an unconditional update keyed on the URL alone, so any signed
     // in client could rewrite any garage's offer — or, with a made-up id,
     // create a stray Offers row.
-    const offerRes = await dynamoDB.send(new GetCommand({ TableName: 'Offers', Key: { id: offerId } }))
+    const offerRes = await dynamoDB.send(new GetCommand({ TableName: TABLES.Offers, Key: { id: offerId } }))
     const offer = offerRes.Item
     if (!offer) {
       return NextResponse.json({ success: false, error: 'Η προσφορά δεν βρέθηκε' }, { status: 404 })
     }
     const requestRes = await dynamoDB.send(new GetCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: offer.serviceRequestId },
     }))
     if (!requestRes.Item || requestRes.Item.clientId !== clientId) {
@@ -78,7 +79,7 @@ async function _PATCH(
         TransactItems: [
           {
             Update: {
-              TableName: 'Offers',
+              TableName: TABLES.Offers,
               Key: { id: offerId },
               // The proposal's own timestamp, not updatedAt: the garage's alert
               // must come back for a new proposal, not for every edit of the
@@ -95,7 +96,7 @@ async function _PATCH(
           },
           {
             ConditionCheck: {
-              TableName: 'ServiceRequests',
+              TableName: TABLES.ServiceRequests,
               Key: { id: offer.serviceRequestId },
               ConditionExpression: '#status = :open AND clientId = :clientId',
               ExpressionAttributeNames: { '#status': 'status' },

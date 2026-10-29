@@ -3,6 +3,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { invalidateGarageActive } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 async function _POST(
   _request: NextRequest,
@@ -14,7 +15,7 @@ async function _POST(
 
     try {
       await dynamoDB.send(new UpdateCommand({
-        TableName: 'Garages',
+        TableName: TABLES.Garages,
         Key: { id: garageId },
         UpdateExpression: 'SET isActive = :inactive, deactivatedAt = :now, updatedAt = :now',
         // Without the condition an unknown id would create a bare garage row.

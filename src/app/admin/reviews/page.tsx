@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Spinner from '@/components/Spinner'
 import StarRating from '@/components/StarRating'
 import { useAsyncTask } from '@/hooks/useAsyncTask'
+import { useConfirm } from '@/hooks/useConfirm'
 
 interface AdminReview {
   reviewId: string
@@ -29,6 +30,7 @@ const FILTERS = [
 ] as const
 
 export default function AdminReviewsPage() {
+  const confirm = useConfirm()
   const [reviews, setReviews] = useState<AdminReview[]>([])
   const [status, setStatus] = useState('')
   const [direction, setDirection] = useState('')
@@ -52,7 +54,7 @@ export default function AdminReviewsPage() {
   const moderate = (review: AdminReview) =>
     run(review.reviewId, async () => {
       const next = review.status === 'hidden' ? 'published' : 'hidden'
-      if (next === 'hidden' && !confirm('Απόκρυψη; Θα αφαιρεθεί και από τον μέσο όρο.')) return
+      if (next === 'hidden' && !(await confirm({ title: 'Απόκρυψη αξιολόγησης;', message: 'Θα αφαιρεθεί και από τον μέσο όρο.', confirmLabel: 'Απόκρυψη', danger: true }))) return
       const res = await fetch(`/api/admin/reviews/${encodeURIComponent(review.reviewId)}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

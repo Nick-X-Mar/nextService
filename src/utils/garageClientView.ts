@@ -1,6 +1,7 @@
 import { getByIdOrNull } from '@/utils/getById'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { GUEST_PLACEHOLDER_NAME } from '@/types/clients'
+import { TABLES } from '@/lib/tables'
 
 /**
  * What a garage may see of a client and their car.
@@ -53,7 +54,7 @@ export async function resolveWinningGarageId(serviceRequest: Row): Promise<strin
   if (!WON_STATES.has(String(serviceRequest.status))) return null
   const direct = str(serviceRequest.acceptedGarageId)
   if (direct) return direct
-  const offer = await getByIdOrNull('Offers', str(serviceRequest.acceptedOfferId))
+  const offer = await getByIdOrNull(TABLES.Offers, str(serviceRequest.acceptedOfferId))
   return str(offer?.garageId) ?? null
 }
 

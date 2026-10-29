@@ -1,7 +1,8 @@
 import { BatchGetCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ensureReviewsTable, REVIEWS_TABLE_NAME } from '@/utils/ensureReviewsTable'
+import { ensureReviewsTable } from '@/utils/ensureReviewsTable'
 import { REVIEW_WINDOW_DAYS, type ReviewDirection } from '@/types/reviews'
+import { TABLES } from '@/lib/tables'
 
 /** Reviews are only invited for a while after the job closes. */
 export function withinReviewWindow(completedAt: unknown, now: number = Date.now()): boolean {
@@ -41,13 +42,13 @@ export async function reviewedRequestIds(
             // it writes, and the recompute that follows must see that write —
             // an eventually consistent read could miss it and cache the stale
             // "αξιολόγησε" prompt for the whole TTL.
-            [REVIEWS_TABLE_NAME]: { Keys: keys, ProjectionExpression: 'requestId', ConsistentRead: true },
+            [TABLES.Reviews]: { Keys: keys, ProjectionExpression: 'requestId', ConsistentRead: true },
           },
         }))
-        for (const item of res.Responses?.[REVIEWS_TABLE_NAME] ?? []) {
+        for (const item of res.Responses?.[TABLES.Reviews] ?? []) {
           if (typeof item.requestId === 'string') found.add(item.requestId)
         }
-        keys = (res.UnprocessedKeys?.[REVIEWS_TABLE_NAME]?.Keys ?? []) as Record<string, unknown>[]
+        keys = (res.UnprocessedKeys?.[TABLES.Reviews]?.Keys ?? []) as Record<string, unknown>[]
       }
       // Still unprocessed: treat as reviewed, for the same reason as a failure.
       for (const key of keys) found.add(String(key.reviewId).split('#')[0])

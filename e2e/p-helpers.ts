@@ -4,6 +4,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { setAuthCookie } from './helpers'
 import { athensToday } from '../src/utils/athensTime'
+import { TABLES } from '../src/lib/tables'
 
 /**
  * Fixtures for the winner-only PII spec.
@@ -102,7 +103,7 @@ export async function newGarage(prefix: string, { active = true }: { active?: bo
   const email = `e2e-p-${prefix}-${unique()}@test.com`
   const now = new Date().toISOString()
   await ddb.send(new PutCommand({
-    TableName: 'Garages',
+    TableName: TABLES.Garages,
     Item: {
       id,
       email,
@@ -155,13 +156,13 @@ export async function newRequest(
  */
 export async function decorateRequest(requestId: string, vehicleId: string, estimatedCost: number) {
   await ddb.send(new UpdateCommand({
-    TableName: 'Vehicles',
+    TableName: TABLES.Vehicles,
     Key: { id: vehicleId },
     UpdateExpression: 'SET licensePhotoUrl = :k',
     ExpressionAttributeValues: { ':k': `license-photos/e2e-p/${vehicleId}.jpg` },
   }))
   await ddb.send(new UpdateCommand({
-    TableName: 'ServiceRequests',
+    TableName: TABLES.ServiceRequests,
     Key: { id: requestId },
     UpdateExpression: 'SET estimatedCost = :c',
     ExpressionAttributeValues: { ':c': estimatedCost },
@@ -189,7 +190,7 @@ export async function acceptOffer(client: Party, requestId: string, offerId: str
 
 /** Moves an appointment's slot into the past (request and accepted offer) so it can be closed. */
 export async function ageAppointment(requestId: string, offerId: string) {
-  for (const [table, id] of [['ServiceRequests', requestId], ['Offers', offerId]] as const) {
+  for (const [table, id] of [[TABLES.ServiceRequests, requestId], [TABLES.Offers, offerId]] as const) {
     await ddb.send(new UpdateCommand({
       TableName: table,
       Key: { id },

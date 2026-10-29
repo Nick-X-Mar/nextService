@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { registerClient, loginViaAPI } from './helpers'
 import { freshClient, getRow, mechanicalRequest, readDraft, setLicensePhotoKey, setVehicleFields } from './b-helpers'
+import { TABLES } from '../src/lib/tables'
 
 const CLIENT_EMAIL = `e2e-profile-${Date.now()}@test.com`
 const CLIENT_PASSWORD = 'TestPass123'
@@ -215,7 +216,7 @@ test.describe('Saved vehicle edits', () => {
       const resp = await api.patch(`/api/vehicles/${sr.vehicleId}/`, { data: bad })
       expect(resp.status()).toBe(400)
     }
-    const row = await getRow('Vehicles', sr.vehicleId)
+    const row = await getRow(TABLES.Vehicles, sr.vehicleId)
     expect(row).toMatchObject({ brand: 'Peugeot', modelYear: '2006', fuelType: 'petrol' })
   })
 
@@ -230,7 +231,7 @@ test.describe('Saved vehicle edits', () => {
       data: { engineCC: '1.6 TDI', nickname: 'Το παλιό', modelYear: '2006' },
     })
     expect(resp.status()).toBe(200)
-    expect(await getRow('Vehicles', sr.vehicleId)).toMatchObject({ engineCC: '1.6 TDI', nickname: 'Το παλιό' })
+    expect(await getRow(TABLES.Vehicles, sr.vehicleId)).toMatchObject({ engineCC: '1.6 TDI', nickname: 'Το παλιό' })
 
     // Litres typed in are stored as cc; anything else that is new still has to be valid.
     const litres = await api.patch(`/api/vehicles/${sr.vehicleId}/`, { data: { engineCC: '1,6' } })
@@ -238,7 +239,7 @@ test.describe('Saved vehicle edits', () => {
     expect((await litres.json()).vehicle.engineCC).toBe('1600')
     const junk = await api.patch(`/api/vehicles/${sr.vehicleId}/`, { data: { engineCC: 'πολλά' } })
     expect(junk.status()).toBe(400)
-    expect((await getRow('Vehicles', sr.vehicleId))?.engineCC).toBe('1600')
+    expect((await getRow(TABLES.Vehicles, sr.vehicleId))?.engineCC).toBe('1600')
   })
 
   test('Another client cannot edit the vehicle', async ({ playwright }) => {
@@ -264,7 +265,7 @@ test.describe('Saved vehicle edits', () => {
     expect(patched.licensePhotoUrl).toMatch(/^https:\/\//)
     expect(patched.licensePhotoUrl).toContain('X-Amz-Signature')
     // Still the key in the table: presigning happens on the way out only.
-    expect((await getRow('Vehicles', sr.vehicleId))?.licensePhotoUrl).toBe(key)
+    expect((await getRow(TABLES.Vehicles, sr.vehicleId))?.licensePhotoUrl).toBe(key)
   })
 })
 
@@ -291,7 +292,7 @@ test.describe('Profile email edits', () => {
     })
     expect(resp.status()).toBe(409)
     expect((await resp.json()).code).toBe('EMAIL_EXISTS')
-    expect((await getRow('Clients', second.clientId))?.email).toBe(second.email.toLowerCase())
+    expect((await getRow(TABLES.Clients, second.clientId))?.email).toBe(second.email.toLowerCase())
   })
 })
 
@@ -323,7 +324,7 @@ test.describe('Profile in the browser', () => {
 
     await section.getByRole('button', { name: 'Αποθήκευση' }).click()
     await expect(section.getByRole('button', { name: 'Επεξεργασία' })).toBeVisible()
-    await expect.poll(async () => (await getRow('Vehicles', sr.vehicleId))?.licensePlate).toBe('ΙΚΧ-4321')
+    await expect.poll(async () => (await getRow(TABLES.Vehicles, sr.vehicleId))?.licensePlate).toBe('ΙΚΧ-4321')
   })
 
   test('"Νέο Αίτημα" from the profile prefills step 1', async ({ page, playwright }) => {

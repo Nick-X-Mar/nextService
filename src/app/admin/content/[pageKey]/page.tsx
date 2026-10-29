@@ -8,6 +8,7 @@ import { useAsyncTask } from '@/hooks/useAsyncTask'
 import type { ContentBlock, ContentBlockType, SitePage } from '@/types/siteContent'
 import BlockCard, { blockLabel } from '../components/BlockCard'
 import { TextAreaField, TextField } from '../components/fields'
+import { useConfirm } from '@/hooks/useConfirm'
 
 const ADDABLE: ContentBlockType[] = ['heading', 'paragraph', 'list', 'faq', 'cards', 'callout', 'cta']
 
@@ -31,6 +32,7 @@ function newBlock(type: ContentBlockType): ContentBlock {
 }
 
 export default function ContentPageEditor() {
+  const confirm = useConfirm()
   const params = useParams<{ pageKey: string }>()
   const pageKey = params.pageKey
 
@@ -101,7 +103,7 @@ export default function ContentPageEditor() {
 
   const reset = () =>
     run('reset', async () => {
-      if (!confirm('Επαναφορά στο αρχικό κείμενο; Οι αλλαγές σου θα χαθούν.')) return
+      if (!(await confirm({ title: 'Επαναφορά στο αρχικό κείμενο;', message: 'Οι αλλαγές σου θα χαθούν.', confirmLabel: 'Επαναφορά', danger: true }))) return
       const res = await fetch(`/api/admin/content/pages/${pageKey}/`, { method: 'DELETE' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {

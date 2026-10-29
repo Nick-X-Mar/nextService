@@ -8,6 +8,7 @@ import {
 } from '@aws-sdk/lib-dynamodb'
 import type { APIRequestContext, Page } from '@playwright/test'
 import { loginViaAPI, registerClient, setAuthCookie } from './helpers'
+import { TABLES } from '../src/lib/tables'
 
 /**
  * Direct reads of DynamoDB Local for the request-funnel specs: "nothing was written"
@@ -43,17 +44,17 @@ async function scanAll(table: string, filter: string, values: Record<string, unk
 
 /** Every request whose description carries `marker` — guests have no clientId to query on. */
 export function requestsWithDescription(marker: string) {
-  return scanAll('ServiceRequests', 'contains(description, :m)', { ':m': marker })
+  return scanAll(TABLES.ServiceRequests, 'contains(description, :m)', { ':m': marker })
 }
 
 /** Every vehicle whose model is exactly `model`. */
 export function vehiclesWithModel(model: string) {
-  return scanAll('Vehicles', '#model = :m', { ':m': model }, { '#model': 'model' })
+  return scanAll(TABLES.Vehicles, '#model = :m', { ':m': model }, { '#model': 'model' })
 }
 
 export async function requestsForClient(clientId: string) {
   const res = await db.send(new QueryCommand({
-    TableName: 'ServiceRequests',
+    TableName: TABLES.ServiceRequests,
     IndexName: 'ClientRequestsIndex',
     KeyConditionExpression: 'clientId = :c',
     ExpressionAttributeValues: { ':c': clientId },
@@ -63,7 +64,7 @@ export async function requestsForClient(clientId: string) {
 
 export async function clientsWithEmail(email: string) {
   const res = await db.send(new QueryCommand({
-    TableName: 'Clients',
+    TableName: TABLES.Clients,
     IndexName: 'EmailIndex',
     KeyConditionExpression: 'email = :e',
     ExpressionAttributeValues: { ':e': email },
@@ -82,7 +83,7 @@ export async function getRow(table: string, id: string, keyName = 'id') {
  */
 export async function setLicensePhotoKey(vehicleId: string, key: string) {
   await db.send(new UpdateCommand({
-    TableName: 'Vehicles',
+    TableName: TABLES.Vehicles,
     Key: { id: vehicleId },
     UpdateExpression: 'SET licensePhotoUrl = :k',
     ExpressionAttributeValues: { ':k': key },
@@ -108,16 +109,16 @@ async function setFields(table: string, id: string, fields: Record<string, unkno
 }
 
 export const setVehicleFields = (vehicleId: string, fields: Record<string, unknown>) =>
-  setFields('Vehicles', vehicleId, fields)
+  setFields(TABLES.Vehicles, vehicleId, fields)
 
 export const setClientFields = (clientId: string, fields: Record<string, unknown>) =>
-  setFields('Clients', clientId, fields)
+  setFields(TABLES.Clients, clientId, fields)
 
 export const setRequestFields = (requestId: string, fields: Record<string, unknown>) =>
-  setFields('ServiceRequests', requestId, fields)
+  setFields(TABLES.ServiceRequests, requestId, fields)
 
 export const setChatMessageFields = (messageId: string, fields: Record<string, unknown>) =>
-  setFields('ChatMessages', messageId, fields)
+  setFields(TABLES.ChatMessages, messageId, fields)
 
 export const uniqueMarker = (label: string) => `e2e-B-${label}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
 

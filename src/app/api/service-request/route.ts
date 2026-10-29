@@ -18,6 +18,7 @@ import { isValidEngineCC, normalizeEngineCC } from '@/app/api/vehicles/engineCC'
 import { GUEST_PLACEHOLDER_NAME } from '@/types/clients'
 import { randomUUID } from 'crypto'
 import { TERMS_VERSION } from '@/lib/legal'
+import { TABLES } from '@/lib/tables'
 
 // Same budget as /api/auth/register: this route registers guests inline, so
 // without its own limit it was the unthrottled way to mint accounts.
@@ -240,7 +241,7 @@ async function _POST(request: NextRequest) {
     // merge that starts in between cannot slip past.
     if (existingClientId) {
       const owner = await dynamoDB.send(new GetCommand({
-        TableName: 'Clients',
+        TableName: TABLES.Clients,
         Key: { id: existingClientId },
         ProjectionExpression: 'id, mergedInto, mergingInto, anonymizedAt',
         ConsistentRead: true,
@@ -260,7 +261,7 @@ async function _POST(request: NextRequest) {
     let savedVehicle: Record<string, unknown> | undefined
     const originalVehicleId = text(body.originalVehicleId)
     if (existingClientId && originalVehicleId) {
-      const row = await dynamoDB.send(new GetCommand({ TableName: 'Vehicles', Key: { id: originalVehicleId } }))
+      const row = await dynamoDB.send(new GetCommand({ TableName: TABLES.Vehicles, Key: { id: originalVehicleId } }))
       if (row.Item && row.Item.clientId === existingClientId) savedVehicle = row.Item
     }
 
@@ -299,7 +300,7 @@ async function _POST(request: NextRequest) {
       // The form's live check fails open (a 429 or 500 there reads as "free"), so
       // this is the check that actually keeps one account per email.
       const existing = await dynamoDB.send(new QueryCommand({
-        TableName: 'Clients',
+        TableName: TABLES.Clients,
         IndexName: 'EmailIndex',
         KeyConditionExpression: 'email = :email',
         ExpressionAttributeValues: { ':email': email },
@@ -348,7 +349,7 @@ async function _POST(request: NextRequest) {
       // Logged-in user typing a car they already have: match on VIN or engine number.
       // Vehicles.ClientVehiclesIndex is keyed on clientId, so this reads only their cars.
       const existingVehicles = await dynamoDB.send(new QueryCommand({
-        TableName: 'Vehicles',
+        TableName: TABLES.Vehicles,
         IndexName: 'ClientVehiclesIndex',
         KeyConditionExpression: 'clientId = :clientId',
         ExpressionAttributeValues: { ':clientId': existingClientId },
@@ -430,16 +431,16 @@ async function _POST(request: NextRequest) {
     if (existingClientId) {
       // First item, so its cancellation code is codes[0] below.
       transactItems.push({
-        ConditionCheck: { TableName: 'Clients', Key: { id: existingClientId }, ConditionExpression: OWNER_CAN_FILE },
+        ConditionCheck: { TableName: TABLES.Clients, Key: { id: existingClientId }, ConditionExpression: OWNER_CAN_FILE },
       })
     }
     if (newClient) {
-      transactItems.push({ Put: { TableName: 'Clients', Item: newClient, ConditionExpression: 'attribute_not_exists(id)' } })
+      transactItems.push({ Put: { TableName: TABLES.Clients, Item: newClient, ConditionExpression: 'attribute_not_exists(id)' } })
     }
     if (newVehicle) {
-      transactItems.push({ Put: { TableName: 'Vehicles', Item: newVehicle, ConditionExpression: 'attribute_not_exists(id)' } })
+      transactItems.push({ Put: { TableName: TABLES.Vehicles, Item: newVehicle, ConditionExpression: 'attribute_not_exists(id)' } })
     }
-    transactItems.push({ Put: { TableName: 'ServiceRequests', Item: requestItem, ConditionExpression: 'attribute_not_exists(id)' } })
+    transactItems.push({ Put: { TableName: TABLES.ServiceRequests, Item: requestItem, ConditionExpression: 'attribute_not_exists(id)' } })
 
     try {
       await dynamoDB.send(new TransactWriteCommand({ TransactItems: transactItems }))
@@ -448,7 +449,7 @@ async function _POST(request: NextRequest) {
       if (!codes) throw error
       if (existingClientId && codes[0] === 'ConditionalCheckFailed') {
         const owner = await dynamoDB.send(new GetCommand({
-          TableName: 'Clients',
+          TableName: TABLES.Clients,
           Key: { id: existingClientId },
           ConsistentRead: true,
         }))
@@ -466,7 +467,7 @@ async function _POST(request: NextRequest) {
       // Hand the stored answer back to the client who owns it; anyone else (a
       // concurrent guest twin, a guessed id) just learns it was a duplicate.
       const prior = await dynamoDB.send(new GetCommand({
-        TableName: 'ServiceRequests',
+        TableName: TABLES.ServiceRequests,
         Key: { id: serviceRequestId },
         ConsistentRead: true,
       }))

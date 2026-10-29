@@ -15,6 +15,7 @@ import { requireClient } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
 import { quotingFirstName } from '@/utils/garageClientView'
+import { TABLES } from '@/lib/tables'
 
 const checkCancelRate = createRateLimiter('request-cancel', 3, 3600000)
 
@@ -44,7 +45,7 @@ async function _PATCH(
 
     // Fetch the service request
     const requestRes = await dynamoDB.send(
-      new GetCommand({ TableName: 'ServiceRequests', Key: { id: requestId } })
+      new GetCommand({ TableName: TABLES.ServiceRequests, Key: { id: requestId } })
     )
     const serviceRequest = requestRes.Item
 
@@ -115,7 +116,7 @@ async function _PATCH(
         TransactItems: [
           {
             Update: {
-              TableName: 'ServiceRequests',
+              TableName: TABLES.ServiceRequests,
               Key: { id: requestId },
               UpdateExpression: 'SET #status = :status, cancelledAt = :cancelledAt, updatedAt = :updatedAt',
               ConditionExpression: acceptedOfferId
@@ -134,7 +135,7 @@ async function _PATCH(
           ...(acceptedOfferId
             ? [{
                 Update: {
-                  TableName: 'Offers',
+                  TableName: TABLES.Offers,
                   Key: { id: acceptedOfferId },
                   UpdateExpression: 'SET #status = :rejected, updatedAt = :updatedAt',
                   // Exists and belongs to this request — an update on a missing
@@ -188,7 +189,7 @@ async function _PATCH(
           TransactItems: [
             {
               Put: {
-                TableName: process.env.WALLET_TRANSACTIONS_TABLE || 'WalletTransactions',
+                TableName: TABLES.WalletTransactions,
                 Item: {
                   transactionId: `cancellation_refund_${requestId}`,
                   clientId,
@@ -203,7 +204,7 @@ async function _PATCH(
             },
             {
               Update: {
-                TableName: 'Clients',
+                TableName: TABLES.Clients,
                 Key: { id: clientId },
                 UpdateExpression: 'ADD walletBalance :points',
                 ExpressionAttributeValues: { ':points': refundPoints }
@@ -244,7 +245,7 @@ async function _PATCH(
       typeof serviceRequest.acceptedGarageId === 'string' ? serviceRequest.acceptedGarageId : undefined
     if (!garageId && acceptedOfferId) {
       const acceptedOffer = (await dynamoDB.send(
-        new GetCommand({ TableName: 'Offers', Key: { id: acceptedOfferId } })
+        new GetCommand({ TableName: TABLES.Offers, Key: { id: acceptedOfferId } })
       )).Item
       garageId = typeof acceptedOffer?.garageId === 'string' ? acceptedOffer.garageId : undefined
     }
@@ -308,9 +309,9 @@ async function notifyCancellationParticipants(args: {
 }): Promise<void> {
   try {
     const [clientRes, garageRes] = await Promise.all([
-      dynamoDB.send(new GetCommand({ TableName: 'Clients', Key: { id: args.clientId } })),
+      dynamoDB.send(new GetCommand({ TableName: TABLES.Clients, Key: { id: args.clientId } })),
       args.garageId
-        ? dynamoDB.send(new GetCommand({ TableName: 'Garages', Key: { id: args.garageId } }))
+        ? dynamoDB.send(new GetCommand({ TableName: TABLES.Garages, Key: { id: args.garageId } }))
         : Promise.resolve({ Item: undefined as Record<string, unknown> | undefined })
     ])
 

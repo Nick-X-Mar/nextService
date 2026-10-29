@@ -3,6 +3,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { ensurePaymentsTable } from '@/utils/ensurePaymentTables'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 async function _GET(request: NextRequest) {
   try {
@@ -15,10 +16,9 @@ async function _GET(request: NextRequest) {
     const fromISO = from ? (from.includes('T') ? from : `${from}T00:00:00.000Z`) : undefined
     const toISO = to ? (to.includes('T') ? to : `${to}T23:59:59.999Z`) : undefined
 
-    const PAYMENTS_TABLE = process.env.PAYMENTS_TABLE || 'Payments'
 
     const result = await dynamoDB.send(new ScanCommand({
-      TableName: PAYMENTS_TABLE,
+      TableName: TABLES.Payments,
       ...(fromISO && toISO ? {
         FilterExpression: 'createdAt BETWEEN :from AND :to',
         ExpressionAttributeValues: { ':from': fromISO, ':to': toISO }

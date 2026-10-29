@@ -1,7 +1,7 @@
 import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ensureReviewsTable, REVIEWS_TABLE_NAME } from '@/utils/ensureReviewsTable'
+import { ensureReviewsTable } from '@/utils/ensureReviewsTable'
 import {
   CLIENT_REVIEW_TAGS,
   GARAGE_REVIEW_TAGS,
@@ -9,6 +9,7 @@ import {
   type Review,
   type ReviewDirection,
 } from '@/types/reviews'
+import { TABLES } from '@/lib/tables'
 
 /**
  * Reviews, in both directions, plus the rolling rating on each party.
@@ -40,7 +41,7 @@ export async function reviewsForRequest(requestId: string): Promise<Review[]> {
   await ensureReviewsTable()
   const res = await dynamoDB.send(
     new QueryCommand({
-      TableName: REVIEWS_TABLE_NAME,
+      TableName: TABLES.Reviews,
       IndexName: 'RequestReviewsIndex',
       KeyConditionExpression: 'requestId = :requestId',
       ExpressionAttributeValues: { ':requestId': requestId },
@@ -56,7 +57,7 @@ export async function reviewForRequest(
   await ensureReviewsTable()
   const res = await dynamoDB.send(
     new GetCommand({
-      TableName: REVIEWS_TABLE_NAME,
+      TableName: TABLES.Reviews,
       Key: { reviewId: reviewId(requestId, direction) },
     })
   )
@@ -79,7 +80,7 @@ export class DuplicateReviewError extends Error {}
  * `ADD` is atomic server-side, so two reviews landing at once cannot lose one
  * another — which a read-modify-write would.
  */
-async function addToAggregate(table: 'Garages' | 'Clients', id: string, rating: number) {
+async function addToAggregate(table: string, id: string, rating: number) {
   try {
     await dynamoDB.send(
       new UpdateCommand({
@@ -144,7 +145,7 @@ export async function createReview(input: {
   try {
     await dynamoDB.send(
       new PutCommand({
-        TableName: REVIEWS_TABLE_NAME,
+        TableName: TABLES.Reviews,
         Item: review,
         ConditionExpression: 'attribute_not_exists(reviewId)',
       })
@@ -157,9 +158,9 @@ export async function createReview(input: {
   }
 
   if (input.direction === 'client_to_garage') {
-    await addToAggregate('Garages', input.garageId, rating)
+    await addToAggregate(TABLES.Garages, input.garageId, rating)
   } else {
-    await addToAggregate('Clients', input.clientId, rating)
+    await addToAggregate(TABLES.Clients, input.clientId, rating)
   }
 
   // Both sides have now written, so neither can be influenced by the other.
@@ -172,7 +173,7 @@ export async function createReview(input: {
       [review.reviewId, other.reviewId].map((id) =>
         dynamoDB.send(
           new UpdateCommand({
-            TableName: REVIEWS_TABLE_NAME,
+            TableName: TABLES.Reviews,
             Key: { reviewId: id },
             UpdateExpression: 'SET revealAt = :now',
             ExpressionAttributeValues: { ':now': revealAt },
@@ -208,7 +209,7 @@ export async function reviewsForGarage(garageId: string, limit = 20): Promise<Re
   await ensureReviewsTable()
   const res = await dynamoDB.send(
     new QueryCommand({
-      TableName: REVIEWS_TABLE_NAME,
+      TableName: TABLES.Reviews,
       IndexName: 'GarageReviewsIndex',
       KeyConditionExpression: 'garageId = :garageId',
       FilterExpression: '#direction = :direction AND #status = :published',

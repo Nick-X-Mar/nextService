@@ -7,6 +7,7 @@ import { requireAuth } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
 import { presentVehicle } from '@/app/api/vehicles/vehicleView'
 import { normalizeEngineCC } from '@/app/api/vehicles/engineCC'
+import { TABLES } from '@/lib/tables'
 
 /**
  * Editable text fields and how each one is checked. `required` fields can be changed
@@ -52,7 +53,7 @@ async function _PATCH(
 
     // Verify the vehicle belongs to the authenticated user
     const getCommand = new GetCommand({
-      TableName: 'Vehicles',
+      TableName: TABLES.Vehicles,
       Key: { id: vehicleId }
     })
     const vehicleResult = await dynamoDB.send(getCommand)
@@ -166,7 +167,7 @@ async function _PATCH(
     }
 
     const updateCommand = new UpdateCommand({
-      TableName: 'Vehicles',
+      TableName: TABLES.Vehicles,
       Key: { id: vehicleId },
       UpdateExpression: updateExpression,
       ConditionExpression: '#clientId = :owner',

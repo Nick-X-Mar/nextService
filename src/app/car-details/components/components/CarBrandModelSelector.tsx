@@ -14,6 +14,7 @@ import {
 } from '../../../../utils/formStorage'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNavigation } from '@/hooks/useNavigation'
+import { useConfirm } from '@/hooks/useConfirm'
 
 // Greek to Latin phonetic transliteration for search matching
 const greekToLatinMap: Record<string, string> = {
@@ -197,6 +198,7 @@ function resolveVehicleFields(v: Partial<ServiceFormData & Vehicle>): VehicleFie
 }
 
 export default function CarBrandModelSelector({ category }: { category: string }) {
+  const confirm = useConfirm()
   const { navigate, back, isNavigating } = useNavigation()
   const [brand, setBrand] = useState('')
   const [model, setModel] = useState('')
@@ -440,8 +442,8 @@ export default function CarBrandModelSelector({ category }: { category: string }
     navigate('/car-specifications/')
   }
 
-  const clearAll = () => {
-    if (confirm('Θέλετε να διαγράψετε όλα τα στοιχεία της φόρμας;')) {
+  const clearAll = async () => {
+    if (await confirm({ title: 'Καθαρισμός φόρμας', message: 'Θέλετε να διαγράψετε όλα τα στοιχεία της φόρμας;', confirmLabel: 'Διαγραφή', danger: true })) {
       clearFormData()
       navigate('/')
     }

@@ -20,6 +20,7 @@ import {
   normalizeEmail,
   requireGuestSession,
 } from '../../_lib/guestMerge'
+import { TABLES } from '@/lib/tables'
 
 // The recipient is someone else's inbox until proven otherwise, so re-sends are
 // capped from every direction: per guest, per target address and per IP. The
@@ -111,7 +112,7 @@ async function _POST(request: NextRequest) {
     try {
       await dynamoDB.send(
         new UpdateCommand({
-          TableName: 'Clients',
+          TableName: TABLES.Clients,
           Key: { id: guestId },
           // A new link replaces the previous one, which stops working.
           UpdateExpression:

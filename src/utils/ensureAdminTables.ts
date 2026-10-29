@@ -12,8 +12,7 @@ import {
 } from '@aws-sdk/client-dynamodb'
 import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
-
-const ADMIN_USERS_TABLE = process.env.ADMIN_USERS_TABLE || 'AdminUsers'
+import { TABLES } from '@/lib/tables'
 
 const isLocal =
   process.env.NODE_ENV === 'development' && !!process.env.DYNAMODB_ENDPOINT
@@ -57,7 +56,7 @@ function getRawClient(): DynamoDBClient {
 }
 
 const adminUsersSpec: CreateTableCommandInput = {
-  TableName: ADMIN_USERS_TABLE,
+  TableName: TABLES.AdminUsers,
   AttributeDefinitions: [
     { AttributeName: 'adminId', AttributeType: 'S' },
     { AttributeName: 'email', AttributeType: 'S' }
@@ -136,4 +135,3 @@ export function ensureAdminUsersTable(): Promise<void> {
   return adminReady
 }
 
-export const ADMIN_USERS_TABLE_NAME = ADMIN_USERS_TABLE

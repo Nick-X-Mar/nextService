@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 async function _GET(
   _request: NextRequest,
@@ -12,11 +13,11 @@ async function _GET(
 
     const [garageResult, offersResult] = await Promise.all([
       dynamoDB.send(new GetCommand({
-        TableName: 'Garages',
+        TableName: TABLES.Garages,
         Key: { id: garageId }
       })),
       dynamoDB.send(new QueryCommand({
-        TableName: 'Offers',
+        TableName: TABLES.Offers,
         IndexName: 'GarageOffersIndex',
         KeyConditionExpression: 'garageId = :garageId',
         ExpressionAttributeValues: { ':garageId': garageId },

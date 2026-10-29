@@ -22,6 +22,7 @@ import { invalidateUnread } from '@/utils/unreadCache'
 import { garageClientView, quotingFirstName, resolveWinningGarageId } from '@/utils/garageClientView'
 import { randomUUID } from 'crypto'
 import { chatChannel } from '@/lib/realtime-channels'
+import { TABLES } from '@/lib/tables'
 
 export type { ChatAttachment }
 
@@ -111,7 +112,7 @@ export async function resolveWinner(request: Record<string, unknown>): Promise<s
   const offerId = request.acceptedOfferId
   if (typeof offerId !== 'string' || !offerId) return null
   const res = await dynamoDB.send(new GetCommand({
-    TableName: 'Offers',
+    TableName: TABLES.Offers,
     Key: { id: offerId },
     ProjectionExpression: 'garageId',
   }))
@@ -128,7 +129,7 @@ async function assignedWinner(request: Record<string, unknown>): Promise<string 
 /** Whether an admin has approved this garage and not since deactivated it. */
 async function isGarageActive(garageId: string): Promise<boolean> {
   const res = await dynamoDB.send(new GetCommand({
-    TableName: 'Garages',
+    TableName: TABLES.Garages,
     Key: { id: garageId },
     ProjectionExpression: 'isActive',
   }))
@@ -183,7 +184,7 @@ async function garageWonRequest(request: Record<string, unknown>, garageId: stri
 async function loadClientName(clientId: unknown): Promise<Record<string, unknown> | null> {
   if (typeof clientId !== 'string' || !clientId) return null
   const res = await dynamoDB.send(new GetCommand({
-    TableName: 'Clients',
+    TableName: TABLES.Clients,
     Key: { id: clientId },
     // `email` only so `quotingFirstName` can tell a real first name from the
     // email's local part; it never leaves this module.
@@ -236,7 +237,7 @@ export async function garageMayReadLegacyMessages(
   const requestId = request.id as string
   return (
     (await anyMatch({
-      TableName: 'Offers',
+      TableName: TABLES.Offers,
       IndexName: 'ServiceRequestOffersIndex',
       KeyConditionExpression: 'serviceRequestId = :r',
       FilterExpression: 'garageId = :g',
@@ -244,7 +245,7 @@ export async function garageMayReadLegacyMessages(
       ProjectionExpression: 'id',
     })) ||
     (await anyMatch({
-      TableName: 'ChatMessages',
+      TableName: TABLES.ChatMessages,
       IndexName: 'RequestMessagesIndex',
       KeyConditionExpression: 'requestId = :r',
       FilterExpression: 'senderId = :g AND senderType = :garage',
@@ -339,7 +340,7 @@ async function resolveSenderNames(
   garageId: string
 ): Promise<{ stored: string; forGarage: string }> {
   if (auth.userType === 'garage') {
-    const res = await dynamoDB.send(new GetCommand({ TableName: 'Garages', Key: { id: auth.userId } }))
+    const res = await dynamoDB.send(new GetCommand({ TableName: TABLES.Garages, Key: { id: auth.userId } }))
     const name = (res.Item?.companyName as string) || 'Unknown'
     return { stored: name, forGarage: name }
   }
@@ -386,7 +387,7 @@ export async function createChatMessage(args: {
     ...(attachments && attachments.length > 0 ? { attachments } : {}),
   }
 
-  await dynamoDB.send(new PutCommand({ TableName: 'ChatMessages', Item: messageData }))
+  await dynamoDB.send(new PutCommand({ TableName: TABLES.ChatMessages, Item: messageData }))
 
   await logEvent({
     eventName: EventName.ChatMessageSent,
@@ -484,7 +485,7 @@ async function notifyByEmail(args: {
   }
 
   const clientId = request.clientId as string | undefined
-  const table = senderType === 'garage' ? 'Clients' : 'Garages'
+  const table = senderType === 'garage' ? TABLES.Clients : TABLES.Garages
   const recipientId = senderType === 'garage' ? clientId : garageId
   if (!recipientId) return
 
@@ -514,13 +515,13 @@ async function notifyByEmail(args: {
   })
 
   await dynamoDB.send(new UpdateCommand({
-    TableName: 'ServiceRequests',
+    TableName: TABLES.ServiceRequests,
     Key: { id: requestId },
     UpdateExpression: 'SET chatNotifiedAt = if_not_exists(chatNotifiedAt, :empty)',
     ExpressionAttributeValues: { ':empty': {} },
   }))
   await dynamoDB.send(new UpdateCommand({
-    TableName: 'ServiceRequests',
+    TableName: TABLES.ServiceRequests,
     Key: { id: requestId },
     UpdateExpression: 'SET chatNotifiedAt.#k = :now',
     ExpressionAttributeNames: { '#k': recipientKey },

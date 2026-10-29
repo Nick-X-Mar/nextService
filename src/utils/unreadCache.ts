@@ -4,6 +4,7 @@ import { collectAll } from '@/utils/pagination'
 import { createTtlCache } from './ttlCache'
 import { ServiceRequestStatus } from '@/types/statuses'
 import type { NotificationSummary } from '@/types/alerts'
+import { TABLES } from '@/lib/tables'
 
 /**
  * Caches the per-user notification summary, which is expensive to build (a
@@ -62,7 +63,7 @@ export function pendingMarket(): Promise<PendingMarket> {
     const rows = await collectAll<{ id?: string }>(
       (startKey) =>
         dynamoDB.send(new QueryCommand({
-          TableName: 'ServiceRequests',
+          TableName: TABLES.ServiceRequests,
           IndexName: 'StatusIndex',
           KeyConditionExpression: '#status = :status',
           ExpressionAttributeNames: { '#status': 'status' },

@@ -7,8 +7,10 @@ import Spinner from '@/components/Spinner'
 import { useAsyncTask } from '@/hooks/useAsyncTask'
 import type { AreaContent } from '@/types/siteContent'
 import { FaqItemsField, StringListField, TextAreaField, TextField, inputClass, labelClass } from '../../components/fields'
+import { useConfirm } from '@/hooks/useConfirm'
 
 export default function AreaContentEditor() {
+  const confirm = useConfirm()
   const params = useParams<{ slug: string }>()
   const slug = params.slug
 
@@ -65,7 +67,7 @@ export default function AreaContentEditor() {
   const reset = () =>
     run('reset', async () => {
       if (!defaults) return
-      if (!confirm('Επαναφορά στο αρχικό κείμενο;')) return
+      if (!(await confirm({ title: 'Επαναφορά στο αρχικό κείμενο;', confirmLabel: 'Επαναφορά', danger: true }))) return
       patch({ ...defaults })
     })
 

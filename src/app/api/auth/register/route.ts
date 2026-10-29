@@ -11,6 +11,7 @@ import { withMetrics } from '@/utils/withMetrics'
 import { randomUUID } from 'crypto'
 import { GUEST_PLACEHOLDER_NAME } from '../_lib/guestMerge'
 import { TERMS_VERSION } from '@/lib/legal'
+import { TABLES } from '@/lib/tables'
 
 const checkRegisterRate = createRateLimiter('register', 3, 3600000)
 
@@ -45,7 +46,7 @@ async function _POST(request: NextRequest) {
     // this is a point lookup — it used to scan the whole Clients table on every
     // single registration attempt.
     const existingResult = await dynamoDB.send(new QueryCommand({
-      TableName: 'Clients',
+      TableName: TABLES.Clients,
       IndexName: 'EmailIndex',
       KeyConditionExpression: 'email = :email',
       ExpressionAttributeValues: { ':email': normalizedEmail },
@@ -86,7 +87,7 @@ async function _POST(request: NextRequest) {
     }
 
     await dynamoDB.send(new PutCommand({
-      TableName: 'Clients',
+      TableName: TABLES.Clients,
       Item: clientData
     }))
 

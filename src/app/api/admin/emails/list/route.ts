@@ -3,6 +3,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { QueryCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { ensureEmailLogsTable } from '@/utils/ensureEventTables'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 async function _GET(request: NextRequest) {
   try {
@@ -24,7 +25,7 @@ async function _GET(request: NextRequest) {
     if (status) {
       // Use StatusIndex
       result = await dynamoDB.send(new QueryCommand({
-        TableName: 'EmailLogs',
+        TableName: TABLES.EmailLogs,
         IndexName: 'StatusIndex',
         KeyConditionExpression: '#status = :status AND sentAt BETWEEN :from AND :to',
         ExpressionAttributeNames: { '#status': 'status' },
@@ -36,7 +37,7 @@ async function _GET(request: NextRequest) {
     } else if (template) {
       // Use TemplateIndex
       result = await dynamoDB.send(new QueryCommand({
-        TableName: 'EmailLogs',
+        TableName: TABLES.EmailLogs,
         IndexName: 'TemplateIndex',
         KeyConditionExpression: 'templateName = :template AND sentAt BETWEEN :from AND :to',
         ExpressionAttributeValues: { ':template': template, ':from': fromISO, ':to': toISO },
@@ -47,7 +48,7 @@ async function _GET(request: NextRequest) {
     } else {
       // Full scan with date filter
       result = await dynamoDB.send(new ScanCommand({
-        TableName: 'EmailLogs',
+        TableName: TABLES.EmailLogs,
         FilterExpression: 'sentAt BETWEEN :from AND :to',
         ExpressionAttributeValues: { ':from': fromISO, ':to': toISO },
         Limit: limit,

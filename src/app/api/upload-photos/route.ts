@@ -16,6 +16,7 @@ import { broadcastRequestPhotos } from '@/utils/requestBroadcast'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { randomUUID } from 'crypto'
 import { SITE_URL } from '@/lib/site-url'
+import { TABLES } from '@/lib/tables'
 
 const checkUploadRate = createRateLimiter('photo-upload', 60, 3600000)
 
@@ -77,7 +78,7 @@ async function _POST(request: NextRequest) {
     // an eventually consistent read can still miss the new row — a 404 that left a
     // fresh request without its photos.
     const existing = await dynamoDB.send(new GetCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: serviceRequestId },
       ConsistentRead: true,
     }))
@@ -181,7 +182,7 @@ async function _POST(request: NextRequest) {
     // side by side both passed the read-time cap check and together overshot it.
     try {
       await dynamoDB.send(new UpdateCommand({
-        TableName: 'ServiceRequests',
+        TableName: TABLES.ServiceRequests,
         Key: { id: serviceRequestId },
         UpdateExpression:
           'SET photos = list_append(if_not_exists(photos, :empty), :photos), ' +

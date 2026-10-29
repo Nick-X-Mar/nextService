@@ -14,11 +14,9 @@ import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
 import { BatchGetCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
-import {
-  ensureErrorResolutionsTable,
-  ERROR_RESOLUTIONS_TABLE
-} from '@/utils/ensureErrorResolutionsTable'
+import { ensureErrorResolutionsTable } from '@/utils/ensureErrorResolutionsTable'
 import { fingerprintError } from '@/utils/errorFingerprint'
+import { TABLES } from '@/lib/tables'
 
 const REGION = process.env.REGION || 'eu-central-1'
 const LOG_GROUPS = [
@@ -171,13 +169,13 @@ async function loadResolutions(fingerprints: string[]): Promise<Map<string, Reso
       const res = await dynamoDB.send(
         new BatchGetCommand({
           RequestItems: {
-            [ERROR_RESOLUTIONS_TABLE]: {
+            [TABLES.ErrorResolutions]: {
               Keys: chunk.map((fp) => ({ fingerprint: fp }))
             }
           }
         })
       )
-      const items = (res.Responses?.[ERROR_RESOLUTIONS_TABLE] || []) as ResolutionRow[]
+      const items = (res.Responses?.[TABLES.ErrorResolutions] || []) as ResolutionRow[]
       for (const item of items) {
         if (item?.fingerprint) map.set(item.fingerprint, item)
       }

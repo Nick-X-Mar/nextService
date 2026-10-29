@@ -6,6 +6,7 @@ import { logEvent } from '@/utils/eventLogger'
 import { EventName, EmailTemplate } from '@/types/events'
 import { invalidateGarageActive } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 /**
  * The only place a garage becomes active — and therefore the only place that
@@ -22,7 +23,7 @@ async function _POST(
     let garage: Record<string, unknown> | undefined
     try {
       const result = await dynamoDB.send(new UpdateCommand({
-        TableName: 'Garages',
+        TableName: TABLES.Garages,
         Key: { id: garageId },
         UpdateExpression: 'SET isActive = :active, activatedAt = :now, updatedAt = :now REMOVE deactivatedAt',
         // Without the condition an unknown id would create a bare garage row. A

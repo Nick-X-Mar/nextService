@@ -19,8 +19,7 @@ import {
 } from '@aws-sdk/client-dynamodb'
 import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
-
-const REVIEWS_TABLE = process.env.REVIEWS_TABLE || 'Reviews'
+import { TABLES } from '@/lib/tables'
 
 const isLocal =
   process.env.NODE_ENV === 'development' && !!process.env.DYNAMODB_ENDPOINT
@@ -62,7 +61,7 @@ function getRawClient(): DynamoDBClient {
 }
 
 const spec: CreateTableCommandInput = {
-  TableName: REVIEWS_TABLE,
+  TableName: TABLES.Reviews,
   AttributeDefinitions: [
     { AttributeName: 'reviewId', AttributeType: 'S' },
     { AttributeName: 'garageId', AttributeType: 'S' },
@@ -130,7 +129,7 @@ let ready: Promise<void> | null = null
 export function ensureReviewsTable(): Promise<void> {
   if (!ready) ready = (async () => {
     const client = getRawClient()
-    const name = REVIEWS_TABLE
+    const name = TABLES.Reviews
 
     try {
       const desc = await client.send(new DescribeTableCommand({ TableName: name }))
@@ -155,4 +154,3 @@ export function ensureReviewsTable(): Promise<void> {
   return ready
 }
 
-export const REVIEWS_TABLE_NAME = REVIEWS_TABLE

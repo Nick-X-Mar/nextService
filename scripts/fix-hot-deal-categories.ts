@@ -29,8 +29,9 @@ import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
 import staticOffers from '../src/data/offers.json'
 import { REQUEST_CATEGORIES } from '../src/utils/categoryLabels'
+import { TABLES } from '../src/lib/tables'
 
-const TABLE = process.env.HOT_DEALS_TABLE || 'HotDeals'
+const TABLE = TABLES.HotDeals
 const REGION = process.env.REGION || 'eu-central-1'
 const ENDPOINT = process.env.DYNAMODB_ENDPOINT
 const APPLY = process.argv.includes('--apply')

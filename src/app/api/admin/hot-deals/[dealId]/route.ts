@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb'
-import { ensureHotDealsTable, HOT_DEALS_TABLE_NAME } from '@/utils/ensureHotDealsTable'
+import { ensureHotDealsTable } from '@/utils/ensureHotDealsTable'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 // GET — single deal
 async function _GET(
@@ -14,7 +15,7 @@ async function _GET(
     const { dealId } = await params
 
     const result = await dynamoDB.send(new GetCommand({
-      TableName: HOT_DEALS_TABLE_NAME,
+      TableName: TABLES.HotDeals,
       Key: { dealId }
     }))
 
@@ -60,7 +61,7 @@ async function _PUT(
     }
 
     await dynamoDB.send(new UpdateCommand({
-      TableName: HOT_DEALS_TABLE_NAME,
+      TableName: TABLES.HotDeals,
       Key: { dealId },
       UpdateExpression: `SET ${updateParts.join(', ')}`,
       ExpressionAttributeValues: values,
@@ -84,7 +85,7 @@ async function _DELETE(
     const { dealId } = await params
 
     await dynamoDB.send(new DeleteCommand({
-      TableName: HOT_DEALS_TABLE_NAME,
+      TableName: TABLES.HotDeals,
       Key: { dealId }
     }))
 

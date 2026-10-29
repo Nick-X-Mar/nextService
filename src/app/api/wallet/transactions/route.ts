@@ -4,6 +4,7 @@ import { QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { ensureWalletTransactionsTable } from '@/utils/ensurePaymentTables'
 import { requireClient } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 async function _GET(request: NextRequest) {
   try {
@@ -14,7 +15,7 @@ async function _GET(request: NextRequest) {
 
     const result = await dynamoDB.send(
       new QueryCommand({
-        TableName: process.env.WALLET_TRANSACTIONS_TABLE || 'WalletTransactions',
+        TableName: TABLES.WalletTransactions,
         IndexName: 'ClientWalletIndex',
         KeyConditionExpression: 'clientId = :clientId',
         ExpressionAttributeValues: { ':clientId': clientId },

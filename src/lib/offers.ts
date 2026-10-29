@@ -1,7 +1,8 @@
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ensureHotDealsTable, HOT_DEALS_TABLE_NAME } from '@/utils/ensureHotDealsTable'
+import { ensureHotDealsTable } from '@/utils/ensureHotDealsTable'
 import staticOffers from '@/data/offers.json'
+import { TABLES } from '@/lib/tables'
 
 export interface Offer {
   id?: string
@@ -32,7 +33,7 @@ export async function getAllOffers(): Promise<Offer[]> {
     await ensureHotDealsTable()
     const result = await dynamoDB.send(
       new ScanCommand({
-        TableName: HOT_DEALS_TABLE_NAME,
+        TableName: TABLES.HotDeals,
         FilterExpression: 'isActive = :active',
         ExpressionAttributeValues: { ':active': true },
       })

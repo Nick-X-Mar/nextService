@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 async function _GET(request: NextRequest) {
   try {
@@ -11,7 +12,7 @@ async function _GET(request: NextRequest) {
     const cursor = searchParams.get('cursor')
 
     const result = await dynamoDB.send(new ScanCommand({
-      TableName: 'Clients',
+      TableName: TABLES.Clients,
       Limit: search ? undefined : limit,
       ...(cursor && !search ? { ExclusiveStartKey: JSON.parse(Buffer.from(cursor, 'base64').toString()) } : {})
     }))

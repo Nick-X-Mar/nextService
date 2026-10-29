@@ -9,7 +9,8 @@ const inter = Inter({
   variable: "--font-inter",
 });
 import AppShell from "@/components/layout/AppShell";
-import ToastContainer from "@/components/ToastContainer";
+import { ToastProvider } from "@/components/ToastProvider";
+import { ConfirmProvider } from "@/components/ConfirmProvider";
 import InAppBrowserEscape from "@/components/InAppBrowserEscape";
 import { UserProvider } from "@/contexts/UserContext";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -88,10 +89,13 @@ export default function RootLayout({
         />
         <AuthProvider>
           <UserProvider>
-            <AppShell>
-              {children}
-            </AppShell>
-            <ToastContainer />
+            <ToastProvider>
+              <ConfirmProvider>
+                <AppShell>
+                  {children}
+                </AppShell>
+              </ConfirmProvider>
+            </ToastProvider>
             <InAppBrowserEscape />
           </UserProvider>
         </AuthProvider>

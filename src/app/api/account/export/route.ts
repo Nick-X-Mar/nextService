@@ -6,9 +6,7 @@ import { requireAuth } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
 import { batchGetById } from '@/utils/batchGetById'
 import { redactClientNames } from '@/utils/chatService'
-
-const EVENT_LOGS_TABLE = process.env.EVENT_LOGS_TABLE || 'EventLogs'
-const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
+import { TABLES } from '@/lib/tables'
 
 /**
  * Collects every log row belonging to one user, following DynamoDB's pagination.
@@ -92,7 +90,7 @@ async function _POST(request: NextRequest) {
       )
     }
 
-    const tableName = userType === 'garage' ? 'Garages' : 'Clients'
+    const tableName = userType === 'garage' ? TABLES.Garages : TABLES.Clients
 
     const lookup = await dynamoDB.send(
       new GetCommand({
@@ -128,7 +126,7 @@ async function _POST(request: NextRequest) {
       const [vehiclesRes, requestsRes] = await Promise.all([
         dynamoDB.send(
           new QueryCommand({
-            TableName: 'Vehicles',
+            TableName: TABLES.Vehicles,
             IndexName: 'ClientVehiclesIndex',
             KeyConditionExpression: 'clientId = :c',
             ExpressionAttributeValues: { ':c': userId }
@@ -136,7 +134,7 @@ async function _POST(request: NextRequest) {
         ),
         dynamoDB.send(
           new QueryCommand({
-            TableName: 'ServiceRequests',
+            TableName: TABLES.ServiceRequests,
             IndexName: 'ClientRequestsIndex',
             KeyConditionExpression: 'clientId = :c',
             ExpressionAttributeValues: { ':c': userId }
@@ -153,7 +151,7 @@ async function _POST(request: NextRequest) {
         const [offRes, chatRes] = await Promise.all([
           dynamoDB.send(
             new QueryCommand({
-              TableName: 'Offers',
+              TableName: TABLES.Offers,
               IndexName: 'ServiceRequestOffersIndex',
               KeyConditionExpression: 'serviceRequestId = :r',
               ExpressionAttributeValues: { ':r': requestId }
@@ -161,7 +159,7 @@ async function _POST(request: NextRequest) {
           ),
           dynamoDB.send(
             new QueryCommand({
-              TableName: 'ChatMessages',
+              TableName: TABLES.ChatMessages,
               IndexName: 'RequestMessagesIndex',
               KeyConditionExpression: 'requestId = :r',
               ExpressionAttributeValues: { ':r': requestId }
@@ -189,7 +187,7 @@ async function _POST(request: NextRequest) {
       let pages = 0
       do {
         const res = await dynamoDB.send(new QueryCommand({
-          TableName: 'Offers',
+          TableName: TABLES.Offers,
           IndexName: 'GarageOffersIndex',
           KeyConditionExpression: 'garageId = :g',
           ExpressionAttributeValues: { ':g': userId },
@@ -201,7 +199,7 @@ async function _POST(request: NextRequest) {
       pages = 0
       do {
         const res = await dynamoDB.send(new ScanCommand({
-          TableName: 'ChatMessages',
+          TableName: TABLES.ChatMessages,
           FilterExpression: '(senderType = :g AND senderId = :id) OR garageId = :id',
           ExpressionAttributeValues: { ':g': 'garage', ':id': userId },
           ExclusiveStartKey: chatsKey,
@@ -218,7 +216,7 @@ async function _POST(request: NextRequest) {
         const key = typeof m.requestId === 'string' ? m.requestId : ''
         byRequest.set(key, [...(byRequest.get(key) ?? []), m])
       }
-      const requests = await batchGetById('ServiceRequests', [...byRequest.keys()], {
+      const requests = await batchGetById(TABLES.ServiceRequests, [...byRequest.keys()], {
         projection: 'id, clientId, #s, acceptedGarageId, acceptedOfferId',
         names: { '#s': 'status' },
       })
@@ -235,7 +233,7 @@ async function _POST(request: NextRequest) {
     }
 
     const eventAttr = userType === 'garage' ? 'garageId' : 'clientId'
-    const activity = await scanAllForUser(EVENT_LOGS_TABLE, eventAttr, userId)
+    const activity = await scanAllForUser(TABLES.EventLogs, eventAttr, userId)
     // A garage's rows include events about its clients: messages the client
     // sent (chat events carried the client's full name until recently), and
     // payment events with the client's deposit and card-decline text. Those
@@ -250,7 +248,7 @@ async function _POST(request: NextRequest) {
     // the client's address — and SES later adds the client's opens and clicks.
     // An export holds only the emails this account was actually sent.
     const ownAddress = typeof user.email === 'string' ? user.email.trim().toLowerCase() : null
-    const emails = await scanAllForUser(EMAIL_LOGS_TABLE, eventAttr, userId)
+    const emails = await scanAllForUser(TABLES.EmailLogs, eventAttr, userId)
     exportData.emailsReceived = ownAddress
       ? emails.filter((e) => typeof e.to === 'string' && e.to.trim().toLowerCase() === ownAddress)
       : []

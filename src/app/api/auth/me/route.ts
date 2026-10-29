@@ -4,6 +4,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand } from '@aws-sdk/lib-dynamodb'
 import { withMetrics } from '@/utils/withMetrics'
 import { PENDING_MERGE_FIELDS } from '../_lib/guestMerge'
+import { TABLES } from '@/lib/tables'
 
 // Never leaves the server: credentials, reset state and the pending-merge
 // token (whose hash alone must not reach the browser that asked for it).
@@ -22,7 +23,7 @@ async function _GET(request: NextRequest) {
     }
 
     const { userId, userType } = auth
-    const tableName = userType === 'garage' ? 'Garages' : 'Clients'
+    const tableName = userType === 'garage' ? TABLES.Garages : TABLES.Clients
 
     const result = await dynamoDB.send(new GetCommand({
       TableName: tableName,

@@ -9,12 +9,14 @@
  */
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { TABLES } from '../src/lib/tables'
 
-const TABLE = process.env.HOT_DEALS_TABLE || 'HotDeals'
+const TABLE = TABLES.HotDeals
 const REGION = process.env.REGION || 'eu-central-1'
 const ENDPOINT = process.env.DYNAMODB_ENDPOINT || 'http://localhost:8000'
 
 const TITLE_TO_SLUG: Record<string, string> = {
+  'Δίσκος Πλατό': 'set_disk_all_cars',
   'Συμπλέκτης': 'set_disk_all_cars',
   'Ιμάντας Χρονισμού με Αντλία Νερού': 'set-imantas-xronismou',
   'Μεγάλο Service Αυτοκινήτου': 'service-auto',

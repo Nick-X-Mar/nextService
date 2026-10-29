@@ -14,6 +14,7 @@ import {
   QUOTING_VEHICLE_PROJECTION,
   type GarageClientView,
 } from '@/utils/garageClientView'
+import { TABLES } from '@/lib/tables'
 
 // Channel names. Keep in sync with the client-side useRealtimeRequests hook.
 export const NEW_REQUESTS_CHANNEL = 'new-requests'
@@ -82,15 +83,15 @@ async function loadById(
 // Look up everything a garage dashboard card needs to render, mirroring the
 // shape returned by /api/garage/available-requests.
 async function buildBroadcastRequest(serviceRequestId: string): Promise<BroadcastRequest | null> {
-  const request = await loadById('ServiceRequests', serviceRequestId)
+  const request = await loadById(TABLES.ServiceRequests, serviceRequestId)
   if (!request) return null
 
   const [client, vehicle] = await Promise.all([
     request.clientId
-      ? loadById('Clients', request.clientId, { expression: QUOTING_CLIENT_PROJECTION })
+      ? loadById(TABLES.Clients, request.clientId, { expression: QUOTING_CLIENT_PROJECTION })
       : Promise.resolve(null),
     request.vehicleId
-      ? loadById('Vehicles', request.vehicleId, {
+      ? loadById(TABLES.Vehicles, request.vehicleId, {
           expression: QUOTING_VEHICLE_PROJECTION,
           names: QUOTING_VEHICLE_NAMES,
         })
@@ -144,7 +145,7 @@ export async function broadcastNewRequest(serviceRequestId: string): Promise<voi
  */
 export async function broadcastRequestPhotos(serviceRequestId: string): Promise<void> {
   try {
-    const request = await loadById('ServiceRequests', serviceRequestId)
+    const request = await loadById(TABLES.ServiceRequests, serviceRequestId)
     if (!request) return
 
     const rawUrls: string[] = request.photoUrls || []

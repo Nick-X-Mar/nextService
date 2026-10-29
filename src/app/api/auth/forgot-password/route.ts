@@ -7,6 +7,7 @@ import { logEvent } from '@/utils/eventLogger'
 import { EventName, EmailTemplate } from '@/types/events'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 const checkIpRateLimit = createRateLimiter('forgot-ip', 10, 3600000)
 const checkEmailRateLimit = createRateLimiter('forgot-email', 3, 3600000)
@@ -60,7 +61,7 @@ async function _POST(request: NextRequest) {
     }
 
     const normalizedEmail = email.trim().toLowerCase()
-    const tableName = userType === 'garage' ? 'Garages' : 'Clients'
+    const tableName = userType === 'garage' ? TABLES.Garages : TABLES.Clients
 
     // Both Clients and Garages carry an EmailIndex keyed on email, so this
     // resolves without reading the table.

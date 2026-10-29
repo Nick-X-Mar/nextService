@@ -5,6 +5,7 @@ import { decodeCursor, encodeCursor, parseLimit } from '@/utils/pagination'
 import { requireClient } from '@/utils/requireAuth'
 import { generatePresignedUrls } from '@/utils/s3Service'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 async function _GET(request: NextRequest) {
   try {
@@ -17,7 +18,7 @@ async function _GET(request: NextRequest) {
     // crossed DynamoDB's 1MB page limit.
     const { searchParams } = new URL(request.url)
     const queryCommand = new QueryCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       IndexName: 'ClientRequestsIndex',
       KeyConditionExpression: 'clientId = :clientId',
       ExpressionAttributeValues: {
@@ -44,7 +45,7 @@ async function _GET(request: NextRequest) {
         try {
           // Get vehicle information
           const vehicleQuery = new QueryCommand({
-            TableName: 'Vehicles',
+            TableName: TABLES.Vehicles,
             KeyConditionExpression: 'id = :vehicleId',
             ExpressionAttributeValues: {
               ':vehicleId': request.vehicleId
@@ -117,7 +118,7 @@ async function _GET(request: NextRequest) {
       const [messageFlags, offersPerRequest] = await Promise.all([
         Promise.all(requestIds.map(async (requestId) => {
           const messages = await dynamoDB.send(new QueryCommand({
-            TableName: 'ChatMessages',
+            TableName: TABLES.ChatMessages,
             IndexName: 'RequestMessagesIndex',
             KeyConditionExpression: 'requestId = :requestId',
             FilterExpression: 'senderType = :garage',
@@ -129,7 +130,7 @@ async function _GET(request: NextRequest) {
         })),
         Promise.all(requestIds.map(async (requestId) => {
           const offers = await dynamoDB.send(new QueryCommand({
-            TableName: 'Offers',
+            TableName: TABLES.Offers,
             IndexName: 'ServiceRequestOffersIndex',
             KeyConditionExpression: 'serviceRequestId = :requestId',
             ExpressionAttributeValues: { ':requestId': requestId },
@@ -142,7 +143,7 @@ async function _GET(request: NextRequest) {
         offersPerRequest.flatMap(([, offers]) => offers.map((o) => o.garageId as string)).filter(Boolean)
       )]
       const garageRows = await Promise.all(
-        garageIds.map((id) => dynamoDB.send(new GetCommand({ TableName: 'Garages', Key: { id } })))
+        garageIds.map((id) => dynamoDB.send(new GetCommand({ TableName: TABLES.Garages, Key: { id } })))
       )
       const garageById = new Map(
         garageRows

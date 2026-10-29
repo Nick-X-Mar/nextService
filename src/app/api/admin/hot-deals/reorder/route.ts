@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { UpdateCommand } from '@aws-sdk/lib-dynamodb'
-import { ensureHotDealsTable, HOT_DEALS_TABLE_NAME } from '@/utils/ensureHotDealsTable'
+import { ensureHotDealsTable } from '@/utils/ensureHotDealsTable'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 // POST — reorder deals: body = { order: ["dealId1", "dealId2", ...] }
 async function _POST(request: NextRequest) {
@@ -18,7 +19,7 @@ async function _POST(request: NextRequest) {
     await Promise.all(
       order.map((dealId, index) =>
         dynamoDB.send(new UpdateCommand({
-          TableName: HOT_DEALS_TABLE_NAME,
+          TableName: TABLES.HotDeals,
           Key: { dealId },
           UpdateExpression: 'SET sortOrder = :order',
           ExpressionAttributeValues: { ':order': index }

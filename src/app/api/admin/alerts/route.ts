@@ -5,6 +5,7 @@ import { getAdminFromRequest } from '@/utils/adminAuth'
 import { withMetrics } from '@/utils/withMetrics'
 import { createTtlCache } from '@/utils/ttlCache'
 import { ensurePaymentsTable } from '@/utils/ensurePaymentTables'
+import { TABLES } from '@/lib/tables'
 
 /**
  * What needs an admin's attention right now.
@@ -27,12 +28,12 @@ interface AdminAlerts {
 const cache = createTtlCache<AdminAlerts>(60_000)
 
 async function compute(): Promise<AdminAlerts> {
-  const paymentsTable = process.env.PAYMENTS_TABLE || 'Payments'
-  const errorsTable = process.env.ERROR_RESOLUTIONS_TABLE || 'ErrorResolutions'
+  const paymentsTable = TABLES.Payments
+  const errorsTable = TABLES.ErrorResolutions
 
   const [garages, payments, errors] = await Promise.all([
     dynamoDB.send(new ScanCommand({
-      TableName: 'Garages',
+      TableName: TABLES.Garages,
       FilterExpression: 'attribute_not_exists(isActive) OR isActive = :false',
       ExpressionAttributeValues: { ':false': false },
       Select: 'COUNT',

@@ -4,6 +4,7 @@ import { collectAll } from '@/utils/pagination'
 import { batchGetById } from '@/utils/batchGetById'
 import { threadWriteState } from '@/utils/chatService'
 import { ServiceRequestStatus } from '@/types/statuses'
+import { TABLES } from '@/lib/tables'
 
 interface ClientChatMessage {
   senderId: string
@@ -45,7 +46,7 @@ async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<v
 function fetchMessages(requestId: string): Promise<ClientChatMessage[]> {
   return collectAll<ClientChatMessage>(
     (startKey) => dynamoDB.send(new QueryCommand({
-      TableName: 'ChatMessages',
+      TableName: TABLES.ChatMessages,
       IndexName: 'RequestMessagesIndex',
       KeyConditionExpression: 'requestId = :requestId',
       ExpressionAttributeValues: { ':requestId': requestId },
@@ -61,7 +62,7 @@ function fetchMessages(requestId: string): Promise<ClientChatMessage[]> {
 function fetchOffers(requestId: string): Promise<Record<string, unknown>[]> {
   return collectAll<Record<string, unknown>>(
     (startKey) => dynamoDB.send(new QueryCommand({
-      TableName: 'Offers',
+      TableName: TABLES.Offers,
       IndexName: 'ServiceRequestOffersIndex',
       KeyConditionExpression: 'serviceRequestId = :requestId',
       ExpressionAttributeValues: { ':requestId': requestId },
@@ -90,7 +91,7 @@ export async function loadClientWorkspace(
 ): Promise<ClientWorkspace> {
   const requests = await collectAll<Record<string, unknown>>(
     (startKey) => dynamoDB.send(new QueryCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       IndexName: 'ClientRequestsIndex',
       KeyConditionExpression: 'clientId = :clientId',
       ExpressionAttributeValues: { ':clientId': clientId },
@@ -124,10 +125,10 @@ export async function loadClientWorkspace(
   }
 
   const [vehicles, acceptedOffers] = await Promise.all([
-    batchGetById('Vehicles', requests.map((r) => r.vehicleId as string | undefined), {
+    batchGetById(TABLES.Vehicles, requests.map((r) => r.vehicleId as string | undefined), {
       projection: 'id, brand, model, modelYear',
     }),
-    batchGetById('Offers', [...legacyAccepted.keys()], { projection: 'id, garageId' }),
+    batchGetById(TABLES.Offers, [...legacyAccepted.keys()], { projection: 'id, garageId' }),
     mapLimit(withMessages, REQUEST_CONCURRENCY, async (req) => {
       messagesByRequest.set(req.id as string, await fetchMessages(req.id as string))
     }),

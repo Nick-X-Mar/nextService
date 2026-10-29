@@ -16,6 +16,7 @@ import {
   QUOTING_VEHICLE_NAMES,
   QUOTING_VEHICLE_PROJECTION,
 } from '@/utils/garageClientView'
+import { TABLES } from '@/lib/tables'
 
 async function _GET(request: NextRequest) {
   try {
@@ -50,7 +51,7 @@ async function _GET(request: NextRequest) {
         collectAll<{ id?: string }>(
           (startKey) =>
             dynamoDB.send(new QueryCommand({
-              TableName: 'ServiceRequests',
+              TableName: TABLES.ServiceRequests,
               IndexName: 'StatusIndex',
               KeyConditionExpression: '#status = :status',
               ExpressionAttributeNames: { '#status': 'status' },
@@ -63,7 +64,7 @@ async function _GET(request: NextRequest) {
         collectAll<{ serviceRequestId?: string }>(
           (startKey) =>
             dynamoDB.send(new QueryCommand({
-              TableName: 'Offers',
+              TableName: TABLES.Offers,
               IndexName: 'GarageOffersIndex',
               KeyConditionExpression: 'garageId = :garageId',
               ProjectionExpression: 'serviceRequestId',
@@ -84,7 +85,7 @@ async function _GET(request: NextRequest) {
 
     const [result, garageOffers] = await Promise.all([
       dynamoDB.send(new QueryCommand({
-        TableName: 'ServiceRequests',
+        TableName: TABLES.ServiceRequests,
         IndexName: 'StatusIndex',
         KeyConditionExpression: '#status = :status',
         ExpressionAttributeNames: { '#status': 'status' },
@@ -96,7 +97,7 @@ async function _GET(request: NextRequest) {
       collectAll<{ serviceRequestId?: string }>(
         (startKey) =>
           dynamoDB.send(new QueryCommand({
-            TableName: 'Offers',
+            TableName: TABLES.Offers,
             IndexName: 'GarageOffersIndex',
             KeyConditionExpression: 'garageId = :garageId',
             ExpressionAttributeValues: { ':garageId': garageId },
@@ -136,10 +137,10 @@ async function _GET(request: NextRequest) {
     // plate, VIN and engine number are not even read. A row missing clientId or
     // vehicleId is skipped by the batch rather than failing the whole feed.
     const [clients, vehicles, presignedByRequest] = await Promise.all([
-      batchGetById('Clients', availableRequests.map((r) => r.clientId as string | undefined), {
+      batchGetById(TABLES.Clients, availableRequests.map((r) => r.clientId as string | undefined), {
         projection: QUOTING_CLIENT_PROJECTION,
       }),
-      batchGetById('Vehicles', availableRequests.map((r) => r.vehicleId as string | undefined), {
+      batchGetById(TABLES.Vehicles, availableRequests.map((r) => r.vehicleId as string | undefined), {
         projection: QUOTING_VEHICLE_PROJECTION,
         names: QUOTING_VEHICLE_NAMES,
       }),

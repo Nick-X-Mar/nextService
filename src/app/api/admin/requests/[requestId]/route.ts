@@ -3,6 +3,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { generatePresignedUrls } from '@/utils/s3Service'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 async function _GET(
   request: NextRequest,
@@ -13,7 +14,7 @@ async function _GET(
 
     // Fetch service request
     const reqResult = await dynamoDB.send(new GetCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: requestId }
     }))
 
@@ -26,18 +27,18 @@ async function _GET(
     const [clientResult, vehicleResult, offersResult] = await Promise.all([
       sr.clientId
         ? dynamoDB.send(new GetCommand({
-            TableName: 'Clients',
+            TableName: TABLES.Clients,
             Key: { id: sr.clientId }
           }))
         : Promise.resolve({ Item: undefined }),
       sr.vehicleId
         ? dynamoDB.send(new GetCommand({
-            TableName: 'Vehicles',
+            TableName: TABLES.Vehicles,
             Key: { id: sr.vehicleId }
           }))
         : Promise.resolve({ Item: undefined }),
       dynamoDB.send(new QueryCommand({
-        TableName: 'Offers',
+        TableName: TABLES.Offers,
         IndexName: 'ServiceRequestOffersIndex',
         KeyConditionExpression: 'serviceRequestId = :reqId',
         ExpressionAttributeValues: { ':reqId': requestId }
@@ -56,7 +57,7 @@ async function _GET(
       const garageResults = await Promise.all(
         garageIds.map((gId) =>
           dynamoDB.send(new GetCommand({
-            TableName: 'Garages',
+            TableName: TABLES.Garages,
             Key: { id: gId },
             ProjectionExpression: 'id, companyName'
           })).then((res) => res.Item)

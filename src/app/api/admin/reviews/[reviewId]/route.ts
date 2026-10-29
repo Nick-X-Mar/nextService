@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ensureReviewsTable, REVIEWS_TABLE_NAME } from '@/utils/ensureReviewsTable'
+import { ensureReviewsTable } from '@/utils/ensureReviewsTable'
 import { getAdminFromRequest } from '@/utils/adminAuth'
 import { withMetrics } from '@/utils/withMetrics'
 import type { Review } from '@/types/reviews'
+import { TABLES } from '@/lib/tables'
 
 /**
  * Hide or restore a review.
@@ -30,7 +31,7 @@ async function _PATCH(
 
     await ensureReviewsTable()
     const existing = await dynamoDB.send(
-      new GetCommand({ TableName: REVIEWS_TABLE_NAME, Key: { reviewId } })
+      new GetCommand({ TableName: TABLES.Reviews, Key: { reviewId } })
     )
     const review = existing.Item as Review | undefined
     if (!review) return NextResponse.json({ error: 'Δεν βρέθηκε' }, { status: 404 })
@@ -42,7 +43,7 @@ async function _PATCH(
     const now = new Date().toISOString()
     await dynamoDB.send(
       new UpdateCommand({
-        TableName: REVIEWS_TABLE_NAME,
+        TableName: TABLES.Reviews,
         Key: { reviewId },
         UpdateExpression:
           'SET #status = :status, moderatedBy = :by, moderatedAt = :now, moderationReason = :reason, updatedAt = :now',
@@ -57,7 +58,7 @@ async function _PATCH(
     )
 
     // Keep the aggregate honest about what is actually on display.
-    const table = review.direction === 'client_to_garage' ? 'Garages' : 'Clients'
+    const table = review.direction === 'client_to_garage' ? TABLES.Garages : TABLES.Clients
     const subjectId = review.direction === 'client_to_garage' ? review.garageId : review.clientId
     const delta = next === 'hidden' ? -1 : 1
 

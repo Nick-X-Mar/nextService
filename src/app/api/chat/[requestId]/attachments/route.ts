@@ -18,6 +18,7 @@ import {
   ACCEPTED_IMAGE_TYPES,
 } from '@/utils/s3Service'
 import { randomUUID } from 'crypto'
+import { TABLES } from '@/lib/tables'
 
 const checkAttachmentRate = createRateLimiter('chat-attachment', 60, 3600000)
 
@@ -71,7 +72,7 @@ async function _POST(
     }
 
     const requestResult = await dynamoDB.send(new GetCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: requestId },
     }))
     if (!requestResult.Item) {

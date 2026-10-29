@@ -3,8 +3,9 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { getAdminFromRequest } from '@/utils/adminAuth'
 import { verifyPassword, hashPassword } from '@/utils/passwordService'
-import { ensureAdminUsersTable, ADMIN_USERS_TABLE_NAME } from '@/utils/ensureAdminTables'
+import { ensureAdminUsersTable } from '@/utils/ensureAdminTables'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 async function _POST(request: NextRequest) {
   try {
@@ -26,7 +27,7 @@ async function _POST(request: NextRequest) {
     }
 
     const result = await dynamoDB.send(new GetCommand({
-      TableName: ADMIN_USERS_TABLE_NAME,
+      TableName: TABLES.AdminUsers,
       Key: { adminId: admin.adminId }
     }))
 
@@ -42,7 +43,7 @@ async function _POST(request: NextRequest) {
     const newHash = await hashPassword(newPassword)
 
     await dynamoDB.send(new UpdateCommand({
-      TableName: ADMIN_USERS_TABLE_NAME,
+      TableName: TABLES.AdminUsers,
       Key: { adminId: admin.adminId },
       UpdateExpression: 'SET passwordHash = :hash, updatedAt = :now',
       ExpressionAttributeValues: {

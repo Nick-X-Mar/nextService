@@ -6,6 +6,7 @@ import { requireOwner } from '@/utils/requireAuth'
 import { getAuthFromRequest } from '@/utils/auth'
 import { withMetrics } from '@/utils/withMetrics'
 import { stringList } from '@/utils/stringList'
+import { TABLES } from '@/lib/tables'
 
 async function _GET(
   request: NextRequest,
@@ -22,7 +23,7 @@ async function _GET(
 
     // Get garage data from database
     const result = await dynamoDB.send(new GetCommand({
-      TableName: 'Garages',
+      TableName: TABLES.Garages,
       Key: { id: garageId }
     }))
 
@@ -129,14 +130,14 @@ async function _PUT(
     // the local tables (and from any environment the stack hasn't reached).
     const [emailOwners, tinOwners] = await Promise.all([
       queryIndexOrScan<{ id: string }>({
-        table: 'Garages',
+        table: TABLES.Garages,
         indexName: 'EmailIndex',
         keyConditionExpression: 'email = :email',
         scanFilterExpression: 'email = :email',
         expressionAttributeValues: { ':email': email },
       }),
       queryIndexOrScan<{ id: string }>({
-        table: 'Garages',
+        table: TABLES.Garages,
         indexName: 'TINIndex',
         keyConditionExpression: 'tin = :tin',
         scanFilterExpression: 'tin = :tin',
@@ -157,7 +158,7 @@ async function _PUT(
     let result
     try {
       result = await dynamoDB.send(new UpdateCommand({
-        TableName: 'Garages',
+        TableName: TABLES.Garages,
         Key: { id: garageId },
         UpdateExpression: 'SET companyName = :companyName, email = :email, mobile = :mobile, address = :address, tin = :tin, taxAuthority = :taxAuthority, description = :description, benefits = :benefits, workdayStartTime = :workdayStartTime, workdayEndTime = :workdayEndTime, updatedAt = :updatedAt',
         ConditionExpression: 'attribute_exists(id)',
@@ -239,7 +240,7 @@ async function _PATCH(
 
     try {
       await dynamoDB.send(new UpdateCommand({
-        TableName: 'Garages',
+        TableName: TABLES.Garages,
         Key: { id: garageId },
         UpdateExpression: 'SET benefits = :benefits, updatedAt = :updatedAt',
         ConditionExpression: 'attribute_exists(id)',

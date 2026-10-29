@@ -3,6 +3,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand } from '@aws-sdk/lib-dynamodb'
 import { requireClient } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 async function _GET(request: NextRequest) {
   try {
@@ -10,7 +11,7 @@ async function _GET(request: NextRequest) {
     if (clientId instanceof NextResponse) return clientId
 
     const result = await dynamoDB.send(
-      new GetCommand({ TableName: 'Clients', Key: { id: clientId } })
+      new GetCommand({ TableName: TABLES.Clients, Key: { id: clientId } })
     )
 
     const points = (result.Item?.walletBalance as number) ?? 0

@@ -3,8 +3,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { ensureEventLogsTable } from '@/utils/ensureEventTables'
 import { withMetrics } from '@/utils/withMetrics'
-
-const EVENT_LOGS_TABLE = process.env.EVENT_LOGS_TABLE || 'EventLogs'
+import { TABLES } from '@/lib/tables'
 
 interface TimelineEvent {
   eventId: string
@@ -36,7 +35,7 @@ async function _GET(
 
     for (let i = 0; i < 10; i++) {
       const res = await dynamoDB.send(new QueryCommand({
-        TableName: EVENT_LOGS_TABLE,
+        TableName: TABLES.EventLogs,
         IndexName: 'RequestTimelineIndex',
         KeyConditionExpression: 'requestId = :rid',
         ExpressionAttributeValues: { ':rid': requestId },
@@ -70,14 +69,14 @@ async function _GET(
     const [clientLookups, garageLookups] = await Promise.all([
       Promise.all([...clientIds].map((id) =>
         dynamoDB.send(new GetCommand({
-          TableName: 'Clients',
+          TableName: TABLES.Clients,
           Key: { id },
           ProjectionExpression: 'id, firstName, lastName, email'
         })).then((r) => r.Item).catch(() => null)
       )),
       Promise.all([...garageIds].map((id) =>
         dynamoDB.send(new GetCommand({
-          TableName: 'Garages',
+          TableName: TABLES.Garages,
           Key: { id },
           ProjectionExpression: 'id, companyName'
         })).then((r) => r.Item).catch(() => null)

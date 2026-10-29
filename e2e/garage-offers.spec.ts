@@ -653,7 +653,14 @@ test.describe.serial('Offer form sends hours', () => {
     // Any two bookable days; which ones does not matter.
     const days = page.locator('td[data-day]:not([data-disabled]):not([data-outside]):not([data-hidden]) button')
     await days.nth(0).click()
-    await days.nth(1).click()
+    // Late in the month the current view can hold a single bookable day; the
+    // second one then comes from the next month.
+    if ((await days.count()) < 2) {
+      await page.getByRole('button', { name: 'Go to the Next Month' }).click()
+      await days.nth(0).click()
+    } else {
+      await days.nth(1).click()
+    }
 
     const sent = page.waitForResponse((r) => r.url().includes('/api/offers') && r.request().method() === 'POST')
     await page.getByRole('button', { name: 'Αποστολή Προσφοράς' }).click()

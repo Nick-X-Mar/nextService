@@ -12,8 +12,7 @@ import {
 } from '@aws-sdk/client-dynamodb'
 import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
-
-export const PERFORMANCE_TABLE = process.env.PERFORMANCE_TABLE || 'PerformanceMetrics'
+import { TABLES } from '@/lib/tables'
 
 const isLocal =
   process.env.NODE_ENV === 'development' && !!process.env.DYNAMODB_ENDPOINT
@@ -60,7 +59,7 @@ function getRawClient(): DynamoDBClient {
 // Sort key: timestamp (ISO string) — enables range queries for time windows
 // GSI on statusCode+timestamp for error rate queries
 const tableSpec: CreateTableCommandInput = {
-  TableName: PERFORMANCE_TABLE,
+  TableName: TABLES.PerformanceMetrics,
   AttributeDefinitions: [
     { AttributeName: 'endpoint', AttributeType: 'S' },
     { AttributeName: 'timestamp', AttributeType: 'S' },
@@ -117,7 +116,7 @@ export function ensurePerformanceTable(): Promise<void> {
 
 async function doEnsure(): Promise<void> {
   const client = getRawClient()
-  const name = PERFORMANCE_TABLE
+  const name = TABLES.PerformanceMetrics
 
   try {
     const desc = await client.send(new DescribeTableCommand({ TableName: name }))

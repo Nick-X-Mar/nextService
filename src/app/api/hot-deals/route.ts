@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
-import { ensureHotDealsTable, HOT_DEALS_TABLE_NAME } from '@/utils/ensureHotDealsTable'
+import { ensureHotDealsTable } from '@/utils/ensureHotDealsTable'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 // Public endpoint — returns active deals sorted by sortOrder
 async function _GET() {
@@ -10,7 +11,7 @@ async function _GET() {
     await ensureHotDealsTable()
 
     const result = await dynamoDB.send(new ScanCommand({
-      TableName: HOT_DEALS_TABLE_NAME,
+      TableName: TABLES.HotDeals,
       FilterExpression: 'isActive = :active',
       ExpressionAttributeValues: { ':active': true }
     }))

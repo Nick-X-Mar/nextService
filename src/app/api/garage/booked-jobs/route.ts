@@ -14,6 +14,7 @@ import {
   isWinningGarage,
   quotingFirstName,
 } from '@/utils/garageClientView'
+import { TABLES } from '@/lib/tables'
 
 /**
  * The jobs a garage has already booked and not yet closed, for a garage that
@@ -40,7 +41,7 @@ async function _GET(request: NextRequest) {
     if (garageId instanceof NextResponse) return garageId
 
     const garage = (await dynamoDB.send(new GetCommand({
-      TableName: 'Garages',
+      TableName: TABLES.Garages,
       Key: { id: garageId },
       ProjectionExpression: 'isActive, deactivatedAt',
     }))).Item
@@ -53,7 +54,7 @@ async function _GET(request: NextRequest) {
     const offers = await collectAll<Record<string, unknown>>(
       (startKey) =>
         dynamoDB.send(new QueryCommand({
-          TableName: 'Offers',
+          TableName: TABLES.Offers,
           IndexName: 'GarageOffersIndex',
           KeyConditionExpression: 'garageId = :garageId',
           FilterExpression: '#status = :accepted',
@@ -67,7 +68,7 @@ async function _GET(request: NextRequest) {
       return NextResponse.json({ success: true, account, jobs: [] })
     }
 
-    const requests = await batchGetById('ServiceRequests', offers.map((o) => o.serviceRequestId as string))
+    const requests = await batchGetById(TABLES.ServiceRequests, offers.map((o) => o.serviceRequestId as string))
     const ownOfferIds = new Set(offers.map((o) => o.id as string))
 
     // Still booked with this garage: an accepted offer can outlive its booking
@@ -82,10 +83,10 @@ async function _GET(request: NextRequest) {
     }
 
     const [clients, vehicles] = await Promise.all([
-      batchGetById('Clients', open.map((r) => r.clientId as string | undefined), {
+      batchGetById(TABLES.Clients, open.map((r) => r.clientId as string | undefined), {
         projection: QUOTING_CLIENT_PROJECTION,
       }),
-      batchGetById('Vehicles', open.map((r) => r.vehicleId as string | undefined), {
+      batchGetById(TABLES.Vehicles, open.map((r) => r.vehicleId as string | undefined), {
         projection: QUOTING_VEHICLE_PROJECTION,
         names: QUOTING_VEHICLE_NAMES,
       }),

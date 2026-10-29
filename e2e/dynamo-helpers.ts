@@ -1,6 +1,7 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, DeleteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { athensDatePlus } from './d-helpers'
+import { TABLES } from '../src/lib/tables'
 
 /**
  * Direct access to local DynamoDB, for fixtures the API deliberately will not
@@ -23,12 +24,12 @@ const client = DynamoDBDocumentClient.from(
 )
 
 export async function getServiceRequest(id: string): Promise<Record<string, unknown> | undefined> {
-  const res = await client.send(new GetCommand({ TableName: 'ServiceRequests', Key: { id }, ConsistentRead: true }))
+  const res = await client.send(new GetCommand({ TableName: TABLES.ServiceRequests, Key: { id }, ConsistentRead: true }))
   return res.Item
 }
 
 export async function getOffer(id: string): Promise<Record<string, unknown> | undefined> {
-  const res = await client.send(new GetCommand({ TableName: 'Offers', Key: { id }, ConsistentRead: true }))
+  const res = await client.send(new GetCommand({ TableName: TABLES.Offers, Key: { id }, ConsistentRead: true }))
   return res.Item
 }
 
@@ -40,7 +41,7 @@ export async function ageAppointment(requestId: string, daysAgo = 2): Promise<st
   const date = athensDatePlus(-daysAgo)
   await client.send(
     new UpdateCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: requestId },
       UpdateExpression: 'SET appointmentDate = :date, appointmentTime = :time',
       ExpressionAttributeValues: { ':date': date, ':time': '09:00' },
@@ -51,7 +52,7 @@ export async function ageAppointment(requestId: string, daysAgo = 2): Promise<st
   // leave it disagreeing and the fixture stops resembling any real state.
   const offers = await client.send(
     new QueryCommand({
-      TableName: 'Offers',
+      TableName: TABLES.Offers,
       IndexName: 'ServiceRequestOffersIndex',
       KeyConditionExpression: 'serviceRequestId = :id',
       ExpressionAttributeValues: { ':id': requestId },
@@ -61,7 +62,7 @@ export async function ageAppointment(requestId: string, daysAgo = 2): Promise<st
     if (offer.status !== 'accepted') continue
     await client.send(
       new UpdateCommand({
-        TableName: 'Offers',
+        TableName: TABLES.Offers,
         Key: { id: offer.id },
         UpdateExpression: 'SET appointmentDate = :date, appointmentTime = :time',
         ExpressionAttributeValues: { ':date': date, ':time': '09:00' },
@@ -89,7 +90,7 @@ export async function insertCompetingOffer(
   const now = new Date().toISOString()
   await client.send(
     new PutCommand({
-      TableName: 'Garages',
+      TableName: TABLES.Garages,
       Item: {
         id: garageId,
         email: `${garageId}@test.com`,
@@ -103,7 +104,7 @@ export async function insertCompetingOffer(
   )
   await client.send(
     new PutCommand({
-      TableName: 'Offers',
+      TableName: TABLES.Offers,
       Item: {
         id,
         offerNumber: `E2E_${id}`,
@@ -134,7 +135,7 @@ export async function insertCompetingOffer(
 export async function unfreezeCommissionRate(requestId: string): Promise<void> {
   await client.send(
     new UpdateCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: requestId },
       UpdateExpression: 'REMOVE commissionPercent',
     })
@@ -144,7 +145,7 @@ export async function unfreezeCommissionRate(requestId: string): Promise<void> {
 export async function makeLegacyCompletion(requestId: string): Promise<void> {
   await client.send(
     new UpdateCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: requestId },
       UpdateExpression: 'REMOVE finalAmounts, completionOutcome',
     })
@@ -152,7 +153,7 @@ export async function makeLegacyCompletion(requestId: string): Promise<void> {
 }
 
 export async function getGarage(id: string): Promise<Record<string, unknown> | undefined> {
-  const res = await client.send(new GetCommand({ TableName: 'Garages', Key: { id } }))
+  const res = await client.send(new GetCommand({ TableName: TABLES.Garages, Key: { id } }))
   return res.Item
 }
 
@@ -163,7 +164,7 @@ export async function getGarage(id: string): Promise<Record<string, unknown> | u
 export async function makeUnpricedCompletion(requestId: string): Promise<void> {
   await client.send(
     new UpdateCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: requestId },
       UpdateExpression: 'SET appointmentPrice = :zero REMOVE finalAmounts, completionOutcome',
       ExpressionAttributeValues: { ':zero': 0 },
@@ -173,10 +174,10 @@ export async function makeUnpricedCompletion(requestId: string): Promise<void> {
 
 /** Deletes a row a test itself created — the stand-in for a write that fails half-way. */
 export async function deleteOffer(id: string): Promise<void> {
-  await client.send(new DeleteCommand({ TableName: 'Offers', Key: { id } }))
+  await client.send(new DeleteCommand({ TableName: TABLES.Offers, Key: { id } }))
 }
 
 /** Puts back a row `deleteOffer` removed. */
 export async function putOffer(item: Record<string, unknown>): Promise<void> {
-  await client.send(new PutCommand({ TableName: 'Offers', Item: item }))
+  await client.send(new PutCommand({ TableName: TABLES.Offers, Item: item }))
 }

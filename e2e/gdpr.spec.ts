@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import { registerClient, loginViaAPI } from './helpers'
 import { PASSWORD, acceptOffer, ageAppointment, completeJob, cookie, loginAdmin, makeOffer, newClient, newGarage, newRequest, postMessage, setClientName } from './E-helpers'
 import { freshClient, getRow, mechanicalRequest, setChatMessageFields, setLicensePhotoKey, setRequestFields } from './b-helpers'
+import { TABLES } from '../src/lib/tables'
 
 const CLIENT_EMAIL = `e2e-gdpr-${Date.now()}@test.com`
 const CLIENT_PASSWORD = 'TestPass123'
@@ -123,7 +124,7 @@ test.describe('Account deletion anonymizes, it does not delete', () => {
     })
 
     // The account row survives with nothing personal on it.
-    const account = await getRow('Clients', sr.clientId)
+    const account = await getRow(TABLES.Clients, sr.clientId)
     expect(account?.anonymizedAt).toBeTruthy()
     expect(account?.isActive).toBe(false)
     for (const field of ['email', 'passwordHash', 'firstName', 'lastName', 'phoneNumber', 'address']) {
@@ -131,24 +132,24 @@ test.describe('Account deletion anonymizes, it does not delete', () => {
     }
 
     // The request is history: closed, without its free text or photos.
-    const job = await getRow('ServiceRequests', sr.serviceRequestId)
+    const job = await getRow(TABLES.ServiceRequests, sr.serviceRequestId)
     expect(job?.status).toBe('cancelled')
     expect(job?.category).toBe('symplektis')
     expect(job).not.toHaveProperty('description')
     expect(job).not.toHaveProperty('photoUrls')
 
     // The car as make and model only.
-    const car = await getRow('Vehicles', sr.vehicleId)
+    const car = await getRow(TABLES.Vehicles, sr.vehicleId)
     expect(car?.brand).toBe(mechanicalRequest().brand)
     for (const field of ['vinNumber', 'licensePlate', 'engineNumber', 'licensePhotoUrl', 'color']) {
       expect(car, field).not.toHaveProperty(field)
     }
 
     // Their side of the chat is gone; the garage's is untouched.
-    const theirs = await getRow('ChatMessages', clientMessageId)
+    const theirs = await getRow(TABLES.ChatMessages, clientMessageId)
     expect(theirs).toMatchObject({ message: 'Το μήνυμα διαγράφηκε', senderName: 'Πελάτης' })
     expect(theirs).not.toHaveProperty('attachments')
-    expect((await getRow('ChatMessages', garageMessageId))?.message).toBe('Καλημέρα, στείλτε μου φωτογραφία')
+    expect((await getRow(TABLES.ChatMessages, garageMessageId))?.message).toBe('Καλημέρα, στείλτε μου φωτογραφία')
 
     // Nothing logs in as it any more, and the old cookie is dead.
     expect((await loginViaAPI(request, email, password, 'client')).data.success).toBeFalsy()
@@ -171,15 +172,15 @@ test.describe('Account deletion anonymizes, it does not delete', () => {
     expect((await early.json()).code).toBe('UPCOMING_APPOINTMENT')
     const garageEarly = await request.post('/api/account/delete/', { headers: cookie(garage.token), data: { password: PASSWORD } })
     expect(garageEarly.status()).toBe(409)
-    expect((await getRow('Clients', client.clientId))?.email).toBe(client.email)
+    expect((await getRow(TABLES.Clients, client.clientId))?.email).toBe(client.email)
 
     // The appointment has passed: the client may go, the job is still the garage's to declare.
     await ageAppointment(requestId, offerId, 2)
     const later = await request.post('/api/account/delete/', { headers: cookie(client.token), data: { password: PASSWORD } })
     expect(later.status(), await later.text()).toBe(200)
-    expect((await getRow('ServiceRequests', requestId))?.status).toBe('appointment')
+    expect((await getRow(TABLES.ServiceRequests, requestId))?.status).toBe('appointment')
     await completeJob(request, garage, requestId)
-    const done = await getRow('ServiceRequests', requestId)
+    const done = await getRow(TABLES.ServiceRequests, requestId)
     expect(done?.status).toBe('completed')
     expect(done?.finalAmounts).toBeTruthy()
   })
@@ -194,7 +195,7 @@ test.describe('Account deletion anonymizes, it does not delete', () => {
     expect(resp.status(), await resp.text()).toBe(200)
     expect((await resp.json()).summary.offersWithdrawn).toBe(1)
 
-    const row = await getRow('Garages', garage.id)
+    const row = await getRow(TABLES.Garages, garage.id)
     expect(row).toMatchObject({ isActive: false })
     expect(row?.anonymizedAt).toBeTruthy()
     expect(row?.companyName).toBeTruthy()
@@ -202,14 +203,14 @@ test.describe('Account deletion anonymizes, it does not delete', () => {
     for (const field of ['email', 'passwordHash', 'mobile', 'contactFirstName', 'contactLastName']) {
       expect(row, field).not.toHaveProperty(field)
     }
-    expect((await getRow('Offers', offerId))?.status).toBe('expired')
+    expect((await getRow(TABLES.Offers, offerId))?.status).toBe('expired')
 
     expect((await loginViaAPI(request, garage.email, PASSWORD, 'garage')).data.success).toBeFalsy()
     // An admin cannot reopen it.
     const admin = await loginAdmin(request)
     const reopen = await request.post(`/api/admin/users/garages/${garage.id}/activate/`, { headers: { Cookie: admin } })
     expect(reopen.status()).toBe(404)
-    expect((await getRow('Garages', garage.id))?.isActive).toBe(false)
+    expect((await getRow(TABLES.Garages, garage.id))?.isActive).toBe(false)
   })
 })
 

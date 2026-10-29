@@ -5,8 +5,7 @@ import { ensureEventLogsTable } from '@/utils/ensureEventTables'
 import { EventName } from '@/types/events'
 import { withMetrics } from '@/utils/withMetrics'
 import { createTtlCache } from '@/utils/ttlCache'
-
-const EVENT_LOGS_TABLE = process.env.EVENT_LOGS_TABLE || 'EventLogs'
+import { TABLES } from '@/lib/tables'
 
 // Ordered list of steps in the client journey. Each step is a single
 // EventName fired once we believe the client has reached that stage.
@@ -64,7 +63,7 @@ async function countUniqueClientsForEvent(
   // loops on misconfigured indexes.
   for (let i = 0; i < 50; i++) {
     const res = await dynamoDB.send(new QueryCommand({
-      TableName: EVENT_LOGS_TABLE,
+      TableName: TABLES.EventLogs,
       IndexName: 'EventNameIndex',
       KeyConditionExpression: 'eventName = :name AND #ts BETWEEN :from AND :to',
       ExpressionAttributeNames: { '#ts': 'timestamp' },

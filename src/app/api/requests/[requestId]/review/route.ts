@@ -21,6 +21,7 @@ import {
   type Review,
   type ReviewDirection,
 } from '@/types/reviews'
+import { TABLES } from '@/lib/tables'
 
 /**
  * Both sides' reviews of one job.
@@ -52,7 +53,7 @@ async function resolveParty(
   // party check below, and one deactivated since keeps the right to review the
   // jobs it completed — the same reasoning as the completion route.
   const res = await dynamoDB.send(
-    new GetCommand({ TableName: 'ServiceRequests', Key: { id: requestId } })
+    new GetCommand({ TableName: TABLES.ServiceRequests, Key: { id: requestId } })
   )
   const serviceRequest = res.Item
   if (!serviceRequest) {

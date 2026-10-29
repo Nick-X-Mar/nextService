@@ -4,6 +4,7 @@ import { ScanCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { ensureEmailLogsTable } from '@/utils/ensureEventTables'
 import { ServiceRequestStatus } from '@/types/statuses'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 async function _GET() {
   try {
@@ -22,12 +23,12 @@ async function _GET() {
       ...statusResults
     ] = await Promise.all([
       // Total clients
-      dynamoDB.send(new ScanCommand({ TableName: 'Clients', Select: 'COUNT' })),
+      dynamoDB.send(new ScanCommand({ TableName: TABLES.Clients, Select: 'COUNT' })),
       // Total garages (with active/pending breakdown)
-      dynamoDB.send(new ScanCommand({ TableName: 'Garages', Select: 'ALL_ATTRIBUTES' })),
+      dynamoDB.send(new ScanCommand({ TableName: TABLES.Garages, Select: 'ALL_ATTRIBUTES' })),
       // Emails sent last 24h
       dynamoDB.send(new QueryCommand({
-        TableName: 'EmailLogs',
+        TableName: TABLES.EmailLogs,
         IndexName: 'StatusIndex',
         KeyConditionExpression: '#status = :status AND sentAt >= :since',
         ExpressionAttributeNames: { '#status': 'status' },
@@ -36,7 +37,7 @@ async function _GET() {
       })),
       // Emails failed last 24h
       dynamoDB.send(new QueryCommand({
-        TableName: 'EmailLogs',
+        TableName: TABLES.EmailLogs,
         IndexName: 'StatusIndex',
         KeyConditionExpression: '#status = :status AND sentAt >= :since',
         ExpressionAttributeNames: { '#status': 'status' },
@@ -45,7 +46,7 @@ async function _GET() {
       })),
       // Custom vehicles (brand or model "other")
       dynamoDB.send(new ScanCommand({
-        TableName: 'Vehicles',
+        TableName: TABLES.Vehicles,
         FilterExpression: 'isBrandOther = :true OR isModelOther = :true',
         ExpressionAttributeValues: { ':true': true },
         Select: 'COUNT'
@@ -53,7 +54,7 @@ async function _GET() {
       // Service requests by status
       ...Object.values(ServiceRequestStatus).map((status) =>
         dynamoDB.send(new QueryCommand({
-          TableName: 'ServiceRequests',
+          TableName: TABLES.ServiceRequests,
           IndexName: 'StatusIndex',
           KeyConditionExpression: '#status = :status',
           ExpressionAttributeNames: { '#status': 'status' },

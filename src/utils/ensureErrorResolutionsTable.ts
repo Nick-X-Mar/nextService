@@ -13,9 +13,7 @@ import {
 } from '@aws-sdk/client-dynamodb'
 import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
-
-export const ERROR_RESOLUTIONS_TABLE =
-  process.env.ERROR_RESOLUTIONS_TABLE || 'ErrorResolutions'
+import { TABLES } from '@/lib/tables'
 
 const isLocal =
   process.env.NODE_ENV === 'development' && !!process.env.DYNAMODB_ENDPOINT
@@ -59,7 +57,7 @@ function getRawClient(): DynamoDBClient {
 }
 
 const errorResolutionsSpec: CreateTableCommandInput = {
-  TableName: ERROR_RESOLUTIONS_TABLE,
+  TableName: TABLES.ErrorResolutions,
   AttributeDefinitions: [
     { AttributeName: 'fingerprint', AttributeType: 'S' },
     { AttributeName: 'status', AttributeType: 'S' },

@@ -14,9 +14,7 @@ import {
 } from '@aws-sdk/client-dynamodb'
 import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
-
-const PAYMENTS_TABLE = process.env.PAYMENTS_TABLE || 'Payments'
-const WALLET_TRANSACTIONS_TABLE = process.env.WALLET_TRANSACTIONS_TABLE || 'WalletTransactions'
+import { TABLES } from '@/lib/tables'
 
 const isLocal =
   process.env.NODE_ENV === 'development' && !!process.env.DYNAMODB_ENDPOINT
@@ -60,7 +58,7 @@ function getRawClient(): DynamoDBClient {
 }
 
 const paymentsSpec: CreateTableCommandInput = {
-  TableName: PAYMENTS_TABLE,
+  TableName: TABLES.Payments,
   AttributeDefinitions: [
     { AttributeName: 'paymentId', AttributeType: 'S' },
     { AttributeName: 'clientId', AttributeType: 'S' },
@@ -98,7 +96,7 @@ const paymentsSpec: CreateTableCommandInput = {
 }
 
 const walletTransactionsSpec: CreateTableCommandInput = {
-  TableName: WALLET_TRANSACTIONS_TABLE,
+  TableName: TABLES.WalletTransactions,
   AttributeDefinitions: [
     { AttributeName: 'transactionId', AttributeType: 'S' },
     { AttributeName: 'clientId', AttributeType: 'S' },

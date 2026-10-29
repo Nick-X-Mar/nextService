@@ -1,14 +1,16 @@
 import { NextResponse } from 'next/server'
 import { ScanCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ensureHotDealsTable, HOT_DEALS_TABLE_NAME } from '@/utils/ensureHotDealsTable'
+import { ensureHotDealsTable } from '@/utils/ensureHotDealsTable'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 // One-shot maintenance route: restores the original English slugs Google already
 // indexed, keyed by title. Safe to run multiple times — a deal whose slug already
 // matches is skipped.
 // Protected by admin middleware (/api/admin/* requires admin cookie).
 const TITLE_TO_SLUG: Record<string, string> = {
+  'Δίσκος Πλατό': 'set_disk_all_cars',
   'Συμπλέκτης': 'set_disk_all_cars',
   'Ιμάντας Χρονισμού με Αντλία Νερού': 'set-imantas-xronismou',
   'Μεγάλο Service Αυτοκινήτου': 'service-auto',
@@ -27,7 +29,7 @@ async function _POST() {
     await ensureHotDealsTable()
 
     const result = await dynamoDB.send(
-      new ScanCommand({ TableName: HOT_DEALS_TABLE_NAME })
+      new ScanCommand({ TableName: TABLES.HotDeals })
     )
     const deals = (result.Items ?? []) as DealItem[]
 
@@ -58,7 +60,7 @@ async function _POST() {
 
       await dynamoDB.send(
         new UpdateCommand({
-          TableName: HOT_DEALS_TABLE_NAME,
+          TableName: TABLES.HotDeals,
           Key: { dealId: deal.dealId },
           UpdateExpression: 'SET slug = :slug, updatedAt = :now',
           ExpressionAttributeValues: {

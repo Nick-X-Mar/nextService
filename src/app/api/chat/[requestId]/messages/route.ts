@@ -16,6 +16,7 @@ import {
   garageMayReadLegacyMessages,
 } from '@/utils/chatService'
 import { presignChatAttachments } from '@/utils/chatAttachments'
+import { TABLES } from '@/lib/tables'
 
 const checkMessageRate = createRateLimiter('chat-message', 60, 3600000)
 
@@ -39,7 +40,7 @@ async function _GET(
 
     // Verify the user has access to this request
     const requestResult = await dynamoDB.send(new GetCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: requestId }
     }))
     if (!requestResult.Item) {
@@ -113,7 +114,7 @@ async function _GET(
 
       do {
         const page = await dynamoDB.send(new QueryCommand({
-          TableName: 'ChatMessages',
+          TableName: TABLES.ChatMessages,
           IndexName: 'RequestMessagesIndex',
           KeyConditionExpression: 'requestId = :requestId',
           ExpressionAttributeValues: expressionValues,
@@ -238,7 +239,7 @@ async function _POST(
     }
 
     const requestResult = await dynamoDB.send(new GetCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: requestId }
     }))
     if (!requestResult.Item) {

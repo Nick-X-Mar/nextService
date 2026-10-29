@@ -7,6 +7,7 @@ import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { withMetrics } from '@/utils/withMetrics'
 import { invalidateUnread } from '@/utils/unreadCache'
+import { TABLES } from '@/lib/tables'
 
 async function _POST(request: NextRequest) {
   try {
@@ -27,7 +28,7 @@ async function _POST(request: NextRequest) {
     const event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
 
     await ensurePaymentsTable()
-    const paymentsTable = process.env.PAYMENTS_TABLE || 'Payments'
+    const paymentsTable = TABLES.Payments
     const now = new Date().toISOString()
 
     switch (event.type) {
@@ -49,7 +50,7 @@ async function _POST(request: NextRequest) {
         if (pi.metadata?.requestId) {
           const updated = await dynamoDB.send(
             new UpdateCommand({
-              TableName: 'ServiceRequests',
+              TableName: TABLES.ServiceRequests,
               Key: { id: pi.metadata.requestId },
               UpdateExpression: 'SET depositPaidAt = :now, updatedAt = :now',
               ExpressionAttributeValues: { ':now': now },

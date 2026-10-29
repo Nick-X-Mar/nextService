@@ -96,7 +96,9 @@ Import from the barrel: `import { Button, Input, Modal, Spinner, Switch, Checkbo
 
 `Badge` is the shadcn-style one at `@/components/ui/badge` (`variant` · `className`) — there is no barrel `Badge`. There is no shared `Card` component either; cards are composed inline from `styles.card` and the surface tokens.
 
-Toasts are global — `const { showSuccess, showError, showInfo } = useToast()` from `@/hooks/useToast`. Types: success \| error \| info \| warning.
+Toasts are global — `const toast = useToast()` from `@/hooks/useToast`, then `toast.success(title, message?)`, `toast.error(…)`, `toast.info(…)`, `toast.warning(…)` or `toast.showToast({ type, title, message, duration })`. They render through a portal from `ToastProvider` (root layout), so a modal never clips them.
+
+Never call `window.confirm()` / `alert()`. Ask with `const confirm = useConfirm()` from `@/hooks/useConfirm`: `if (!(await confirm({ title, message, confirmLabel, danger: true }))) return` — it renders the shared `Modal`.
 
 Do **not** create a new Button/Modal/Input/Spinner variant file. Extend the existing component's variant map instead, and only when a genuinely new case appears.
 

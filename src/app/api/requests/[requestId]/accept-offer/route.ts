@@ -17,6 +17,7 @@ import { broadcastRequestUpdate } from '@/utils/requestBroadcast'
 import { invalidateUnread } from '@/utils/unreadCache'
 import { rejectPendingOffersOn } from '@/app/api/offers/offerWrites'
 import { garageCommissionPercent } from '@/lib/commission-basis'
+import { TABLES } from '@/lib/tables'
 
 const checkAcceptRate = createRateLimiter('accept-offer', 5, 3600000)
 
@@ -174,7 +175,7 @@ async function _PATCH(
     }
 
     const fetchRes = await dynamoDB.send(
-      new GetCommand({ TableName: 'ServiceRequests', Key: { id: requestId } })
+      new GetCommand({ TableName: TABLES.ServiceRequests, Key: { id: requestId } })
     )
     const serviceRequest = fetchRes.Item
 
@@ -207,7 +208,7 @@ async function _PATCH(
     // The winning offer decides which garage keeps access to this job, so it is
     // read before anything is written rather than inferred afterwards.
     const acceptedOfferRes = await dynamoDB.send(
-      new GetCommand({ TableName: 'Offers', Key: { id: offerId } })
+      new GetCommand({ TableName: TABLES.Offers, Key: { id: offerId } })
     )
     const acceptedOffer = acceptedOfferRes.Item
     if (!acceptedOffer || acceptedOffer.serviceRequestId !== requestId) {
@@ -326,7 +327,7 @@ async function _PATCH(
     // moment is frozen on the job. A rate changed later applies to the next
     // booking, never to one already made.
     const garageRate = (await dynamoDB.send(new GetCommand({
-      TableName: 'Garages',
+      TableName: TABLES.Garages,
       Key: { id: acceptedGarageId },
       ProjectionExpression: 'commissionPercent',
     }))).Item
@@ -377,7 +378,7 @@ async function _PATCH(
         TransactItems: [
           {
             Update: {
-              TableName: 'ServiceRequests',
+              TableName: TABLES.ServiceRequests,
               Key: { id: requestId },
               UpdateExpression: `SET ${requestSetParts.join(', ')}`,
               ConditionExpression: '#status = :pending AND attribute_not_exists(acceptedOfferId)',
@@ -387,7 +388,7 @@ async function _PATCH(
           },
           {
             Update: {
-              TableName: 'Offers',
+              TableName: TABLES.Offers,
               Key: { id: offerId },
               UpdateExpression:
                 'SET #status = :accepted, appointmentDate = :appointmentDate, ' +
@@ -413,7 +414,7 @@ async function _PATCH(
             // A deactivated garage keeps its existing bookings but takes no
             // new ones — its pending offers are still in clients' lists.
             ConditionCheck: {
-              TableName: 'Garages',
+              TableName: TABLES.Garages,
               Key: { id: acceptedGarageId },
               ConditionExpression: 'isActive = :active',
               ExpressionAttributeValues: { ':active': true }
@@ -428,7 +429,7 @@ async function _PATCH(
         if (failed(0)) {
           // The request moved on — re-read it so the message says what happened.
           const current = await dynamoDB.send(
-            new GetCommand({ TableName: 'ServiceRequests', Key: { id: requestId }, ConsistentRead: true })
+            new GetCommand({ TableName: TABLES.ServiceRequests, Key: { id: requestId }, ConsistentRead: true })
           )
           if (current.Item?.status !== ServiceRequestStatus.PENDING || current.Item?.acceptedOfferId) {
             return NextResponse.json(
@@ -438,7 +439,7 @@ async function _PATCH(
           }
         } else if (failed(1)) {
           const current = await dynamoDB.send(
-            new GetCommand({ TableName: 'Offers', Key: { id: offerId }, ConsistentRead: true })
+            new GetCommand({ TableName: TABLES.Offers, Key: { id: offerId }, ConsistentRead: true })
           )
           const currentAmount = Number(current.Item?.offerAmount)
           if (
@@ -603,9 +604,9 @@ async function notifyAcceptanceParticipants(args: {
 }): Promise<void> {
   try {
     const [clientRes, garageRes] = await Promise.all([
-      dynamoDB.send(new GetCommand({ TableName: 'Clients', Key: { id: args.clientId } })),
+      dynamoDB.send(new GetCommand({ TableName: TABLES.Clients, Key: { id: args.clientId } })),
       args.garageId
-        ? dynamoDB.send(new GetCommand({ TableName: 'Garages', Key: { id: args.garageId } }))
+        ? dynamoDB.send(new GetCommand({ TableName: TABLES.Garages, Key: { id: args.garageId } }))
         : Promise.resolve({ Item: undefined as Record<string, unknown> | undefined })
     ])
 

@@ -17,6 +17,7 @@ import {
   uniqueMarker,
   vehiclesWithModel,
 } from './b-helpers'
+import { TABLES } from '../src/lib/tables'
 
 const CLIENT_EMAIL = `e2e-sr-${Date.now()}@test.com`
 const CLIENT_PASSWORD = 'TestPass123'
@@ -203,7 +204,7 @@ test.describe('Request creation stores the right thing', () => {
       data: mechanicalRequest({ isTurbo: true }),
     })).json()
     expect(first.success).toBe(true)
-    expect((await getRow('Vehicles', first.vehicleId))?.isTurbo).toBe(true)
+    expect((await getRow(TABLES.Vehicles, first.vehicleId))?.isTurbo).toBe(true)
 
     const detail = await (await api.get(`/api/requests/${first.serviceRequestId}/`)).json()
     expect(detail.request.vehicle.isTurbo).toBe(true)
@@ -231,7 +232,7 @@ test.describe('Request creation stores the right thing', () => {
       }),
     })
     const data = await resp.json()
-    const row = await getRow('ServiceRequests', data.serviceRequestId)
+    const row = await getRow(TABLES.ServiceRequests, data.serviceRequestId)
     expect(row?.photos).toEqual([])
     expect(row?.photoUrls).toEqual([])
 
@@ -253,7 +254,7 @@ test.describe('Request creation stores the right thing', () => {
     })).json()
     expect(mine.success).toBe(true)
     expect(mine.vehicleId).not.toBe(theirs.vehicleId)
-    expect((await getRow('Vehicles', mine.vehicleId))?.clientId).toBe(other.clientId)
+    expect((await getRow(TABLES.Vehicles, mine.vehicleId))?.clientId).toBe(other.clientId)
   })
 
   test('Editing a saved car keeps its άδεια photo on the new row', async ({ playwright }) => {
@@ -266,7 +267,7 @@ test.describe('Request creation stores the right thing', () => {
       data: mechanicalRequest({ originalVehicleId: first.vehicleId, vinNumber: 'VF3EDITED00000001' }),
     })).json()
     expect(edited.vehicleId).not.toBe(first.vehicleId)
-    const copy = await getRow('Vehicles', edited.vehicleId)
+    const copy = await getRow(TABLES.Vehicles, edited.vehicleId)
     expect(copy?.licensePhotoUrl).toBe(key)
     expect(copy?.vinNumber).toBe('VF3EDITED00000001')
   })
@@ -288,7 +289,7 @@ test.describe('Request creation stores the right thing', () => {
       data: mechanicalRequest({ model: '307', originalVehicleId: first.vehicleId }),
     })).json()
     expect(other.vehicleId).not.toBe(first.vehicleId)
-    const row = await getRow('Vehicles', other.vehicleId)
+    const row = await getRow(TABLES.Vehicles, other.vehicleId)
     expect(row?.model).toBe('307')
     for (const field of ['licensePlate', 'color', 'nickname', 'licensePhotoUrl', 'vinNumber', 'engineNumber']) {
       expect(row?.[field], field).toBeUndefined()
@@ -298,7 +299,7 @@ test.describe('Request creation stores the right thing', () => {
     const edited = await (await api.post('/api/service-request/', {
       data: mechanicalRequest({ modelYear: '2007', originalVehicleId: first.vehicleId }),
     })).json()
-    const copy = await getRow('Vehicles', edited.vehicleId)
+    const copy = await getRow(TABLES.Vehicles, edited.vehicleId)
     expect(copy?.licensePlate).toBe('ΙΚΧ-1234')
     expect(copy?.nickname).toBe('Το κόκκινο')
     expect(copy?.licensePhotoUrl).toBe(`Requests/${first.vehicleId}/license/e2e.jpg`)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand, QueryCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 async function _GET(request: NextRequest) {
   try {
@@ -28,7 +29,7 @@ async function _GET(request: NextRequest) {
       }
 
       result = await dynamoDB.send(new QueryCommand({
-        TableName: 'ServiceRequests',
+        TableName: TABLES.ServiceRequests,
         IndexName: 'StatusIndex',
         KeyConditionExpression: keyCondition,
         ExpressionAttributeNames: { '#status': 'status' },
@@ -39,7 +40,7 @@ async function _GET(request: NextRequest) {
       }))
     } else {
       result = await dynamoDB.send(new ScanCommand({
-        TableName: 'ServiceRequests',
+        TableName: TABLES.ServiceRequests,
         ...(fromISO && toISO ? {
           FilterExpression: 'createdAt BETWEEN :from AND :to',
           ExpressionAttributeValues: { ':from': fromISO, ':to': toISO }
@@ -58,14 +59,14 @@ async function _GET(request: NextRequest) {
     if (clientIds.length > 0) {
       const batchResult = await dynamoDB.send(new BatchGetCommand({
         RequestItems: {
-          Clients: {
+          [TABLES.Clients]: {
             Keys: clientIds.slice(0, 100).map((id) => ({ id })),
             ProjectionExpression: 'id, firstName, lastName, email'
           }
         }
       }))
 
-      for (const client of batchResult.Responses?.Clients || []) {
+      for (const client of batchResult.Responses?.[TABLES.Clients] || []) {
         clientMap[client.id] = [client.firstName, client.lastName].filter(Boolean).join(' ') || client.email
       }
     }
@@ -74,7 +75,7 @@ async function _GET(request: NextRequest) {
     const offerCounts = await Promise.all(
       requests.slice(0, 50).map((r) =>
         dynamoDB.send(new QueryCommand({
-          TableName: 'Offers',
+          TableName: TABLES.Offers,
           IndexName: 'ServiceRequestOffersIndex',
           KeyConditionExpression: 'serviceRequestId = :reqId',
           ExpressionAttributeValues: { ':reqId': r.id },

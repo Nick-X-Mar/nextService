@@ -16,8 +16,7 @@ import {
 } from '@aws-sdk/client-dynamodb'
 import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
-
-const SITE_CONTENT_TABLE = process.env.SITE_CONTENT_TABLE || 'SiteContent'
+import { TABLES } from '@/lib/tables'
 
 const isLocal =
   process.env.NODE_ENV === 'development' && !!process.env.DYNAMODB_ENDPOINT
@@ -59,7 +58,7 @@ function getRawClient(): DynamoDBClient {
 }
 
 const spec: CreateTableCommandInput = {
-  TableName: SITE_CONTENT_TABLE,
+  TableName: TABLES.SiteContent,
   AttributeDefinitions: [
     { AttributeName: 'pageKey', AttributeType: 'S' }
   ],
@@ -88,7 +87,7 @@ let ready: Promise<void> | null = null
 export function ensureSiteContentTable(): Promise<void> {
   if (!ready) ready = (async () => {
     const client = getRawClient()
-    const name = SITE_CONTENT_TABLE
+    const name = TABLES.SiteContent
 
     try {
       const desc = await client.send(new DescribeTableCommand({ TableName: name }))
@@ -113,4 +112,3 @@ export function ensureSiteContentTable(): Promise<void> {
   return ready
 }
 
-export const SITE_CONTENT_TABLE_NAME = SITE_CONTENT_TABLE

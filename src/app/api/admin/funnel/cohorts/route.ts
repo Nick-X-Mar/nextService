@@ -5,8 +5,7 @@ import { ensureEventLogsTable } from '@/utils/ensureEventTables'
 import { EventName } from '@/types/events'
 import { withMetrics } from '@/utils/withMetrics'
 import { createTtlCache } from '@/utils/ttlCache'
-
-const EVENT_LOGS_TABLE = process.env.EVENT_LOGS_TABLE || 'EventLogs'
+import { TABLES } from '@/lib/tables'
 
 interface ClientRegisteredEvent {
   clientId: string
@@ -32,7 +31,7 @@ async function fetchClientRegistrationsSince(sinceIso: string): Promise<ClientRe
 
   for (let i = 0; i < 50; i++) {
     const res = await dynamoDB.send(new QueryCommand({
-      TableName: EVENT_LOGS_TABLE,
+      TableName: TABLES.EventLogs,
       IndexName: 'EventNameIndex',
       KeyConditionExpression: 'eventName = :name AND #ts >= :since',
       ExpressionAttributeNames: { '#ts': 'timestamp' },
@@ -64,7 +63,7 @@ async function countClientEvents(clientId: string, eventName: string): Promise<n
 
   for (let i = 0; i < 5; i++) {
     const res = await dynamoDB.send(new QueryCommand({
-      TableName: EVENT_LOGS_TABLE,
+      TableName: TABLES.EventLogs,
       IndexName: 'ClientTimelineIndex',
       KeyConditionExpression: 'clientId = :cid',
       FilterExpression: 'eventName = :name',

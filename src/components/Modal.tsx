@@ -64,7 +64,12 @@ export default function Modal({
       className="fixed inset-0 flex items-center justify-center p-4 z-50 bg-on-surface/20 backdrop-blur-sm"
       onClick={handleBackdropClick}
     >
-      <div className={`bg-surface-container-lowest rounded-2xl shadow-2xl ${sizeClasses[size]} w-full max-h-[90vh] overflow-y-auto border border-outline-variant/10`}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className={`bg-surface-container-lowest rounded-2xl shadow-2xl ${sizeClasses[size]} w-full max-h-[90vh] overflow-y-auto border border-outline-variant/10`}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-outline-variant/10">
           <h2 className="text-xl font-bold text-on-surface tracking-tight">

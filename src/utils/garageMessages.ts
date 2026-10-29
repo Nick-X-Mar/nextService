@@ -4,6 +4,7 @@ import { collectAll } from '@/utils/pagination'
 import { batchGetById } from '@/utils/batchGetById'
 import { threadWriteState } from '@/utils/chatService'
 import { ServiceRequestStatus, OfferStatus } from '@/types/statuses'
+import { TABLES } from '@/lib/tables'
 
 export interface GarageChatMessage {
   requestId: string
@@ -31,7 +32,7 @@ export async function fetchGarageMessages(garageId: string): Promise<GarageChatM
   try {
     return await collectAll<GarageChatMessage>(
       (startKey) => dynamoDB.send(new QueryCommand({
-        TableName: 'ChatMessages',
+        TableName: TABLES.ChatMessages,
         IndexName: 'GarageMessagesIndex',
         KeyConditionExpression: 'garageId = :garageId',
         ExpressionAttributeValues: { ':garageId': garageId },
@@ -45,7 +46,7 @@ export async function fetchGarageMessages(garageId: string): Promise<GarageChatM
     if (name !== 'ValidationException' && name !== 'ResourceNotFoundException') throw error
     return collectAll<GarageChatMessage>(
       (startKey) => dynamoDB.send(new ScanCommand({
-        TableName: 'ChatMessages',
+        TableName: TABLES.ChatMessages,
         FilterExpression: 'garageId = :garageId',
         ExpressionAttributeValues: { ':garageId': garageId },
         ExclusiveStartKey: startKey,
@@ -134,7 +135,7 @@ export async function loadGarageWorkspace(
     fetchGarageMessages(garageId),
     collectAll<Record<string, unknown>>(
       (startKey) => dynamoDB.send(new QueryCommand({
-        TableName: 'Offers',
+        TableName: TABLES.Offers,
         IndexName: 'GarageOffersIndex',
         KeyConditionExpression: 'garageId = :garageId',
         ExpressionAttributeValues: { ':garageId': garageId },
@@ -150,7 +151,7 @@ export async function loadGarageWorkspace(
         ...messages.map((m) => m.requestId),
         ...offers.map((o) => o.serviceRequestId as string),
       ]
-  const requests = await batchGetById('ServiceRequests', requestIds, {
+  const requests = await batchGetById(TABLES.ServiceRequests, requestIds, {
     projection: REQUEST_PROJECTION,
     names: { '#s': 'status' },
   })
@@ -166,7 +167,7 @@ export async function hydrateVehicles(ws: GarageWorkspace, requestIds: string[])
     .map((id) => ws.requests.get(id)?.vehicleId as string | undefined)
     .filter((id): id is string => !!id && !ws.vehicles.has(id))
   if (missing.length === 0) return
-  const found = await batchGetById('Vehicles', missing, { projection: VEHICLE_PROJECTION })
+  const found = await batchGetById(TABLES.Vehicles, missing, { projection: VEHICLE_PROJECTION })
   for (const [id, vehicle] of found) ws.vehicles.set(id, vehicle)
 }
 

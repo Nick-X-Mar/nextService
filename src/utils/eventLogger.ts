@@ -3,8 +3,7 @@ import { PutCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ensureEventLogsTable } from '@/utils/ensureEventTables'
 import type { EventLogRecord, LogEventInput } from '@/types/events'
-
-const EVENT_LOGS_TABLE = process.env.EVENT_LOGS_TABLE || 'EventLogs'
+import { TABLES } from '@/lib/tables'
 
 // Retention: 365 days. After this, DynamoDB TTL deletes the row
 // automatically. Aligned with the data retention policy in the privacy doc.
@@ -49,7 +48,7 @@ export function logEvent(input: LogEventInput): Promise<void> {
 
   return ensureEventLogsTable()
     .then(async () => {
-      await dynamoDB.send(new PutCommand({ TableName: EVENT_LOGS_TABLE, Item: item }))
+      await dynamoDB.send(new PutCommand({ TableName: TABLES.EventLogs, Item: item }))
     })
     .catch((err) => {
       console.error('[eventLogger] Failed to write event:', input.eventName, err)

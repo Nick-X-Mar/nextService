@@ -10,6 +10,8 @@ import 'react-day-picker/dist/style.css'
 import RequestTimeline from './components/RequestTimeline'
 import Spinner from '@/components/Spinner'
 import { isCommissionable } from '@/lib/commission-basis'
+import { useConfirm } from '@/hooks/useConfirm'
+import { useToast } from '@/hooks/useToast'
 
 interface RequestDetail {
   id: string
@@ -81,6 +83,8 @@ const offerStatusStyles: Record<string, string> = {
 }
 
 export default function RequestDetailPage() {
+  const confirm = useConfirm()
+  const toast = useToast()
   const { requestId } = useParams<{ requestId: string }>()
   const router = useRouter()
   const [data, setData] = useState<RequestDetail | null>(null)
@@ -112,7 +116,7 @@ export default function RequestDetailPage() {
   }, [fetchDetail])
 
   async function handleCancel() {
-    if (!confirm('Σίγουρα θέλετε να ακυρώσετε αυτό το request;')) return
+    if (!(await confirm({ title: 'Ακύρωση αιτήματος;', message: 'Σίγουρα θέλετε να ακυρώσετε αυτό το αίτημα;', confirmLabel: 'Ακύρωση αιτήματος', cancelLabel: 'Πίσω', danger: true }))) return
     setCancelling(true)
     try {
       const res = await fetch(`/api/admin/requests/${requestId}/cancel/`, { method: 'PATCH' })
@@ -120,9 +124,9 @@ export default function RequestDetailPage() {
         await fetchDetail()
       } else {
         const err = await res.json()
-        alert(err.error || 'Αποτυχία ακύρωσης')
+        toast.error(err.error || 'Αποτυχία ακύρωσης')
       }
-    } catch { alert('Αποτυχία ακύρωσης') }
+    } catch { toast.error('Αποτυχία ακύρωσης') }
     setCancelling(false)
   }
 
@@ -143,7 +147,7 @@ export default function RequestDetailPage() {
 
   async function handleAssign() {
     if (!assignForm.garageId || !assignForm.price) {
-      alert('Επιλέξτε συνεργείο και τιμή')
+      toast.warning('Επιλέξτε συνεργείο και τιμή')
       return
     }
     setAssigning(true)
@@ -168,9 +172,9 @@ export default function RequestDetailPage() {
         await fetchDetail()
       } else {
         const err = await res.json()
-        alert(err.error || 'Αποτυχία ανάθεσης')
+        toast.error(err.error || 'Αποτυχία ανάθεσης')
       }
-    } catch { alert('Αποτυχία ανάθεσης') }
+    } catch { toast.error('Αποτυχία ανάθεσης') }
     setAssigning(false)
   }
 

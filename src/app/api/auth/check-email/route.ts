@@ -3,6 +3,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 /**
  * Tells the signup form whether an email already has an account, so it can show
@@ -50,7 +51,7 @@ async function _POST(request: NextRequest) {
     // anonymous request would read the entire table.
     const result = await dynamoDB.send(
       new QueryCommand({
-        TableName: userType === 'garage' ? 'Garages' : 'Clients',
+        TableName: userType === 'garage' ? TABLES.Garages : TABLES.Clients,
         IndexName: 'EmailIndex',
         KeyConditionExpression: 'email = :email',
         ExpressionAttributeValues: { ':email': normalizedEmail },

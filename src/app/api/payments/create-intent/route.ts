@@ -9,6 +9,7 @@ import type { PaymentRecord, SavedCard } from '@/types/payments'
 import { requireClient } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 const checkPaymentRate = createRateLimiter('payment-create', 5, 3600000)
 
@@ -45,7 +46,7 @@ async function _POST(request: NextRequest) {
 
     // Fetch client to get/create Stripe customer
     const clientRes = await dynamoDB.send(
-      new GetCommand({ TableName: 'Clients', Key: { id: clientId } })
+      new GetCommand({ TableName: TABLES.Clients, Key: { id: clientId } })
     )
     const client = clientRes.Item
     if (!client) {
@@ -57,7 +58,7 @@ async function _POST(request: NextRequest) {
 
     // Fetch offer to get garageId and the authoritative offerAmount
     const offerRes = await dynamoDB.send(
-      new GetCommand({ TableName: 'Offers', Key: { id: offerId } })
+      new GetCommand({ TableName: TABLES.Offers, Key: { id: offerId } })
     )
     const offer = offerRes.Item
     if (!offer || typeof offer.offerAmount !== 'number') {
@@ -82,7 +83,7 @@ async function _POST(request: NextRequest) {
       // Save stripeCustomerId to client record
       await dynamoDB.send(
         new UpdateCommand({
-          TableName: 'Clients',
+          TableName: TABLES.Clients,
           Key: { id: clientId },
           UpdateExpression: 'SET stripeCustomerId = :scid',
           ExpressionAttributeValues: { ':scid': stripeCustomerId }
@@ -147,7 +148,7 @@ async function _POST(request: NextRequest) {
 
     await dynamoDB.send(
       new PutCommand({
-        TableName: process.env.PAYMENTS_TABLE || 'Payments',
+        TableName: TABLES.Payments,
         Item: paymentRecord
       })
     )

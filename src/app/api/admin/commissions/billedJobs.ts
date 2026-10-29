@@ -10,6 +10,7 @@ import {
   type CommissionRateSource,
   type OutcomeReviewStatus,
 } from '@/lib/commission-basis'
+import { TABLES } from '@/lib/tables'
 
 type Row = Record<string, unknown>
 
@@ -76,7 +77,7 @@ export async function billedJobsForMonth(
       .filter((v): v is string => typeof v === 'string')
   ))
   const offerToGarage = new Map<string, string>()
-  for (const offer of await batchGet('Offers', legacyOfferIds, 'id, garageId')) {
+  for (const offer of await batchGet(TABLES.Offers, legacyOfferIds, 'id, garageId')) {
     if (typeof offer.garageId === 'string') offerToGarage.set(offer.id as string, offer.garageId)
   }
   const garageOf = (r: Row): string | undefined =>
@@ -92,7 +93,7 @@ export async function billedJobsForMonth(
   const garages = new Map<string, Row>()
   const garageIds = Array.from(new Set(owned.map((x) => x.garageId)))
   if (onlyGarageId && !garageIds.includes(onlyGarageId)) garageIds.push(onlyGarageId)
-  for (const g of await batchGet('Garages', garageIds, 'id, companyName, email, commissionPercent, commissionPercentSetAt, commissionPercentSetBy')) {
+  for (const g of await batchGet(TABLES.Garages, garageIds, 'id, companyName, email, commissionPercent, commissionPercentSetAt, commissionPercentSetBy')) {
     garages.set(g.id as string, g)
   }
 
@@ -114,7 +115,7 @@ async function monthRows(status: string, month: string): Promise<Row[]> {
   let lastKey: Record<string, unknown> | undefined
   do {
     const result = await dynamoDB.send(new QueryCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       IndexName: 'StatusIndex',
       KeyConditionExpression: '#status = :status',
       FilterExpression:

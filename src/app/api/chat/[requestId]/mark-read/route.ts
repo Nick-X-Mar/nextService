@@ -4,6 +4,7 @@ import { UpdateCommand, GetCommand } from '@aws-sdk/lib-dynamodb'
 import { withMetrics } from '@/utils/withMetrics'
 import { requireChatParticipant } from '@/utils/chatService'
 import { invalidateUnread } from '@/utils/unreadCache'
+import { TABLES } from '@/lib/tables'
 
 async function _POST(
   request: NextRequest,
@@ -22,7 +23,7 @@ async function _POST(
     }
 
     const requestResult = await dynamoDB.send(new GetCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: requestId }
     }))
     if (!requestResult.Item) {
@@ -63,14 +64,14 @@ async function _POST(
     // Two updates so concurrent marks on different garages can't clobber each
     // other: create the map if absent, then set only this thread's key.
     await dynamoDB.send(new UpdateCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: requestId },
       UpdateExpression: `SET ${field} = if_not_exists(${field}, :empty)`,
       ExpressionAttributeValues: { ':empty': {} }
     }))
 
     await dynamoDB.send(new UpdateCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: requestId },
       UpdateExpression: `SET ${field}.#key = :timestamp`,
       ExpressionAttributeNames: { '#key': key },

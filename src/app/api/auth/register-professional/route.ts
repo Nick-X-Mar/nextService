@@ -13,6 +13,7 @@ import { withMetrics } from '@/utils/withMetrics'
 import { randomUUID } from 'crypto'
 import { TERMS_VERSION } from '@/lib/legal'
 import { stringList } from '@/utils/stringList'
+import { TABLES } from '@/lib/tables'
 
 const checkRateLimit = createRateLimiter('register-pro', 3, 3600000)
 
@@ -118,7 +119,7 @@ async function _POST(request: NextRequest) {
     // local tables are not built from it, so this tolerates the index being
     // absent instead of failing registration outright.
     const existingTins = await queryIndexOrScan<{ id: string }>({
-      table: 'Garages',
+      table: TABLES.Garages,
       indexName: 'TINIndex',
       keyConditionExpression: 'tin = :tin',
       scanFilterExpression: 'tin = :tin',
@@ -138,7 +139,7 @@ async function _POST(request: NextRequest) {
     // be able to sign in. Uses the EmailIndex added to the Garages table.
     const existingEmailResult = await dynamoDB.send(
       new QueryCommand({
-        TableName: 'Garages',
+        TableName: TABLES.Garages,
         IndexName: 'EmailIndex',
         KeyConditionExpression: 'email = :email',
         ExpressionAttributeValues: { ':email': normalizedEmail },
@@ -180,7 +181,7 @@ async function _POST(request: NextRequest) {
     }
 
     const putCommand = new PutCommand({
-      TableName: 'Garages',
+      TableName: TABLES.Garages,
       Item: garageData
     })
 

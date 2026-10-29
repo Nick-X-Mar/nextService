@@ -24,6 +24,7 @@ import {
   putNewOffer,
   requestStillOpen,
 } from './offerWrites'
+import { TABLES } from '@/lib/tables'
 
 const checkOfferRate = createRateLimiter('offer-create', 10, 3600000)
 
@@ -87,7 +88,7 @@ async function _POST(request: NextRequest) {
     if (benefits === null) return badRequest('Μη έγκυρες παροχές')
 
     const requestRes = await dynamoDB.send(new GetCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: serviceRequestId },
     }))
     const serviceRequest = requestRes.Item
@@ -216,7 +217,7 @@ async function _GET(request: NextRequest) {
     let scopedGarageId = garageId
     if (serviceRequestId) {
       const serviceRequest = await dynamoDB.send(new GetCommand({
-        TableName: 'ServiceRequests',
+        TableName: TABLES.ServiceRequests,
         Key: { id: serviceRequestId }
       }))
       if (!serviceRequest.Item) {
@@ -244,7 +245,7 @@ async function _GET(request: NextRequest) {
       const byRequest = await collectAll<Record<string, unknown>>(
         (startKey) =>
           dynamoDB.send(new QueryCommand({
-            TableName: 'Offers',
+            TableName: TABLES.Offers,
             IndexName: 'ServiceRequestOffersIndex',
             KeyConditionExpression: 'serviceRequestId = :serviceRequestId',
             ExpressionAttributeValues: { ':serviceRequestId': serviceRequestId },
@@ -260,7 +261,7 @@ async function _GET(request: NextRequest) {
       offers = await collectAll<Record<string, unknown>>(
         (startKey) =>
           dynamoDB.send(new QueryCommand({
-            TableName: 'Offers',
+            TableName: TABLES.Offers,
             IndexName: 'GarageOffersIndex',
             KeyConditionExpression: 'garageId = :garageId',
             ExpressionAttributeValues: { ':garageId': scopedGarageId },
@@ -304,7 +305,7 @@ async function _PUT(request: NextRequest) {
       return badRequest(`Το ποσό της προσφοράς πρέπει να είναι θετικό και έως ${MAX_OFFER_AMOUNT.toLocaleString('el-GR')} €`)
     }
 
-    const existingRes = await dynamoDB.send(new GetCommand({ TableName: 'Offers', Key: { id: offerId } }))
+    const existingRes = await dynamoDB.send(new GetCommand({ TableName: TABLES.Offers, Key: { id: offerId } }))
     const existing = existingRes.Item
     if (!existing) {
       return NextResponse.json({ success: false, error: 'Η προσφορά δεν βρέθηκε' }, { status: 404 })
@@ -343,7 +344,7 @@ async function _PUT(request: NextRequest) {
         TransactItems: [
           {
             Update: {
-              TableName: 'Offers',
+              TableName: TABLES.Offers,
               Key: { id: offerId },
               UpdateExpression: 'SET offerAmount = :offerAmount, benefits = :benefits, availabilityDates = :availabilityDates, availabilitySlots = :availabilitySlots, updatedAt = :updatedAt',
               // The read above is a fast path; this is what holds when the
@@ -371,7 +372,7 @@ async function _PUT(request: NextRequest) {
       if (failed === 1) return NextResponse.json(REQUEST_NOT_OPEN, { status: 409 })
 
       const [stored, open] = await Promise.all([
-        dynamoDB.send(new GetCommand({ TableName: 'Offers', Key: { id: offerId }, ConsistentRead: true })),
+        dynamoDB.send(new GetCommand({ TableName: TABLES.Offers, Key: { id: offerId }, ConsistentRead: true })),
         isRequestOpen(serviceRequestId),
       ])
       if (stored.Item?.status !== OfferStatus.PENDING || stored.Item?.garageId !== garageId) {
@@ -416,7 +417,7 @@ async function _PUT(request: NextRequest) {
 async function invalidateRequestOwner(serviceRequestId: string): Promise<void> {
   try {
     const res = await dynamoDB.send(new GetCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: serviceRequestId },
       ProjectionExpression: 'clientId',
     }))
@@ -441,8 +442,8 @@ async function notifyClientAboutNewOffer(args: {
     if (!args.clientId) return
 
     const [clientRes, garageRes] = await Promise.all([
-      dynamoDB.send(new GetCommand({ TableName: 'Clients', Key: { id: args.clientId } })),
-      dynamoDB.send(new GetCommand({ TableName: 'Garages', Key: { id: args.garageId } }))
+      dynamoDB.send(new GetCommand({ TableName: TABLES.Clients, Key: { id: args.clientId } })),
+      dynamoDB.send(new GetCommand({ TableName: TABLES.Garages, Key: { id: args.garageId } }))
     ])
 
     const clientEmail = clientRes.Item?.email as string | undefined

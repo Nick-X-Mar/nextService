@@ -19,6 +19,7 @@ import {
   requireGuestSession,
 } from '../_lib/guestMerge'
 import { TERMS_VERSION } from '@/lib/legal'
+import { TABLES } from '@/lib/tables'
 
 const checkIpRate = createRateLimiter('register-requests', 10, 3600000)
 const checkGuestRate = createRateLimiter('register-requests-guest', 10, 3600000)
@@ -144,7 +145,7 @@ async function _POST(request: NextRequest) {
     try {
       const result = await dynamoDB.send(
         new UpdateCommand({
-          TableName: 'Clients',
+          TableName: TABLES.Clients,
           Key: { id: guestId },
           // A half-finished merge must not be overtaken by a registration.
           UpdateExpression: `SET ${sets.join(', ')} REMOVE ${PENDING_MERGE_FIELDS.join(', ')}`,

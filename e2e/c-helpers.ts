@@ -1,6 +1,7 @@
 import { type APIRequestContext } from '@playwright/test'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
+import { TABLES } from '../src/lib/tables'
 
 /**
  * Fixtures for the garage offer specs.
@@ -19,14 +20,14 @@ const db = DynamoDBDocumentClient.from(
 )
 
 export async function getOffer(id: string): Promise<Record<string, unknown> | undefined> {
-  const res = await db.send(new GetCommand({ TableName: 'Offers', Key: { id }, ConsistentRead: true }))
+  const res = await db.send(new GetCommand({ TableName: TABLES.Offers, Key: { id }, ConsistentRead: true }))
   return res.Item
 }
 
 export async function setRequestStatus(id: string, status: string): Promise<void> {
   await db.send(
     new UpdateCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id },
       UpdateExpression: 'SET #status = :status',
       ExpressionAttributeNames: { '#status': 'status' },
@@ -97,7 +98,7 @@ export async function acceptOffer(
 
   await db.send(
     new UpdateCommand({
-      TableName: 'Offers',
+      TableName: TABLES.Offers,
       Key: { id: args.offerId },
       UpdateExpression: 'SET #status = :status, appointmentDate = :date, appointmentTime = :time, appointmentPrice = :price',
       ExpressionAttributeNames: { '#status': 'status' },
@@ -106,7 +107,7 @@ export async function acceptOffer(
   )
   await db.send(
     new UpdateCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: args.requestId },
       UpdateExpression: 'SET #status = :status, acceptedOfferId = :offerId, appointmentDate = :date, appointmentTime = :time',
       ExpressionAttributeNames: { '#status': 'status' },

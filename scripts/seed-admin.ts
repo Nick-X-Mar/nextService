@@ -20,8 +20,8 @@ import {
 import { DynamoDBDocumentClient, PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import bcrypt from 'bcryptjs'
 import { randomUUID } from 'crypto'
+import { TABLES } from '../src/lib/tables'
 
-const ADMIN_USERS_TABLE = process.env.ADMIN_USERS_TABLE || 'AdminUsers'
 const REGION = process.env.REGION || 'eu-central-1'
 const ENDPOINT = process.env.DYNAMODB_ENDPOINT || 'http://localhost:8000'
 
@@ -30,17 +30,17 @@ const password = process.env.ADMIN_PASSWORD || 'admin123'
 
 async function ensureTable(baseClient: DynamoDBClient, isLocal: boolean) {
   try {
-    await baseClient.send(new DescribeTableCommand({ TableName: ADMIN_USERS_TABLE }))
+    await baseClient.send(new DescribeTableCommand({ TableName: TABLES.AdminUsers }))
     return
   } catch (err) {
     if (!(err instanceof ResourceNotFoundException)) throw err
   }
 
-  console.log(`Creating ${ADMIN_USERS_TABLE} table...`)
+  console.log(`Creating ${TABLES.AdminUsers} table...`)
 
   try {
     await baseClient.send(new CreateTableCommand({
-      TableName: ADMIN_USERS_TABLE,
+      TableName: TABLES.AdminUsers,
       AttributeDefinitions: [
         { AttributeName: 'adminId', AttributeType: 'S' },
         { AttributeName: 'email', AttributeType: 'S' }
@@ -66,9 +66,9 @@ async function ensureTable(baseClient: DynamoDBClient, isLocal: boolean) {
   // Wait for ACTIVE
   for (let i = 0; i < 30; i++) {
     try {
-      const desc = await baseClient.send(new DescribeTableCommand({ TableName: ADMIN_USERS_TABLE }))
+      const desc = await baseClient.send(new DescribeTableCommand({ TableName: TABLES.AdminUsers }))
       if (desc.Table?.TableStatus === 'ACTIVE') {
-        console.log(`${ADMIN_USERS_TABLE} table is ready.`)
+        console.log(`${TABLES.AdminUsers} table is ready.`)
         return
       }
     } catch { /* keep polling */ }
@@ -90,7 +90,7 @@ async function main() {
 
   // Check if admin already exists
   const existing = await db.send(new ScanCommand({
-    TableName: ADMIN_USERS_TABLE,
+    TableName: TABLES.AdminUsers,
     FilterExpression: 'email = :email',
     ExpressionAttributeValues: { ':email': email }
   }))
@@ -104,7 +104,7 @@ async function main() {
   const passwordHash = await bcrypt.hash(password, 12)
 
   await db.send(new PutCommand({
-    TableName: ADMIN_USERS_TABLE,
+    TableName: TABLES.AdminUsers,
     Item: {
       adminId,
       email,

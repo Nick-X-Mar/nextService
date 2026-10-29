@@ -3,6 +3,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { requireClientOwner } from '@/app/api/clients/requireClientOwner'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 async function _GET(
   request: NextRequest,
@@ -35,7 +36,7 @@ async function _GET(
 
     // Get client information from DynamoDB
     const getCommand = new GetCommand({
-      TableName: 'Clients',
+      TableName: TABLES.Clients,
       Key: {
         id: clientId
       }
@@ -122,7 +123,7 @@ async function _PUT(
     // part becomes the placeholder instead of outliving the email it came from.
     if (firstName) {
       const current = (await dynamoDB.send(new GetCommand({
-        TableName: 'Clients',
+        TableName: TABLES.Clients,
         Key: { id: clientId },
         ProjectionExpression: 'email',
       }))).Item
@@ -178,7 +179,7 @@ async function _PUT(
     // One account per email. Clients.EmailIndex is keyed on email, so this is a point
     // lookup; the owner keeping their own address is not a clash.
     const holders = await dynamoDB.send(new QueryCommand({
-      TableName: 'Clients',
+      TableName: TABLES.Clients,
       IndexName: 'EmailIndex',
       KeyConditionExpression: 'email = :email',
       ExpressionAttributeValues: { ':email': email },
@@ -199,7 +200,7 @@ async function _PUT(
     let Attributes: Record<string, unknown> | undefined
     try {
       const result = await dynamoDB.send(new UpdateCommand({
-        TableName: 'Clients',
+        TableName: TABLES.Clients,
         Key: { id: clientId },
         UpdateExpression: updateExpression,
         // Without this an UpdateCommand on a deleted account quietly recreates a

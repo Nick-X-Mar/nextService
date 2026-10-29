@@ -15,6 +15,7 @@ import {
 import { athensToday } from '@/utils/athensTime'
 import type { CompletionAmounts } from '@/types/reviews'
 import { billedJobsForMonth } from '../../billedJobs'
+import { TABLES } from '@/lib/tables'
 
 interface AppointmentRow {
   requestId: string
@@ -126,13 +127,13 @@ async function _GET(
       const batch = clientIds.slice(i, i + 100)
       const res = await dynamoDB.send(new BatchGetCommand({
         RequestItems: {
-          Clients: {
+          [TABLES.Clients]: {
             Keys: batch.map((id) => ({ id })),
             ProjectionExpression: 'id, firstName, lastName, email, phoneNumber, anonymizedAt',
           },
         },
       }))
-      for (const c of res.Responses?.Clients || []) {
+      for (const c of res.Responses?.[TABLES.Clients] || []) {
         const name = [c.firstName, c.lastName].filter(Boolean).join(' ').trim()
         // A closed account keeps its jobs, not its name.
         clientNames[c.id] = c.anonymizedAt ? 'Διαγραμμένος πελάτης' : (name || c.email || c.id)
@@ -145,14 +146,14 @@ async function _GET(
       const batch = vehicleIds.slice(i, i + 100)
       const res = await dynamoDB.send(new BatchGetCommand({
         RequestItems: {
-          Vehicles: {
+          [TABLES.Vehicles]: {
             Keys: batch.map((id) => ({ id })),
             ProjectionExpression: 'id, brand, #m, modelYear, licensePlate',
             ExpressionAttributeNames: { '#m': 'model' },
           },
         },
       }))
-      for (const v of res.Responses?.Vehicles || []) {
+      for (const v of res.Responses?.[TABLES.Vehicles] || []) {
         const parts = [v.brand, v.model, v.modelYear].filter(Boolean).join(' ')
         const plate = v.licensePlate ? ` (${v.licensePlate})` : ''
         vehicleLabels[v.id] = (parts + plate).trim() || '-'

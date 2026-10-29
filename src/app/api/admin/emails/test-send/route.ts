@@ -5,6 +5,7 @@ import { sendEmail, isNotificationsEnabled } from '@/utils/emailService'
 import { ensureEmailLogsTable } from '@/utils/ensureEventTables'
 import { withMetrics } from '@/utils/withMetrics'
 import { EmailTemplate } from '@/types/events'
+import { TABLES } from '@/lib/tables'
 
 // Admin-triggered test send. Lets the operator verify the full pipeline:
 //   1. SES SendRawEmail accepts the message  → status moves queued → sent
@@ -85,7 +86,7 @@ async function _GET(request: NextRequest): Promise<NextResponse> {
   // limit 5 — pick the most recent admin_test_email row.
   const result = await dynamoDB.send(
     new QueryCommand({
-      TableName: 'EmailLogs',
+      TableName: TABLES.EmailLogs,
       IndexName: 'RecipientIndex',
       KeyConditionExpression: '#to = :to',
       ExpressionAttributeNames: { '#to': 'to' },

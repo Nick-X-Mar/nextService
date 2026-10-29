@@ -4,7 +4,8 @@
  */
 import { dynamoDB } from '@/utils/dynamoService'
 import { PutCommand, QueryCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
-import { ensurePerformanceTable, PERFORMANCE_TABLE } from '@/utils/ensurePerformanceTable'
+import { ensurePerformanceTable } from '@/utils/ensurePerformanceTable'
+import { TABLES } from '@/lib/tables'
 
 export interface PerformanceMetric {
   endpoint: string
@@ -25,7 +26,7 @@ export async function recordMetric(metric: PerformanceMetric): Promise<void> {
     // when multiple requests to the same endpoint happen in the same ms
     const uniqueTimestamp = `${metric.timestamp}#${Math.random().toString(36).slice(2, 8)}`
     await dynamoDB.send(new PutCommand({
-      TableName: PERFORMANCE_TABLE,
+      TableName: TABLES.PerformanceMetrics,
       Item: {
         endpoint: metric.endpoint,
         method: metric.method,
@@ -59,7 +60,7 @@ export async function queryMetrics(window: TimeWindow): Promise<PerformanceMetri
 
   do {
     const result = await dynamoDB.send(new ScanCommand({
-      TableName: PERFORMANCE_TABLE,
+      TableName: TABLES.PerformanceMetrics,
       FilterExpression: 'rawTimestamp BETWEEN :since AND :until',
       ExpressionAttributeValues: {
         ':since': window.since,
@@ -96,7 +97,7 @@ export async function queryEndpointMetrics(endpoint: string, window: TimeWindow)
 
   do {
     const result = await dynamoDB.send(new QueryCommand({
-      TableName: PERFORMANCE_TABLE,
+      TableName: TABLES.PerformanceMetrics,
       KeyConditionExpression: 'endpoint = :ep AND #ts BETWEEN :since AND :until',
       ExpressionAttributeNames: { '#ts': 'timestamp' },
       ExpressionAttributeValues: {

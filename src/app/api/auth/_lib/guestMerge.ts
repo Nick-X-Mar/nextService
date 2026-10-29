@@ -3,7 +3,7 @@ import { createHash, timingSafeEqual } from 'crypto'
 import { DeleteCommand, GetCommand, QueryCommand, TransactWriteCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
 import { getAuth } from '@/utils/requireAuth'
-import { REVIEWS_TABLE_NAME } from '@/utils/ensureReviewsTable'
+import { TABLES } from '@/lib/tables'
 
 /**
  * A "guest" is a Clients row with no credentials at all — no email, no
@@ -16,9 +16,6 @@ import { REVIEWS_TABLE_NAME } from '@/utils/ensureReviewsTable'
  * (`mergedInto`, `mergedAt`) rather than deleted, so a tab still holding the
  * guest session can learn what happened to it.
  */
-
-const CLIENTS = 'Clients'
-const WALLET_TRANSACTIONS = process.env.WALLET_TRANSACTIONS_TABLE || 'WalletTransactions'
 
 /** The first name the old funnel gave every guest it created (shared with the UI). */
 export { GUEST_PLACEHOLDER_NAME } from '@/types/clients'
@@ -108,14 +105,14 @@ export function isConditionalCheckFailed(err: unknown): boolean {
 }
 
 export async function getClient(id: string): Promise<Record<string, unknown> | undefined> {
-  const res = await dynamoDB.send(new GetCommand({ TableName: CLIENTS, Key: { id }, ConsistentRead: true }))
+  const res = await dynamoDB.send(new GetCommand({ TableName: TABLES.Clients, Key: { id }, ConsistentRead: true }))
   return res.Item
 }
 
 export async function findClientByEmail(email: string): Promise<Record<string, unknown> | undefined> {
   const res = await dynamoDB.send(
     new QueryCommand({
-      TableName: CLIENTS,
+      TableName: TABLES.Clients,
       IndexName: 'EmailIndex',
       KeyConditionExpression: 'email = :email',
       ExpressionAttributeValues: { ':email': email },
@@ -194,7 +191,7 @@ export async function claimGuestForMerge(
   try {
     await dynamoDB.send(
       new UpdateCommand({
-        TableName: CLIENTS,
+        TableName: TABLES.Clients,
         Key: { id: guestId },
         UpdateExpression: `SET mergingInto = :acct, mergeClaimedAt = :claimedAt${extra.set ? `, ${extra.set}` : ''}`,
         ConditionExpression: `${GUEST_CONDITION} AND (attribute_not_exists(mergingInto) OR mergingInto = :acct)${
@@ -224,7 +221,7 @@ export async function finalizeGuestMerge(guestId: string, accountId: string): Pr
   try {
     await dynamoDB.send(
       new UpdateCommand({
-        TableName: CLIENTS,
+        TableName: TABLES.Clients,
         Key: { id: guestId },
         UpdateExpression: `SET mergedInto = :acct, mergedAt = :now, updatedAt = :now REMOVE ${PENDING_MERGE_FIELDS.join(', ')}`,
         ConditionExpression: 'mergingInto = :acct AND attribute_not_exists(mergedInto)',
@@ -324,7 +321,7 @@ async function moveTotals(guestId: string, accountId: string): Promise<void> {
           TransactItems: [
             {
               Update: {
-                TableName: CLIENTS,
+                TableName: TABLES.Clients,
                 Key: { id: guestId },
                 UpdateExpression: `REMOVE ${held.join(', ')}`,
                 ConditionExpression: conditions.join(' AND '),
@@ -333,7 +330,7 @@ async function moveTotals(guestId: string, accountId: string): Promise<void> {
             },
             {
               Update: {
-                TableName: CLIENTS,
+                TableName: TABLES.Clients,
                 Key: { id: accountId },
                 UpdateExpression: `ADD ${toAdd.map((field) => `${field} :${field}`).join(', ')} SET updatedAt = :now`,
                 ConditionExpression: 'attribute_exists(id) AND attribute_not_exists(mergedInto)',
@@ -379,11 +376,11 @@ export async function mergeGuestInto(
 ): Promise<{ requests: number; vehiclesMoved: number; vehiclesDeduplicated: number; reviews: number }> {
   const now = new Date().toISOString()
   const [guestVehicles, accountVehicles, guestRequests, guestReviews, guestWallet] = await Promise.all([
-    queryAll('Vehicles', 'ClientVehiclesIndex', guestId),
-    queryAll('Vehicles', 'ClientVehiclesIndex', accountId),
-    queryAll('ServiceRequests', 'ClientRequestsIndex', guestId),
-    queryAllIfTableExists(REVIEWS_TABLE_NAME, 'ClientReviewsIndex', guestId),
-    queryAllIfTableExists(WALLET_TRANSACTIONS, 'ClientWalletIndex', guestId),
+    queryAll(TABLES.Vehicles, 'ClientVehiclesIndex', guestId),
+    queryAll(TABLES.Vehicles, 'ClientVehiclesIndex', accountId),
+    queryAll(TABLES.ServiceRequests, 'ClientRequestsIndex', guestId),
+    queryAllIfTableExists(TABLES.Reviews, 'ClientReviewsIndex', guestId),
+    queryAllIfTableExists(TABLES.WalletTransactions, 'ClientWalletIndex', guestId),
   ])
 
   // guest vehicle id → the account vehicle it duplicates
@@ -396,7 +393,7 @@ export async function mergeGuestInto(
     if (!existing) {
       await sendIdempotent(
         new UpdateCommand({
-          TableName: 'Vehicles',
+          TableName: TABLES.Vehicles,
           Key: { id: guestVehicle.id },
           UpdateExpression: 'SET clientId = :acct, updatedAt = :now',
           ConditionExpression: 'clientId = :guest',
@@ -419,7 +416,7 @@ export async function mergeGuestInto(
     if (sets.length > 0) {
       await sendIdempotent(
         new UpdateCommand({
-          TableName: 'Vehicles',
+          TableName: TABLES.Vehicles,
           Key: { id: existing.id },
           UpdateExpression: `SET ${sets.join(', ')}, updatedAt = :now`,
           ConditionExpression: 'clientId = :acct',
@@ -434,7 +431,7 @@ export async function mergeGuestInto(
     const redirectTo = vehicleRedirect.get(req.vehicleId as string)
     await sendIdempotent(
       new UpdateCommand({
-        TableName: 'ServiceRequests',
+        TableName: TABLES.ServiceRequests,
         Key: { id: req.id },
         UpdateExpression: redirectTo
           ? 'SET clientId = :acct, vehicleId = :vehicle, updatedAt = :now'
@@ -454,7 +451,7 @@ export async function mergeGuestInto(
   for (const guestVehicleId of vehicleRedirect.keys()) {
     await sendIdempotent(
       new DeleteCommand({
-        TableName: 'Vehicles',
+        TableName: TABLES.Vehicles,
         Key: { id: guestVehicleId },
         ConditionExpression: 'clientId = :guest',
         ExpressionAttributeValues: { ':guest': guestId },
@@ -467,7 +464,7 @@ export async function mergeGuestInto(
   for (const review of guestReviews) {
     await sendIdempotent(
       new UpdateCommand({
-        TableName: REVIEWS_TABLE_NAME,
+        TableName: TABLES.Reviews,
         Key: { reviewId: review.reviewId },
         UpdateExpression: 'SET clientId = :acct',
         ConditionExpression: 'clientId = :guest',
@@ -480,7 +477,7 @@ export async function mergeGuestInto(
   for (const entry of guestWallet) {
     await sendIdempotent(
       new UpdateCommand({
-        TableName: WALLET_TRANSACTIONS,
+        TableName: TABLES.WalletTransactions,
         Key: { transactionId: entry.transactionId },
         UpdateExpression: 'SET clientId = :acct',
         ConditionExpression: 'clientId = :guest',

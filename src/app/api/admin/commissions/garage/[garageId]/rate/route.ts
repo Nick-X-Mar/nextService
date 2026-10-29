@@ -5,6 +5,7 @@ import { withMetrics } from '@/utils/withMetrics'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { DEFAULT_COMMISSION_PERCENT, parseCommissionPercent } from '@/lib/commission-basis'
+import { TABLES } from '@/lib/tables'
 
 /**
  * PUT /api/admin/commissions/garage/[garageId]/rate
@@ -34,7 +35,7 @@ async function _PUT(
     const now = new Date().toISOString()
     try {
       await dynamoDB.send(new UpdateCommand({
-        TableName: 'Garages',
+        TableName: TABLES.Garages,
         Key: { id: garageId },
         UpdateExpression: percent === null
           ? 'SET commissionPercentSetAt = :now, commissionPercentSetBy = :by REMOVE commissionPercent'

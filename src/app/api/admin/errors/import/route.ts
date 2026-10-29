@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PutCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
-import {
-  ensureErrorResolutionsTable,
-  ERROR_RESOLUTIONS_TABLE
-} from '@/utils/ensureErrorResolutionsTable'
+import { ensureErrorResolutionsTable } from '@/utils/ensureErrorResolutionsTable'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 interface IncomingResolution {
   fingerprint?: unknown
@@ -89,7 +87,7 @@ async function _POST(request: NextRequest) {
       if (status === 'open') {
         await dynamoDB.send(
           new DeleteCommand({
-            TableName: ERROR_RESOLUTIONS_TABLE,
+            TableName: TABLES.ErrorResolutions,
             Key: { fingerprint: fp }
           })
         )
@@ -97,7 +95,7 @@ async function _POST(request: NextRequest) {
       } else {
         await dynamoDB.send(
           new PutCommand({
-            TableName: ERROR_RESOLUTIONS_TABLE,
+            TableName: TABLES.ErrorResolutions,
             Item: {
               fingerprint: fp,
               status,

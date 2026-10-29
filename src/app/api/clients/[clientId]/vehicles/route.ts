@@ -4,6 +4,7 @@ import { QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { requireClientOwner } from '@/app/api/clients/requireClientOwner'
 import { withMetrics } from '@/utils/withMetrics'
 import { presentVehicle } from '@/app/api/vehicles/vehicleView'
+import { TABLES } from '@/lib/tables'
 
 async function _GET(
   request: NextRequest,
@@ -33,7 +34,7 @@ async function _GET(
 
     // Query vehicles by clientId using the ClientVehiclesIndex
     const queryCommand = new QueryCommand({
-      TableName: 'Vehicles',
+      TableName: TABLES.Vehicles,
       IndexName: 'ClientVehiclesIndex',
       KeyConditionExpression: 'clientId = :clientId',
       ExpressionAttributeValues: {

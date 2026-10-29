@@ -6,6 +6,7 @@ import { withMetrics } from '@/utils/withMetrics'
 import { collectAll } from '@/utils/pagination'
 import { resolveWinner, threadWriteState } from '@/utils/chatService'
 import { ServiceRequestStatus } from '@/types/statuses'
+import { TABLES } from '@/lib/tables'
 
 interface ChatMessageItem {
   id: string
@@ -36,7 +37,7 @@ async function _GET(
 
     // Verify the client owns this request
     const requestResult = await dynamoDB.send(new GetCommand({
-      TableName: 'ServiceRequests',
+      TableName: TABLES.ServiceRequests,
       Key: { id: requestId }
     }))
     if (!requestResult.Item || requestResult.Item.clientId !== clientId) {
@@ -55,7 +56,7 @@ async function _GET(
     // so a long thread quietly lost the garages further back in its history.
     const messages = (await collectAll<Record<string, unknown>>(
       (startKey) => dynamoDB.send(new QueryCommand({
-        TableName: 'ChatMessages',
+        TableName: TABLES.ChatMessages,
         IndexName: 'RequestMessagesIndex',
         KeyConditionExpression: 'requestId = :requestId',
         ExpressionAttributeValues: { ':requestId': requestId },
@@ -86,7 +87,7 @@ async function _GET(
     // sent.
     const offerGarageIds = (await collectAll<Record<string, unknown>>(
       (startKey) => dynamoDB.send(new QueryCommand({
-        TableName: 'Offers',
+        TableName: TABLES.Offers,
         IndexName: 'ServiceRequestOffersIndex',
         KeyConditionExpression: 'serviceRequestId = :requestId',
         ExpressionAttributeValues: { ':requestId': requestId },
@@ -114,7 +115,7 @@ async function _GET(
     const garageResults = await Promise.all(
       garageIds.map((garageId) =>
         dynamoDB.send(new GetCommand({
-          TableName: 'Garages',
+          TableName: TABLES.Garages,
           Key: { id: garageId }
         }))
       )

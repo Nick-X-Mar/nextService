@@ -17,6 +17,7 @@ import {
   parseOfferAmount,
   putNewOffer,
 } from '@/app/api/offers/offerWrites'
+import { TABLES } from '@/lib/tables'
 
 /**
  * The admin files an offer on a garage's behalf — typically a quote the garage
@@ -50,8 +51,8 @@ async function _POST(
     const availabilityDates = parsedDates.dates
 
     const [reqResult, garageResult] = await Promise.all([
-      dynamoDB.send(new GetCommand({ TableName: 'ServiceRequests', Key: { id: requestId } })),
-      dynamoDB.send(new GetCommand({ TableName: 'Garages', Key: { id: garageId } })),
+      dynamoDB.send(new GetCommand({ TableName: TABLES.ServiceRequests, Key: { id: requestId } })),
+      dynamoDB.send(new GetCommand({ TableName: TABLES.Garages, Key: { id: garageId } })),
     ])
 
     const sr = reqResult.Item
@@ -144,7 +145,7 @@ async function _POST(
       try {
         if (!sr.clientId) return
         const clientRes = await dynamoDB.send(new GetCommand({
-          TableName: 'Clients',
+          TableName: TABLES.Clients,
           Key: { id: sr.clientId }
         }))
         const clientEmail = clientRes.Item?.email as string | undefined

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { GetCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
 import { createTtlCache } from '@/utils/ttlCache'
+import { TABLES } from '@/lib/tables'
 
 export interface AuthInfo {
   userId: string
@@ -78,7 +79,7 @@ export async function requireActiveGarage(request: NextRequest): Promise<string 
 
   const active = await garageActiveCache.getOrCompute(garageId, async () => {
     const res = await dynamoDB.send(
-      new GetCommand({ TableName: 'Garages', Key: { id: garageId }, ProjectionExpression: 'isActive' })
+      new GetCommand({ TableName: TABLES.Garages, Key: { id: garageId }, ProjectionExpression: 'isActive' })
     )
     return res.Item?.isActive === true
   })

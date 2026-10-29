@@ -5,6 +5,7 @@ import { getStripe } from '@/lib/stripe-server'
 import type { SavedCard } from '@/types/payments'
 import { requireClient } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
+import { TABLES } from '@/lib/tables'
 
 async function _GET(request: NextRequest) {
   try {
@@ -12,7 +13,7 @@ async function _GET(request: NextRequest) {
     if (clientId instanceof NextResponse) return clientId
 
     const clientRes = await dynamoDB.send(
-      new GetCommand({ TableName: 'Clients', Key: { id: clientId } })
+      new GetCommand({ TableName: TABLES.Clients, Key: { id: clientId } })
     )
     const stripeCustomerId = clientRes.Item?.stripeCustomerId as string | undefined
 

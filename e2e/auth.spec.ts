@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import { loginViaAPI, TEST_GARAGE } from './helpers'
 import { adminPost, adminSession, api, createClientWithRequest, emailLogsFor, getRow, makeLegacyGuest, registerPendingGarage } from './a-helpers'
 import { clientEmailLogs, publishedSiteOrigin } from './r-helpers'
+import { TABLES } from '../src/lib/tables'
 
 test.describe('Authentication flows', () => {
 
@@ -83,7 +84,7 @@ test.describe.serial('Pending garages', () => {
     garage = await registerPendingGarage('pending')
     const client = await createClientWithRequest(`e2e-auth-pending-${Date.now()}@test.com`, 'TestPass123')
     requestId = client.requestId
-    expect((await getRow('Garages', garage.garageId))?.isActive).toBe(false)
+    expect((await getRow(TABLES.Garages, garage.garageId))?.isActive).toBe(false)
   })
 
   test('A pending garage can save its profile and stays pending', async () => {
@@ -103,7 +104,7 @@ test.describe.serial('Pending garages', () => {
     expect(res.status).toBe(200)
     expect((res.data.garage as { isActive: boolean }).isActive).toBe(false)
 
-    const row = await getRow('Garages', garage.garageId)
+    const row = await getRow(TABLES.Garages, garage.garageId)
     expect(row?.isActive).toBe(false)
     expect(row?.companyName).toBe(`${garage.profile.companyName} (νέο)`)
 
@@ -133,7 +134,7 @@ test.describe.serial('Pending garages', () => {
       },
     })
     expect(res.status).toBe(409)
-    expect((await getRow('Garages', garage.garageId))?.email).toBe(garage.profile.email)
+    expect((await getRow(TABLES.Garages, garage.garageId))?.email).toBe(garage.profile.email)
   })
 
   test('Admin approval activates the garage once; a deactivation bites at once', async () => {
@@ -176,12 +177,12 @@ test.describe.serial('Pending garages', () => {
       },
     })
     expect(save.status).toBe(200)
-    expect((await getRow('Garages', garage.garageId))?.isActive).toBe(false)
+    expect((await getRow(TABLES.Garages, garage.garageId))?.isActive).toBe(false)
     expect(await emailLogsFor(garage.garageId, 'garage_activated')).toHaveLength(1)
 
     // Unknown ids are refused instead of minting a bare garage row.
     expect(await adminPost('/api/admin/users/garages/garage-does-not-exist/deactivate/', admin)).toBe(404)
-    expect(await getRow('Garages', 'garage-does-not-exist')).toBeUndefined()
+    expect(await getRow(TABLES.Garages, 'garage-does-not-exist')).toBeUndefined()
   })
 })
 
@@ -258,6 +259,6 @@ test("Registering without a name never turns the email into the first name", asy
   expect(res.status).toBe(200)
   const client = res.data.client as { id: string; firstName: string }
   expect(client.firstName).toBe('Επισκέπτης')
-  expect((await getRow('Clients', client.id))?.firstName).not.toBe(address.split('@')[0])
+  expect((await getRow(TABLES.Clients, client.id))?.firstName).not.toBe(address.split('@')[0])
 })
 
