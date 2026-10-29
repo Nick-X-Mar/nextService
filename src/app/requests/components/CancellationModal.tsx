@@ -6,6 +6,7 @@ import Spinner from '@/components/Spinner'
 import type { ServiceRequest } from '@/types/requests'
 import { athensDaysUntil } from '@/utils/athensTime'
 import { hasAppointmentStarted } from '@/lib/appointment-window'
+import PlusVat from '@/components/PlusVat'
 
 interface CancellationModalProps {
   isOpen: boolean
@@ -79,7 +80,7 @@ export default function CancellationModal({
           {price > 0 && (
             <div className="flex items-center gap-2">
               <Icon name="euro" size="sm" className="text-on-surface-variant" />
-              <span className="text-sm text-on-surface">{price}€</span>
+              <span className="text-sm text-on-surface">{price}€<PlusVat /></span>
             </div>
           )}
         </div>

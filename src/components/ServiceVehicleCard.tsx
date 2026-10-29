@@ -3,6 +3,7 @@
 import { styles } from '@/styles/styles'
 import Icon from '@/components/ui/Icon'
 import { getCategoryText } from '@/utils/categoryLabels'
+import PlusVat from './PlusVat'
 
 interface VehicleDetails {
   brand?: string | null
@@ -187,7 +188,7 @@ export default function ServiceVehicleCard({
         <div className="mb-5">
           <p className={styles.label}>Εκτιμώμενο Κόστος</p>
           {/* A floor — the lowest we've quoted for this car — never a quote. */}
-          <p className="text-sm font-medium text-on-surface mt-1">από {formattedEstimatedCost}</p>
+          <p className="text-sm font-medium text-on-surface mt-1">από {formattedEstimatedCost}<PlusVat /></p>
         </div>
       )}
 

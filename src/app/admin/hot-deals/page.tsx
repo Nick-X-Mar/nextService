@@ -184,7 +184,7 @@ export default function HotDealsAdminPage() {
                 value={editing.title || ''}
                 onChange={(e) => setEditing({ ...editing, title: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg border border-outline-variant/30 bg-surface text-sm text-on-surface"
-                placeholder="e.g. Συμπλέκτης"
+                placeholder="e.g. Δίσκος Πλατό"
               />
             </div>
             <div>

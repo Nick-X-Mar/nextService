@@ -38,6 +38,9 @@ infra/.cdk.staging/
 infra/cdk.out/.cache/
 infra/cdk.out/asset.*/
 infra/cdk.out/cdk.out
+# Production synth (`-c stage=production -o cdk.out.production`) — the
+# committed infra/cdk.out is staging's.
+infra/cdk.out.production/
 
 # IDE
 .vscode/

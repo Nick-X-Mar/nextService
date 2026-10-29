@@ -9,6 +9,7 @@ import type { BookedJob } from '@/types/bookedJobs'
 import CompletionModal from './CompletionModal'
 import { formatAppointment } from './offerStatus'
 import { clientDisplayName } from './clientLabel'
+import { PLUS_VAT } from '@/utils/vat'
 
 interface BookedJobsPanelProps {
   jobs: BookedJob[]
@@ -61,7 +62,7 @@ export default function BookedJobsPanel({ jobs, onChanged }: BookedJobsPanelProp
                 </p>
                 <p className="text-xs text-on-surface-variant mt-0.5">
                   {formatAppointment(job.appointmentDate, job.appointmentTime)}
-                  {typeof job.price === 'number' && ` · ${job.price.toLocaleString('el-GR')} €`}
+                  {typeof job.price === 'number' && ` · ${job.price.toLocaleString('el-GR')} € ${PLUS_VAT}`}
                 </p>
               </div>
               {due ? (

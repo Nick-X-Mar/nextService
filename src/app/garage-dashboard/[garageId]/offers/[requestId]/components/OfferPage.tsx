@@ -735,13 +735,13 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={`${styles.label} mb-2 block`}>
-                Ποσό Προσφοράς <span className="text-tertiary">*</span>
+                Ποσό Προσφοράς χωρίς ΦΠΑ <span className="text-tertiary">*</span>
               </label>
               <input
                 type="number"
                 value={offerAmount || ''}
                 onChange={(e) => handleOfferAmountChange(e.target.value)}
-                placeholder="Εισάγετε ποσό σε €"
+                placeholder="Ποσό σε €, χωρίς ΦΠΑ"
                 className={styles.input}
                 required
                 disabled={readOnly}
@@ -763,7 +763,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
           {estimatedCost > 0 && (
             <p className="mt-4 text-xs text-on-surface-variant flex items-center gap-1">
               <Icon name="info" size="sm" className="text-on-surface-variant/70" />
-              Ο πελάτης είδε ενδεικτική εκτίμηση από {estimatedCost}€, με βάση αντίστοιχες
+              Ο πελάτης είδε ενδεικτική εκτίμηση από {estimatedCost}€ + ΦΠΑ, με βάση αντίστοιχες
               εργασίες που έχουμε αναλάβει.
             </p>
           )}

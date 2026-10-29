@@ -12,27 +12,16 @@ import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
 import { randomUUID } from 'crypto'
 import { TERMS_VERSION } from '@/lib/legal'
+import { stringList } from '@/utils/stringList'
 
 const checkRateLimit = createRateLimiter('register-pro', 3, 3600000)
-
-/** Free-text chips from the form: strings only, trimmed, a sane number of them. */
-function stringList(raw: unknown, max = 20, maxLength = 200): string[] {
-  if (!Array.isArray(raw)) return []
-  const out: string[] = []
-  for (const item of raw) {
-    if (typeof item !== 'string') continue
-    const text = item.trim()
-    if (text && text.length <= maxLength && !out.includes(text)) out.push(text)
-  }
-  return out.slice(0, max)
-}
 
 const optionalText = (raw: unknown) => (typeof raw === 'string' ? raw.trim() : '')
 
 async function _POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { companyName, contactFirstName, contactLastName, tin, email, password, taxAuthority, address, mobile, benefits, services, acceptedTerms } = body
+    const { companyName, contactFirstName, contactLastName, tin, email, password, taxAuthority, address, mobile, benefits, acceptedTerms } = body
 
     if (acceptedTerms !== true) {
       return NextResponse.json(
@@ -184,7 +173,6 @@ async function _POST(request: NextRequest) {
       isActive: false,
       description: 'Εταιρεία εγγεγραμμένη στο NextService',
       benefits: stringList(benefits),
-      services: stringList(services),
       acceptedTermsAt: nowIso,
       acceptedTermsVersion: TERMS_VERSION,
       createdAt: nowIso,

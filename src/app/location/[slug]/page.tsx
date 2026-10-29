@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
+import PlusVat from '@/components/PlusVat'
 import { ACTIVE_GARAGE_LOCATIONS } from '@/data/locations'
 import { getAllAreas, getAreaContent } from '@/lib/site-content'
 import { RichLine } from '@/components/content/RichText'
@@ -282,6 +283,7 @@ export default async function LocationPage({ params }: PageProps) {
                       </span>
                       <span className="text-base font-black text-primary whitespace-nowrap">
                         {o.price}
+                        <PlusVat />
                       </span>
                     </Link>
                   </li>

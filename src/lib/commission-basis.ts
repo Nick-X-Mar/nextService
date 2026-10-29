@@ -1,6 +1,5 @@
 import {
   DEFAULT_VAT_RATE,
-  splitVat,
   type CompletionAmounts,
   type CompletionOutcome,
 } from '@/types/reviews'
@@ -73,11 +72,11 @@ export function isCommissionable(request: BillableFields): boolean {
  * passed straight on; charging commission on it would bill the garage for
  * handling someone else's tax.
  *
- * The quote remains the fallback for jobs closed before this shipped, and for
- * anything an admin closes without a declared amount. A quote is what the
- * client was told they would pay, VAT included, so the fallback is the net
- * part of it too — otherwise an undeclared job would cost the garage more
- * commission than a declared one for the same price.
+ * The quote remains the fallback for jobs closed before this shipped, for a
+ * booking whose day has come without a declaration, and for anything an admin
+ * closes without a declared amount. Garages quote net of VAT (every price they
+ * give is shown "+ ΦΠΑ"), so the quote is already a net figure and is used
+ * as it is.
  */
 export function commissionBasis(request: {
   finalAmounts?: CompletionAmounts
@@ -89,7 +88,7 @@ export function commissionBasis(request: {
   }
   const quoted = request.appointmentPrice
   return {
-    amount: typeof quoted === 'number' && quoted > 0 ? splitVat(quoted, 'gross', DEFAULT_VAT_RATE).net : 0,
+    amount: typeof quoted === 'number' && quoted > 0 ? roundCents(quoted) : 0,
     source: 'quoted',
   }
 }

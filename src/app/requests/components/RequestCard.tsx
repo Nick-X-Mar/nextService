@@ -6,6 +6,7 @@ import { ServiceRequestStatus } from '../../../types/statuses'
 import type { ServiceRequest } from '../../../types/requests'
 import { SERVICE_CATEGORIES, getCategoryText } from '@/utils/categoryLabels'
 import { hasAppointmentStarted } from '@/lib/appointment-window'
+import PlusVat from '@/components/PlusVat'
 
 interface RequestCardProps {
   request: ServiceRequest
@@ -159,13 +160,13 @@ export default function RequestCard({
           {estimatedCost && (
             <div className="text-right mr-2 hidden md:block">
               <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">Εκτίμηση</p>
-              <p className="text-xl font-bold text-tertiary">{estimatedCost}€</p>
+              <p className="text-xl font-bold text-tertiary">{estimatedCost}€<PlusVat /></p>
             </div>
           )}
           {/* Mobile: cost shown inline */}
           {estimatedCost && (
             <div className="text-left mr-auto md:hidden">
-              <p className="text-lg font-bold text-tertiary">{estimatedCost}€</p>
+              <p className="text-lg font-bold text-tertiary">{estimatedCost}€<PlusVat /></p>
             </div>
           )}
           {onChatClick && request.status !== ServiceRequestStatus.APPOINTMENT && (

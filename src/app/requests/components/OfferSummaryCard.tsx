@@ -2,6 +2,7 @@
 
 import Icon from '@/components/ui/Icon'
 import { OfferStatus } from '../../../types/statuses'
+import PlusVat from '@/components/PlusVat'
 
 interface OfferSummaryOffer {
   id: string
@@ -87,7 +88,7 @@ export default function OfferSummaryCard({ offer, index, isLast, onClick }: Offe
 
       {/* Price */}
       <div className="flex items-center gap-2 flex-shrink-0">
-        <p className="text-base font-black text-on-surface">{price}€</p>
+        <p className="text-base font-black text-on-surface whitespace-nowrap">{price}€<PlusVat /></p>
         <Icon name="chevron_right" size="sm" className="text-on-surface-variant" />
       </div>
     </button>

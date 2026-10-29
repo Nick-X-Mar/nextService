@@ -10,7 +10,7 @@ import { withMetrics } from '@/utils/withMetrics'
 // "critical > 300 days". If it drops below the thresholds, something is
 // wrong with the rotator.
 
-const REGION = process.env.SES_REGION || process.env.REGION || 'eu-central-1'
+const REGION = process.env.NEXT_PUBLIC_APPSYNC_REGION || process.env.REGION || 'eu-central-1'
 
 // Thresholds for banner severity. Below `critical`, the banner is red and
 // the admin needs to redeploy urgently (the rotator has likely failed for
@@ -37,24 +37,17 @@ function getClient(): AppSyncClient {
   return sharedClient
 }
 
-function extractApiIdFromEndpoint(): string | null {
-  // The SSR runtime gets the same NEXT_PUBLIC_* vars as the client. The
-  // endpoint looks like `{apiId}.appsync-api.{region}.amazonaws.com`.
-  const endpoint = process.env.NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT || ''
-  const host = endpoint.replace(/^https?:\/\//, '').replace(/\/.*$/, '')
-  const m = host.match(/^([^.]+)\.appsync-api\./)
-  return m ? m[1] : null
-}
-
 async function computeHealth(): Promise<ApiKeyHealth> {
-  const apiId = extractApiIdFromEndpoint()
+  // Set by the Amplify stack. The endpoints' host prefix is not the API id
+  // (an Events API's DNS name is its own), so it cannot be derived from them.
+  const apiId = process.env.APPSYNC_API_ID || null
   if (!apiId) {
     return {
       apiId: null,
       expiresAt: null,
       daysRemaining: null,
       severity: 'unknown',
-      message: 'AppSync endpoint env var not set — cannot determine expiration.'
+      message: 'APPSYNC_API_ID is not set — cannot determine expiration.'
     }
   }
 

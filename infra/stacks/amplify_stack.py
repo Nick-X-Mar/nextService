@@ -15,6 +15,16 @@ from aws_cdk import (
 from constructs import Construct
 
 
+# Regions an account has to enable before use. Services there act under
+# regional principals (`<service>.<region>.amazonaws.com`).
+OPT_IN_REGIONS = {
+    "eu-south-1", "eu-south-2", "eu-central-2",
+    "me-south-1", "me-central-1", "af-south-1", "il-central-1",
+    "ap-east-1", "ap-south-2", "ap-southeast-3", "ap-southeast-4",
+    "ca-west-1",
+}
+
+
 class AmplifyStack(Stack):
     """Amplify Hosting for the Next.js app, with env vars wired from other stacks."""
 
@@ -28,11 +38,13 @@ class AmplifyStack(Stack):
         github_token_secret_name: str,
         auth_secrets_name: str,
         branch: str = "main",
+        role_name: str,
         s3_bucket_name: str,
-        site_url: str,
+        site_url: str | None,
         appsync_http_endpoint: str,
         appsync_realtime_endpoint: str,
         appsync_api_key: str,
+        appsync_api_id: str,
         realtime_secret_name: str,
         **kwargs,
     ) -> None:
@@ -111,11 +123,20 @@ class AmplifyStack(Stack):
         # Attach AWSLambdaBasicExecutionRole so the SSR runtime auto-creates
         # `/aws/amplify/<appId>` log group and writes stdout/stderr there —
         # matches the pattern Amplify's default managed compute role uses.
+        # In an opt-in region (Milan) Amplify assumes the role as its regional
+        # principal; with only the global one every build fails at the start
+        # with "Unable to assume specified IAM Role".
+        amplify_principals = [iam.ServicePrincipal("amplify.amazonaws.com")]
+        if self.region in OPT_IN_REGIONS:
+            amplify_principals.append(
+                iam.ServicePrincipal(f"amplify.{self.region}.amazonaws.com")
+            )
         self.amplify_role = iam.Role(
             self, "AmplifyRole",
-            role_name="nextservice-amplify-role",
+            # IAM names are account-global, so each stage needs its own.
+            role_name=role_name,
             assumed_by=iam.CompositePrincipal(
-                iam.ServicePrincipal("amplify.amazonaws.com"),
+                *amplify_principals,
                 iam.ServicePrincipal("lambda.amazonaws.com"),
             ),
             managed_policies=[
@@ -186,7 +207,8 @@ class AmplifyStack(Stack):
             ],
         ))
 
-        # S3 access — wildcard so one role works across envs (staging/production/...)
+        # S3 access — this stage's bucket only. Bucket names are global, so a
+        # wildcard would let one stage's server read the other's photos.
         self.amplify_role.add_to_policy(iam.PolicyStatement(
             sid="S3Access",
             actions=[
@@ -196,8 +218,8 @@ class AmplifyStack(Stack):
                 "s3:ListBucket",
             ],
             resources=[
-                "arn:aws:s3:::nextservice-uploads-*",
-                "arn:aws:s3:::nextservice-uploads-*/*",
+                f"arn:aws:s3:::{s3_bucket_name}",
+                f"arn:aws:s3:::{s3_bucket_name}/*",
             ],
         ))
 
@@ -353,6 +375,12 @@ frontend:
                     name="NEXT_PUBLIC_APPSYNC_API_KEY",
                     value=appsync_api_key,
                 ),
+                # Read by the admin key health check. The endpoints' host prefix
+                # is not the API id, so it cannot be derived from them.
+                amplify.CfnApp.EnvironmentVariableProperty(
+                    name="APPSYNC_API_ID",
+                    value=appsync_api_id,
+                ),
                 amplify.CfnApp.EnvironmentVariableProperty(
                     name="AMPLIFY_ROLE_ARN",
                     value=self.amplify_role.role_arn,
@@ -399,11 +427,6 @@ frontend:
                     name="REALTIME_JWT_SECRET",
                     value=SecretValue.secrets_manager(realtime_secret_name).unsafe_unwrap(),
                 ),
-                # SEO — public-facing origin for canonical URLs, OG tags,
-                # sitemap, robots, JSON-LD. Set per-deploy from app.py.
-                amplify.CfnApp.EnvironmentVariableProperty(
-                    name="SITE_URL", value=site_url,
-                ),
                 # Payments feature flags — disabled for the launch phase
                 # (free booking, no deposit, no refunds flow). Flip to "true"
                 # once the Stripe integration is ready to go live.
@@ -415,6 +438,13 @@ frontend:
                 ),
             ],
         )
+
+        # SEO — public-facing origin for canonical URLs, OG tags, sitemap,
+        # robots, JSON-LD and emailed links. Set per stage from app.py; until a
+        # stage has one (its first deploy) it is the Amplify default domain.
+        # It sits on the branch because the app can't reference its own
+        # default domain in its own env vars (a circular dependency).
+        branch_site_url = site_url or f"https://{branch}.{self.amplify_app.attr_default_domain}"
         # Amplify env vars resolve `{{resolve:secretsmanager:...}}` at deploy
         # time, so the secret must exist before the app is created/updated.
         self.amplify_app.node.add_dependency(auth_secrets_cr)
@@ -431,6 +461,11 @@ frontend:
             stage="PRODUCTION",
             enable_auto_build=True,
             compute_role_arn=self.amplify_role.role_arn,
+            environment_variables=[
+                amplify.CfnBranch.EnvironmentVariableProperty(
+                    name="SITE_URL", value=branch_site_url,
+                ),
+            ],
         )
 
         # ── Outputs ─────────────────────────────────────────────

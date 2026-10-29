@@ -67,9 +67,28 @@ class NotificationsStack(Stack):
         app_url: str,
         notifications_enabled: bool = True,
         ses_from_address: str = "no-reply@nextservice.gr",
+        manage_ses_identity: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
+
+        # ── SES domain identity ─────────────────────────────────
+        # SES identities are regional: a stage in a new region can't send as
+        # nextservice.gr until the domain is verified there too. Easy DKIM
+        # gives three CNAMEs (stack outputs below) to add at the domain's DNS
+        # host; once they resolve SES verifies the domain by itself. Those
+        # signatures are also what passes the domain's strict DMARC
+        # (adkim=s), since the MAIL FROM is SES's own and SPF can't align.
+        # A new region also starts in the SES sandbox — production access is
+        # an account request per region, not something a stack can set.
+        if manage_ses_identity:
+            domain_identity = ses.EmailIdentity(
+                self, "DomainIdentity",
+                identity=ses.Identity.domain(ses_from_address.split("@", 1)[1]),
+            )
+            for i, record in enumerate(domain_identity.dkim_records, start=1):
+                CfnOutput(self, f"DkimRecord{i}",
+                          value=f"{record.name} CNAME {record.value}")
 
         # ── SES Configuration Set ───────────────────────────────
         # Every outbound email is tagged with this config set (via the

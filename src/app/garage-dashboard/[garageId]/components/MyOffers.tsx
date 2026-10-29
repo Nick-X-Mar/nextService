@@ -10,6 +10,7 @@ import { getCategoryText } from '@/utils/categoryLabels'
 import { isGarageInactive } from './garageInactive'
 import { formatAppointment, garageOfferState, offerStatusClass, offerStatusIcon, offerStatusLabel } from './offerStatus'
 import { clientDisplayName, clientInitials } from './clientLabel'
+import { PLUS_VAT } from '@/utils/vat'
 
 interface Offer {
   id: string
@@ -197,7 +198,7 @@ export default function MyOffers({ garageId, onInactive }: MyOffersProps) {
                 <div className="text-right">
                   <p className="text-2xl font-black text-primary tracking-tight">
                     {typeof price === 'number' ? price.toLocaleString('el-GR') : '-'}{' '}
-                    <span className="text-sm font-bold text-on-surface-variant">€</span>
+                    <span className="text-sm font-bold text-on-surface-variant">€ {PLUS_VAT}</span>
                   </p>
                   <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mt-1">
                     {new Date(offer.createdAt).toLocaleDateString('el-GR')}

@@ -3,6 +3,7 @@
 import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
 import type { PriceEstimate } from '@/hooks/usePriceEstimate'
+import PlusVat from '@/components/PlusVat'
 
 interface EstimatedCostCardProps {
   estimate: PriceEstimate | null
@@ -75,7 +76,7 @@ export default function EstimatedCostCard({ estimate, isLoading }: EstimatedCost
               <p className="text-sm font-medium">Υπολογισμός...</p>
             </div>
           ) : (
-            <p className="text-xl font-black text-primary">{estimate.estimatedCost}€</p>
+            <p className="text-xl font-black text-primary">{estimate.estimatedCost}€<PlusVat /></p>
           )}
         </div>
       </div>

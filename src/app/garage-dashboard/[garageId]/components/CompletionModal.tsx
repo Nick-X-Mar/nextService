@@ -26,9 +26,10 @@ const VAT_RATE = DECLARABLE_VAT_RATES[0]
  * and ignore a second one. Only the first two are required; the rating is
  * optional and clearly marked as such.
  *
- * The amount is entered as the garage thinks of it: the figure on the receipt,
- * VAT included. The net is derived and shown live, because that is the number
- * commission is calculated on and it should never be a surprise later.
+ * The amount is entered as the garage quotes: net of VAT by default, with a
+ * switch for a receipt total that includes it. The split is shown live, because
+ * the net is the number commission is calculated on and it should never be a
+ * surprise later.
  */
 export default function CompletionModal({
   isOpen,
@@ -47,7 +48,8 @@ export default function CompletionModal({
 }) {
   const [outcome, setOutcome] = useState<CompletionOutcome>('completed')
   const [amount, setAmount] = useState(quotedPrice ? String(quotedPrice) : '')
-  const [vatIncluded, setVatIncluded] = useState(true)
+  // Garages quote net of VAT, so the quote it is pre-filled with is a net figure.
+  const [vatIncluded, setVatIncluded] = useState(false)
   const [notes, setNotes] = useState('')
   const [rating, setRating] = useState(0)
   const [comment, setComment] = useState('')
@@ -178,7 +180,7 @@ export default function CompletionModal({
               </div>
               {typeof quotedPrice === 'number' && quotedPrice > 0 && (
                 <p className="text-xs text-on-surface-variant mt-1">
-                  Είχες δώσει προσφορά {quotedPrice.toFixed(2)}€
+                  Είχες δώσει προσφορά {quotedPrice.toFixed(2)}€ + ΦΠΑ
                 </p>
               )}
             </div>

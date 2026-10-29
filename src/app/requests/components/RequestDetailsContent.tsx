@@ -15,6 +15,8 @@ import { ServiceRequestStatus, OfferStatus } from '../../../types/statuses'
 import type { ServiceRequest } from '../../../types/requests'
 import type { SavedCard } from '@/types/payments'
 import { slotsForDate, type AvailabilitySlots } from '@/utils/availabilitySlots'
+import PlusVat from '@/components/PlusVat'
+import { PLUS_VAT } from '@/utils/vat'
 
 interface Offer {
   id: string
@@ -1043,8 +1045,9 @@ export default function RequestDetailsContent({
                         <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
                           {isAcceptedOffer ? 'Τελικό ποσό' : 'Τιμή'}
                         </p>
-                        <p className="text-xl font-black text-on-surface">
+                        <p className="text-xl font-black text-on-surface whitespace-nowrap">
                           {formatCurrency(offer.appointmentPrice ?? offer.offerAmount)}
+                          <PlusVat />
                         </p>
                         {isAcceptedOffer && request.appointmentDate && (
                           <p className="text-xs font-bold text-green-700 mt-1 flex items-center gap-1 justify-end">
@@ -1057,7 +1060,7 @@ export default function RequestDetailsContent({
                             price whenever there was no estimate — JSX renders 0. */}
                         {(offer.estimatedCost ?? 0) > 0 && (
                           <p className="text-xs text-on-surface-variant mt-1">
-                            Εκτιμώμενο: {formatCurrency(offer.estimatedCost)}
+                            Εκτιμώμενο: {formatCurrency(offer.estimatedCost)} {PLUS_VAT}
                           </p>
                         )}
                         </div>

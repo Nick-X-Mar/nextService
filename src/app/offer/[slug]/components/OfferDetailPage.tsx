@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge'
 import { useNavigation } from '@/hooks/useNavigation'
 import { startNewRequest } from '@/utils/formStorage'
 import { getCategoryText } from '@/utils/categoryLabels'
+import PlusVat from '@/components/PlusVat'
+import { withPlusVat } from '@/utils/vat'
 
 interface Offer {
   id?: string
@@ -51,8 +53,8 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
     if (!offer) return
     const url = `${window.location.origin}/offer/${offer.slug}`
     const shareData = {
-      title: `${offer.title} - ${offer.price} | NextService`,
-      text: `${offer.title} σε ${offer.subtitle}: ${offer.price}. Πραγματική τιμή από εργασία που έγινε μέσω NextService.`,
+      title: `${offer.title} - ${withPlusVat(offer.price)} | NextService`,
+      text: `${offer.title} σε ${offer.subtitle}: ${withPlusVat(offer.price)}. Πραγματική τιμή από εργασία που έγινε μέσω NextService.`,
       url,
     }
 
@@ -159,6 +161,7 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
           <div className="flex items-baseline gap-2">
             <span className="text-4xl font-black text-tertiary">
               {offer.price}
+              <PlusVat />
             </span>
           </div>
 

@@ -5,6 +5,7 @@ import sharp from 'sharp'
 import { getOfferBySlug } from '@/lib/offers'
 import { loadLogoDataUri } from '@/lib/og-logo'
 import { getCategoryText } from '@/utils/categoryLabels'
+import { PLUS_VAT } from '@/utils/vat'
 
 export const runtime = 'nodejs'
 export const alt = 'NextService προσφορά'
@@ -207,8 +208,11 @@ export default async function Image({ params }: Params) {
                 <div style={{ fontSize: 22, fontWeight: 600, opacity: 0.8, textTransform: 'uppercase', letterSpacing: 2 }}>
                   Κόστισε
                 </div>
-                <div style={{ fontSize: 108, fontWeight: 900, color: '#ff9900', lineHeight: 1, letterSpacing: -3 }}>
-                  {price}
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
+                  <div style={{ fontSize: 108, fontWeight: 900, color: '#ff9900', lineHeight: 1, letterSpacing: -3 }}>
+                    {price}
+                  </div>
+                  <div style={{ fontSize: 40, fontWeight: 700, color: '#ff9900' }}>{PLUS_VAT}</div>
                 </div>
               </div>
             )}

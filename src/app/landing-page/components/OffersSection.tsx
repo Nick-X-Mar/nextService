@@ -5,6 +5,7 @@ import staticOffers from '../../../data/offers.json'
 import Link from 'next/link'
 import Image from 'next/image'
 import Icon from '@/components/ui/Icon'
+import PlusVat from '@/components/PlusVat'
 import { Badge } from '@/components/ui/badge'
 import { motion, useMotionValue, useSpring } from 'motion/react'
 
@@ -252,6 +253,7 @@ export default function OffersSection() {
                       <div className="flex items-baseline gap-2">
                         <span className="text-3xl font-black text-tertiary drop-shadow-lg">
                           {offer.price}
+                          <PlusVat />
                         </span>
                       </div>
 

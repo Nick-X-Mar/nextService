@@ -104,7 +104,7 @@ const renderers: Record<EmailTemplateName, TemplateRenderer> = {
       subject,
       bodyHtml: `
         <h2 style="margin:0 0 16px 0;font-size:20px;">Νέα προσφορά για το αίτημά σου</h2>
-        <p>Το συνεργείο <strong>${v.garageName || ''}</strong> σου έστειλε προσφορά${v.offerAmount ? ` ύψους <strong>${v.offerAmount}€</strong>` : ''}.</p>
+        <p>Το συνεργείο <strong>${v.garageName || ''}</strong> σου έστειλε προσφορά${v.offerAmount ? ` ύψους <strong>${v.offerAmount}€ + ΦΠΑ</strong>` : ''}.</p>
         <p>Μπες στην εφαρμογή για να δεις τις λεπτομέρειες, να συνομιλήσεις με το συνεργείο και να αποδεχτείς εφόσον σε ενδιαφέρει.</p>
       `,
       ctaLabel: 'Δες την προσφορά',
@@ -118,7 +118,7 @@ const renderers: Record<EmailTemplateName, TemplateRenderer> = {
       subject,
       bodyHtml: `
         <h2 style="margin:0 0 16px 0;font-size:20px;">Συγχαρητήρια!</h2>
-        <p>Ο πελάτης αποδέχτηκε την προσφορά σου${v.offerAmount ? ` ύψους <strong>${v.offerAmount}€</strong>` : ''}${v.appointmentDate ? ` και προγραμμάτισε ραντεβού για <strong>${greekDate(v.appointmentDate)}</strong>` : ''}.</p>
+        <p>Ο πελάτης αποδέχτηκε την προσφορά σου${v.offerAmount ? ` ύψους <strong>${v.offerAmount}€ + ΦΠΑ</strong>` : ''}${v.appointmentDate ? ` και προγραμμάτισε ραντεβού για <strong>${greekDate(v.appointmentDate)}</strong>` : ''}.</p>
         <p>Δες τις λεπτομέρειες του ραντεβού στο dashboard σου.</p>
       `,
       ctaLabel: 'Άνοιγμα dashboard',
@@ -132,7 +132,7 @@ const renderers: Record<EmailTemplateName, TemplateRenderer> = {
       subject,
       bodyHtml: `
         <h2 style="margin:0 0 16px 0;font-size:20px;">Το ραντεβού σου επιβεβαιώθηκε</h2>
-        <p>Έχεις προγραμματίσει ραντεβού με το συνεργείο <strong>${v.garageName || ''}</strong> για τις <strong>${greekDate(v.appointmentDate)}</strong>${v.appointmentPrice ? ` με συμφωνημένο κόστος <strong>${v.appointmentPrice}€</strong>` : ''}.</p>
+        <p>Έχεις προγραμματίσει ραντεβού με το συνεργείο <strong>${v.garageName || ''}</strong> για τις <strong>${greekDate(v.appointmentDate)}</strong>${v.appointmentPrice ? ` με συμφωνημένο κόστος <strong>${v.appointmentPrice}€ + ΦΠΑ</strong>` : ''}.</p>
         <p>Μπορείς να δεις όλες τις λεπτομέρειες στην εφαρμογή.</p>
       `,
       ctaLabel: 'Δες το ραντεβού',
@@ -175,7 +175,7 @@ const renderers: Record<EmailTemplateName, TemplateRenderer> = {
       bodyHtml: `
         <h2 style="margin:0 0 16px 0;font-size:20px;">Η πληρωμή σου ολοκληρώθηκε</h2>
         <p>Καταβλήθηκε προκαταβολή <strong>${v.depositAmount || ''}€</strong> για το ραντεβού σου με το συνεργείο <strong>${v.garageName || ''}</strong> στις <strong>${greekDate(v.appointmentDate)}</strong>.</p>
-        <p><strong>Υπόλοιπο στο συνεργείο:</strong> ${v.remainingAmount || ''}€</p>
+        <p><strong>Υπόλοιπο στο συνεργείο:</strong> ${v.remainingAmount || ''}€ + ΦΠΑ</p>
         <p>Μπορείς να δεις τις λεπτομέρειες στην εφαρμογή.</p>
       `,
       ctaLabel: 'Δες το ραντεβού',

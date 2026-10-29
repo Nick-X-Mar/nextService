@@ -7,6 +7,7 @@ import StripeProvider from '@/components/StripeProvider'
 import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
 import type { SavedCard } from '@/types/payments'
+import PlusVat from '@/components/PlusVat'
 
 interface PaymentModalProps {
   isOpen: boolean
@@ -115,7 +116,7 @@ function BreakdownStep({
       <div className="bg-surface-container rounded-xl p-4 space-y-3">
         <div className="flex justify-between items-center">
           <span className="text-sm text-on-surface-variant">Ποσό προσφοράς</span>
-          <span className="text-sm font-medium text-on-surface">{offerAmount.toFixed(2)}€</span>
+          <span className="text-sm font-medium text-on-surface">{offerAmount.toFixed(2)}€<PlusVat /></span>
         </div>
         <div className="border-t border-outline-variant/20" />
         <div className="flex justify-between items-center">
@@ -124,7 +125,7 @@ function BreakdownStep({
         </div>
         <div className="flex justify-between items-center">
           <span className="text-sm text-on-surface-variant">Υπόλοιπο στο συνεργείο</span>
-          <span className="text-sm font-medium text-on-surface">{remainingAmount.toFixed(2)}€</span>
+          <span className="text-sm font-medium text-on-surface">{remainingAmount.toFixed(2)}€<PlusVat /></span>
         </div>
       </div>
 

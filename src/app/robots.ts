@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next'
-import { SITE_URL } from '@/lib/site-url'
+import { IS_INDEXABLE, SITE_URL } from '@/lib/site-url'
 
 // Crawl-budget control for authenticated app areas. Every one of these also
 // carries `robots: { index: false, follow: false }` on its layout, so the
@@ -25,6 +25,10 @@ const disallowPrivate = [
 ]
 
 export default function robots(): MetadataRoute.Robots {
+  // A staging host, or production before the domain cutover: keep everyone out.
+  if (!IS_INDEXABLE) {
+    return { rules: { userAgent: '*', disallow: '/' } }
+  }
   return {
     rules: [
       {

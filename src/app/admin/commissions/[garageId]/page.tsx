@@ -16,7 +16,7 @@ interface AppointmentRow {
   clientName: string
   vehicleLabel: string
   category: string
-  /** The quote, VAT included. */
+  /** The quote, net of VAT. */
   appointmentPrice: number
   /** The net figure the commission was taken from. */
   basisAmount: number
@@ -167,7 +167,7 @@ export default function GarageCommissionsPage({ params }: { params: Promise<{ ga
     },
     {
       key: 'appointmentPrice',
-      header: 'Προσφορά (με ΦΠΑ)',
+      header: 'Προσφορά (χωρίς ΦΠΑ)',
       sortable: true,
       render: (item) => formatEUR(item.appointmentPrice),
     },

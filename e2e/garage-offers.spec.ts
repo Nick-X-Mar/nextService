@@ -518,7 +518,7 @@ test.describe('The offer page', () => {
     await page.goto(`/garage-dashboard/${shop.id}/offers/${requestId}/`)
     await expect(page.getByText('Το αίτημα ακυρώθηκε')).toBeVisible({ timeout: 45_000 })
     await expect(page.getByText('Ακυρώθηκε', { exact: true })).toBeVisible()
-    await expect(page.getByPlaceholder('Εισάγετε ποσό σε €')).toBeDisabled()
+    await expect(page.getByPlaceholder('Ποσό σε €, χωρίς ΦΠΑ')).toBeDisabled()
     await expect(page.getByRole('button', { name: /Ενημέρωση Προσφοράς/ })).toHaveCount(0)
   })
 
@@ -540,7 +540,7 @@ test.describe('The offer page', () => {
     await page.goto(`/garage-dashboard/${shop.id}/offers/${requestId}/`)
     await expect(page.getByText('Η προσφορά δεν είναι πλέον ενεργή')).toBeVisible({ timeout: 45_000 })
     await expect(page.getByText('Απορρίφθηκε', { exact: true })).toBeVisible()
-    await expect(page.getByPlaceholder('Εισάγετε ποσό σε €')).toBeDisabled()
+    await expect(page.getByPlaceholder('Ποσό σε €, χωρίς ΦΠΑ')).toBeDisabled()
     await expect(page.getByRole('button', { name: /Ενημέρωση Προσφοράς/ })).toHaveCount(0)
   })
 })
@@ -649,7 +649,7 @@ test.describe.serial('Offer form sends hours', () => {
     await expect(page.getByRole('heading', { name: 'Νέα Προσφορά' })).toBeVisible({ timeout: 20_000 })
     await expect(page.getByText('Δεν έχει σταλεί', { exact: true })).toBeVisible()
 
-    await page.getByPlaceholder('Εισάγετε ποσό σε €').fill('175')
+    await page.getByPlaceholder('Ποσό σε €, χωρίς ΦΠΑ').fill('175')
     // Any two bookable days; which ones does not matter.
     const days = page.locator('td[data-day]:not([data-disabled]):not([data-outside]):not([data-hidden]) button')
     await days.nth(0).click()

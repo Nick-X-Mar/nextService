@@ -13,6 +13,7 @@ import CompletionModal from './CompletionModal'
 import { isGarageInactive } from './garageInactive'
 import { formatAppointment, isUpcomingAppointment } from './offerStatus'
 import { clientDisplayName, clientInitials, telHref } from './clientLabel'
+import { PLUS_VAT } from '@/utils/vat'
 
 interface Offer {
   id: string
@@ -238,7 +239,7 @@ export default function Appointments({ garageId, onInactive }: AppointmentsProps
                       ? offer.appointmentPrice
                       : offer.offerAmount
                     )?.toLocaleString('el-GR') ?? '-'}{' '}
-                    <span className="text-sm font-bold text-on-surface-variant">€</span>
+                    <span className="text-sm font-bold text-on-surface-variant">€ {PLUS_VAT}</span>
                   </p>
                 </div>
               </div>

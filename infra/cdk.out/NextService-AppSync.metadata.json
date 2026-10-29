@@ -119,6 +119,12 @@
       "data": "ExportsOutputFnGetAttChatApiKeyApiKeyCBB19482"
     }
   ],
+  "/NextService-AppSync/Exports/Output{\"Fn::GetAtt\":[\"ChatEventsApi\",\"ApiId\"]}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputFnGetAttChatEventsApiApiId96C43684"
+    }
+  ],
   "/NextService-AppSync/EventsAuthorizerFn/ServiceRole/Resource": [
     {
       "type": "aws:cdk:logicalId",

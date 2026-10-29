@@ -360,8 +360,8 @@
        ],
        "Effect": "Allow",
        "Resource": [
-        "arn:aws:s3:::nextservice-uploads-*",
-        "arn:aws:s3:::nextservice-uploads-*/*"
+        "arn:aws:s3:::nextservice-uploads-766671488262-staging",
+        "arn:aws:s3:::nextservice-uploads-766671488262-staging/*"
        ],
        "Sid": "S3Access"
       },
@@ -489,6 +489,12 @@
       }
      },
      {
+      "Name": "APPSYNC_API_ID",
+      "Value": {
+       "Fn::ImportValue": "NextService-AppSync:ExportsOutputFnGetAttChatEventsApiApiId96C43684"
+      }
+     },
+     {
       "Name": "AMPLIFY_ROLE_ARN",
       "Value": {
        "Fn::GetAtt": [
@@ -538,10 +544,6 @@
       "Value": "{{resolve:secretsmanager:nextservice/realtime-jwt-secret:SecretString:::}}"
      },
      {
-      "Name": "SITE_URL",
-      "Value": "https://dev.d3ku6yajf4j6y8.amplifyapp.com"
-     },
-     {
       "Name": "NEXT_PUBLIC_PAYMENTS_ENABLED",
       "Value": "false"
      },
@@ -584,6 +586,12 @@
      ]
     },
     "EnableAutoBuild": true,
+    "EnvironmentVariables": [
+     {
+      "Name": "SITE_URL",
+      "Value": "https://dev.d3ku6yajf4j6y8.amplifyapp.com"
+     }
+    ],
     "Stage": "PRODUCTION"
    },
    "Metadata": {

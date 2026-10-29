@@ -205,7 +205,8 @@ test.describe('Accepting an offer the garage changed or can no longer honour', (
     await loginAsClient(page, request, c.email, PASSWORD)
     await page.goto(`/requests/${c.clientId}/details/${requestId}/`)
     // The card's price on its own — the error banner below quotes figures too.
-    const price = (euros: number) => page.getByText(new RegExp(`^${euros}\\s€$`))
+    // Garages quote net, so the card says "+ ΦΠΑ" after it.
+    const price = (euros: number) => page.getByText(new RegExp(`^${euros}\\s€\\s*\\+ ΦΠΑ$`))
     await expect(price(100)).toBeVisible({ timeout: 60_000 })
 
     // The garage re-prices while the page is open.
@@ -400,7 +401,7 @@ test.describe('Commissions', () => {
 
     const noShow = await bookedAppointment(request, c, { description: 'E2E lifecycle: no-show', offerAmount: 310 })
     const done = await bookedAppointment(request, c, { description: 'E2E lifecycle: billed', offerAmount: 150 })
-    const legacy = await bookedAppointment(request, c, { description: 'E2E lifecycle: legacy', offerAmount: 124 })
+    const legacy = await bookedAppointment(request, c, { description: 'E2E lifecycle: legacy', offerAmount: 100 })
     const date = await ageAppointment(noShow.requestId, 2)
     await ageAppointment(done.requestId, 2)
     await ageAppointment(legacy.requestId, 2)
@@ -425,7 +426,7 @@ test.describe('Commissions', () => {
 
     // Closed with no outcome, nothing declared: what jobs closed before the
     // completion flow look like.
-    const legacyResp = await complete(request, legacy.garage, legacy.requestId, { outcome: 'completed', amount: 124 })
+    const legacyResp = await complete(request, legacy.garage, legacy.requestId, { outcome: 'completed', amount: 100 })
     expect(legacyResp.status()).toBe(200)
     await makeLegacyCompletion(legacy.requestId)
 
@@ -455,10 +456,10 @@ test.describe('Commissions', () => {
     expect(billed?.basis).toBe('declared')
     expect(billed?.basisAmount).toBe(150) // 186 gross at 24%
 
-    // The quote is VAT-inclusive, so the fallback bills its net: 124 → 100.
+    // Garages quote net of VAT, so the fallback bills the quote as it is.
     const fallback = rows.find((r) => r.requestId === legacy.requestId)
     expect(fallback?.basis).toBe('quoted')
-    expect(fallback?.appointmentPrice).toBe(124)
+    expect(fallback?.appointmentPrice).toBe(100)
     expect(fallback?.basisAmount).toBe(100)
   })
 })
@@ -646,7 +647,7 @@ test.describe('Commission from the appointment day', () => {
     const book = async (description: string) => {
       const date = athensDatePlus(30)
       const requestId = await createRequest(request, c, description)
-      const offerId = await createOffer(request, shop.token, requestId, 124, [date])
+      const offerId = await createOffer(request, shop.token, requestId, 100, [date])
       const accept = await acceptOffer(request, c, requestId, { offerId, appointmentDate: date, appointmentTime: '10:00' })
       expect(accept.status(), await accept.text()).toBe(200)
       return requestId
@@ -670,7 +671,7 @@ test.describe('Commission from the appointment day', () => {
     const month = (await ageAppointment(undeclared, 2)).slice(0, 7)
     expect((await ageAppointment(noShow, 2)).slice(0, 7)).toBe(month)
 
-    // The day has come and the garage has said nothing: billed on the quote's net (124 → 100).
+    // The day has come and the garage has said nothing: billed on the quote, which is already net.
     let page = await detail(month)
     const ids = (rows: { requestId: string }[]) => rows.map((r) => r.requestId)
     expect(ids(page.appointments)).toEqual(expect.arrayContaining([undeclared, noShow]))

@@ -5,6 +5,7 @@ import { queryIndexOrScan } from '@/utils/indexQuery'
 import { requireOwner } from '@/utils/requireAuth'
 import { getAuthFromRequest } from '@/utils/auth'
 import { withMetrics } from '@/utils/withMetrics'
+import { stringList } from '@/utils/stringList'
 
 async function _GET(
   request: NextRequest,
@@ -215,5 +216,55 @@ async function _PUT(
   }
 }
 
+/**
+ * Saves only the garage's benefits (the "Παροχές" clients see next to its
+ * offers). The registration flow's extra-services step calls this right after
+ * sign-up, when the garage is still pending and has no profile to resubmit.
+ */
+async function _PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ garageId: string }> }
+) {
+  try {
+    const { garageId } = await params
+
+    const ownerAuth = requireOwner(request, garageId)
+    if (ownerAuth instanceof NextResponse) return ownerAuth
+
+    const body = await request.json().catch(() => null)
+    if (!body || !Array.isArray(body.benefits)) {
+      return NextResponse.json({ error: 'Λείπουν οι παροχές' }, { status: 400 })
+    }
+    const benefits = stringList(body.benefits)
+
+    try {
+      await dynamoDB.send(new UpdateCommand({
+        TableName: 'Garages',
+        Key: { id: garageId },
+        UpdateExpression: 'SET benefits = :benefits, updatedAt = :updatedAt',
+        ConditionExpression: 'attribute_exists(id)',
+        ExpressionAttributeValues: {
+          ':benefits': benefits,
+          ':updatedAt': new Date().toISOString(),
+        },
+      }))
+    } catch (err) {
+      if (err instanceof Error && err.name === 'ConditionalCheckFailedException') {
+        return NextResponse.json({ error: 'Το συνεργείο δεν βρέθηκε' }, { status: 404 })
+      }
+      throw err
+    }
+
+    return NextResponse.json({ success: true, benefits })
+  } catch (error) {
+    console.error('Error updating garage benefits:', error)
+    return NextResponse.json(
+      { error: 'Σφάλμα κατά την αποθήκευση των παροχών' },
+      { status: 500 }
+    )
+  }
+}
+
 export const GET = withMetrics(_GET)
 export const PUT = withMetrics(_PUT)
+export const PATCH = withMetrics(_PATCH)

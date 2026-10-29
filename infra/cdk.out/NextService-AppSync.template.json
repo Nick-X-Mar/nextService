@@ -493,6 +493,17 @@
    "Export": {
     "Name": "NextService-AppSync:ExportsOutputFnGetAttChatApiKeyApiKeyCBB19482"
    }
+  },
+  "ExportsOutputFnGetAttChatEventsApiApiId96C43684": {
+   "Value": {
+    "Fn::GetAtt": [
+     "ChatEventsApi",
+     "ApiId"
+    ]
+   },
+   "Export": {
+    "Name": "NextService-AppSync:ExportsOutputFnGetAttChatEventsApiApiId96C43684"
+   }
   }
  },
  "Parameters": {

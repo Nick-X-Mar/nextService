@@ -233,7 +233,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '*.s3.eu-central-1.amazonaws.com',
+        hostname: '*.s3.*.amazonaws.com',
       },
       {
         protocol: 'https',
@@ -268,6 +268,7 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_APPSYNC_REGION: process.env.NEXT_PUBLIC_APPSYNC_REGION,
     NEXT_PUBLIC_APPSYNC_ENDPOINT: process.env.NEXT_PUBLIC_APPSYNC_ENDPOINT,
     NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT: process.env.NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT,
+    APPSYNC_API_ID: process.env.APPSYNC_API_ID,
     DEPOSIT_PERCENT: process.env.DEPOSIT_PERCENT,
     CANCELLATION_DEADLINE_DAYS: process.env.CANCELLATION_DEADLINE_DAYS,
     // Amplify Hosting quirk: app-level env vars are only available at build

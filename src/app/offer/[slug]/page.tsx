@@ -6,6 +6,7 @@ import OfferDetailPage from './components/OfferDetailPage'
 import { getOfferBySlug, type Offer } from '@/lib/offers'
 import { SITE_URL } from '@/lib/site-url'
 import { getCategoryText } from '@/utils/categoryLabels'
+import { withPlusVat } from '@/utils/vat'
 import {
   ORGANIZATION_ID,
   breadcrumbJsonLd,
@@ -38,11 +39,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const url = `${SITE_URL}/offer/${offer.slug}/`
   // Title ≤ 60 chars for Google SERP. The car is part of the claim — the price
   // only means something next to it — so it goes in the title whenever it fits.
-  const titleWithCar = `${offer.title} ${offer.subtitle} — ${offer.price}`
-  const title = titleWithCar.length <= 60 ? titleWithCar : `${offer.title} — ${offer.price}`
+  const titleWithCar = `${offer.title} ${offer.subtitle} — ${withPlusVat(offer.price)}`
+  const title = titleWithCar.length <= 60 ? titleWithCar : `${offer.title} — ${withPlusVat(offer.price)}`
   const ogTitle = `${title} | NextService`
   // Description 110-160 chars.
-  const description = `${offer.title} σε ${offer.subtitle}: ${offer.price}. Πραγματική τιμή από εργασία που έγινε μέσω NextService. ${offer.details.slice(0, 2).join(' · ')}.`
+  const description = `${offer.title} σε ${offer.subtitle}: ${withPlusVat(offer.price)}. Πραγματική τιμή από εργασία που έγινε μέσω NextService. ${offer.details.slice(0, 2).join(' · ')}.`
 
   // Explicit OG image URL WITH trailing slash. Without this, Next.js generates
   // /opengraph-image (no slash) which 308-redirects under trailingSlash:true,
@@ -137,7 +138,7 @@ function buildOfferFaqs(offer: Offer) {
   return [
     {
       question: `Πόσο κοστίζει ${offer.title.toLowerCase()};`,
-      answer: `${offer.title} σε ${offer.subtitle} κόστισε ${offer.price}, με την εργασία και τα επώνυμα ανταλλακτικά μέσα στην τιμή. Είναι πραγματική εργασία που έγινε μέσω NextService, όχι τυποποιημένο πακέτο ούτε τιμοκατάλογος — για το δικό σου αυτοκίνητο η τιμή μπορεί να είναι διαφορετική. Στείλε αίτημα και θα λάβεις τη δική σου προσφορά από συνεργεία της περιοχής σου.`,
+      answer: `${offer.title} σε ${offer.subtitle} κόστισε ${withPlusVat(offer.price)}, με την εργασία και τα επώνυμα ανταλλακτικά μέσα στην τιμή. Είναι πραγματική εργασία που έγινε μέσω NextService, όχι τυποποιημένο πακέτο ούτε τιμοκατάλογος — για το δικό σου αυτοκίνητο η τιμή μπορεί να είναι διαφορετική. Στείλε αίτημα και θα λάβεις τη δική σου προσφορά από συνεργεία της περιοχής σου.`,
     },
     {
       question: `Πόση ώρα χρειάζεται ${offer.title.toLowerCase()};`,

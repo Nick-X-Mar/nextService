@@ -13,7 +13,7 @@ import ToastContainer from "@/components/ToastContainer";
 import InAppBrowserEscape from "@/components/InAppBrowserEscape";
 import { UserProvider } from "@/contexts/UserContext";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { SITE_URL } from "@/lib/site-url";
+import { SITE_URL, IS_INDEXABLE } from "@/lib/site-url";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -57,11 +57,11 @@ export const metadata: Metadata = {
     images: [`${SITE_URL}/opengraph-image/`],
   },
   robots: {
-    index: true,
-    follow: true,
+    index: IS_INDEXABLE,
+    follow: IS_INDEXABLE,
     googleBot: {
-      index: true,
-      follow: true,
+      index: IS_INDEXABLE,
+      follow: IS_INDEXABLE,
       "max-image-preview": "large",
       "max-snippet": -1,
     },

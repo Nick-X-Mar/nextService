@@ -22,7 +22,7 @@ interface AppointmentRow {
   clientName: string
   vehicleLabel: string
   category: string
-  /** What the garage quoted when the client booked, VAT included. */
+  /** What the garage quoted when the client booked, net of VAT. */
   appointmentPrice: number
   /** What it declared it actually charged, net of VAT. Null when never declared. */
   declaredNet: number | null
