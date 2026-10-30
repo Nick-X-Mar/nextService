@@ -15,6 +15,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { useNavigation } from '@/hooks/useNavigation'
 import { useConfirm } from '@/hooks/useConfirm'
+import { track } from '@/lib/track'
 
 // Greek to Latin phonetic transliteration for search matching
 const greekToLatinMap: Record<string, string> = {
@@ -283,12 +284,7 @@ export default function CarBrandModelSelector({ category }: { category: string }
 
   // Track form funnel
   useEffect(() => {
-    const clientId = typeof window !== 'undefined' ? localStorage.getItem('clientId') : null
-    fetch('/api/track/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ eventName: 'car_details_started', clientId, metadata: { category } }),
-    }).catch(() => {})
+    track('car_details_started', { category })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -425,16 +421,7 @@ export default function CarBrandModelSelector({ category }: { category: string }
       is4x4,
       isTurbo
     })
-    const clientId = localStorage.getItem('clientId')
-    fetch('/api/track/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        eventName: 'car_details_completed',
-        clientId,
-        metadata: { brand: currentBrand, model: currentModel, isBrandOther, isModelOther, category },
-      }),
-    }).catch(() => {})
+    track('car_details_completed', { brand: currentBrand, model: currentModel, isBrandOther, isModelOther, category })
 
     // Every category continues to step 2. Bodywork used to submit from here, with no
     // email or password for a guest — the API stored the request, then refused it.

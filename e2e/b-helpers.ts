@@ -47,6 +47,21 @@ export function requestsWithDescription(marker: string) {
   return scanAll(TABLES.ServiceRequests, 'contains(description, :m)', { ':m': marker })
 }
 
+/** The daily visitor key (src/utils/visitorKey.ts) the submit of `requestId` was logged under. */
+export async function visitorOfRequest(requestId: string) {
+  const [row] = await scanAll(TABLES.EventLogs, 'eventName = :e AND requestId = :r', {
+    ':e': 'service_request_submitted',
+    ':r': requestId,
+  })
+  return row?.visitId as string | undefined
+}
+
+/** Every funnel event logged under one visitor key, by event name. */
+export async function eventsOfVisitor(visitId: string) {
+  const rows = await scanAll(TABLES.EventLogs, 'visitId = :v', { ':v': visitId })
+  return rows.map((r) => r.eventName as string)
+}
+
 /** Every vehicle whose model is exactly `model`. */
 export function vehiclesWithModel(model: string) {
   return scanAll(TABLES.Vehicles, '#model = :m', { ':m': model }, { '#model': 'model' })

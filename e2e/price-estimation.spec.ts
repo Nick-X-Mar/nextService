@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
-import { freshClient, getRow } from './b-helpers'
+import { freshClient, getRow, mechanicalRequest } from './b-helpers'
+import { api, newGarage, OFFER_DATES, unique } from './p-helpers'
 import { TABLES } from '../src/lib/tables'
 
 /**
@@ -97,6 +98,53 @@ test.describe('Estimate on bodywork and on the stored request', () => {
       data: { ...PEUGEOT_206, brand: 'Ferrari', model: 'F40', estimatedCost: 999 },
     })).json()
     expect((await getRow(TABLES.ServiceRequests, unpriced.serviceRequestId))?.estimatedCost).toBeUndefined()
+  })
+})
+
+test.describe('Offers sent on the platform', () => {
+  test('price the same car from then on: every offer counts, the lowest wins', async ({ playwright }) => {
+    // A model no spreadsheet has ever seen, so only this test's offers can price it.
+    const car = mechanicalRequest({ model: `E2E${unique().replace(/\D/g, '').slice(-9)}`, description: 'E2E platform estimate' })
+    const estimate = async (data: Record<string, unknown>) =>
+      (await api('/api/price-estimation/', { method: 'POST', body: data })).data.estimation
+
+    expect(await estimate(car)).toBeNull()
+
+    const { api: client } = await freshClient(playwright, 'platform-estimate')
+    const { serviceRequestId } = await (await client.post('/api/service-request/', { data: car })).json()
+    expect(serviceRequestId).toBeTruthy()
+
+    const offer = async (amount: number) => {
+      const garage = await newGarage('estimate')
+      const res = await api('/api/offers/', {
+        method: 'POST',
+        token: garage.token,
+        body: { serviceRequestId, offerAmount: amount, benefits: [], availabilityDates: OFFER_DATES },
+      })
+      expect(res.status, JSON.stringify(res.data)).toBe(200)
+      return { garage, offerId: res.data.offer.id as string }
+    }
+
+    await offer(320)
+    expect(await estimate(car)).toMatchObject({ estimatedCost: 320, basedOnPastJobs: 1 })
+
+    // A second, cheaper quote — not accepted by anyone — sets the floor.
+    const { garage, offerId } = await offer(280)
+    expect(await estimate(car)).toMatchObject({ estimatedCost: 280, basedOnPastJobs: 2 })
+
+    // An edited offer is its new price.
+    const edit = await api('/api/offers/', { method: 'PUT', token: garage.token, body: { offerId, offerAmount: 300 } })
+    expect(edit.status, JSON.stringify(edit.data)).toBe(200)
+    expect(await estimate(car)).toMatchObject({ estimatedCost: 300 })
+
+    // A slip of the keyboard does not become the headline price: the spreadsheets'
+    // outlier bounds (half the category's median) apply to offers too.
+    await offer(20)
+    expect(await estimate(car)).toMatchObject({ estimatedCost: 300, basedOnPastJobs: 2 })
+
+    // Still the same-car rule: another engine of the same model is not priced by it.
+    expect(await estimate({ ...car, fuelType: 'diesel' })).toBeNull()
+    expect(await estimate({ ...car, modelYear: '2015' })).toBeNull()
   })
 })
 

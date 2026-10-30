@@ -19,6 +19,7 @@ import { GUEST_PLACEHOLDER_NAME } from '@/types/clients'
 import { randomUUID } from 'crypto'
 import { TERMS_VERSION } from '@/lib/legal'
 import { TABLES } from '@/lib/tables'
+import { visitorKey } from '@/utils/visitorKey'
 
 // Same budget as /api/auth/register: this route registers guests inline, so
 // without its own limit it was the unthrottled way to mint accounts.
@@ -398,7 +399,7 @@ async function _POST(request: NextRequest) {
 
     // The estimate is the server's own lookup on the car being stored, never a figure
     // from the body — it is shown to garages next to the request.
-    const estimation = estimateFor({ category, ...vehicle })
+    const estimation = await estimateFor({ category, ...vehicle })
 
     // An idempotency key from the form makes a retried or double-fired submit land on
     // the same request id, which the condition below then refuses to write twice.
@@ -488,12 +489,15 @@ async function _POST(request: NextRequest) {
       )
     }
 
+    // The same daily visitor key /api/track gives the form's earlier steps, so the
+    // funnel follows a signed-out visitor through to this one.
     await logEvent({
       eventName: EventName.ServiceRequestSubmitted,
       actorType: 'client',
       actorId: clientId,
       clientId,
       requestId: serviceRequestId,
+      visitId: visitorKey(request),
       source: 'api/service-request',
       metadata: {
         category,

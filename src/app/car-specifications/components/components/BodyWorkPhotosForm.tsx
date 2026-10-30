@@ -14,6 +14,7 @@ import { useFileDrop } from '@/hooks/useFileDrop'
 import EstimatedCostCard from './EstimatedCostCard'
 import GuestAccountFields, { useGuestAccount } from './GuestAccount'
 import Image from 'next/image'
+import { track } from '@/lib/track'
 
 interface BodyWorkPhotosFormProps {
   savedData: {
@@ -59,12 +60,7 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
 
   // Track form funnel
   useEffect(() => {
-    const clientId = localStorage.getItem('clientId')
-    fetch('/api/track/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ eventName: 'car_specs_started', clientId }),
-    }).catch(() => {})
+    track('car_specs_started')
   }, [])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -376,8 +372,10 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
           </div>
         </div>
 
-        {/* Fixed bottom section */}
-        <div className="fixed bottom-0 left-0 right-0 bg-surface/80 backdrop-blur-xl border-t border-outline-variant/10 px-5 pt-4 pb-8 z-30">
+        {/* Fixed bottom section, above the phone's BottomNav (h-20). At
+            bottom-0 the nav covered half the submit button and all of the
+            back link. */}
+        <div className="fixed bottom-20 md:bottom-0 left-0 right-0 bg-surface/80 backdrop-blur-xl border-t border-outline-variant/10 px-5 pt-4 pb-4 md:pb-8 z-40">
           <div className="max-w-lg mx-auto">
             {/* CTA Button */}
             <GearSubmitButton

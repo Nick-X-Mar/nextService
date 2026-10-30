@@ -25,6 +25,7 @@ import {
   requestStillOpen,
 } from './offerWrites'
 import { TABLES } from '@/lib/tables'
+import { invalidatePlatformExamples } from '@/app/api/price-estimation/platformExamples'
 
 const checkOfferRate = createRateLimiter('offer-create', 10, 3600000)
 
@@ -383,8 +384,9 @@ async function _PUT(request: NextRequest) {
     }
 
     // A changed price or new dates are news to the client; the garage's own
-    // counts read the same row.
+    // counts read the same row. The new price is also a past job for the estimate.
     invalidateUnread('garage', garageId)
+    invalidatePlatformExamples()
     await invalidateRequestOwner(serviceRequestId)
 
     await logEvent({

@@ -558,7 +558,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
   return (
     <div className={styles.pageWrapper}>
       {/* Header */}
-      <div className="bg-surface-container-lowest border-b border-outline-variant/10 sticky top-0 z-20">
+      <div className="bg-surface-container-lowest border-b border-outline-variant/10 sticky top-16 z-20">
         <div className="max-w-3xl mx-auto px-5 md:px-8">
           <div className="flex items-center gap-4 py-4">
             <button

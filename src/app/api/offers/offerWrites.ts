@@ -5,6 +5,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { collectAll } from '@/utils/pagination'
 import { OfferStatus, ServiceRequestStatus } from '@/types/statuses'
 import { TABLES } from '@/lib/tables'
+import { invalidatePlatformExamples } from '@/app/api/price-estimation/platformExamples'
 
 /**
  * The writes every path that files an offer must go through — the garage's own
@@ -151,6 +152,7 @@ export async function putNewOffer(
     return { ok: false, code: 'WRITE_CONFLICT' }
   }
 
+  invalidatePlatformExamples()
   await closeIfRequestMovedOn(offer.id, offer.serviceRequestId)
   return { ok: true }
 }

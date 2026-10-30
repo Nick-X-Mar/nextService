@@ -15,6 +15,7 @@ import EstimatedCostCard from './EstimatedCostCard'
 import LicenseSample from './LicenseSample'
 import GuestAccountFields, { useGuestAccount } from './GuestAccount'
 import { useFileDrop } from '@/hooks/useFileDrop'
+import { track } from '@/lib/track'
 
 interface CarSpecsFormProps {
   savedData: {
@@ -82,12 +83,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
 
   // Track form funnel
   useEffect(() => {
-    const clientId = localStorage.getItem('clientId')
-    fetch('/api/track/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ eventName: 'car_specs_started', clientId }),
-    }).catch(() => {})
+    track('car_specs_started')
   }, [])
 
   const { estimate, isLoading: isEstimatingPrice } = usePriceEstimate(savedData)

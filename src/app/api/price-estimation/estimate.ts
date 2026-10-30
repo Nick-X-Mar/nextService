@@ -1,4 +1,5 @@
-import { lookupPrice } from '@/lib/price-lookup'
+import { EXAMPLES, canonFuel, lookupPriceIn } from '@/lib/price-lookup'
+import { platformExamples } from './platformExamples'
 
 /**
  * The vehicle fields the price lookup reads, in the shape the request form sends them.
@@ -35,31 +36,20 @@ function toInt(value: string | number | undefined): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-/** The form sends 'petrol' | 'diesel'; the dataset also carries lpg / hybrid / ev. */
-function normalizeFuel(fuel: string | undefined): string | null {
-  if (!fuel) return null
-  const f = fuel.toLowerCase()
-  if (f.includes('diesel') || f.includes('πετρελ')) return 'diesel'
-  if (f.includes('petrol') || f.includes('βενζ')) return 'petrol'
-  if (f.includes('lpg') || f.includes('υγραερ')) return 'lpg'
-  if (f.includes('hybrid') || f.includes('υβριδ')) return 'hybrid'
-  if (f.includes('electric') || f.includes('ηλεκτρ')) return 'ev'
-  return null
-}
-
 /**
  * Null when we have never quoted this exact car — no history for the category at all
  * (ΚΤΕΟ, ελαστικά), or none close enough to be honest about. Callers show nothing then;
  * there is deliberately no fallback figure.
  */
-export function estimateFor(input: EstimateInput): Estimation | null {
-  const match = lookupPrice({
+export async function estimateFor(input: EstimateInput): Promise<Estimation | null> {
+  const examples = [...EXAMPLES, ...(await platformExamples())]
+  const match = lookupPriceIn(examples, {
     category: input.category,
     brand: input.brand,
     model: input.model,
     year: toInt(input.modelYear),
     cc: toInt(input.engineCC),
-    fuel: normalizeFuel(input.fuelType),
+    fuel: canonFuel(input.fuelType),
     is4x4: input.is4x4,
     isTurbo: input.isTurbo,
   })

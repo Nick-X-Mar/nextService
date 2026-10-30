@@ -21,6 +21,7 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testIgnore: /.*\.mobile\.spec\.ts/,
     },
     {
       name: 'firefox',
@@ -31,6 +32,21 @@ export default defineConfig({
       name: 'webkit',
       use: { ...devices['Desktop Safari'] },
       testMatch: /.*cross-browser\.spec\.ts/,
+    },
+    /**
+     * Nearly every client is on a phone. `*.mobile.spec.ts` runs on an iPhone
+     * (WebKit, Safari's engine) and on a 360px Android — the narrowest common
+     * width, where layouts that fit an iPhone still spill sideways.
+     */
+    {
+      name: 'mobile-iphone',
+      use: { ...devices['iPhone 13'] },
+      testMatch: /.*\.mobile\.spec\.ts/,
+    },
+    {
+      name: 'mobile-android',
+      use: { ...devices['Pixel 5'], viewport: { width: 360, height: 740 } },
+      testMatch: /.*\.mobile\.spec\.ts/,
     },
   ],
 })

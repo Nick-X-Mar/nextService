@@ -19,7 +19,7 @@ async function _POST(request: NextRequest) {
     // We have never quoted this exact car — no history for the category at all (ΚΤΕΟ,
     // ελαστικά), or none close enough to be honest about. Say nothing rather than
     // extrapolate; the client hides the estimate card when estimation is null.
-    return NextResponse.json({ success: true, estimation: estimateFor(body) })
+    return NextResponse.json({ success: true, estimation: await estimateFor(body) })
   } catch (error) {
     console.error('Price estimation error:', error)
     return NextResponse.json(

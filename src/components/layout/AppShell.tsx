@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense } from 'react'
+import { Suspense, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { NotificationsProvider } from '@/contexts/NotificationsContext'
@@ -8,13 +8,21 @@ import TopHeader from './TopHeader'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 import Footer from './Footer'
+import { trackVisitStart } from '@/lib/track'
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
-  const { userType } = useAuth()
+  const { userType, isLoading } = useAuth()
   const pathname = usePathname()
 
+  // Top of the request-form funnel. Garages and the admin are not the visitors
+  // it counts, so it waits until we know who this is.
+  const isAdmin = pathname.startsWith('/admin')
+  useEffect(() => {
+    if (!isLoading && userType !== 'garage' && !isAdmin) trackVisitStart()
+  }, [isLoading, userType, isAdmin])
+
   // Admin routes have their own layout — bypass the main app shell entirely
-  if (pathname.startsWith('/admin')) {
+  if (isAdmin) {
     return <>{children}</>
   }
 

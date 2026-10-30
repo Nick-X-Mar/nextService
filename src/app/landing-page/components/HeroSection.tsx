@@ -8,6 +8,7 @@ import Spinner from '@/components/Spinner'
 import { useNavigation } from '@/hooks/useNavigation'
 import { startNewRequest } from '@/utils/formStorage'
 import { SERVICE_CATEGORIES as categories } from '@/utils/categoryLabels'
+import { track } from '@/lib/track'
 
 /**
  * Opens the category menu on `/?open=1` — where the "Νέο Αίτημα" buttons send
@@ -86,12 +87,7 @@ export default function HeroSection() {
     if (tlRef.current) tlRef.current.reverse()
     setIsOpen(false)
     startNewRequest({ category: value })
-    const clientId = localStorage.getItem('clientId')
-    fetch('/api/track/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ eventName: 'category_selected', clientId, metadata: { category: value } }),
-    }).catch(() => {})
+    track('category_selected', { category: value })
     setTimeout(() => {
       navigate('/car-details/')
     }, 500)

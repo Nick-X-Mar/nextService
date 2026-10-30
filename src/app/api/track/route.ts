@@ -5,9 +5,11 @@ import type { EventNameValue } from '@/types/events'
 import { getAuth } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
+import { visitorKey } from '@/utils/visitorKey'
 
 // Events allowed from client-side (whitelist to prevent abuse)
 const ALLOWED_EVENTS = new Set<EventNameValue>([
+  EventName.VisitStarted,
   EventName.CategorySelected,
   EventName.CarDetailsStarted,
   EventName.CarDetailsCompleted,
@@ -41,6 +43,7 @@ async function _POST(request: NextRequest) {
       actorType: 'client',
       actorId: clientId,
       clientId,
+      visitId: visitorKey(request),
       metadata: metadata || undefined,
       source: 'client-side',
     })

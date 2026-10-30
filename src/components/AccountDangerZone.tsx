@@ -164,7 +164,7 @@ export default function AccountDangerZone({ userId, userType }: AccountDangerZon
       </section>
 
       {showExportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
           <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md shadow-xl">
             <h3 className="text-lg font-bold text-on-surface mb-2">Εξαγωγή δεδομένων</h3>
             <p className="text-sm text-on-surface-variant mb-4">
@@ -200,7 +200,7 @@ export default function AccountDangerZone({ userId, userType }: AccountDangerZon
       )}
 
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
           <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md shadow-xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-error-container/30 rounded-full flex items-center justify-center">

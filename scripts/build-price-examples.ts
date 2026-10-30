@@ -344,7 +344,11 @@ function toNumber(raw: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-/** One candidate price per garage line, VAT-normalised to what the customer pays. */
+/**
+ * One candidate price per garage line, net of VAT — how garages quote and how the app
+ * shows every garage price ("+ ΦΠΑ"). Most lines say nothing about VAT and are net, as
+ * are the "συν ΦΠΑ" ones; only a price stated "με ΦΠΑ" has the VAT taken out.
+ */
 function extractCandidates(text: string, category: string | null): number[] {
   const own = category ? CATEGORY_KEYWORDS[category] : undefined
   const out: number[] = []
@@ -376,7 +380,7 @@ function extractCandidates(text: string, category: string | null): number[] {
     }
     if (value === null || value < 15 || value > 8000) continue
 
-    if (/φπα/.test(flat) && !/με\s*φπα|συμπ\w*\s*φπα/.test(flat)) value *= VAT
+    if (/με\s*φπα|συμπ\w*\s*φπα/.test(flat)) value /= VAT
     out.push(Math.round(value))
   }
   return out

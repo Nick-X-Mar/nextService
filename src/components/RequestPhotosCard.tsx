@@ -106,7 +106,7 @@ export default function RequestPhotosCard({
     <div className={`bg-surface-container-lowest rounded-xl p-5 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border transition-colors ${
       dragActive ? 'border-primary bg-primary/5' : 'border-outline-variant/10'
     }`}>
-      <div className="flex items-center justify-between gap-3 mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <h3 className="text-lg font-bold text-on-surface flex items-center gap-2">
           <Icon name="photo_library" size="md" className="text-on-surface-variant" />
           Φωτογραφίες{count > 0 ? ` (${count})` : ''}

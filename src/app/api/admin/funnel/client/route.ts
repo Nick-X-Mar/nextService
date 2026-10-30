@@ -7,31 +7,17 @@ import { withMetrics } from '@/utils/withMetrics'
 import { createTtlCache } from '@/utils/ttlCache'
 import { TABLES } from '@/lib/tables'
 
-// Ordered list of steps in the client journey. Each step is a single
-// EventName fired once we believe the client has reached that stage.
-// Counted as unique clientId per event in the time window.
+// The request form, step by step, counted per visitor and day (the server-side
+// key in src/utils/visitorKey.ts). Most people fill it in signed out, so counting clientIds
+// missed exactly the visitors who leave. What happens after the request is sent
+// is the Sankey's job (per request), not this funnel's.
 const CLIENT_FUNNEL_STEPS = [
-  { key: 'category_selected',                  label: 'Επιλογή Κατηγορίας' },
-  { key: 'car_details_completed',              label: 'Συμπλήρωση Στοιχείων Αυτοκινήτου' },
-  { key: 'service_request_submitted',          label: 'Υποβολή Αιτήματος' },
-  { key: 'client_availability_dates_submitted',label: 'Δήλωση Διαθεσιμότητας' },
-  { key: 'offer_accepted',                     label: 'Αποδοχή Προσφοράς' },
-  { key: 'payment_succeeded',                  label: 'Επιτυχής Πληρωμή' },
-  { key: 'service_completed',                  label: 'Ολοκλήρωση Υπηρεσίας' }
+  { key: EventName.VisitStarted,            label: 'Επίσκεψη στο site' },
+  { key: EventName.CarDetailsStarted,       label: 'Άνοιξε τη φόρμα αιτήματος' },
+  { key: EventName.CarDetailsCompleted,     label: 'Συμπλήρωσε το αυτοκίνητο' },
+  { key: EventName.CarSpecsStarted,         label: 'Έφτασε στο τελευταίο βήμα' },
+  { key: EventName.ServiceRequestSubmitted, label: 'Έστειλε αίτημα' }
 ] as const
-
-// Verify our hardcoded keys still exist on EventName so a typo here
-// would fail to compile rather than silently return 0 forever.
-const _typeCheck: ReadonlyArray<typeof EventName[keyof typeof EventName]> = [
-  EventName.CategorySelected,
-  EventName.CarDetailsCompleted,
-  EventName.ServiceRequestSubmitted,
-  EventName.ClientAvailabilityDatesSubmitted,
-  EventName.OfferAccepted,
-  EventName.PaymentSucceeded,
-  EventName.ServiceCompleted
-]
-void _typeCheck
 
 interface FunnelStepResult {
   key: string
@@ -51,11 +37,11 @@ interface ClientFunnelResponse {
 // loads and tab-switch refreshes down to ~free.
 const cache = createTtlCache<ClientFunnelResponse>(5 * 60_000)
 
-async function countUniqueClientsForEvent(
+async function visitsWithEvent(
   eventName: string,
   fromIso: string,
   toIso: string
-): Promise<number> {
+): Promise<Set<string>> {
   const seen = new Set<string>()
   let lastEvaluatedKey: Record<string, unknown> | undefined
 
@@ -72,27 +58,33 @@ async function countUniqueClientsForEvent(
         ':from': fromIso,
         ':to': toIso
       },
-      ProjectionExpression: 'clientId',
+      ProjectionExpression: 'visitId',
       ExclusiveStartKey: lastEvaluatedKey
     }))
     for (const item of res.Items || []) {
-      if (item.clientId) seen.add(item.clientId as string)
+      if (item.visitId) seen.add(item.visitId as string)
     }
     if (!res.LastEvaluatedKey) break
     lastEvaluatedKey = res.LastEvaluatedKey
   }
 
-  return seen.size
+  return seen
 }
 
 async function computeClientFunnel(fromIso: string, toIso: string): Promise<ClientFunnelResponse> {
   await ensureEventLogsTable()
 
-  const counts = await Promise.all(
-    CLIENT_FUNNEL_STEPS.map((step) =>
-      countUniqueClientsForEvent(step.key, fromIso, toIso)
-    )
+  const sets = await Promise.all(
+    CLIENT_FUNNEL_STEPS.map((step) => visitsWithEvent(step.key, fromIso, toIso))
   )
+  // A step counts only the visits that also reached the one before it, so every bar
+  // is a subset of the last and the gap between two bars is the people who left there.
+  const counts: number[] = []
+  let reached = sets[0]
+  for (const [i, set] of sets.entries()) {
+    if (i > 0) reached = new Set([...set].filter((id) => reached.has(id)))
+    counts.push(reached.size)
+  }
 
   const firstCount = counts[0] || 0
   const steps: FunnelStepResult[] = CLIENT_FUNNEL_STEPS.map((step, i) => {

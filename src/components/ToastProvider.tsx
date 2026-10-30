@@ -49,9 +49,10 @@ let toastSeq = 0
  * App-wide toasts, read through `useToast()`.
  *
  * Rendered through a portal on `document.body`, so a toast fired from inside a
- * modal or an `overflow-hidden` card is never clipped by it. Toasts stack:
- * bottom-centre above the BottomNav on a phone, top-right under the header on
- * desktop.
+ * modal or an `overflow-hidden` card is never clipped by it. Toasts stack
+ * under the header: full-width on a phone, top-right on desktop. Not at the
+ * bottom of a phone — there an error sat on the very button (Σύνδεση, the chat
+ * composer's send) the user wants to press again.
  */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
@@ -101,7 +102,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {mounted &&
         toasts.length > 0 &&
         createPortal(
-          <div className="fixed inset-x-0 bottom-24 z-[100] flex flex-col items-center gap-2 px-4 pb-[env(safe-area-inset-bottom)] pointer-events-none md:inset-x-auto md:bottom-auto md:top-20 md:right-4 md:items-end md:px-0 md:pb-0">
+          <div className="fixed inset-x-0 top-20 z-[100] flex flex-col items-center gap-2 px-4 pointer-events-none md:inset-x-auto md:right-4 md:items-end md:px-0">
             {toasts.map((toast) => (
               <ToastCard key={toast.id} toast={toast} onDismiss={() => dismiss(toast.id)} />
             ))}
@@ -131,7 +132,7 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
     <div
       role={toast.type === 'error' || toast.type === 'warning' ? 'alert' : 'status'}
       className={`pointer-events-auto w-full max-w-md ${style.surface} border rounded-xl shadow-lg transition-all duration-200 ease-out ${
-        visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3 md:translate-y-0 md:translate-x-3'
+        visible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-3 md:translate-y-0 md:translate-x-3'
       }`}
     >
       <div className="flex items-start gap-3 p-4">

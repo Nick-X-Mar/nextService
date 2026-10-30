@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import { registerClient, loginViaAPI, setAuthCookie, TEST_GARAGE } from './helpers'
 import {
   clientsWithEmail,
+  eventsOfVisitor,
   freshClient,
   getRow,
   mechanicalRequest,
@@ -16,7 +17,9 @@ import {
   TINY_PNG,
   uniqueMarker,
   vehiclesWithModel,
+  visitorOfRequest,
 } from './b-helpers'
+import { loginAdmin } from './E-helpers'
 import { TABLES } from '../src/lib/tables'
 
 const CLIENT_EMAIL = `e2e-sr-${Date.now()}@test.com`
@@ -402,6 +405,9 @@ test.describe('Request funnel in the browser', () => {
   test('A guest can send a bodywork request, signing up on step 2', async ({ page }) => {
     const marker = uniqueMarker('bwguest')
     const email = `e2e-b-bwguest-${Date.now()}@test.com`
+    // The funnel keys a visitor by IP + browser + day, and every test shares the IP:
+    // a browser of its own keeps this visit apart from the rest of the suite.
+    await page.setExtraHTTPHeaders({ 'User-Agent': `E2E funnel ${marker}` })
     // Photo storage is S3; this spec stays off AWS and checks only that the form
     // hands the photos to the endpoint.
     let uploadedFiles = 0
@@ -448,6 +454,31 @@ test.describe('Request funnel in the browser', () => {
     expect(stored[0].description).toBe(marker)
     expect(stored[0].estimatedCost).toBe(estimate.estimation.estimatedCost)
     expect(uploadedFiles).toBe(1)
+
+    // The admin funnel follows this signed-out visitor through every step by a
+    // visitor key the server derives — there was no clientId until the very last
+    // one, and nothing is stored in the browser to count it by.
+    expect(await page.evaluate(() => Object.keys(sessionStorage).filter((k) => /visit/i.test(k)))).toEqual([])
+    const visitor = await visitorOfRequest(stored[0].id as string)
+    expect(visitor).toMatch(/^v_[0-9a-f]{24}$/)
+    const steps = await eventsOfVisitor(visitor!)
+    expect(steps).toEqual(expect.arrayContaining([
+      'visit_started', 'car_details_started', 'car_details_completed', 'car_specs_started', 'service_request_submitted',
+    ]))
+    expect(steps.filter((s) => s === 'service_request_submitted')).toHaveLength(1)
+
+    // …and so the admin funnel counts the visit at every step, each bar within the last.
+    const adminCookie = await loginAdmin(page.request)
+    const today = new Date().toISOString().slice(0, 10)
+    const funnel = await (await page.request.get(`/api/admin/funnel/client/?from=${today}&to=${today}`, {
+      headers: { Cookie: adminCookie },
+    })).json()
+    const counts: number[] = funnel.steps.map((s: { count: number }) => s.count)
+    expect(funnel.steps.map((s: { key: string }) => s.key)).toEqual([
+      'visit_started', 'car_details_started', 'car_details_completed', 'car_specs_started', 'service_request_submitted',
+    ])
+    expect(counts.at(-1)).toBeGreaterThanOrEqual(1)
+    for (let i = 1; i < counts.length; i++) expect(counts[i]).toBeLessThanOrEqual(counts[i - 1])
   })
 
   test('A signed-in garage is told the request makes it a client account', async ({ page, request }) => {

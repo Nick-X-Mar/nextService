@@ -72,7 +72,7 @@ export default function TopHeader() {
           )}
           {userType === 'garage' && garage && (
             <Link href={`/garage-dashboard/${garage.id}/`} className="text-secondary hover:text-on-surface transition-colors">
-              Dashboard
+              Πίνακας Συνεργείου
             </Link>
           )}
         </nav>
@@ -160,7 +160,7 @@ export default function TopHeader() {
           {userType === 'garage' && garage && (
             <Link href={`/garage-dashboard/${garage.id}/`} onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
               <Icon name="dashboard" className="text-primary" />
-              <span className="font-medium">Dashboard</span>
+              <span className="font-medium">Πίνακας Συνεργείου</span>
             </Link>
           )}
           {userType && userType !== 'guest' && (

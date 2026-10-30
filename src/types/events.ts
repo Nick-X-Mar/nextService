@@ -20,7 +20,9 @@ export const EventName = {
   GuestMergeRequested: 'guest_merge_requested',
   GuestMergedIntoAccount: 'guest_merged_into_account',
 
-  // Phase A+ — Form funnel (client-side, tracked via /api/track)
+  // Phase A+ — Form funnel (client-side, tracked via /api/track, counted per
+  // daily visitor — see src/utils/visitorKey.ts)
+  VisitStarted: 'visit_started',
   CategorySelected: 'category_selected',
   CarDetailsStarted: 'car_details_started',
   CarDetailsCompleted: 'car_details_completed',
@@ -91,6 +93,8 @@ export interface LogEventInput {
   garageId?: string
   requestId?: string
   offerId?: string
+  /** Daily visitor key (src/utils/visitorKey.ts) — what the request-form funnel counts. */
+  visitId?: string
   metadata?: Record<string, unknown>
   source?: string
 }

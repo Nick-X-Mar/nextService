@@ -8,6 +8,7 @@ Deploys all infrastructure for the NextService platform:
   - AppSync Events API for real-time chat
   - CloudWatch monitoring + SNS email alerts
   - Amplify Hosting (Next.js SSR)
+  - Route 53 zone of nextservice.gr (production stage only)
 
 Usage:
   cd infra
@@ -42,6 +43,7 @@ from stacks.appsync_stack import AppSyncStack, REALTIME_SECRET_NAME
 from stacks.monitoring_stack import MonitoringStack
 from stacks.amplify_stack import AmplifyStack
 from stacks.notifications_stack import NotificationsStack
+from stacks.dns_stack import DnsStack
 
 # ─────────────────────────────────────────────────────────────────
 # CONFIGURATION — edit these values for your deployment
@@ -196,5 +198,11 @@ if app_url:
     )
     notifications.add_dependency(dynamo)
     notifications.add_dependency(monitoring)
+
+# 7. DNS — the nextservice.gr zone (Route 53). One zone serves both stages
+# (it carries each region's SES DKIM records), so it is deployed with
+# production only: a bare `cdk deploy --all` must never touch live DNS.
+if stage == "production":
+    DnsStack(app, "NextService-DNS", termination_protection=True, env=env)
 
 app.synth()

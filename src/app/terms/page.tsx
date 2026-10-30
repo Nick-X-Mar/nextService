@@ -96,7 +96,7 @@ export default async function TermsPage() {
           </section>
 
           <div className="mt-8 pt-6 border-t border-outline-variant/20 text-center">
-            <Link href="/" className="text-sm text-primary underline">
+            <Link href="/" className="inline-block py-2 text-sm text-primary underline">
               Επιστροφή στην αρχική
             </Link>
           </div>

@@ -109,7 +109,10 @@ export default function FunnelPage() {
         <DateRangePicker from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t) }} />
       </div>
 
-      <Section title="Πελάτες — Conversion Funnel" subtitle="Μοναδικοί πελάτες ανά βήμα στο επιλεγμένο διάστημα.">
+      <Section
+        title="Πελάτες — Πού φεύγουν στη φόρμα αιτήματος"
+        subtitle="Επισκέπτες (ο καθένας μία φορά τη μέρα) που έφτασαν σε κάθε βήμα, μαζί με όλα τα προηγούμενα. Χωρίς cookies, άρα κατά προσέγγιση. Το κόκκινο δείχνει βήμα όπου φεύγουν πάνω από τους μισούς. Μετράει από 30/10/2026· ό,τι γίνεται μετά την αποστολή φαίνεται στο Sankey."
+      >
         <SectionBody state={client}>
           {(d) => <FunnelChart steps={d.steps} />}
         </SectionBody>

@@ -106,12 +106,13 @@ export default function ResetPasswordPage() {
                   placeholder={`Τουλάχιστον ${MIN_PASSWORD_LENGTH} χαρακτήρες`}
                   required
                   disabled={isLoading}
-                  className={`${styles.input} pr-10`}
+                  className={`${styles.input} pr-12`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors"
+                  aria-label={showPassword ? 'Απόκρυψη κωδικού' : 'Εμφάνιση κωδικού'}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:text-on-surface transition-colors"
                 >
                   <Icon name={showPassword ? 'visibility_off' : 'visibility'} size="sm" />
                 </button>

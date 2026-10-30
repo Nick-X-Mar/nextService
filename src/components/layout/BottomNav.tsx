@@ -89,11 +89,12 @@ export default function BottomNav() {
                   </span>
                 )}
               </span>
-              {/* Below 360px the garage's five Greek labels don't fit at the
-                  normal size, so they drop a point and give up their letter
-                  spacing rather than all ending in an ellipsis. From 360px up
-                  — every current iPhone and Android — nothing changes. */}
-              <span className="font-body text-[9px] tracking-normal min-[360px]:text-[10px] min-[360px]:tracking-[0.05em] uppercase font-bold mt-1 max-w-full truncate">
+              {/* Below 390px the garage's five Greek labels don't fit at the
+                  normal size — at 360px, the most common Android width,
+                  ΠΡΟΣΦΟΡΕΣ and ΜΗΝΥΜΑΤΑ ended in an ellipsis — so they drop a
+                  point and give up their letter spacing. From 390px up
+                  (current iPhones) nothing changes. */}
+              <span className="font-body text-[9px] tracking-normal min-[390px]:text-[10px] min-[390px]:tracking-[0.05em] uppercase font-bold mt-1 max-w-full truncate">
                 {item.label}
               </span>
             </Link>

@@ -75,8 +75,9 @@ class NotificationsStack(Stack):
         # ── SES domain identity ─────────────────────────────────
         # SES identities are regional: a stage in a new region can't send as
         # nextservice.gr until the domain is verified there too. Easy DKIM
-        # gives three CNAMEs (stack outputs below) to add at the domain's DNS
-        # host; once they resolve SES verifies the domain by itself. Those
+        # gives three CNAMEs (stack outputs below); they go in the zone in
+        # `dns_stack.py`, and once they resolve SES verifies the domain by
+        # itself. Those
         # signatures are also what passes the domain's strict DMARC
         # (adkim=s), since the MAIL FROM is SES's own and SPF can't align.
         # A new region also starts in the SES sandbox — production access is

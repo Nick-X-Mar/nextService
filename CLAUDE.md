@@ -41,7 +41,8 @@ Node 20 (`.nvmrc`). Java is required for DynamoDB Local.
 | AppSync mock (WS) | ws://localhost:3002/graphql (health: `/health`) |
 
 Testing: Playwright E2E only (`e2e/*.spec.ts`). There is no unit-test framework — do not add unit test files; extend the existing E2E specs instead.
-- Serial (`workers: 1`) against `http://localhost:3000`. Chromium runs every spec; Firefox and WebKit run only `*cross-browser.spec.ts`.
+- Serial (`workers: 1`) against `http://localhost:3000`. Chromium (desktop) runs every spec except `*.mobile.spec.ts`; Firefox and WebKit run only `*cross-browser.spec.ts`; `mobile-iphone` (WebKit) and `mobile-android` (360px Chromium) run only `*.mobile.spec.ts` — `npx playwright test --project=mobile-iphone --project=mobile-android`.
+- ~95% of clients are on a phone. A layout change is not done until it passes the mobile projects: no sideways scroll at 360px, nothing interactive under the `BottomNav` (`h-20`, `z-50` — a fixed bar on a page with the nav sits at `bottom-20 md:bottom-0`; a sheet goes above it, `Modal` is `z-[60]`), page sub-headers stick at `top-16` under the `TopHeader`. Fields are kept ≥16px on touch screens by a rule in `globals.css` (iOS zooms into anything smaller).
 - The suite registers a fresh client per run but signs in as a fixed, pre-existing garage (`TEST_GARAGE` in `e2e/helpers.ts`), which must exist in your local DynamoDB.
 - For states the API rightly refuses to create (e.g. an appointment in the past), `e2e/dynamo-helpers.ts` writes to DynamoDB Local directly. Extend that; never add a test backdoor to production routes.
 
@@ -59,7 +60,7 @@ Testing: Playwright E2E only (`e2e/*.spec.ts`). There is no unit-test framework 
 - `upload-photos/` — S3 photo uploads (the old free-prefix `upload/` route was deleted)
 - `garage/`, `clients/`, `vehicles/` — entity CRUD
 - `payments/`, `wallet/`, `webhooks/stripe` — Stripe deposits, saved cards, wallet balance/transactions
-- `price-estimation/`, `hot-deals/`, `track/` — public endpoints. Price estimation is a strict lookup over past quotes (`src/lib/price-lookup.ts` + `src/data/price-examples.json`), not a formula: it answers only when the same car is already in the dataset — same category, brand and model, model year ±1, same fuel, engine cc ±150 and same turbo/4x4 (that engine gate is skipped for bodywork, where the form never collects those) — and returns the lowest of those past prices, shown as "Εκτιμώμενο κόστος από X€". No match ⇒ `estimation: null` and the UI shows nothing. Leave-one-out coverage is ~20%, so most requests legitimately get no estimate.
+- `price-estimation/`, `hot-deals/`, `track/` — public endpoints. Price estimation is a strict lookup over past quotes, not a formula. The quotes are the spreadsheets' (`src/data/price-examples.json`) plus **every offer garages send on the platform**, accepted or not (`platformExamples.ts`, cached 10 min, invalidated on the instance that writes an offer, same outlier bounds as the build script); all of them net of VAT. It answers only when the same car is already in the data (`src/lib/price-lookup.ts`) — same category, brand and model, model year ±1, same fuel, engine cc ±150 and same turbo/4x4 (that engine gate is skipped for bodywork, where the form never collects those) — and returns the lowest of those past prices, shown as "Εκτιμώμενο κόστος από X€". No match ⇒ `estimation: null` and the UI shows nothing. Leave-one-out coverage is ~20%, so most requests legitimately get no estimate.
 - `account/export`, `account/delete` — GDPR. **Nothing is ever hard-deleted.** "Διαγραφή λογαριασμού" closes and *anonymizes* the account (product rule): the row keeps an allowlist of fields (a garage keeps επωνυμία/ΑΦΜ/ΔΟΥ/διεύθυνση for invoicing; a client keeps nothing personal), vehicles keep make/model only, request descriptions and photos, the client's chat text/photos/name and the άδεια are removed (S3 objects deleted), pending requests are cancelled and pending offers withdrawn, and the job history, amounts, commissions and ratings stay. Refused with 409 `UPCOMING_APPOINTMENT` while a booking has not started. `anonymizedAt` marks the row; `/api/auth/me`, request filing and garage activation treat it as gone.
 - `admin/**` — the whole admin surface (users, requests, payments, commissions, emails, errors, funnel, performance, hot-deals, custom vehicles, **content**, **reviews**, settings, tests)
 
@@ -93,7 +94,7 @@ Key routes:
 - `/register-professional`, `/profile/[clientId]`, `/offer`, `/privacy`, `/terms`
 - `/admin/**` — dashboard, users, garages, requests, payments, commissions, emails, errors, funnel, performance, hot-deals, custom-vehicles, **content** (edit the public pages' copy), **reviews** (moderation), settings, tests
 
-SEO: `sitemap.ts`, `robots.ts`, `opengraph-image.tsx` (the OG routes read fonts/logo/artwork from `public/` on disk; Amplify's SSR bundle has no `public/`, so those files are listed in `outputFileTracingIncludes` in `next.config.ts` — add any new file an OG route reads there), canonical URLs from `src/lib/site-url.ts` (`SITE_URL`). `trailingSlash: true` is enabled — URLs without a trailing slash 308-redirect.
+SEO: the old WordPress site's 76 sitemap URLs are each served as is or 308'd in one hop (`LEGACY_REDIRECTS` in `next.config.ts`, locked by `e2e/legacy-urls.spec.ts`; Greek paths must be matched percent-encoded). `sitemap.ts`, `robots.ts`, `opengraph-image.tsx` (the OG routes read fonts/logo/artwork from `public/` on disk; Amplify's SSR bundle has no `public/`, so those files are listed in `outputFileTracingIncludes` in `next.config.ts` — add any new file an OG route reads there), canonical URLs from `src/lib/site-url.ts` (`SITE_URL`). `trailingSlash: true` is enabled — URLs without a trailing slash 308-redirect.
 
 ### Shared Code
 
@@ -104,7 +105,7 @@ SEO: `sitemap.ts`, `robots.ts`, `opengraph-image.tsx` (the OG routes read fonts/
 - `src/lib/tables.ts` — `TABLES`, every DynamoDB table name declared once. Never write a table name as a string literal (app, scripts and E2E helpers all import it). `TABLE_PREFIX` prefixes every name, for a second isolated set of tables on one endpoint; CDK does not provision it, so it stays unset in AWS (the region separates the stages).
 - `src/utils/dynamoService.ts` — DynamoDB client factory (local endpoint vs explicit creds vs `.aws/` profile vs IAM role)
 - `src/utils/ensure*Table.ts` — create the newer tables in DynamoDB Local (in AWS they are CDK-owned and these only describe them)
-- `src/utils/eventLogger.ts` — funnel events → `EventLogs` (365-day TTL)
+- `src/utils/eventLogger.ts` — funnel events → `EventLogs` (365-day TTL). Browser-side funnel steps go through `track()` (`src/lib/track.ts`). The admin client funnel counts visitors, not clientIds, because most people fill the form in signed out. The visitor is keyed by `visitorKey()` (`src/utils/visitorKey.ts`): a server-side HMAC of IP + user agent + UTC day, also stamped on `service_request_submitted`. **Nothing is stored in the browser for analytics.** The privacy policy promises no statistics cookies and so asks for no consent; keep it that way.
 - `src/utils/performanceService.ts`, `withMetrics.ts` — API latency metrics
 - `src/utils/errorFingerprint.ts`, `errorGroups.ts` — admin error grouping
 - `src/utils/emailService.ts`, `notificationService.ts`, `src/lib/email-templates/` — SES emails
@@ -179,7 +180,7 @@ Account `766671488262`. Two stages, one region each, declared once in `STAGES` (
 | `staging` (default) | `eu-central-1` Frankfurt | `dev` | https://dev.d3ku6yajf4j6y8.amplifyapp.com |
 | `production` | `eu-south-1` Milan (closest to Greece, 31 ms vs 54 ms) | `production` | https://production.d22r1orgditcqx.amplifyapp.com |
 
-Stacks (same names in both regions): `NextService-DynamoDB`, `-S3`, `-Monitoring`, `-AppSync`, `-Amplify`, `-Notifications`.
+Stacks (same names in both regions): `NextService-DynamoDB`, `-S3`, `-Monitoring`, `-AppSync`, `-Amplify`, `-Notifications`. Plus `NextService-DNS`, production only.
 
 ```bash
 cd infra && source .venv/bin/activate
@@ -191,7 +192,8 @@ cdk deploy --all -c stage=production -o cdk.out.production  # production (gitign
 - Regional names (tables, functions, topics, secrets, log groups) are identical across stages. Only account-global names differ: the Amplify IAM role (`nextservice-amplify-role[-production]`) and the S3 bucket (`nextservice-uploads-<account>-<stage>`). Each role reaches only its own bucket.
 - Each region has its own Secrets Manager copies: `nextservice/auth-secrets` and `nextservice/realtime-jwt-secret` are generated per stage by the stacks; `nextservice/github-token` is created by hand once per region.
 - Milan is an opt-in region: Amplify assumes the role there as `amplify.eu-south-1.amazonaws.com` (`OPT_IN_REGIONS` in `amplify_stack.py`), or every build fails with "Unable to assume specified IAM Role". The same misleading error also means the region's own GitHub App ("AWS Amplify (<region>)", e.g. github.com/apps/aws-amplify-eu-south-1) isn't installed on the repo — each region needs its own install, even with token cloning.
-- SES is per region. Staging's `nextservice.gr` identity was made by hand; production's is in the Notifications stack (`manage_ses_identity`), with its three DKIM CNAMEs as stack outputs (DNS is at Pointer, `name-servers.gr`). Production access is requested per region.
+- SES is per region. Staging's `nextservice.gr` identity was made by hand; production's is in the Notifications stack (`manage_ses_identity`). Production access is requested per region.
+- **DNS is Route 53, in CDK** (`NextService-DNS`, `infra/stacks/dns_stack.py`, deployed with `-c stage=production` only; one zone serves both stages). The domain is still *registered* at Pointer, which only holds the name servers. That file is the whole zone: a record set in Plesk is not served. Mail is still hosted at Pointer (MX, mail/webmail, SRV, SPF, Plesk's `default._domainkey`), so keep those intact; each region's SES DKIM CNAMEs are listed in `SES_DKIM_TOKENS`. The zone has `RETAIN` and the stack termination protection — deleting either takes site and mail offline.
 - Seed/maintenance scripts default to `eu-central-1`; pass `REGION=eu-south-1` to aim one at production.
 
 Amplify quirk: app-level env vars are **build-time only**. Anything the SSR runtime needs must also be listed in the `env` block of `next.config.ts`.

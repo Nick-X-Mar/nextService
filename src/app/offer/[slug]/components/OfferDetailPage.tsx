@@ -89,7 +89,7 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
   return (
     <div className="min-h-screen bg-surface">
       {/* Top Bar */}
-      <div className="sticky top-0 z-10 bg-surface/80 backdrop-blur-xl border-b border-outline-variant/20">
+      <div className="sticky top-16 z-10 bg-surface/80 backdrop-blur-xl border-b border-outline-variant/20">
         <div className="max-w-2xl mx-auto flex items-center justify-between px-4 h-14">
           <button
             onClick={() => router.back()}
@@ -109,7 +109,7 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 pb-48">
+      <div className="max-w-2xl mx-auto px-4 pb-8">
         {/* Image Section */}
         {offer.image ? (
           <div className="relative mt-4 aspect-[16/10] w-full overflow-hidden rounded-2xl bg-surface-container-high">
@@ -215,8 +215,10 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
         </div>
       </div>
 
-      {/* Fixed Bottom CTA — above BottomNav (h-20 = 80px on mobile) */}
-      <div className="fixed bottom-20 md:bottom-0 inset-x-0 z-40 bg-surface/80 backdrop-blur-xl border-t border-outline-variant/20 p-4">
+      {/* Bottom CTA, kept above BottomNav (h-20 = 80px on mobile). Sticky, not
+          fixed: it rides along the offer and stops at the end of the page, so
+          the footer below is never left under it. */}
+      <div className="sticky bottom-20 md:bottom-0 z-40 bg-surface/80 backdrop-blur-xl border-t border-outline-variant/20 p-4">
         <div className="max-w-2xl mx-auto">
           <button
             onClick={handleGetOffer}
