@@ -137,3 +137,5 @@ dev-data/
 
 # Playwright test results
 test-results/
+# Offer spreadsheets (customer names and phones) — input to scripts/build-price-examples.ts, never committed
+NextService - *.csv
