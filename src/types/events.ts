@@ -105,8 +105,9 @@ export interface EventLogRecord extends LogEventInput {
 }
 
 /**
- * Email template names. Each one maps 1:1 to a file in
- * src/lib/email-templates/. Keep this enum and the folder in sync.
+ * Email template names. Each one has an entry in the catalog
+ * (src/lib/email-templates/catalog.ts), which holds its copy and its link.
+ * The last two are sent by the Lambdas in infra/lambdas/, never by the app.
  */
 export const EmailTemplate = {
   WelcomeGarage: 'welcome_garage',
@@ -121,7 +122,9 @@ export const EmailTemplate = {
   PaymentConfirmationClient: 'payment_confirmation_client',
   CancellationConfirmationClient: 'cancellation_confirmation_client',
   CancellationNotificationGarage: 'cancellation_notification_garage',
-  AccountMergeConfirmation: 'account_merge_confirmation'
+  AccountMergeConfirmation: 'account_merge_confirmation',
+  NewRequestForGarages: 'new_request_for_garages',
+  CompletionPromptGarage: 'completion_prompt_garage'
 } as const
 
 export type EmailTemplateName = typeof EmailTemplate[keyof typeof EmailTemplate]

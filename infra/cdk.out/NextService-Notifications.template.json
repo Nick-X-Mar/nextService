@@ -286,6 +286,12 @@
        "Sid": "ReadVehicles"
       },
       {
+       "Action": "dynamodb:GetItem",
+       "Effect": "Allow",
+       "Resource": "arn:aws:dynamodb:eu-central-1:766671488262:table/SiteContent",
+       "Sid": "ReadEmailCopy"
+      },
+      {
        "Action": [
         "dynamodb:PutItem",
         "dynamodb:UpdateItem"
@@ -352,7 +358,7 @@
    "Properties": {
     "Code": {
      "S3Bucket": "cdk-hnb659fds-assets-766671488262-eu-central-1",
-     "S3Key": "7acd5d9bdba59678ad1b6cf778241a64675045de2d4d3b8fb47f75af00064305.zip"
+     "S3Key": "f54be1c4defab2308788fb331204f6253294ce152d3df2f7b58ea5efeeaff8e8.zip"
     },
     "Description": "Fan-out new service request → active garages via SES",
     "Environment": {
@@ -363,6 +369,7 @@
       "GARAGES_TABLE": "Garages",
       "VEHICLES_TABLE": "Vehicles",
       "EMAIL_LOGS_TABLE": "EmailLogs",
+      "SITE_CONTENT_TABLE": "SiteContent",
       "NOTIFICATIONS_ENABLED": "true",
       "SEND_CONCURRENCY": "10"
      }
@@ -385,7 +392,7 @@
    ],
    "Metadata": {
     "aws:cdk:path": "NextService-Notifications/NewRequestBroadcastFn/Resource",
-    "aws:asset:path": "asset.7acd5d9bdba59678ad1b6cf778241a64675045de2d4d3b8fb47f75af00064305",
+    "aws:asset:path": "asset.f54be1c4defab2308788fb331204f6253294ce152d3df2f7b58ea5efeeaff8e8",
     "aws:asset:is-bundled": false,
     "aws:asset:property": "Code"
    }
@@ -540,6 +547,12 @@
        "Sid": "ReadGaragesForCompletionPrompt"
       },
       {
+       "Action": "dynamodb:GetItem",
+       "Effect": "Allow",
+       "Resource": "arn:aws:dynamodb:eu-central-1:766671488262:table/SiteContent",
+       "Sid": "ReadCompletionEmailCopy"
+      },
+      {
        "Action": [
         "dynamodb:PutItem",
         "dynamodb:UpdateItem"
@@ -579,7 +592,7 @@
    "Properties": {
     "Code": {
      "S3Bucket": "cdk-hnb659fds-assets-766671488262-eu-central-1",
-     "S3Key": "0124a0fd5dcf2f034e788a1a030bd6f72e49ca5069274ad9e2c7e53e2121b4af.zip"
+     "S3Key": "03fb109570f7b07ee7da54236ad7dfc06928ea40fcec76586964968dcee71d54.zip"
     },
     "Description": "Asks garages to confirm appointments whose slot has passed",
     "Environment": {
@@ -590,6 +603,7 @@
       "SERVICE_REQUESTS_TABLE": "ServiceRequests",
       "GARAGES_TABLE": "Garages",
       "EMAIL_LOGS_TABLE": "EmailLogs",
+      "SITE_CONTENT_TABLE": "SiteContent",
       "NOTIFICATIONS_ENABLED": "true",
       "COMPLETION_GRACE_HOURS": "4",
       "COMPLETION_MAX_AGE_DAYS": "30"
@@ -613,7 +627,7 @@
    ],
    "Metadata": {
     "aws:cdk:path": "NextService-Notifications/CompletionSweeperFn/Resource",
-    "aws:asset:path": "asset.0124a0fd5dcf2f034e788a1a030bd6f72e49ca5069274ad9e2c7e53e2121b4af",
+    "aws:asset:path": "asset.03fb109570f7b07ee7da54236ad7dfc06928ea40fcec76586964968dcee71d54",
     "aws:asset:is-bundled": false,
     "aws:asset:property": "Code"
    }

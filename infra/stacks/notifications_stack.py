@@ -219,6 +219,7 @@ class NotificationsStack(Stack):
                 "GARAGES_TABLE": "Garages",
                 "VEHICLES_TABLE": "Vehicles",
                 "EMAIL_LOGS_TABLE": "EmailLogs",
+                "SITE_CONTENT_TABLE": "SiteContent",
                 "NOTIFICATIONS_ENABLED": "true" if notifications_enabled else "false",
                 "SEND_CONCURRENCY": "10",
             },
@@ -247,6 +248,15 @@ class NotificationsStack(Stack):
             actions=["dynamodb:GetItem"],
             resources=[
                 f"arn:aws:dynamodb:{self.region}:{self.account}:table/Vehicles",
+            ],
+        ))
+        # The email's copy is admin-editable: one `email:<template>` row in
+        # SiteContent, read once per new request.
+        self.broadcast_fn.add_to_role_policy(iam.PolicyStatement(
+            sid="ReadEmailCopy",
+            actions=["dynamodb:GetItem"],
+            resources=[
+                f"arn:aws:dynamodb:{self.region}:{self.account}:table/SiteContent",
             ],
         ))
         self.broadcast_fn.add_to_role_policy(iam.PolicyStatement(
@@ -376,6 +386,7 @@ class NotificationsStack(Stack):
                 "SERVICE_REQUESTS_TABLE": "ServiceRequests",
                 "GARAGES_TABLE": "Garages",
                 "EMAIL_LOGS_TABLE": "EmailLogs",
+                "SITE_CONTENT_TABLE": "SiteContent",
                 "NOTIFICATIONS_ENABLED": str(notifications_enabled).lower(),
                 # Keep in step with COMPLETION_GRACE_HOURS in
                 # src/types/reviews.ts — the in-app prompt uses that constant,
@@ -401,6 +412,16 @@ class NotificationsStack(Stack):
                 sid="ReadGaragesForCompletionPrompt",
                 actions=["dynamodb:GetItem"],
                 resources=[garages_table_arn],
+            )
+        )
+        # Admin-editable copy of the prompt (`email:completion_prompt_garage`).
+        self.completion_sweeper_fn.add_to_role_policy(
+            iam.PolicyStatement(
+                sid="ReadCompletionEmailCopy",
+                actions=["dynamodb:GetItem"],
+                resources=[
+                    f"arn:aws:dynamodb:{self.region}:{self.account}:table/SiteContent"
+                ],
             )
         )
         self.completion_sweeper_fn.add_to_role_policy(

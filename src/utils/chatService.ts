@@ -449,10 +449,9 @@ export async function createChatMessage(args: {
 const CHAT_EMAIL_COOLDOWN_MS = 15 * 60 * 1000
 
 /**
- * Fire-and-forget "you have a new message" mail to whoever did not send it.
- *
- * Never awaited by the request path: a slow SES call must not delay the message
- * appearing in the sender's own chat window.
+ * "You have a new message" mail to whoever did not send it. Awaited by the
+ * caller — on Amplify an unawaited send may never leave — and never throws
+ * into it.
  *
  * Two gates make this safe without presence detection. First, we skip anyone
  * whose read marker for this thread is newer than the previous message — if

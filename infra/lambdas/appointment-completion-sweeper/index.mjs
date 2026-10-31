@@ -16,9 +16,11 @@
  * so the prompt is only ever sent once.
  *
  * Self-contained: only the AWS SDK v3 that ships with the Node.js 20 runtime.
- * No node_modules, no bundler. The email HTML is duplicated from
- * `src/lib/email-templates/baseLayout.ts` for the same reason as in
- * new-request-broadcast — a Lambda cannot import from the Next.js app.
+ * No node_modules, no bundler. The email's copy is admin-editable
+ * (/admin/emails/templates): an override row `email:completion_prompt_garage`
+ * in SiteContent replaces DEFAULT_COPY field by field. DEFAULT_COPY, renderCopy
+ * and baseLayout are copies of src/lib/email-templates/{catalog,index,baseLayout}.ts
+ * (and of the same functions in new-request-broadcast) — change them together.
  */
 
 import { randomUUID } from 'node:crypto'
@@ -33,6 +35,8 @@ const APP_URL = (process.env.APP_URL || 'https://nextservice.gr').replace(/\/$/,
 const REQUESTS_TABLE = process.env.SERVICE_REQUESTS_TABLE || 'ServiceRequests'
 const GARAGES_TABLE = process.env.GARAGES_TABLE || 'Garages'
 const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
+const SITE_CONTENT_TABLE = process.env.SITE_CONTENT_TABLE || 'SiteContent'
+const TEMPLATE_NAME = 'completion_prompt_garage'
 const SES_CONFIG_SET = process.env.SES_CONFIG_SET || ''
 const NOTIFICATIONS_ENABLED =
   (process.env.NOTIFICATIONS_ENABLED ?? 'false').toLowerCase() === 'true'
@@ -170,36 +174,129 @@ function renderEmail(companyName, request) {
   )}`
   // `2026-10-28` → `28/10/2026`, as the app's own mails print it.
   const when = String(request.appointmentDate || '').replace(/^(\d{4})-(\d{2})-(\d{2})/, (_, y, m, d) => `${d}/${m}/${y}`)
-  const subject = 'Έγινε η επισκευή; Δήλωσέ το στο NextService'
+  return { link, values: { 'επωνυμία': companyName, 'ημερομηνία': when } }
+}
 
-  const html = `<!doctype html><html lang="el"><body style="margin:0;padding:0;background:#fbf9f8;font-family:Inter,Arial,sans-serif;color:#1b1c1c">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px">
-<tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;padding:32px">
-<tr><td>
-<h1 style="margin:0 0 16px;font-size:22px;font-weight:800;color:#1b1c1c">Έγινε η επισκευή;</h1>
-<p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#5b5f62">
-Γεια σου ${escapeHtml(companyName)},<br>
-Το ραντεβού της ${escapeHtml(when)} έχει περάσει και δεν μας έχεις πει τι έγινε.
-</p>
-<p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#5b5f62">
-Μπες και δήλωσε αν έγινε η εργασία, το ποσό που χρέωσες (με ή χωρίς ΦΠΑ) και πώς σου φάνηκε ο πελάτης. Παίρνει λιγότερο από ένα λεπτό και χρειάζεται για την εκκαθάριση.
-</p>
-<a href="${link}" style="display:inline-block;background:#8a5100;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:12px;font-size:15px;font-weight:700">Δήλωσε την ολοκλήρωση</a>
-<p style="margin:24px 0 0;font-size:12px;color:#887361">NextService</p>
-</td></tr></table></td></tr></table></body></html>`
+// ── Email copy ───────────────────────────────────────────────────────────
+// A copy of the catalog entry in src/lib/email-templates/catalog.ts.
+const DEFAULT_COPY = {
+  subject: 'Έγινε η επισκευή; Δήλωσέ το στο NextService',
+  heading: 'Έγινε η επισκευή;',
+  body:
+    'Γεια σου {επωνυμία},\n\n' +
+    'Το ραντεβού της **{ημερομηνία}** έχει περάσει και δεν μας έχεις πει τι έγινε.\n\n' +
+    'Δήλωσε αν έγινε η εργασία, το ποσό που χρέωσες και πώς σου φάνηκε ο πελάτης. Παίρνει λιγότερο από ένα λεπτό και χρειάζεται για την εκκαθάριση.',
+  ctaLabel: 'Δήλωσε την ολοκλήρωση',
+  note: ''
+}
 
-  const text = `Έγινε η επισκευή;
+/** The admin's edited copy over the shipped one, field by field. Never throws. */
+async function loadCopy() {
+  try {
+    const res = await ddb.send(new GetCommand({
+      TableName: SITE_CONTENT_TABLE,
+      Key: { pageKey: `email:${TEMPLATE_NAME}` }
+    }))
+    return mergeCopy(DEFAULT_COPY, res.Item)
+  } catch (err) {
+    console.error('[sweeper] email copy lookup failed, using the shipped copy:', err)
+    return DEFAULT_COPY
+  }
+}
 
-Γεια σου ${companyName},
-Το ραντεβού της ${when} έχει περάσει και δεν μας έχεις πει τι έγινε.
+function mergeCopy(defaults, stored) {
+  const merged = { ...defaults }
+  if (!stored) return merged
+  for (const key of Object.keys(defaults)) {
+    const value = stored[key]
+    if (typeof value === 'string' && (value.trim() || key === 'note' || key === 'heading')) merged[key] = value
+  }
+  return merged
+}
 
-Δήλωσε αν έγινε η εργασία, το ποσό που χρέωσες (με ή χωρίς ΦΠΑ) και πώς σου φάνηκε ο πελάτης:
-${link}
+const TOKEN_PATTERN = /\{([^{}\n]{1,40})\}/g
 
-NextService`
+/** A copy of renderDefinition in src/lib/email-templates/index.ts. */
+function renderCopy(copy, values, ctaHref) {
+  const raw = {}
+  for (const [token, value] of Object.entries(values)) raw[token] = String(value ?? '').trim()
+
+  const fillText = (text) => text.replace(TOKEN_PATTERN, (_, token) => raw[token] ?? '')
+  const fillHtml = (html) => html.replace(TOKEN_PATTERN, (_, token) => escapeHtml(raw[token] ?? ''))
+  const present = (p) => [...p.matchAll(TOKEN_PATTERN)].every(([, token]) => !!raw[token])
+  const paragraphs = (text) =>
+    text.split(/\n\s*\n/).map((p) => p.trim()).filter((p) => p && present(p))
+  const inline = (escaped) =>
+    escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')
+
+  const subject = fillText(copy.subject).replace(/\s+/g, ' ').trim()
+  const heading = fillText(copy.heading).trim()
+  const body = paragraphs(copy.body)
+  const note = paragraphs(copy.note)
+  const ctaUrl = ctaHref && copy.ctaLabel.trim() ? escapeHtml(ctaHref) : undefined
+  const ctaLabel = ctaUrl ? escapeHtml(copy.ctaLabel.trim()) : undefined
+
+  const bodyHtml = [
+    heading ? `<h2 style="margin:0 0 16px 0;font-size:20px;">${fillHtml(inline(escapeHtml(copy.heading.trim())))}</h2>` : '',
+    ...body.map((p) => `<p>${fillHtml(inline(escapeHtml(p)))}</p>`)
+  ].join('\n')
+  const noteHtml = note
+    .map((p) => `<p style="margin:20px 0 0 0;color:#6b7280;font-size:13px;">${fillHtml(inline(escapeHtml(p)))}</p>`)
+    .join('\n')
+  const html = baseLayout({ title: escapeHtml(subject), bodyHtml, ctaLabel, ctaUrl, noteHtml })
+
+  const plain = (p) => fillText(p).replace(/\*\*/g, '')
+  const text = [
+    heading ? plain(copy.heading.trim()) : '',
+    ...body.map(plain),
+    ctaUrl ? `${copy.ctaLabel.trim()}: ${ctaHref}` : '',
+    ...note.map(plain),
+    'NextService'
+  ].filter(Boolean).join('\n\n')
 
   return { subject, html, text }
+}
+
+// A copy of src/lib/email-templates/baseLayout.ts.
+function baseLayout({ title, bodyHtml, ctaLabel, ctaUrl, noteHtml = '' }) {
+  const cta = ctaLabel && ctaUrl
+    ? `<p style="margin:32px 0 0 0;text-align:center;">
+         <a href="${ctaUrl}" style="display:inline-block;background:#f97316;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:600;font-family:Arial,sans-serif;font-size:16px;">${ctaLabel}</a>
+       </p>`
+    : ''
+
+  return `<!DOCTYPE html>
+<html lang="el">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;color:#1f2937;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+          <tr>
+            <td style="background:#f97316;padding:24px 28px;">
+              <h1 style="margin:0;color:#ffffff;font-size:22px;font-family:Arial,sans-serif;">NextService</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px;font-size:15px;line-height:1.6;color:#1f2937;">
+              ${bodyHtml}
+              ${cta}
+              ${noteHtml}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 28px;background:#fafafa;font-size:12px;color:#6b7280;text-align:center;">
+              Έλαβες αυτό το email επειδή χρησιμοποιείς το NextService.<br>
+              © NextService — Η αγορά συνεργείων αυτοκινήτου.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
 }
 
 function escapeHtml(value) {
@@ -226,17 +323,20 @@ async function writeEmailLog(record) {
 
 async function sendPrompt(garage, request) {
   const emailId = randomUUID()
-  const rendered = renderEmail(garage.companyName || 'συνεργείο', request)
+  const { link, values } = renderEmail(garage.companyName || 'συνεργείο', request)
+  const rendered = renderCopy(await loadCopy(), values, link)
 
   const base = {
     emailId,
     to: garage.email,
-    templateName: 'completion_prompt_garage',
+    templateName: TEMPLATE_NAME,
     triggerEvent: 'service_completion_prompt',
     garageId: request.acceptedGarageId,
     requestId: request.id,
     subject: rendered.subject,
-    createdAt: new Date().toISOString(),
+    // The admin's email list and stats query on sentAt; a row without it
+    // never showed up there.
+    sentAt: new Date().toISOString(),
   }
 
   if (!NOTIFICATIONS_ENABLED) {
@@ -249,7 +349,7 @@ async function sendPrompt(garage, request) {
     return
   }
 
-  await writeEmailLog({ ...base, status: 'pending' })
+  await writeEmailLog({ ...base, status: 'queued' })
 
   try {
     const boundary = `----=_Part_${randomUUID().replace(/-/g, '')}`

@@ -1,17 +1,25 @@
 /**
  * Minimal HTML wrapper used by every email template. Keep it simple — most
  * mail clients strip CSS aggressively. The look matches the orange brand.
+ *
+ * The card is fluid up to 560px: most recipients read on a phone, where a
+ * fixed 560px table was scaled down to fit.
+ *
+ * infra/lambdas/new-request-broadcast and appointment-completion-sweeper carry
+ * a copy of this function. Change one, change the others.
  */
 export function baseLayout({
   title,
   bodyHtml,
   ctaLabel,
-  ctaUrl
+  ctaUrl,
+  noteHtml = ''
 }: {
   title: string
   bodyHtml: string
   ctaLabel?: string
   ctaUrl?: string
+  noteHtml?: string
 }): string {
   const cta = ctaLabel && ctaUrl
     ? `<p style="margin:32px 0 0 0;text-align:center;">
@@ -21,25 +29,26 @@ export function baseLayout({
 
   return `<!DOCTYPE html>
 <html lang="el">
-<head><meta charset="UTF-8"><title>${title}</title></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title></head>
 <body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif;color:#1f2937;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:32px 16px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:24px 12px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
           <tr>
-            <td style="background:#f97316;padding:24px 32px;">
+            <td style="background:#f97316;padding:24px 28px;">
               <h1 style="margin:0;color:#ffffff;font-size:22px;font-family:Arial,sans-serif;">NextService</h1>
             </td>
           </tr>
           <tr>
-            <td style="padding:32px;font-size:15px;line-height:1.6;color:#1f2937;">
+            <td style="padding:28px;font-size:15px;line-height:1.6;color:#1f2937;">
               ${bodyHtml}
               ${cta}
+              ${noteHtml}
             </td>
           </tr>
           <tr>
-            <td style="padding:20px 32px;background:#fafafa;font-size:12px;color:#6b7280;text-align:center;">
+            <td style="padding:20px 28px;background:#fafafa;font-size:12px;color:#6b7280;text-align:center;">
               Έλαβες αυτό το email επειδή χρησιμοποιείς το NextService.<br>
               © NextService — Η αγορά συνεργείων αυτοκινήτου.
             </td>
@@ -50,26 +59,4 @@ export function baseLayout({
   </table>
 </body>
 </html>`
-}
-
-const ENTITIES: Record<string, string> = { lt: '<', gt: '>', quot: '"', '#39': "'", amp: '&' }
-
-/** Reverses the escaping renderEmail applies, for text that is not HTML. */
-export function decodeEntities(text: string): string {
-  return text.replace(/&(lt|gt|quot|#39|amp);/g, (_, entity: string) => ENTITIES[entity])
-}
-
-/**
- * Strip HTML tags + collapse whitespace, used to derive a plain-text body
- * (for SES `Text` field) and the `bodyPreview` we store in EmailLogs.
- */
-export function htmlToPlainText(html: string): string {
-  return decodeEntities(
-    html
-      .replace(/<style[\s\S]*?<\/style>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&nbsp;/g, ' ')
-  )
-    .replace(/\s+/g, ' ')
-    .trim()
 }

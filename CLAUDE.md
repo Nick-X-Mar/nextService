@@ -108,7 +108,7 @@ SEO: the old WordPress site's 76 sitemap URLs are each served as is or 308'd in 
 - `src/utils/eventLogger.ts` — funnel events → `EventLogs` (365-day TTL). Browser-side funnel steps go through `track()` (`src/lib/track.ts`). The admin client funnel counts visitors, not clientIds, because most people fill the form in signed out. The visitor is keyed by `visitorKey()` (`src/utils/visitorKey.ts`): a server-side HMAC of IP + user agent + UTC day, also stamped on `service_request_submitted`. **Nothing is stored in the browser for analytics.** The privacy policy promises no statistics cookies and so asks for no consent; keep it that way.
 - `src/utils/performanceService.ts`, `withMetrics.ts` — API latency metrics
 - `src/utils/errorFingerprint.ts`, `errorGroups.ts` — admin error grouping
-- `src/utils/emailService.ts`, `notificationService.ts`, `src/lib/email-templates/` — SES emails
+- `src/utils/emailService.ts`, `src/lib/email-templates/` — SES emails. Every email (the Lambdas' two included) is one entry in `catalog.ts`: who gets it, when, its `{token}` fields and its shipped copy (subject/heading/body/button/note as plain text — blank line = paragraph, `**bold**`, a paragraph whose token is empty is dropped). The link is code; the copy is admin-editable on `/admin/emails/templates/` and stored as `email:<template>` rows in `SiteContent` (`src/lib/email-content.ts`), the catalog staying the fallback field by field. Reset deletes the row.
 - `src/utils/s3Service.ts`, `formStorage.ts`, `rateLimit.ts`, `requireAuth.ts`, `ttlCache.ts`, `requestBroadcast.ts`
 - `src/lib/` — `appsync-service.ts` (browser socket), `appsync-publish.ts` (server-side HTTP publish — API routes never publish over the socket), `site-content.ts` + `content-validation.ts` (the page CMS), `commission-basis.ts`, `stripe-client.ts`, `stripe-server.ts`, `offers.ts`, `site-url.ts`
 - `src/hooks/` — `useRealtimeRequests`, `useNewRequestNotifier`, `useToast` + `useConfirm` (context hooks over `ToastProvider` / `ConfirmProvider`, mounted once in the root layout; never `window.confirm()` or `alert()`)
@@ -157,7 +157,7 @@ Chat channels are `request/{requestId}/garage/{garageId}` — always built with 
 
 `ServiceRequests` has a DynamoDB Stream → `infra/lambdas/new-request-broadcast` → SES fan-out to active garages. The Next.js route only writes to DynamoDB. `ses-event-processor` records deliveries/bounces into `EmailLogs` (surfaced in `/admin/emails`).
 
-Lambdas in `infra/lambdas/` are self-contained `index.mjs` files (only the AWS SDK bundled with the runtime) and can't import from the app. The email HTML in `new-request-broadcast` and `appointment-completion-sweeper` is therefore a copy of `src/lib/email-templates/baseLayout.ts`. Change one, change the others.
+Lambdas in `infra/lambdas/` are self-contained `index.mjs` files (only the AWS SDK bundled with the runtime) and can't import from the app. `new-request-broadcast` and `appointment-completion-sweeper` therefore carry copies of `baseLayout`, `renderDefinition` (as `renderCopy`) and their own catalog entry (`DEFAULT_COPY`), and read their `email:<template>` override from `SiteContent` themselves. Change one, change the others.
 
 ## Data (DynamoDB)
 

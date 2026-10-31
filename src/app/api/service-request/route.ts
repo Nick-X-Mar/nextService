@@ -508,12 +508,14 @@ async function _POST(request: NextRequest) {
       }
     })
 
-    // Confirmation email to the client. For guest registrations we have the
-    // address straight from the body; for logged-in clients we'd need to look
-    // it up — skip if we don't have it locally to avoid an extra DB hit.
-    if (newClient) {
+    // Confirmation email to the client: a new registration's address is in the
+    // body, a signed-in client's is one read away.
+    const confirmationTo = newClient
+      ? (newClient.email as string)
+      : await clientEmail(clientId)
+    if (confirmationTo) {
       await sendEmail({
-        to: newClient.email as string,
+        to: confirmationTo,
         templateName: EmailTemplate.RequestConfirmation,
         variables: {
           brand: vehicle.brand,
@@ -564,3 +566,18 @@ async function _POST(request: NextRequest) {
 }
 
 export const POST = withMetrics(_POST)
+
+/** A signed-in client's email, for the confirmation mail. Never throws. */
+async function clientEmail(clientId: string): Promise<string | undefined> {
+  try {
+    const res = await dynamoDB.send(new GetCommand({
+      TableName: TABLES.Clients,
+      Key: { id: clientId },
+      ProjectionExpression: 'email',
+    }))
+    return typeof res.Item?.email === 'string' ? res.Item.email : undefined
+  } catch (err) {
+    console.error('[service-request] client email lookup failed:', err)
+    return undefined
+  }
+}

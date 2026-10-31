@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
+import Icon from '@/components/ui/Icon'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
 import DateRangePicker from '../components/DateRangePicker'
@@ -198,9 +200,18 @@ export default function EmailsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
         <h1 className="text-2xl font-bold font-headline text-on-surface">Email Analytics</h1>
-        <DateRangePicker from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t) }} />
+        <div className="flex items-center gap-3 flex-wrap">
+          <Link
+            href="/admin/emails/templates/"
+            className="px-4 py-2 rounded-lg bg-gradient-to-br from-primary to-primary-container text-on-primary text-sm font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all flex items-center gap-2"
+          >
+            <Icon name="edit_note" size="sm" />
+            Κείμενα των emails
+          </Link>
+          <DateRangePicker from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t) }} />
+        </div>
       </div>
 
       {/* Reputation warnings — red banner if we're trending toward SES suspension */}

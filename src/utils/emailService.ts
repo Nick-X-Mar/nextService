@@ -6,6 +6,8 @@ import { PutCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ensureEmailLogsTable } from '@/utils/ensureEventTables'
 import { renderEmail } from '@/lib/email-templates'
+import type { EmailCopy } from '@/lib/email-templates/catalog'
+import { getEmailCopy } from '@/lib/email-content'
 import type {
   EmailLogRecord,
   EmailStatus,
@@ -71,6 +73,8 @@ export interface SendEmailInput {
   clientId?: string
   garageId?: string
   requestId?: string
+  /** An unsaved draft from the admin editor's test send. Normally the stored copy is used. */
+  copy?: EmailCopy
 }
 
 /**
@@ -95,7 +99,9 @@ async function sendEmailInternal(input: SendEmailInput): Promise<void> {
     return
   }
 
-  const rendered = renderEmail(templateName, variables)
+  // The admin's edited copy, if there is one (src/lib/email-content.ts).
+  const copy = input.copy || (await getEmailCopy(templateName))
+  const rendered = renderEmail(templateName, variables, copy)
   const emailId = randomUUID()
   const sentAt = new Date().toISOString()
 
