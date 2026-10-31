@@ -6,6 +6,7 @@ import LoginModal from '@/components/LoginModal'
 import { useAuth } from '@/contexts/AuthContext'
 import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 import { adoptFormData } from '@/utils/formStorage'
+import { countryList, DEFAULT_COUNTRY, dialCodeOf, toE164 } from '@/utils/phone'
 
 const isEmailValid = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
 
@@ -31,6 +32,11 @@ export function useGuestAccount() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
+  // Optional. Only the garage the client books with ever sees it.
+  const [phoneCountry, setPhoneCountry] = useState(DEFAULT_COUNTRY)
+  const [phone, setPhone] = useState('')
+  const phoneNumber = phone.trim() ? toE164(phoneCountry, phone) : ''
+  const isPhoneValid = phoneNumber !== null
   const [emailExists, setEmailExists] = useState(false)
   const [isCheckingEmail, setIsCheckingEmail] = useState(false)
   const [showEmailHint, setShowEmailHint] = useState(false)
@@ -72,10 +78,12 @@ export function useGuestAccount() {
 
   /** Until the session is settled we don't know which shape the submit takes. */
   const isReady = authSettled &&
-    (isLoggedIn || (isEmailValid(email) && !emailExists && isPasswordValid && acceptedTerms))
+    (isLoggedIn || (isEmailValid(email) && !emailExists && isPasswordValid && isPhoneValid && acceptedTerms))
 
   /** The fields the request body needs: none for a signed-in client. */
-  const credentials = isLoggedIn ? {} : { email, password, acceptedTerms: true as const }
+  const credentials = isLoggedIn
+    ? {}
+    : { email, password, acceptedTerms: true as const, ...(phoneNumber ? { phoneNumber } : {}) }
 
   // A different address is a fresh question; the old answer (possibly a 409) no
   // longer applies to it.
@@ -113,6 +121,7 @@ export function useGuestAccount() {
     email, changeEmail, password, setPassword, confirmPassword, setConfirmPassword,
     acceptedTerms, setAcceptedTerms, emailExists, isCheckingEmail, showEmailHint, setShowEmailHint,
     showLoginModal, setShowLoginModal,
+    phoneCountry, setPhoneCountry, phone, setPhone, isPhoneValid,
   }
 }
 
@@ -124,6 +133,7 @@ export default function GuestAccountFields({ account }: { account: GuestAccount 
     email, changeEmail, password, setPassword, confirmPassword, setConfirmPassword,
     acceptedTerms, setAcceptedTerms, emailExists, isCheckingEmail, showEmailHint, setShowEmailHint,
     showLoginModal, setShowLoginModal,
+    phoneCountry, setPhoneCountry, phone, setPhone, isPhoneValid,
   } = account
   // A garage session counts as signed out here: submitting registers a client
   // and the new client cookie replaces the garage's. Say so before it happens.
@@ -193,6 +203,14 @@ export default function GuestAccountFields({ account }: { account: GuestAccount 
           {/* Password fields - only if email is valid and doesn't exist */}
           {isEmailValid(email) && !emailExists && (
             <>
+              <PhoneField
+                country={phoneCountry}
+                onCountryChange={setPhoneCountry}
+                value={phone}
+                onChange={setPhone}
+                invalid={!isPhoneValid}
+              />
+
               <div className="space-y-3">
                 <label htmlFor="guest-password" className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
                   Κωδικός πρόσβασης <span className="text-error">*</span>
@@ -282,5 +300,80 @@ export default function GuestAccountFields({ account }: { account: GuestAccount 
         }}
       />
     </>
+  )
+}
+
+/**
+ * Optional mobile with its own country picker. The native <select> sits invisibly
+ * over a compact "🇬🇷 +30" label, so the phone's own picker opens with every
+ * country's full name while the field stays narrow.
+ */
+function PhoneField({
+  country, onCountryChange, value, onChange, invalid,
+}: {
+  country: string
+  onCountryChange: (iso: string) => void
+  value: string
+  onChange: (value: string) => void
+  invalid: boolean
+}) {
+  const selected = countryList().find((c) => c.iso === country)
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-primary-fixed/40 border border-primary/10 rounded-xl p-4 flex items-start gap-3">
+        <Icon name="phone_iphone" className="text-primary shrink-0" />
+        <div>
+          <p className="text-sm font-bold text-on-surface">Θέλεις πιο άμεση επικοινωνία;</p>
+          <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+            Δήλωσε το κινητό σου, ώστε το συνεργείο να μπορεί να σε καλέσει για το ραντεβού. Το βλέπει μόνο το
+            συνεργείο που θα επιλέξεις, αφού κλείσεις ραντεβού.
+          </p>
+        </div>
+      </div>
+      <label htmlFor="guest-phone" className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
+        Κινητό <span className="normal-case tracking-normal font-medium">(προαιρετικό)</span>
+      </label>
+      <div className="flex gap-2">
+        <div className="relative shrink-0">
+          <div
+            aria-hidden="true"
+            className="h-full bg-surface-container-highest rounded-xl px-3 flex items-center gap-1.5 font-medium text-on-surface"
+          >
+            <span>{selected?.flag}</span>
+            <span>+{dialCodeOf(country)}</span>
+            <Icon name="expand_more" size="sm" className="text-on-surface-variant/60" />
+          </div>
+          <select
+            aria-label="Χώρα κινητού"
+            value={country}
+            onChange={(e) => onCountryChange(e.target.value)}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          >
+            {countryList().map((c) => (
+              <option key={c.iso} value={c.iso}>
+                {c.flag} {c.name} (+{c.dial})
+              </option>
+            ))}
+          </select>
+        </div>
+        <input
+          id="guest-phone"
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel-national"
+          value={value}
+          onChange={(e) => onChange(e.target.value.replace(/[^\d\s+()-]/g, ''))}
+          placeholder={country === 'GR' ? 'π.χ. 6912345678' : 'Αριθμός κινητού'}
+          className="min-w-0 flex-1 bg-surface-container-highest border-none rounded-xl px-4 py-4 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
+        />
+      </div>
+      {invalid && (
+        <p className="text-xs text-error flex items-center gap-1">
+          <Icon name="error" size="sm" className="text-error" />
+          {country === 'GR' ? 'Το κινητό ξεκινά από 69 και έχει 10 ψηφία' : 'Μη έγκυρος αριθμός κινητού'}
+        </p>
+      )}
+    </div>
   )
 }

@@ -106,6 +106,18 @@ test('The bodywork request can be sent: its button is not under the bottom bar',
   expect(await isTappable(page.getByRole('button', { name: 'Επιστροφή' }))).toBe(true)
 })
 
+test('The mobile field and its country picker fit a phone screen', async ({ page }) => {
+  await seedDraft(page, { category: 'meriki-vafi', description: 'Γρατζουνιά στην πόρτα', brand: 'Fiat', model: 'Punto', modelYear: '2015', owner: 'guest' }, '/car-specifications/')
+  await page.locator('#guest-email').fill(`e2e-mobile-phone-${Date.now()}@test.com`)
+  const phone = page.locator('#guest-phone')
+  await expect(phone).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width)
+  expect(parseFloat(await phone.evaluate((el) => getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16)
+  const picker = page.getByLabel('Χώρα κινητού')
+  await picker.scrollIntoViewIfNeeded()
+  expect(await isTappable(picker)).toBe(true)
+})
+
 test('A sheet opens above the bottom bar: the last category can be tapped', async ({ page }) => {
   await page.goto('/car-details/?new=1')
   const last = page.getByRole('button', { name: /Αλλαγή λαδιών/ })

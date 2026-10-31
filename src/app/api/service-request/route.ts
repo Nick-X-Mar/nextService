@@ -6,6 +6,7 @@ import { hashPassword } from '@/utils/passwordService'
 import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 import { logEvent } from '@/utils/eventLogger'
 import { sendEmail } from '@/utils/emailService'
+import { isValidPhoneNumber } from '@/utils/phone'
 import { EventName, EmailTemplate } from '@/types/events'
 import { getAuth } from '@/utils/requireAuth'
 import { signToken, setAuthCookie } from '@/utils/auth'
@@ -294,6 +295,9 @@ async function _POST(request: NextRequest) {
       if (body.acceptedTerms !== true) {
         return badRequest('Πρέπει να αποδεχτείς τους Όρους Χρήσης και την Πολιτική Απορρήτου')
       }
+      if (text(body.phoneNumber) && !isValidPhoneNumber(text(body.phoneNumber))) {
+        return badRequest('Μη έγκυρος αριθμός κινητού')
+      }
       if (!checkGuestSignupRate(clientIp(request))) {
         return NextResponse.json({ error: 'Πολλές εγγραφές. Δοκιμάστε ξανά σε 1 ώρα.' }, { status: 429 })
       }
@@ -333,7 +337,7 @@ async function _POST(request: NextRequest) {
         updatedAt: nowIso,
       }
       const lastName = text(body.lastName).slice(0, 100)
-      const phoneNumber = text(body.phoneNumber).slice(0, 30)
+      const phoneNumber = text(body.phoneNumber)
       const address = text(body.address).slice(0, 200)
       if (lastName) newClient.lastName = lastName
       if (phoneNumber) newClient.phoneNumber = phoneNumber

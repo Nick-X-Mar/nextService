@@ -180,6 +180,60 @@ test.describe('Request creation writes nothing until it is valid', () => {
     // The response no longer claims SMS notifications that never happened.
     expect(data.notificationsSent).toBeUndefined()
   })
+
+  test('Guest registration keeps the optional mobile as E.164 and refuses a bad one', async ({ playwright }) => {
+    const guest = await newGuest(playwright)
+    const email = `e2e-b-phone-${Date.now()}@test.com`
+
+    const bad = await guest.post('/api/service-request/', {
+      data: mechanicalRequest({ email, password: 'GoodPass123', acceptedTerms: true, phoneNumber: '+30 21012' }),
+    })
+    expect(bad.status()).toBe(400)
+    expect(await clientsWithEmail(email)).toHaveLength(0)
+
+    const ok = await guest.post('/api/service-request/', {
+      data: mechanicalRequest({ email, password: 'GoodPass123', acceptedTerms: true, phoneNumber: '+306912345678' }),
+    })
+    expect(ok.status()).toBe(200)
+    const [account] = await clientsWithEmail(email)
+    expect(account.phoneNumber).toBe('+306912345678')
+  })
+})
+
+test('The request form offers an optional mobile with a country picker', async ({ page }) => {
+  await page.route('**/api/upload-photos/', (route) =>
+    route.fulfill({ json: { success: true, photoData: [{}], rejected: [] } })
+  )
+  const marker = uniqueMarker('phone-ui')
+  await seedDraft(page, {
+    category: 'meriki-vafi', description: marker, brand: 'Fiat', model: 'Punto', modelYear: '2015', owner: 'guest',
+  }, '/car-specifications/')
+
+  const email = `e2e-b-phone-ui-${Date.now()}@test.com`
+  await page.locator('#guest-email').fill(email)
+  await expect(page.getByText('Θέλεις πιο άμεση επικοινωνία;')).toBeVisible()
+  await expect(page.getByText('+30', { exact: true })).toBeVisible()
+
+  // Another country, picked from the full list.
+  await page.getByLabel('Χώρα κινητού').selectOption('CY')
+  await expect(page.getByText('+357', { exact: true })).toBeVisible()
+  await page.getByLabel('Χώρα κινητού').selectOption('GR')
+
+  await page.locator('#guest-password').fill('GoodPass123')
+  await page.locator('#guest-password-confirm').fill('GoodPass123')
+  await page.getByRole('checkbox').check()
+  await page.locator('#damage-photos').setInputFiles({ name: 'damage.png', mimeType: 'image/png', buffer: TINY_PNG })
+
+  // A landline is not a mobile: the form says so and will not send.
+  await page.locator('#guest-phone').fill('2101234567')
+  await expect(page.getByText('Το κινητό ξεκινά από 69 και έχει 10 ψηφία')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'ΑΠΟΣΤΟΛΗ ΑΙΤΗΜΑΤΟΣ' })).toBeDisabled()
+
+  await page.locator('#guest-phone').fill('691 234 5678')
+  await page.getByRole('button', { name: 'ΑΠΟΣΤΟΛΗ ΑΙΤΗΜΑΤΟΣ' }).click()
+  await page.waitForURL('**/requests/client-**')
+  const [account] = await clientsWithEmail(email)
+  expect(account.phoneNumber).toBe('+306912345678')
 })
 
 test.describe('Request creation stores the right thing', () => {
