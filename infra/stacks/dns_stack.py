@@ -44,6 +44,7 @@ POINTER_MAIL2_IP = "185.162.238.15"
 
 # Easy DKIM tokens of the nextservice.gr SES identity in each stage's region:
 # `aws sesv2 get-email-identity --email-identity nextservice.gr --region <r>`.
+# Each token is CNAME'd to `<token>.<domain>`, the domain from SES_DKIM_DOMAINS.
 SES_DKIM_TOKENS = {
     "staging": [  # eu-central-1, verified by hand before the stacks existed
         "e3qs26y3ad6nq5dc2hl6ma26wlnqp2bz",
@@ -55,6 +56,15 @@ SES_DKIM_TOKENS = {
         "rmwemfhntsqldlhowuzdg6ql7aj5dscu",
         "5szlotvkaecxk6asytal55mhw3c4anag",
     ],
+}
+
+# Where the DKIM CNAMEs point. Regions launched after 2019 (Milan among them)
+# sign with a regional domain, and SES only looks for that one: production's
+# records pointed at the global domain and its verification failed. The
+# Notifications stack's DkimRecord outputs print the exact targets.
+SES_DKIM_DOMAINS = {
+    "staging": "dkim.amazonses.com",
+    "production": "dkim.eu-south-1.amazonses.com",
 }
 
 # Plesk's DKIM key for mail sent from the Pointer mailboxes. Longer than one
@@ -135,7 +145,7 @@ class DnsStack(Stack):
         for stage, tokens in SES_DKIM_TOKENS.items():
             for i, token in enumerate(tokens, start=1):
                 cname(f"SesDkim{stage.capitalize()}{i}", f"{token}._domainkey",
-                      f"{token}.dkim.amazonses.com")
+                      f"{token}.{SES_DKIM_DOMAINS[stage]}")
 
         CfnOutput(self, "NameServers",
                   value=Fn.join(" ", zone.hosted_zone_name_servers),
