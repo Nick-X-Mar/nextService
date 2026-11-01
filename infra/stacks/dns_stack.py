@@ -14,8 +14,10 @@ What lives in the zone:
   - Both stages send through SES as nextservice.gr, so each region's Easy DKIM
     CNAMEs are here — staging's and production's. They never change for the
     life of an identity (SES rotates the keys behind them).
-  - The apex and www still serve the old WordPress site at Pointer until the
-    domain cutover moves them to Amplify.
+  - www is served by Amplify (production) since 2026-11-02: Amplify owns its
+    record and its certificate's validation CNAME, so neither is declared
+    here. The apex still points at Pointer, whose WordPress 301s every path
+    to www — mail clients may be set up with the bare domain as their server.
 
 Deployed with the production stage only, so a bare `cdk deploy --all` (which
 targets staging) can never touch live DNS. One zone serves both stages.
@@ -78,12 +80,16 @@ PLESK_DKIM_KEY = (
 )
 
 TTL = Duration.hours(1)
+# The names that move to Amplify at the cutover: short, so the switch and a
+# rollback both reach every resolver within minutes.
+CUTOVER_TTL = Duration.minutes(5)
 
 
 class DnsStack(Stack):
     """Route 53 public hosted zone for nextservice.gr and all its records."""
 
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, *,
+                 amplify_prefixes: list[str] = (), **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
         # Deleting the stack or the zone would take the domain — site and
@@ -111,7 +117,14 @@ class DnsStack(Stack):
 
         # ── Website (old WordPress at Pointer until the cutover) ──
         a("ApexA", None, POINTER_HOST_IP)
-        cname("WwwCname", "www", DOMAIN)
+        # www moves to Amplify at the cutover (`domain_prefixes` in app.py).
+        # Amplify then writes the record itself, so it leaves this stack —
+        # RETAIN keeps it in the zone until Amplify replaces it, instead of
+        # CloudFormation deleting it and leaving www unresolvable meanwhile.
+        if "www" not in amplify_prefixes:
+            www = route53.CnameRecord(self, "WwwCname", zone=zone, record_name="www",
+                                      domain_name=DOMAIN, ttl=CUTOVER_TTL)
+            www.apply_removal_policy(RemovalPolicy.RETAIN)
         cname("FtpCname", "ftp", DOMAIN)
         a("Ipv4A", "ipv4", POINTER_HOST_IP)
         # Plesk's vanity name-server hostnames. Nothing delegates to them, but

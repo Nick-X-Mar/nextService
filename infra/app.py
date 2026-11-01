@@ -84,6 +84,14 @@ AUTH_SECRETS_NAME = "nextservice/auth-secrets"
 #   manage_ses_identity — whether the Notifications stack owns the SES domain
 #                 identity. Staging's predates the stacks and was verified by
 #                 hand; creating it again would fail as "already exists".
+#   domain_prefixes — the nextservice.gr names this stage's Amplify branch
+#                 serves ("www", "" for the apex). Listing one connects it in
+#                 Amplify, which issues the certificate and writes the name's
+#                 record in the Route 53 zone; the DNS stack then drops its own
+#                 record for it. THE CUTOVER: add "www" here and set site_url to
+#                 https://www.nextservice.gr in the same change. The apex stays
+#                 on Pointer for now: its WordPress 301s every path to www, and
+#                 mail clients may be set up with the bare domain as server.
 STAGES = {
     "staging": {
         "region": "eu-central-1",
@@ -91,13 +99,15 @@ STAGES = {
         "site_url": "https://dev.d3ku6yajf4j6y8.amplifyapp.com",
         "amplify_role_name": "nextservice-amplify-role",
         "manage_ses_identity": False,
+        "domain_prefixes": [],
     },
     "production": {
         "region": "eu-south-1",
         "branch": "production",
-        "site_url": "https://production.d22r1orgditcqx.amplifyapp.com",
+        "site_url": "https://www.nextservice.gr",
         "amplify_role_name": "nextservice-amplify-role-production",
         "manage_ses_identity": True,
+        "domain_prefixes": ["www"],
     },
 }
 
@@ -169,6 +179,7 @@ amplify = AmplifyStack(
     appsync_api_key=appsync.api_key.attr_api_key,
     appsync_api_id=appsync.events_api.attr_api_id,
     realtime_secret_name=REALTIME_SECRET_NAME,
+    domain_prefixes=config["domain_prefixes"],
     env=env,
 )
 # Amplify no longer imports anything from the S3 stack (bucket name is passed
@@ -203,6 +214,7 @@ if app_url:
 # (it carries each region's SES DKIM records), so it is deployed with
 # production only: a bare `cdk deploy --all` must never touch live DNS.
 if stage == "production":
-    DnsStack(app, "NextService-DNS", termination_protection=True, env=env)
+    DnsStack(app, "NextService-DNS", termination_protection=True,
+             amplify_prefixes=config["domain_prefixes"], env=env)
 
 app.synth()

@@ -46,6 +46,7 @@ class AmplifyStack(Stack):
         appsync_api_key: str,
         appsync_api_id: str,
         realtime_secret_name: str,
+        domain_prefixes: list[str] = (),
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -470,6 +471,34 @@ frontend:
                 ),
             ],
         )
+
+        # ── Custom domain ───────────────────────────────────────
+        # The nextservice.gr names this branch serves (`domain_prefixes` in
+        # app.py). The zone is in this account, so Amplify itself writes each
+        # name's record and its certificate's validation CNAME into Route 53;
+        # the DNS stack leaves those names alone. Removing a prefix (the
+        # rollback) disconnects it, and the DNS stack's record must come back
+        # in the same change.
+        if domain_prefixes:
+            custom_domain = amplify.CfnDomain(
+                self, "CustomDomain",
+                app_id=self.amplify_app.attr_app_id,
+                domain_name="nextservice.gr",
+                sub_domain_settings=[
+                    amplify.CfnDomain.SubDomainSettingProperty(
+                        branch_name=branch, prefix=prefix)
+                    for prefix in domain_prefixes
+                ],
+                # No certificate_settings: the Amplify-managed certificate is
+                # the default, and passing AMPLIFY_MANAGED explicitly is refused
+                # by the CloudFormation handler as a custom certificate without
+                # an ARN.
+                enable_auto_sub_domain=False,
+            )
+            custom_domain.add_dependency(self.main_branch)
+            CfnOutput(self, "CustomDomainStatus", value=custom_domain.attr_domain_status)
+            CfnOutput(self, "CustomDomainCertificateRecord",
+                      value=custom_domain.attr_certificate_record)
 
         # ── Outputs ─────────────────────────────────────────────
         CfnOutput(self, "AmplifyAppId",

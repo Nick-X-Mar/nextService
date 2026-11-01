@@ -183,7 +183,7 @@ Account `766671488262`. Two stages, one region each, declared once in `STAGES` (
 | Stage | Region | Branch | URL |
 |---|---|---|---|
 | `staging` (default) | `eu-central-1` Frankfurt | `dev` | https://dev.d3ku6yajf4j6y8.amplifyapp.com |
-| `production` | `eu-south-1` Milan (closest to Greece, 31 ms vs 54 ms) | `production` | https://production.d22r1orgditcqx.amplifyapp.com |
+| `production` | `eu-south-1` Milan (closest to Greece, 31 ms vs 54 ms) | `production` | https://www.nextservice.gr (also production.d22r1orgditcqx.amplifyapp.com) |
 
 Stacks (same names in both regions): `NextService-DynamoDB`, `-S3`, `-Monitoring`, `-AppSync`, `-Amplify`, `-Notifications`. Plus `NextService-DNS`, production only.
 
@@ -198,6 +198,7 @@ cdk deploy --all -c stage=production -o cdk.out.production  # production (gitign
 - Each region has its own Secrets Manager copies: `nextservice/auth-secrets` and `nextservice/realtime-jwt-secret` are generated per stage by the stacks; `nextservice/github-token` is created by hand once per region.
 - Milan is an opt-in region: Amplify assumes the role there as `amplify.eu-south-1.amazonaws.com` (`OPT_IN_REGIONS` in `amplify_stack.py`), or every build fails with "Unable to assume specified IAM Role". The same misleading error also means the region's own GitHub App ("AWS Amplify (<region>)", e.g. github.com/apps/aws-amplify-eu-south-1) isn't installed on the repo — each region needs its own install, even with token cloning.
 - SES is per region. Staging's `nextservice.gr` identity was made by hand; production's is in the Notifications stack (`manage_ses_identity`). Production access is requested per region.
+- **www.nextservice.gr is Amplify** (production, since 2026-11-02): `domain_prefixes` in `infra/app.py` connects it, and Amplify writes the `www` record and its certificate's validation CNAME into the zone itself — the DNS stack declares neither. The apex is still Pointer's WordPress, which 301s every path to `www`; it stays there until mail clients are known not to use the bare domain as their server. Rollback: empty `domain_prefixes`, put `site_url` back, and redeploy DNS (its `www` record returns) and Amplify.
 - **DNS is Route 53, in CDK** (`NextService-DNS`, `infra/stacks/dns_stack.py`, deployed with `-c stage=production` only; one zone serves both stages). The domain is still *registered* at Pointer, which only holds the name servers. That file is the whole zone: a record set in Plesk is not served. Mail is still hosted at Pointer (MX, mail/webmail, SRV, SPF, Plesk's `default._domainkey`), so keep those intact; each region's SES DKIM CNAMEs are listed in `SES_DKIM_TOKENS`. The zone has `RETAIN` and the stack termination protection — deleting either takes site and mail offline.
 - Seed/maintenance scripts default to `eu-central-1`; pass `REGION=eu-south-1` to aim one at production.
 
