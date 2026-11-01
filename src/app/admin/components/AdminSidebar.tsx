@@ -24,7 +24,17 @@ const navItems = [
   { icon: 'science', label: 'E2E Tests', href: '/admin/tests' },
 ]
 
-export default function AdminSidebar() {
+export default function AdminSidebar({
+  open,
+  collapsed,
+  onClose,
+}: {
+  /** Below lg: whether the drawer is showing. */
+  open: boolean
+  /** From lg up: folded away by the admin. */
+  collapsed: boolean
+  onClose: () => void
+}) {
   const pathname = usePathname()
   const [customVehicleCount, setCustomVehicleCount] = useState(0)
   const [pendingGarageCount, setPendingGarageCount] = useState(0)
@@ -42,13 +52,29 @@ export default function AdminSidebar() {
   }, [])
 
   return (
-    <aside className="fixed top-0 left-0 h-full w-60 bg-inverse-surface text-inverse-on-surface flex flex-col z-40">
+    <>
+    {open && (
+      <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={onClose} aria-hidden="true" />
+    )}
+    <aside
+      className={`fixed top-0 left-0 h-full w-60 bg-inverse-surface text-inverse-on-surface flex flex-col z-50 transition-transform duration-200 ${
+        open ? 'translate-x-0' : '-translate-x-full'
+      } ${collapsed ? 'lg:-translate-x-full' : 'lg:translate-x-0'}`}
+    >
       {/* Logo */}
       <div className="h-14 flex items-center px-5 border-b border-white/10">
         <Image src="/images/next_logo.svg" alt="NextService" width={100} height={80} className="h-7 w-auto brightness-0 invert" />
         <span className="ml-2 text-xs font-medium bg-inverse-primary/20 text-inverse-primary px-2 py-0.5 rounded-full">
           Admin
         </span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Κλείσιμο μενού"
+          className="ml-auto lg:hidden p-1 rounded-lg text-inverse-on-surface/70 hover:bg-white/5"
+        >
+          <span className="material-symbols-outlined text-[20px]">close</span>
+        </button>
       </div>
 
       {/* Navigation */}
@@ -87,5 +113,6 @@ export default function AdminSidebar() {
         NextService Admin v1.0
       </div>
     </aside>
+    </>
   )
 }

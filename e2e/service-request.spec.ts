@@ -181,7 +181,7 @@ test.describe('Request creation writes nothing until it is valid', () => {
     expect(data.notificationsSent).toBeUndefined()
   })
 
-  test('Guest registration keeps the optional mobile as E.164 and refuses a bad one', async ({ playwright }) => {
+  test('Guest registration keeps the mobile as E.164 and refuses a bad one', async ({ playwright }) => {
     const guest = await newGuest(playwright)
     const email = `e2e-b-phone-${Date.now()}@test.com`
 
@@ -198,9 +198,33 @@ test.describe('Request creation writes nothing until it is valid', () => {
     const [account] = await clientsWithEmail(email)
     expect(account.phoneNumber).toBe('+306912345678')
   })
+
+  test('With no password the mobile is the password, however it is typed back', async ({ playwright, request }) => {
+    const guest = await newGuest(playwright)
+    const email = `e2e-b-phonepass-${Date.now()}@test.com`
+
+    const none = await guest.post('/api/service-request/', {
+      data: mechanicalRequest({ email, acceptedTerms: true }),
+    })
+    expect(none.status()).toBe(400)
+    expect(await clientsWithEmail(email)).toHaveLength(0)
+
+    const ok = await guest.post('/api/service-request/', {
+      data: mechanicalRequest({ email, acceptedTerms: true, phoneNumber: '+306912345678' }),
+    })
+    expect(ok.status()).toBe(200)
+
+    const login = (password: string) =>
+      request.post('/api/auth/login/', { data: { email, password, userType: 'client' } })
+    for (const typed of ['6912345678', '691 234 5678', '+30 6912345678', '00306912345678', '306912345678']) {
+      expect((await login(typed)).status(), typed).toBe(200)
+    }
+    expect((await login('6912345679')).status()).toBe(401)
+    expect((await login('GoodPass123')).status()).toBe(401)
+  })
 })
 
-test('The request form offers an optional mobile with a country picker', async ({ page }) => {
+test('The request form asks for email and mobile, the mobile being the password', async ({ page, request }) => {
   await page.route('**/api/upload-photos/', (route) =>
     route.fulfill({ json: { success: true, photoData: [{}], rejected: [] } })
   )
@@ -210,8 +234,10 @@ test('The request form offers an optional mobile with a country picker', async (
   }, '/car-specifications/')
 
   const email = `e2e-b-phone-ui-${Date.now()}@test.com`
+  await expect(page.getByText('Βάλτε ενεργό email για να λάβετε την προσφορά σας.')).toBeVisible()
   await page.locator('#guest-email').fill(email)
-  await expect(page.getByText('Θέλεις πιο άμεση επικοινωνία;')).toBeVisible()
+  await expect(page.getByText('ο αριθμός του κινητού σας θα είναι ο')).toBeVisible()
+  await expect(page.locator('#guest-password')).toHaveCount(0)
   await expect(page.getByText('+30', { exact: true })).toBeVisible()
 
   // Another country, picked from the full list.
@@ -219,10 +245,11 @@ test('The request form offers an optional mobile with a country picker', async (
   await expect(page.getByText('+357', { exact: true })).toBeVisible()
   await page.getByLabel('Χώρα κινητού').selectOption('GR')
 
-  await page.locator('#guest-password').fill('GoodPass123')
-  await page.locator('#guest-password-confirm').fill('GoodPass123')
   await page.getByRole('checkbox').check()
   await page.locator('#damage-photos').setInputFiles({ name: 'damage.png', mimeType: 'image/png', buffer: TINY_PNG })
+
+  // The mobile is required: without it the form will not send.
+  await expect(page.getByRole('button', { name: 'ΑΠΟΣΤΟΛΗ ΑΙΤΗΜΑΤΟΣ' })).toBeDisabled()
 
   // A landline is not a mobile: the form says so and will not send.
   await page.locator('#guest-phone').fill('2101234567')
@@ -234,6 +261,10 @@ test('The request form offers an optional mobile with a country picker', async (
   await page.waitForURL('**/requests/client-**')
   const [account] = await clientsWithEmail(email)
   expect(account.phoneNumber).toBe('+306912345678')
+  const login = await request.post('/api/auth/login/', {
+    data: { email, password: '6912345678', userType: 'client' },
+  })
+  expect(login.status()).toBe(200)
 })
 
 test.describe('Request creation stores the right thing', () => {
@@ -492,8 +523,7 @@ test.describe('Request funnel in the browser', () => {
     await expect(page.getByText(`${estimate.estimation.estimatedCost}€`)).toBeVisible()
 
     await page.locator('#guest-email').fill(email)
-    await page.locator('#guest-password').fill('GoodPass123')
-    await page.locator('#guest-password-confirm').fill('GoodPass123')
+    await page.locator('#guest-phone').fill('6912345678')
     await page.getByRole('checkbox').check()
     await page.locator('#damage-photos').setInputFiles({ name: 'damage.png', mimeType: 'image/png', buffer: TINY_PNG })
 
@@ -552,8 +582,7 @@ test.describe('Request funnel in the browser', () => {
     await page.getByRole('textbox', { name: 'Αριθμός κινητήρα' }).fill('KFV12345')
     // Engine number alone is not enough — the button stays off until the VIN is in.
     await page.locator('#guest-email').fill(`e2e-vin-${Date.now()}@test.com`)
-    await page.locator('#guest-password').fill('GoodPass123')
-    await page.locator('#guest-password-confirm').fill('GoodPass123')
+    await page.locator('#guest-phone').fill('6912345678')
     await page.getByRole('checkbox').check()
     const submit = page.getByRole('button', { name: 'ΑΠΟΣΤΟΛΗ ΑΙΤΗΜΑΤΟΣ' })
     await expect(submit).toBeDisabled()
@@ -576,8 +605,7 @@ test.describe('Request funnel in the browser', () => {
     }, '/car-specifications/')
 
     await page.locator('#guest-email').fill(owner.email)
-    await page.locator('#guest-password').fill('GoodPass123')
-    await page.locator('#guest-password-confirm').fill('GoodPass123')
+    await page.locator('#guest-phone').fill('6912345678')
     await page.getByRole('checkbox').check()
     await page.getByRole('button', { name: 'ΑΠΟΣΤΟΛΗ ΑΙΤΗΜΑΤΟΣ' }).click()
 

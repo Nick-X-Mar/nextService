@@ -12,6 +12,7 @@ import AppShell from "@/components/layout/AppShell";
 import { ToastProvider } from "@/components/ToastProvider";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import InAppBrowserEscape from "@/components/InAppBrowserEscape";
+import NumberWheelGuard from "@/components/NumberWheelGuard";
 import { UserProvider } from "@/contexts/UserContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SITE_URL, IS_INDEXABLE } from "@/lib/site-url";
@@ -97,6 +98,7 @@ export default function RootLayout({
               </ConfirmProvider>
             </ToastProvider>
             <InAppBrowserEscape />
+            <NumberWheelGuard />
           </UserProvider>
         </AuthProvider>
       </body>

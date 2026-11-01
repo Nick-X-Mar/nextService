@@ -12,6 +12,8 @@ import { getCategoryText } from '@/utils/categoryLabels'
 import { useRealtimeRequests, type BroadcastRequest } from '@/hooks/useRealtimeRequests'
 import { isGarageInactive } from './garageInactive'
 import { clientDisplayName, clientInitials } from './clientLabel'
+import DeclineRequestModal from './DeclineRequestModal'
+import { useNotifications } from '@/contexts/NotificationsContext'
 
 interface AvailableRequestsProps {
   garageId: string
@@ -65,6 +67,8 @@ export default function AvailableRequests({ garageId, onInactive }: AvailableReq
   // visual highlight on the corresponding card.
   const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set())
   const { navigate, isNavigating } = useNavigation()
+  const { refresh: refreshNotifications } = useNotifications()
+  const [declining, setDeclining] = useState<ServiceRequest | null>(null)
 
   // Hold a ref to the offer-request ids the garage has already responded to so
   // we can filter realtime arrivals that are no longer relevant. The initial
@@ -184,6 +188,12 @@ export default function AvailableRequests({ garageId, onInactive }: AvailableReq
       prev.map(r => (r.id === payload.requestId ? { ...r, photoUrls: payload.photoUrls } : r))
     )
   }, [])
+
+  const handleDeclined = useCallback((requestId: string) => {
+    respondedRequestIdsRef.current.add(requestId)
+    setRequests((prev) => prev.filter((r) => r.id !== requestId))
+    refreshNotifications()
+  }, [refreshNotifications])
 
   useRealtimeRequests({
     onNewRequest: handleNewRequest,
@@ -442,6 +452,17 @@ export default function AvailableRequests({ garageId, onInactive }: AvailableReq
                       : <Icon name="chat" size="sm" />}
                   </button>
                 </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setDeclining(request)
+                  }}
+                  className="mt-3 w-full flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold text-secondary hover:bg-surface-container hover:text-tertiary transition-colors active:scale-95"
+                >
+                  <Icon name="block" size="sm" />
+                  Δεν μπορώ να το αναλάβω
+                </button>
               </article>
             )
           })}
@@ -453,6 +474,12 @@ export default function AvailableRequests({ garageId, onInactive }: AvailableReq
           />
         </div>
       )}
+      <DeclineRequestModal
+        requestId={declining?.id ?? null}
+        vehicleLabel={[declining?.vehicle?.brand, declining?.vehicle?.model].filter(Boolean).join(' ') || undefined}
+        onClose={() => setDeclining(null)}
+        onDeclined={handleDeclined}
+      />
     </div>
   )
 }

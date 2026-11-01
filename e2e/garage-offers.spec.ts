@@ -627,23 +627,24 @@ test.describe.serial('Accepted offer is frozen and fully reported', () => {
 })
 
 /**
- * The offer form, driven as a garage drives it. An untouched hour grid means
- * "every hour open" and has to be sent as exactly that — sent as nothing, the
- * client booked a day with no hour. And an hours-only edit has to count as a
- * change, or the update button never enabled for it.
+ * The offer form, driven as a garage drives it. The hour grid starts with
+ * nothing picked, so an untouched day can't be sent — the client would book a
+ * day with no hour — and what the garage picks is sent as exactly that. And an
+ * hours-only edit has to count as a change, or the update button never enabled.
  */
 test.describe.serial('Offer form sends hours', () => {
   const email = `e2e-offer-form-${Date.now()}@test.com`
   const password = 'TestPass123'
   let srId: string
+  let cId: string
 
   test('Setup: an open request', async ({ request }) => {
-    const cId = (await registerClient(request, email, password)).client.id
+    cId = (await registerClient(request, email, password)).client.id
     const cToken = (await loginViaAPI(request, email, password, 'client')).token
     srId = await createRequest(request, cToken, cId, 'E2E offer form')
   })
 
-  test('A new offer with the grid untouched carries every working hour', async ({ page, request }) => {
+  test('No hour is picked to begin with; the hours picked are what is sent', async ({ page, request }) => {
     await loginAsGarage(page, request)
     await page.goto(`/garage-dashboard/${TEST_GARAGE.id}/offers/${srId}/`)
     await expect(page.getByRole('heading', { name: 'Νέα Προσφορά' })).toBeVisible({ timeout: 20_000 })
@@ -659,6 +660,22 @@ test.describe.serial('Offer form sends hours', () => {
     await days.nth(0).click()
     await days.nth(1).click()
 
+    await expect(page.locator('td button[aria-pressed="false"]').first()).toBeVisible()
+    await expect(page.locator('td button[aria-pressed="true"]')).toHaveCount(0)
+
+    // Untouched: refused in the form, nothing reaches the API.
+    let posted = false
+    page.on('request', (r) => { if (r.url().includes('/api/offers') && r.method() === 'POST') posted = true })
+    await page.getByRole('button', { name: 'Αποστολή Προσφοράς' }).click()
+    await expect(page.getByText('Ημέρα χωρίς ώρες')).toBeVisible()
+    expect(posted).toBe(false)
+
+    // One tap on an hour label picks that hour on both days.
+    const hourLabel = page.locator('tbody th button').first()
+    const hour = (await hourLabel.textContent())!.trim()
+    await hourLabel.click()
+    await expect(page.locator('td button[aria-pressed="true"]')).toHaveCount(2)
+
     const sent = page.waitForResponse((r) => r.url().includes('/api/offers') && r.request().method() === 'POST')
     await page.getByRole('button', { name: 'Αποστολή Προσφοράς' }).click()
     const body = await (await sent).json()
@@ -669,14 +686,26 @@ test.describe.serial('Offer form sends hours', () => {
     const slots = stored?.availabilitySlots as Record<string, string[]>
     expect(dates).toHaveLength(2)
     for (const date of dates) {
-      expect(slots[date]?.length, `hours for ${date}`).toBeGreaterThan(0)
+      expect(slots[date], `hours for ${date}`).toEqual([hour])
     }
 
     // And it lands on the offers tab the dashboard actually reads.
     await expect(page).toHaveURL(/\?tab=offers/, { timeout: 20_000 })
   })
 
-  test('Closing a single hour is an edit that can be saved', async ({ page, request }) => {
+  test('The client sees where the garage is by its municipality only', async ({ request }) => {
+    const cToken = (await loginViaAPI(request, email, password, 'client')).token
+    const resp = await request.get(`/api/requests?clientId=${cId}&include=summary`, {
+      headers: { Cookie: `auth-token=${cToken}` },
+    })
+    expect(resp.status()).toBe(200)
+    const offers = (await resp.json()).offers?.[srId] as Array<{ garage: Record<string, unknown> }>
+    expect(offers).toHaveLength(1)
+    expect(offers[0].garage).toHaveProperty('municipality')
+    expect(offers[0].garage).not.toHaveProperty('address')
+  })
+
+  test('Picking one more hour is an edit that can be saved', async ({ page, request }) => {
     await loginAsGarage(page, request)
     await page.goto(`/garage-dashboard/${TEST_GARAGE.id}/offers/${srId}/`)
     await expect(page.getByRole('heading', { name: 'Ενημέρωση Προσφοράς' })).toBeVisible({ timeout: 20_000 })
@@ -685,8 +714,8 @@ test.describe.serial('Offer form sends hours', () => {
     const update = page.getByRole('button', { name: 'Ενημέρωση Προσφοράς' })
     await expect(update).toBeDisabled()
 
-    const firstOpenCell = page.locator('td button[aria-pressed="true"]').first()
-    await firstOpenCell.click()
+    const firstFreeCell = page.locator('td button[aria-pressed="false"]').first()
+    await firstFreeCell.click()
     await expect(update).toBeEnabled()
 
     const sent = page.waitForResponse((r) => r.url().includes('/api/offers') && r.request().method() === 'PUT')
@@ -700,6 +729,7 @@ test.describe.serial('Offer form sends hours', () => {
     const storedTotal = Object.values(stored?.availabilitySlots as Record<string, string[]>)
       .reduce((n, hours) => n + hours.length, 0)
     expect(storedTotal).toBe(total)
+    expect(total).toBe(3)
     expect(Object.keys(slots)).toHaveLength(2)
   })
 })

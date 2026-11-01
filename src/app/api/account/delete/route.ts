@@ -12,7 +12,7 @@ import {
 } from '@aws-sdk/lib-dynamodb'
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
-import { verifyPassword } from '@/utils/passwordService'
+import { verifyAccountPassword } from '@/utils/passwordService'
 import { deleteFileFromS3, extractS3KeyFromUrl } from '@/utils/s3Service'
 import { requireAuth, invalidateGarageActive } from '@/utils/requireAuth'
 import { clearAuthCookie } from '@/utils/auth'
@@ -39,7 +39,7 @@ const REMOVED_MESSAGE = 'Το μήνυμα διαγράφηκε'
  */
 const CLIENT_KEEPS = new Set(['id', 'createdAt', 'ratingCount', 'ratingSum'])
 const GARAGE_KEEPS = new Set([
-  'id', 'createdAt', 'companyName', 'tin', 'taxAuthority', 'address', 'activatedAt', 'deactivatedAt',
+  'id', 'createdAt', 'companyName', 'tin', 'taxAuthority', 'address', 'area', 'municipality', 'activatedAt', 'deactivatedAt',
   'commissionPercent', 'commissionPercentSetAt', 'commissionPercentSetBy', 'ratingCount', 'ratingSum',
 ])
 /** The car stays as make and model; everything that identifies the actual vehicle or its owner goes. */
@@ -104,7 +104,7 @@ async function _POST(request: NextRequest) {
         { status: 400 }
       )
     }
-    if (!(await verifyPassword(password, user.passwordHash))) {
+    if (!(await verifyAccountPassword(password, user.passwordHash))) {
       return NextResponse.json({ error: 'Λάθος κωδικός' }, { status: 401 })
     }
 

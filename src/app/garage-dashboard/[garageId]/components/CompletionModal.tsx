@@ -7,8 +7,9 @@ import { useToast } from '@/hooks/useToast'
 import { useAsyncTask } from '@/hooks/useAsyncTask'
 import {
   CLIENT_REVIEW_TAGS,
+  LOWER_AMOUNT_REASONS,
+  NOT_DONE_REASONS,
   splitVat,
-  type CompletionOutcome,
 } from '@/types/reviews'
 import { DECLARABLE_VAT_RATES } from '@/lib/commission-basis'
 
@@ -26,10 +27,12 @@ const VAT_RATE = DECLARABLE_VAT_RATES[0]
  * and ignore a second one. Only the first two are required; the rating is
  * optional and clearly marked as such.
  *
- * The amount is entered as the garage quotes: net of VAT by default, with a
- * switch for a receipt total that includes it. The split is shown live, because
- * the net is the number commission is calculated on and it should never be a
- * surprise later.
+ * - It happened: was the amount the quote's? One tap if so. If not, the final
+ *   amount net of VAT, and a reason when it is lower than the quote.
+ * - It did not: why, from a list (only "δεν ήρθε" counts as a no-show).
+ *
+ * The VAT split is shown live, because the net is the number commission is
+ * calculated on and it should never be a surprise later.
  */
 export default function CompletionModal({
   isOpen,
@@ -46,10 +49,14 @@ export default function CompletionModal({
   quotedPrice?: number
   onCompleted: () => void
 }) {
-  const [outcome, setOutcome] = useState<CompletionOutcome>('completed')
-  const [amount, setAmount] = useState(quotedPrice ? String(quotedPrice) : '')
-  // Garages quote net of VAT, so the quote it is pre-filled with is a net figure.
-  const [vatIncluded, setVatIncluded] = useState(false)
+  const hasQuote = typeof quotedPrice === 'number' && quotedPrice > 0
+  const [happened, setHappened] = useState(true)
+  // null until the garage answers "same as the quote?"; no quote, no question.
+  const [sameAsQuote, setSameAsQuote] = useState<boolean | null>(hasQuote ? null : false)
+  const [amount, setAmount] = useState('')
+  const [notDoneCode, setNotDoneCode] = useState('')
+  const [lowerCode, setLowerCode] = useState('')
+  const [reasonText, setReasonText] = useState('')
   const [notes, setNotes] = useState('')
   const [rating, setRating] = useState(0)
   const [comment, setComment] = useState('')
@@ -63,16 +70,32 @@ export default function CompletionModal({
     if (!submitting) onClose()
   }
 
-  const parsed = Number(amount.replace(',', '.'))
+  // Garages quote net of VAT, and the final amount is asked for net too.
+  const parsed = sameAsQuote && hasQuote ? quotedPrice : Number(amount.replace(',', '.'))
   const breakdown = useMemo(() => {
     if (!Number.isFinite(parsed) || parsed <= 0) return null
-    return splitVat(parsed, vatIncluded ? 'gross' : 'net', VAT_RATE)
-  }, [parsed, vatIncluded])
+    return splitVat(parsed, 'net', VAT_RATE)
+  }, [parsed])
+  const isLower = happened && hasQuote && !sameAsQuote && !!breakdown && breakdown.net < quotedPrice - 0.005
+  const reasonCode = happened ? (isLower ? lowerCode : '') : notDoneCode
+  const notDoneDef = NOT_DONE_REASONS.find((r) => r.code === notDoneCode)
 
   const submit = () =>
     run(async () => {
-      if (outcome === 'completed' && (!breakdown || breakdown.gross <= 0)) {
-        showError('Συμπλήρωσε το ποσό που χρέωσες.')
+      if (happened && sameAsQuote === null) {
+        showError('Πες μας αν το ποσό ήταν αυτό της προσφοράς.')
+        return
+      }
+      if (happened && (!breakdown || breakdown.gross <= 0)) {
+        showError('Συμπλήρωσε το τελικό ποσό χωρίς ΦΠΑ.')
+        return
+      }
+      if ((!happened || isLower) && !reasonCode) {
+        showError(happened ? 'Το ποσό είναι μικρότερο από την προσφορά. Διάλεξε τον λόγο.' : 'Διάλεξε τον λόγο που δεν έγινε.')
+        return
+      }
+      if (reasonCode === 'other' && !reasonText.trim()) {
+        showError('Γράψε τον λόγο.')
         return
       }
 
@@ -80,8 +103,9 @@ export default function CompletionModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          outcome,
-          ...(outcome === 'completed' ? { amount: parsed, vatIncluded, vatRate: VAT_RATE } : {}),
+          outcome: happened ? 'completed' : notDoneDef?.outcome,
+          ...(happened ? { amount: parsed, vatIncluded: false, vatRate: VAT_RATE } : {}),
+          ...(reasonCode ? { reason: { code: reasonCode, text: reasonCode === 'other' ? reasonText : undefined } } : {}),
           notes,
           ...(rating > 0 ? { rating, comment, tags } : {}),
         }),
@@ -108,11 +132,14 @@ export default function CompletionModal({
   const toggleTag = (tag: string) =>
     setTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
 
-  const outcomes: { value: CompletionOutcome; label: string; icon: string }[] = [
-    { value: 'completed', label: 'Ναι, έγινε', icon: 'check_circle' },
-    { value: 'not_done', label: 'Ήρθε, δεν έγινε', icon: 'do_not_disturb_on' },
-    { value: 'no_show', label: 'Δεν ήρθε', icon: 'person_off' },
-  ]
+  const choice = (selected: boolean) =>
+    `flex items-center justify-center gap-2 rounded-xl border p-3 text-sm font-bold transition-colors active:scale-95 ${
+      selected
+        ? 'border-primary bg-primary/5 text-primary'
+        : 'border-outline-variant/30 bg-surface-container-lowest text-on-surface'
+    }`
+  const label = 'block text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mb-2'
+  const field = 'w-full px-3 py-2.5 rounded-xl border border-outline-variant/30 bg-surface-container-highest text-sm text-on-surface'
 
   return (
     <Modal isOpen={isOpen} onClose={close} title="Ολοκλήρωση εργασίας" size="lg">
@@ -125,105 +152,146 @@ export default function CompletionModal({
         )}
 
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mb-2">
-            Έγινε η επισκευή;
-          </p>
-          <div className="grid grid-cols-3 gap-2">
-            {outcomes.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setOutcome(option.value)}
-                disabled={submitting}
-                className={`flex flex-col items-center gap-1 rounded-xl border p-3 text-xs font-bold transition-colors active:scale-95 ${
-                  outcome === option.value
-                    ? 'border-primary bg-primary/5 text-primary'
-                    : 'border-outline-variant/30 bg-surface-container-lowest text-on-surface'
-                }`}
-              >
-                <Icon name={option.icon} size="md" />
-                {option.label}
-              </button>
-            ))}
+          <p className={label}>Έγινε το ραντεβού;</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => setHappened(true)} disabled={submitting} className={choice(happened)}>
+              <Icon name="check_circle" size="sm" />
+              Ναι, έγινε
+            </button>
+            <button type="button" onClick={() => setHappened(false)} disabled={submitting} className={choice(!happened)}>
+              <Icon name="do_not_disturb_on" size="sm" />
+              Όχι
+            </button>
           </div>
         </div>
 
-        {outcome !== 'completed' && (
-          // Said up front: the commission is waived only after a check with the client.
-          <p className="flex items-start gap-2 rounded-xl bg-surface-container-low p-3 text-xs text-on-surface-variant">
-            <Icon name="info" size="sm" className="text-primary shrink-0" />
-            Θα επικοινωνήσουμε με τον πελάτη για επιβεβαίωση. Αν η εργασία έγινε τελικά, χρεώνεται κανονικά με την
-            τιμή της προσφοράς.
-          </p>
-        )}
-
-        {outcome === 'completed' && (
+        {!happened && (
           <div className="space-y-3">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mb-1">
-                Ποσό που χρέωσες <span className="text-tertiary">*</span>
+              <label htmlFor="not-done-reason" className={label}>
+                Γιατί δεν έγινε; <span className="text-tertiary">*</span>
               </label>
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full px-3 py-2.5 pr-8 rounded-xl border border-outline-variant/30 bg-surface-container-highest text-base font-medium text-on-surface"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant">
-                    €
-                  </span>
-                </div>
+              <select
+                id="not-done-reason"
+                value={notDoneCode}
+                onChange={(e) => setNotDoneCode(e.target.value)}
+                disabled={submitting}
+                className={field}
+              >
+                <option value="">Διάλεξε λόγο</option>
+                {NOT_DONE_REASONS.map((r) => (
+                  <option key={r.code} value={r.code}>{r.label}</option>
+                ))}
+              </select>
+            </div>
+            {/* Said up front: the commission is waived only after a check with the client. */}
+            <p className="flex items-start gap-2 rounded-xl bg-surface-container-low p-3 text-xs text-on-surface-variant">
+              <Icon name="info" size="sm" className="text-primary shrink-0" />
+              Θα επικοινωνήσουμε με τον πελάτη για επιβεβαίωση. Αν η εργασία έγινε τελικά, χρεώνεται κανονικά με την
+              τιμή της προσφοράς.
+            </p>
+          </div>
+        )}
+
+        {happened && hasQuote && (
+          <div>
+            <p className={label}>Το ποσό που εισέπραξες είναι αυτό της προσφοράς;</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setSameAsQuote(true)}
+                disabled={submitting}
+                className={choice(sameAsQuote === true)}
+              >
+                Ναι, {quotedPrice.toFixed(2)}€ + ΦΠΑ
+              </button>
+              <button
+                type="button"
+                onClick={() => setSameAsQuote(false)}
+                disabled={submitting}
+                className={choice(sameAsQuote === false)}
+              >
+                Όχι, άλλο ποσό
+              </button>
+            </div>
+          </div>
+        )}
+
+        {happened && sameAsQuote === false && (
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="final-amount" className={label}>
+                Τελικό ποσό χωρίς ΦΠΑ <span className="text-tertiary">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  id="final-amount"
+                  type="text"
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2.5 pr-8 rounded-xl border border-outline-variant/30 bg-surface-container-highest text-base font-medium text-on-surface"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant">€</span>
               </div>
-              {typeof quotedPrice === 'number' && quotedPrice > 0 && (
+              {hasQuote && (
                 <p className="text-xs text-on-surface-variant mt-1">
                   Είχες δώσει προσφορά {quotedPrice.toFixed(2)}€ + ΦΠΑ
                 </p>
               )}
             </div>
 
-            <div className="flex gap-2">
-              {[
-                { value: true, label: 'Με ΦΠΑ' },
-                { value: false, label: 'Χωρίς ΦΠΑ' },
-              ].map((option) => (
-                <button
-                  key={String(option.value)}
-                  type="button"
-                  onClick={() => setVatIncluded(option.value)}
+            {isLower && (
+              <div>
+                <label htmlFor="lower-reason" className={label}>
+                  Γιατί είναι μικρότερο από την προσφορά; <span className="text-tertiary">*</span>
+                </label>
+                <select
+                  id="lower-reason"
+                  value={lowerCode}
+                  onChange={(e) => setLowerCode(e.target.value)}
                   disabled={submitting}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-xs font-bold transition-colors active:scale-95 ${
-                    vatIncluded === option.value
-                      ? 'border-primary bg-primary/5 text-primary'
-                      : 'border-outline-variant/30 bg-surface-container-lowest text-on-surface'
-                  }`}
+                  className={field}
                 >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-
-            {breakdown && (
-              // Shown live so the split is never a surprise on the commission
-              // report later — that is calculated on the net figure.
-              <div className="rounded-xl bg-surface-container-low p-3 text-sm">
-                <div className="flex justify-between text-on-surface-variant">
-                  <span>Καθαρή αξία</span>
-                  <span className="font-medium text-on-surface">{breakdown.net.toFixed(2)}€</span>
-                </div>
-                <div className="flex justify-between text-on-surface-variant">
-                  <span>ΦΠΑ {breakdown.vatRate}%</span>
-                  <span className="font-medium text-on-surface">{breakdown.vat.toFixed(2)}€</span>
-                </div>
-                <div className="mt-1 pt-1 border-t border-outline-variant/20 flex justify-between">
-                  <span className="font-bold text-on-surface">Σύνολο</span>
-                  <span className="font-bold text-on-surface">{breakdown.gross.toFixed(2)}€</span>
-                </div>
+                  <option value="">Διάλεξε λόγο</option>
+                  {LOWER_AMOUNT_REASONS.map((r) => (
+                    <option key={r.code} value={r.code}>{r.label}</option>
+                  ))}
+                </select>
               </div>
             )}
+          </div>
+        )}
+
+        {reasonCode === 'other' && (
+          <textarea
+            value={reasonText}
+            onChange={(e) => setReasonText(e.target.value)}
+            rows={2}
+            maxLength={500}
+            placeholder="Γράψε τον λόγο"
+            aria-label="Άλλος λόγος"
+            className={field}
+          />
+        )}
+
+        {happened && breakdown && (
+          // Shown live so the split is never a surprise on the commission
+          // report later — that is calculated on the net figure.
+          <div className="rounded-xl bg-surface-container-low p-3 text-sm">
+            <div className="flex justify-between text-on-surface-variant">
+              <span>Καθαρή αξία</span>
+              <span className="font-medium text-on-surface">{breakdown.net.toFixed(2)}€</span>
+            </div>
+            <div className="flex justify-between text-on-surface-variant">
+              <span>ΦΠΑ {breakdown.vatRate}%</span>
+              <span className="font-medium text-on-surface">{breakdown.vat.toFixed(2)}€</span>
+            </div>
+            <div className="mt-1 pt-1 border-t border-outline-variant/20 flex justify-between">
+              <span className="font-bold text-on-surface">Σύνολο με ΦΠΑ</span>
+              <span className="font-bold text-on-surface">{breakdown.gross.toFixed(2)}€</span>
+            </div>
           </div>
         )}
 

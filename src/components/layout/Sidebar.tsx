@@ -33,6 +33,7 @@ export default function Sidebar() {
     { label: 'Αιτήματα', icon: 'build', href: `/requests/${client.id}` },
     { label: 'Ραντεβού', icon: 'calendar_today', href: `/requests/${client.id}?tab=appointment`, matchTab: 'appointment' },
     { label: 'Μηνύματα', icon: 'chat', href: `/requests/${client.id}/chats`, badge: threads },
+    { label: 'Πληρωμές', icon: 'receipt_long', href: `/requests/${client.id}/payments` },
     { label: 'Προφίλ', icon: 'person', href: `/profile/${client.id}` },
   ] : []
 
@@ -48,6 +49,7 @@ export default function Sidebar() {
     { label: 'Ραντεβού', icon: 'calendar_today', href: `/garage-dashboard/${garage.id}?tab=appointments`, matchTab: 'appointments' },
     { label: 'Ανοιχτές Συνομιλίες', icon: 'chat', href: `/garage-dashboard/${garage.id}/chats`, badge: openThreads, badgeLabel: 'συνομιλίες με νέα μηνύματα' },
     { label: 'Συνομιλίες Ραντεβού', icon: 'forum', href: `/garage-dashboard/${garage.id}/chats/appointments`, badge: appointmentThreads, badgeLabel: 'συνομιλίες με νέα μηνύματα' },
+    { label: 'Πληρωμές', icon: 'receipt_long', href: `/garage-dashboard/${garage.id}?tab=payments`, matchTab: 'payments' },
     { label: 'Ρυθμίσεις', icon: 'settings', href: `/garage-dashboard/${garage.id}?tab=settings`, matchTab: 'settings' },
   ] : []
 
@@ -70,7 +72,7 @@ export default function Sidebar() {
       {/* User info */}
       <div className="px-6 py-6">
         <div className="text-[10px] font-bold uppercase tracking-widest text-secondary mb-1">
-          {userType === 'garage' ? 'Συνεργείο' : 'Πελάτης'}
+          {userType === 'garage' ? 'Συνεργείο' : 'Επισκέπτης'}
         </div>
         <div className="text-on-surface font-bold text-base truncate">
           {displayName || 'Χρήστης'}

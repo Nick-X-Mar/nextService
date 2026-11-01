@@ -97,7 +97,8 @@ export async function loadClientWorkspace(
       ExpressionAttributeValues: { ':clientId': clientId },
       ProjectionExpression:
         'id, clientReadAt, clientOffersSeenAt, vehicleId, category, #s, appointmentDate, ' +
-        'appointmentTime, depositPaidAt, completedAt, acceptedGarageId, acceptedOfferId, createdAt',
+        'appointmentTime, depositPaidAt, completedAt, acceptedGarageId, acceptedOfferId, createdAt, ' +
+        'clientConfirmation, finalAmounts.gross, completionOutcome',
       ExpressionAttributeNames: { '#s': 'status' },
       ExclusiveStartKey: startKey,
     })),

@@ -91,6 +91,8 @@ test.describe.serial('A deactivated garage with a booking it has not closed', ()
     await expect(job).not.toContainText('Απενεργοπούλου')
 
     await job.getByRole('button', { name: 'Δήλωσέ το' }).click()
+    // Charged what it quoted.
+    await page.getByRole('button', { name: /^Ναι, .*\+ ΦΠΑ$/ }).click()
     const completed = page.waitForResponse(
       (r) => r.url().includes(`/api/requests/${requestId}/complete`) && r.request().method() === 'POST'
     )

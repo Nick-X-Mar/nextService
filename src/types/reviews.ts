@@ -42,6 +42,60 @@ export type CompletionOutcome =
   /** The client came but the job did not happen — wrong diagnosis, declined quote. */
   | 'not_done'
 
+/**
+ * Why a booked job did not happen, picked from a list on the completion form.
+ * The reason decides the outcome stored: only a client who never came is a
+ * `no_show`; everything else is `not_done`.
+ */
+export const NOT_DONE_REASONS = [
+  { code: 'no_show', label: 'Ο πελάτης δεν ήρθε', outcome: 'no_show' },
+  { code: 'client_cancelled', label: 'Ο πελάτης ακύρωσε ή άλλαξε γνώμη', outcome: 'not_done' },
+  { code: 'price', label: 'Δεν συμφωνήσαμε στην τιμή', outcome: 'not_done' },
+  { code: 'parts', label: 'Δεν βρέθηκαν ανταλλακτικά', outcome: 'not_done' },
+  { code: 'not_needed', label: 'Δεν χρειαζόταν τελικά η εργασία', outcome: 'not_done' },
+  { code: 'garage', label: 'Δεν μπορέσαμε εμείς (εξοπλισμός, προσωπικό)', outcome: 'not_done' },
+  { code: 'other', label: 'Άλλος λόγος', outcome: 'not_done' },
+] as const
+
+/** Why the garage charged less than it quoted — asked only then. */
+export const LOWER_AMOUNT_REASONS = [
+  { code: 'less_work', label: 'Χρειάστηκε λιγότερη δουλειά' },
+  { code: 'discount', label: 'Έκανα έκπτωση στον πελάτη' },
+  { code: 'cheaper_parts', label: 'Φθηνότερα ανταλλακτικά' },
+  { code: 'client_parts', label: 'Ο πελάτης έφερε δικά του ανταλλακτικά' },
+  { code: 'other', label: 'Άλλος λόγος' },
+] as const
+
+/** The reason stored with a closed job: why it did not happen, or why it cost less. */
+export interface CompletionReason {
+  kind: 'not_done' | 'lower_amount'
+  code: string
+  /** The garage's own words, for `other`. */
+  text?: string
+}
+
+/** How a stored reason reads on the garage's, client's and admin's screens. */
+export function completionReasonLabel(reason: CompletionReason | null | undefined): string | null {
+  if (!reason) return null
+  if (reason.code === 'other' && reason.text) return reason.text
+  const list: readonly { code: string; label: string }[] =
+    reason.kind === 'not_done' ? NOT_DONE_REASONS : LOWER_AMOUNT_REASONS
+  return list.find((r) => r.code === reason.code)?.label ?? null
+}
+
+/**
+ * The client's word on a closed job, from their Πληρωμές page: that it went as
+ * the garage declared, or not. It settles nothing by itself — an admin reads
+ * it when checking a no-show or a declared amount.
+ */
+export interface ClientConfirmation {
+  status: 'confirmed' | 'disputed'
+  /** What the client says they paid, VAT included, when they disagree. */
+  amountPaid?: number
+  note?: string
+  at: string
+}
+
 export type ReviewDirection = 'client_to_garage' | 'garage_to_client'
 
 export type ReviewStatus = 'published' | 'hidden'

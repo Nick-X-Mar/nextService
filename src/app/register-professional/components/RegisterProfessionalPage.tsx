@@ -21,6 +21,8 @@ interface GarageFormData {
   email: string
   taxAuthority: string
   address: string
+  area: string
+  municipality: string
   mobile: string
 }
 
@@ -33,6 +35,8 @@ export default function RegisterProfessionalPage() {
     email: '',
     taxAuthority: '',
     address: '',
+    area: '',
+    municipality: '',
     mobile: ''
   })
   const [password, setPassword] = useState('')
@@ -130,6 +134,16 @@ export default function RegisterProfessionalPage() {
 
     if (!formData.address.trim()) {
       error('Σφάλμα', 'Η διεύθυνση είναι υποχρεωτική')
+      return false
+    }
+
+    if (!formData.area.trim()) {
+      error('Σφάλμα', 'Η περιοχή είναι υποχρεωτική')
+      return false
+    }
+
+    if (!formData.municipality.trim()) {
+      error('Σφάλμα', 'Ο δήμος είναι υποχρεωτικός')
       return false
     }
 
@@ -268,6 +282,9 @@ export default function RegisterProfessionalPage() {
     { key: 'email', label: 'Email', icon: 'mail', type: 'email', placeholder: 'π.χ. info@company.gr' },
     { key: 'taxAuthority', label: 'ΔΟΥ', icon: 'account_balance', type: 'text', placeholder: 'π.χ. ΔΟΥ Αθηνών' },
     { key: 'address', label: 'Διεύθυνση', icon: 'location_on', type: 'text', placeholder: 'π.χ. Λεωφόρος Πατησιών 123, Αθήνα' },
+    { key: 'area', label: 'Περιοχή', icon: 'map', type: 'text', placeholder: 'π.χ. Κυψέλη' },
+    // The only part of the location a client sees before booking.
+    { key: 'municipality', label: 'Δήμος', icon: 'location_city', type: 'text', placeholder: 'π.χ. Δήμος Αθηναίων' },
     { key: 'mobile', label: 'Κινητό Τηλέφωνο', icon: 'phone_iphone', type: 'tel', placeholder: 'π.χ. 6971234567 ή +30 6971234567' },
   ]
 

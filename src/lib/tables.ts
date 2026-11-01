@@ -32,4 +32,6 @@ export const TABLES = {
   WalletTransactions: table('WalletTransactions', process.env.WALLET_TRANSACTIONS_TABLE),
   PerformanceMetrics: table('PerformanceMetrics', process.env.PERFORMANCE_TABLE),
   SiteContent: table('SiteContent', process.env.SITE_CONTENT_TABLE),
+  RequestDeclines: table('RequestDeclines'),
+  GarageSettlements: table('GarageSettlements'),
 } as const

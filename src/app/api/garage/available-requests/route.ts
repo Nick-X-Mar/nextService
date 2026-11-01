@@ -17,6 +17,7 @@ import {
   QUOTING_VEHICLE_PROJECTION,
 } from '@/utils/garageClientView'
 import { TABLES } from '@/lib/tables'
+import { garageDeclines } from '@/utils/requestDeclines'
 
 async function _GET(request: NextRequest) {
   try {
@@ -47,7 +48,7 @@ async function _GET(request: NextRequest) {
     // dashboard did on load — and the count came out wrong anyway, because the
     // feed is paginated and the badge only ever saw the first page.
     if (searchParams.get('countOnly') === '1') {
-      const [pendingIds, offers] = await Promise.all([
+      const [pendingIds, offers, declines] = await Promise.all([
         collectAll<{ id?: string }>(
           (startKey) =>
             dynamoDB.send(new QueryCommand({
@@ -73,9 +74,11 @@ async function _GET(request: NextRequest) {
             })),
           `available-requests count offers for ${garageId}`
         ),
+        garageDeclines(garageId),
       ])
 
-      const answered = new Set(offers.map((o) => o.serviceRequestId))
+      // Quoted or declined: either way the garage has answered it.
+      const answered = new Set([...offers.map((o) => o.serviceRequestId), ...declines.map((d) => d.requestId)])
       const requestIds = pendingIds
         .map((r) => r.id)
         .filter((id): id is string => !!id && !answered.has(id))
@@ -83,7 +86,7 @@ async function _GET(request: NextRequest) {
       return NextResponse.json({ success: true, count: requestIds.length, requestIds })
     }
 
-    const [result, garageOffers] = await Promise.all([
+    const [result, garageOffers, declines] = await Promise.all([
       dynamoDB.send(new QueryCommand({
         TableName: TABLES.ServiceRequests,
         IndexName: 'StatusIndex',
@@ -104,7 +107,8 @@ async function _GET(request: NextRequest) {
             ExclusiveStartKey: startKey,
           })),
         `available-requests offers for ${garageId}`
-      )
+      ),
+      garageDeclines(garageId),
     ])
 
     if (!result.Items || result.Items.length === 0) {
@@ -115,11 +119,12 @@ async function _GET(request: NextRequest) {
       })
     }
 
-    const garageOfferRequestIds = new Set(
-      garageOffers.map(offer => offer.serviceRequestId)
-    )
+    const garageOfferRequestIds = new Set([
+      ...garageOffers.map(offer => offer.serviceRequestId),
+      ...declines.map((d) => d.requestId),
+    ])
 
-    // Filter out requests that this garage has already made offers for
+    // Filter out requests that this garage has already quoted or declined
     const availableRequests = result.Items.filter(
       request => !garageOfferRequestIds.has(request.id)
     )

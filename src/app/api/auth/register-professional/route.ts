@@ -22,7 +22,7 @@ const optionalText = (raw: unknown) => (typeof raw === 'string' ? raw.trim() : '
 async function _POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { companyName, contactFirstName, contactLastName, tin, email, password, taxAuthority, address, mobile, benefits, acceptedTerms } = body
+    const { companyName, contactFirstName, contactLastName, tin, email, password, taxAuthority, address, area, municipality, mobile, benefits, acceptedTerms } = body
 
     if (acceptedTerms !== true) {
       return NextResponse.json(
@@ -60,6 +60,14 @@ async function _POST(request: NextRequest) {
       return NextResponse.json({ 
         error: 'Η διεύθυνση είναι υποχρεωτική' 
       }, { status: 400 })
+    }
+
+    if (!optionalText(area)) {
+      return NextResponse.json({ error: 'Η περιοχή είναι υποχρεωτική' }, { status: 400 })
+    }
+
+    if (!optionalText(municipality)) {
+      return NextResponse.json({ error: 'Ο δήμος είναι υποχρεωτικός' }, { status: 400 })
     }
 
     if (!mobile || typeof mobile !== 'string' || !mobile.trim()) {
@@ -170,6 +178,8 @@ async function _POST(request: NextRequest) {
       passwordHash,
       taxAuthority: taxAuthority.trim(),
       address: address.trim(),
+      area: optionalText(area).slice(0, 100),
+      municipality: optionalText(municipality).slice(0, 100),
       mobile: cleanMobile,
       isActive: false,
       description: 'Εταιρεία εγγεγραμμένη στο NextService',

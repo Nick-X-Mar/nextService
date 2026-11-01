@@ -9,6 +9,18 @@ import { athensToday } from '@/utils/athensTime'
 import { getCategoryText } from '@/utils/categoryLabels'
 import Spinner from '@/components/Spinner'
 import { useAsyncTask } from '@/hooks/useAsyncTask'
+import {
+  SETTLEMENT_STATUS_LABELS,
+  settlementMethodLabel,
+  type LedgerTotals,
+  type Settlement,
+} from '@/types/settlements'
+
+interface ClientWord {
+  status: 'confirmed' | 'disputed'
+  amountPaid?: number
+  note?: string
+}
 
 interface AppointmentRow {
   requestId: string
@@ -28,6 +40,9 @@ interface AppointmentRow {
   rateSource: 'job' | 'garage' | 'default'
   /** The appointment day came and the garage has not declared — billed on the agreed price meanwhile. */
   undeclared: boolean
+  /** Why the garage charged less than it quoted. */
+  reason: string | null
+  clientConfirmation: ClientWord | null
 }
 
 interface FlaggedRow {
@@ -44,6 +59,8 @@ interface FlaggedRow {
   appointmentPrice: number
   commissionIfBilled: number
   reviewStatus: 'pending' | 'confirmed' | 'rejected'
+  reason: string | null
+  clientConfirmation: ClientWord | null
   reviewedAt?: string
   reviewedBy?: string
   reviewNote?: string
@@ -66,6 +83,20 @@ interface GarageCommissionsData {
   }
   appointments: AppointmentRow[]
   flagged: FlaggedRow[]
+  ledger: { totals: LedgerTotals; settlements: Settlement[] }
+}
+
+/** The client's answer on their Πληρωμές page, as one short line. */
+function ClientWordLine({ word }: { word: ClientWord | null }) {
+  if (!word) return <p className="text-[11px] text-on-surface/50">Ο πελάτης δεν έχει απαντήσει</p>
+  if (word.status === 'confirmed') return <p className="text-[11px] text-green-700 font-bold">Ο πελάτης επιβεβαίωσε</p>
+  return (
+    <p className="text-[11px] text-tertiary font-bold">
+      Ο πελάτης διαφωνεί
+      {typeof word.amountPaid === 'number' ? ` · λέει ότι πλήρωσε ${formatEUR(word.amountPaid)}` : ''}
+      {word.note ? ` · «${word.note}»` : ''}
+    </p>
+  )
 }
 
 const MONTH_LABELS = [
@@ -181,6 +212,8 @@ export default function GarageCommissionsPage({ params }: { params: Promise<{ ga
           <p className={`text-[11px] ${item.undeclared ? 'font-bold text-tertiary' : 'text-on-surface/50'}`}>
             {item.basis === 'declared' ? 'Δηλωμένο ποσό' : item.undeclared ? 'Δεν έχει δηλωθεί — βάσει προσφοράς' : 'Βάσει προσφοράς'}
           </p>
+          {item.reason && <p className="text-[11px] text-on-surface/70">Λόγος: {item.reason}</p>}
+          {!item.undeclared && <ClientWordLine word={item.clientConfirmation} />}
         </div>
       ),
     },
@@ -277,6 +310,14 @@ export default function GarageCommissionsPage({ params }: { params: Promise<{ ga
           garageId={garageId}
           data={data}
           onSaved={(rate) => setData((d) => (d ? { ...d, ...rate } : d))}
+        />
+      )}
+
+      {data && (
+        <SettlementsCard
+          totals={data.ledger.totals}
+          settlements={data.ledger.settlements}
+          onReviewed={() => setReload((n) => n + 1)}
         />
       )}
 
@@ -468,7 +509,9 @@ function FlaggedJobs({
                     <> · <a href={`mailto:${row.clientEmail}`} className="text-primary hover:underline">{row.clientEmail}</a></>
                   )}
                 </p>
+                {row.reason && <p className="text-xs text-on-surface/70 mt-1">Λόγος: {row.reason}</p>}
                 {row.garageNotes && <p className="text-xs text-on-surface/60 mt-1">Σημείωση συνεργείου: {row.garageNotes}</p>}
+                <ClientWordLine word={row.clientConfirmation} />
               </div>
               <div className="text-right">
                 <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold ${
@@ -510,6 +553,119 @@ function FlaggedJobs({
           </div>
         ))}
       </div>
+      {error && <p role="alert" className="text-xs text-error mt-2">{error}</p>}
+    </div>
+  )
+}
+
+/**
+ * What the garage owes overall and the payments it has declared. A declared
+ * payment counts at once; "Βρέθηκε" confirms it against the bank, "Δεν βρέθηκε"
+ * takes it back out of the balance. Either can be changed.
+ */
+function SettlementsCard({
+  totals,
+  settlements,
+  onReviewed,
+}: {
+  totals: LedgerTotals
+  settlements: Settlement[]
+  onReviewed: () => void
+}) {
+  const { run, isPending } = useAsyncTask()
+  const [error, setError] = useState('')
+
+  const decide = (s: Settlement, decision: 'confirmed' | 'rejected') =>
+    run(`${decision}-${s.settlementId}`, async () => {
+      setError('')
+      const res = await fetch(`/api/admin/commissions/settlements/${s.settlementId}/`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(json.error || 'Η αποθήκευση απέτυχε')
+        return
+      }
+      onReviewed()
+    })
+
+  return (
+    <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-5 mb-6" data-testid="settlements">
+      <h3 className="font-bold text-on-surface flex items-center gap-2">
+        <span className="material-symbols-outlined text-primary text-[20px]">account_balance</span>
+        Υπόλοιπο και πληρωμές (από την αρχή)
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+        <div className="rounded-lg bg-surface-container-low p-3">
+          <p className="text-xs text-on-surface/60">Προμήθεια συνολικά</p>
+          <p className="font-bold text-on-surface">{formatEUR(totals.commission)}</p>
+        </div>
+        <div className="rounded-lg bg-surface-container-low p-3">
+          <p className="text-xs text-on-surface/60">Πληρωμές</p>
+          <p className="font-bold text-on-surface">{formatEUR(totals.paid)}</p>
+          {totals.paidUnconfirmed > 0 && (
+            <p className="text-[11px] text-amber-800">{formatEUR(totals.paidUnconfirmed)} προς έλεγχο</p>
+          )}
+        </div>
+        <div className="rounded-lg bg-surface-container-low p-3">
+          <p className="text-xs text-on-surface/60">Υπόλοιπο</p>
+          <p data-testid="admin-balance" className={`font-bold ${totals.balance > 0 ? 'text-primary' : 'text-green-700'}`}>
+            {formatEUR(totals.balance)}
+          </p>
+        </div>
+      </div>
+      {settlements.length === 0 ? (
+        <p className="text-sm text-on-surface/50 mt-4">Το συνεργείο δεν έχει δηλώσει πληρωμή.</p>
+      ) : (
+        <div className="space-y-2 mt-4">
+          {settlements.map((s) => (
+            <div key={s.settlementId} data-testid="admin-settlement" className="rounded-lg border border-outline-variant/20 p-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm min-w-0">
+                <p className="font-bold text-on-surface">
+                  {formatEUR(s.amount)} · {formatDate(s.paidOn)} · {settlementMethodLabel(s.method)}
+                </p>
+                {s.reference && <p className="text-xs text-on-surface/60 break-all">Αρ. συναλλαγής: {s.reference}</p>}
+                {s.reviewedAt && (
+                  <p className="text-[11px] text-on-surface/50">
+                    {new Date(s.reviewedAt).toLocaleDateString('el-GR')}{s.reviewedBy ? ` · ${s.reviewedBy}` : ''}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold ${
+                  s.status === 'declared'
+                    ? 'bg-amber-100 text-amber-800'
+                    : s.status === 'confirmed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                }`}>
+                  {SETTLEMENT_STATUS_LABELS[s.status]}
+                </span>
+                {s.status !== 'confirmed' && (
+                  <button
+                    onClick={() => decide(s, 'confirmed')}
+                    disabled={isPending()}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary text-on-primary px-3 py-1.5 text-xs font-bold disabled:opacity-50"
+                  >
+                    {isPending(`confirmed-${s.settlementId}`) && <Spinner size="sm" />}
+                    Βρέθηκε
+                  </button>
+                )}
+                {s.status !== 'rejected' && (
+                  <button
+                    onClick={() => decide(s, 'rejected')}
+                    disabled={isPending()}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-outline-variant/30 px-3 py-1.5 text-xs font-bold text-on-surface hover:bg-surface-container disabled:opacity-50"
+                  >
+                    {isPending(`rejected-${s.settlementId}`) && <Spinner size="sm" />}
+                    Δεν βρέθηκε
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {error && <p role="alert" className="text-xs text-error mt-2">{error}</p>}
     </div>
   )

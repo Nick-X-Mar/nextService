@@ -6,7 +6,7 @@ import { hashPassword } from '@/utils/passwordService'
 import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 import { logEvent } from '@/utils/eventLogger'
 import { sendEmail } from '@/utils/emailService'
-import { isValidPhoneNumber } from '@/utils/phone'
+import { isValidPhoneNumber, nationalNumber } from '@/utils/phone'
 import { EventName, EmailTemplate } from '@/types/events'
 import { getAuth } from '@/utils/requireAuth'
 import { signToken, setAuthCookie } from '@/utils/auth'
@@ -283,10 +283,18 @@ async function _POST(request: NextRequest) {
     const clientId = existingClientId || `client-${randomUUID()}`
     if (!existingClientId) {
       const email = text(body.email).toLowerCase()
-      const password = typeof body.password === 'string' ? body.password : ''
-      if (!email || !password) return badRequest('Email και κωδικός είναι υποχρεωτικά')
+      const phoneNumber = text(body.phoneNumber)
+      if (phoneNumber && !isValidPhoneNumber(phoneNumber)) {
+        return badRequest('Μη έγκυρος αριθμός κινητού')
+      }
+      // The form asks for no password: the mobile is the password, as the national
+      // number (`6912345678`, see verifyAccountPassword). A password sent explicitly
+      // is still honoured.
+      const typedPassword = typeof body.password === 'string' ? body.password : ''
+      const password = typedPassword || (phoneNumber ? nationalNumber(phoneNumber) : '')
+      if (!email || !password) return badRequest('Email και κινητό είναι υποχρεωτικά')
       if (!EMAIL_PATTERN.test(email) || email.length > 254) return badRequest('Μη έγκυρη διεύθυνση email')
-      if (password.length < MIN_PASSWORD_LENGTH || password.length > 200) {
+      if (typedPassword && (typedPassword.length < MIN_PASSWORD_LENGTH || typedPassword.length > 200)) {
         return badRequest(`Ο κωδικός πρέπει να έχει τουλάχιστον ${MIN_PASSWORD_LENGTH} χαρακτήρες`)
       }
       // Inline guest registration must record consent the same way the
@@ -294,9 +302,6 @@ async function _POST(request: NextRequest) {
       // without proof of ToS acceptance.
       if (body.acceptedTerms !== true) {
         return badRequest('Πρέπει να αποδεχτείς τους Όρους Χρήσης και την Πολιτική Απορρήτου')
-      }
-      if (text(body.phoneNumber) && !isValidPhoneNumber(text(body.phoneNumber))) {
-        return badRequest('Μη έγκυρος αριθμός κινητού')
       }
       if (!checkGuestSignupRate(clientIp(request))) {
         return NextResponse.json({ error: 'Πολλές εγγραφές. Δοκιμάστε ξανά σε 1 ώρα.' }, { status: 429 })
@@ -337,7 +342,6 @@ async function _POST(request: NextRequest) {
         updatedAt: nowIso,
       }
       const lastName = text(body.lastName).slice(0, 100)
-      const phoneNumber = text(body.phoneNumber)
       const address = text(body.address).slice(0, 200)
       if (lastName) newClient.lastName = lastName
       if (phoneNumber) newClient.phoneNumber = phoneNumber

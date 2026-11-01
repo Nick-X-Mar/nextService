@@ -209,6 +209,8 @@ export async function registerPendingGarage(tag: string) {
     password: 'TestPass123',
     taxAuthority: 'Α΄ Αθηνών',
     address: 'Πανεπιστημίου 1, Αθήνα',
+    area: 'Κέντρο',
+    municipality: 'Δήμος Αθηναίων',
     mobile: `69${stamp.slice(-8)}`,
     acceptedTerms: true,
   }

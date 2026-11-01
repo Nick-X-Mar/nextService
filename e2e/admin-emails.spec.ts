@@ -83,7 +83,7 @@ test.describe.serial('Admin email editor', () => {
       data: {
         subject: 'Ακύρωση',
         heading: 'Ακυρώθηκε',
-        body: 'Πρώτη παράγραφος με **{συνεργείο}**.\n\nΔεύτερη με {πόντοι} πόντους.',
+        body: 'Πρώτη παράγραφος με **{συνεργείο}**.\n\nΔεύτερη στις {ημερομηνία}.',
         ctaLabel: '',
         note: '',
       },
@@ -91,7 +91,7 @@ test.describe.serial('Admin email editor', () => {
     expect(resp.status()).toBe(200)
     const { preview } = await resp.json()
     expect(preview.html).toContain('<strong>Auto Fix Παπαδόπουλος</strong>')
-    expect(preview.html).toContain('Δεύτερη με 27 πόντους')
+    expect(preview.html).toContain('Δεύτερη στις 05/11/2026')
     // No CTA URL on this email, so no button.
     expect(preview.html).not.toContain('<a href=')
   })

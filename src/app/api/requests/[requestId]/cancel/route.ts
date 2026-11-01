@@ -277,8 +277,7 @@ async function _PATCH(
       clientId,
       garageId,
       requestId,
-      appointmentDate,
-      refundPoints: refundPoints > 0 ? refundPoints : undefined
+      appointmentDate
     })
 
     return NextResponse.json({
@@ -305,7 +304,6 @@ async function notifyCancellationParticipants(args: {
   garageId?: string
   requestId: string
   appointmentDate: string
-  refundPoints?: number
 }): Promise<void> {
   try {
     const [clientRes, garageRes] = await Promise.all([
@@ -331,8 +329,7 @@ async function notifyCancellationParticipants(args: {
           clientId: args.clientId,
           requestId: args.requestId,
           garageName,
-          appointmentDate: args.appointmentDate,
-          refundPoints: args.refundPoints ? String(args.refundPoints) : ''
+          appointmentDate: args.appointmentDate
         },
         triggerEvent: EventName.AppointmentCancelled,
         clientId: args.clientId,

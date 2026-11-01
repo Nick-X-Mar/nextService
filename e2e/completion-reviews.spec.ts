@@ -258,7 +258,7 @@ test.describe.serial('Completion and reviews', () => {
     await ageAppointment(rid, 1)
     const complete = await request.post(`/api/requests/${rid}/complete/`, {
       headers: { Cookie: `auth-token=${gt}` },
-      data: { outcome: 'completed', amount: 90 },
+      data: { outcome: 'completed', amount: 90, reason: { code: 'discount' } },
     })
     // Otherwise the 400 below could come from "not completed yet".
     expect(complete.status(), await complete.text()).toBe(200)

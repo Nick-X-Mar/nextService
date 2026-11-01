@@ -104,6 +104,10 @@ test('The bodywork request can be sent: its button is not under the bottom bar',
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
   expect(await isTappable(submit)).toBe(true)
   expect(await isTappable(page.getByRole('button', { name: 'Επιστροφή' }))).toBe(true)
+  // The terms checkbox sits in the bar above the button; the page's last lines
+  // must still scroll clear of that taller bar.
+  expect(await isTappable(page.getByRole('checkbox'))).toBe(true)
+  expect(await isTappable(page.getByText('Συμπεριλάβετε το περιβάλλον της ζημιάς'))).toBe(true)
 })
 
 test('The mobile field and its country picker fit a phone screen', async ({ page }) => {

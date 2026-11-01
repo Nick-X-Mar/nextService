@@ -166,7 +166,8 @@ async function _GET(request: NextRequest) {
                 garage: garage
                   ? {
                       companyName: garage.companyName,
-                      address: garage.address,
+                      // The offer lists show where a shop is by its municipality only.
+                      municipality: garage.municipality || '',
                       benefits: Array.isArray(garage.benefits) ? garage.benefits : [],
                     }
                   : null,

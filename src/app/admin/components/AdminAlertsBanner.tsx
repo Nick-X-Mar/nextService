@@ -8,6 +8,7 @@ interface AdminAlerts {
   pendingGarages: number
   failedPayments: number
   openErrorGroups: number
+  declaredSettlements: number
 }
 
 // Slower than the app-side poll: none of these change minute to minute, and the
@@ -69,6 +70,12 @@ export default function AdminAlertsBanner() {
       tone: 'bg-error-container/40 text-error',
     },
     {
+      href: '/admin/commissions/',
+      label: alerts.declaredSettlements === 1 ? 'πληρωμή συνεργείου προς έλεγχο' : 'πληρωμές συνεργείων προς έλεγχο',
+      count: alerts.declaredSettlements ?? 0,
+      tone: 'bg-primary/10 text-primary',
+    },
+    {
       href: '/admin/errors/',
       label: alerts.openErrorGroups === 1 ? 'ανοιχτό σφάλμα' : 'ανοιχτά σφάλματα',
       count: alerts.openErrorGroups,
@@ -79,7 +86,7 @@ export default function AdminAlertsBanner() {
   if (items.length === 0) return null
 
   return (
-    <div className="border-b border-outline-variant/20 bg-surface-container-low px-6 py-2">
+    <div className="border-b border-outline-variant/20 bg-surface-container-low px-4 lg:px-6 py-2">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface/50">
           Χρειάζονται προσοχή

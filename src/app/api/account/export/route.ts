@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GetCommand, QueryCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
-import { verifyPassword } from '@/utils/passwordService'
+import { verifyAccountPassword } from '@/utils/passwordService'
 import { requireAuth } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
 import { batchGetById } from '@/utils/batchGetById'
 import { redactClientNames } from '@/utils/chatService'
+import { garageDeclines } from '@/utils/requestDeclines'
+import { garageSettlements } from '@/utils/garageLedger'
 import { TABLES } from '@/lib/tables'
 
 /**
@@ -105,7 +107,7 @@ async function _POST(request: NextRequest) {
     if (!user.passwordHash) {
       return NextResponse.json({ error: 'Λάθος κωδικός' }, { status: 401 })
     }
-    const ok = await verifyPassword(password, user.passwordHash as string)
+    const ok = await verifyAccountPassword(password, user.passwordHash as string)
     if (!ok) {
       return NextResponse.json({ error: 'Λάθος κωδικός' }, { status: 401 })
     }
@@ -230,6 +232,10 @@ async function _POST(request: NextRequest) {
 
       exportData.offersSent = offersSent
       exportData.chatMessages = visibleChats
+      // Its own records: requests it declined and payments it declared.
+      const [declines, settlements] = await Promise.all([garageDeclines(userId), garageSettlements(userId)])
+      exportData.declinedRequests = declines
+      exportData.commissionPayments = settlements
     }
 
     const eventAttr = userType === 'garage' ? 'garageId' : 'clientId'

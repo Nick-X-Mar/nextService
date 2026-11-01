@@ -13,7 +13,7 @@ import { getCategoryText } from '@/utils/categoryLabels'
 import { compressImage } from '@/utils/imageCompression'
 import EstimatedCostCard from './EstimatedCostCard'
 import LicenseSample from './LicenseSample'
-import GuestAccountFields, { useGuestAccount } from './GuestAccount'
+import GuestAccountFields, { GuestTermsCheckbox, useGuestAccount } from './GuestAccount'
 import { useFileDrop } from '@/hooks/useFileDrop'
 import { track } from '@/lib/track'
 
@@ -369,7 +369,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
         {/* Main form card */}
         <div className="mt-6 space-y-6">
 
-          {/* Email & Password for guest users */}
+          {/* Email & mobile for guest users */}
           {mounted && <GuestAccountFields account={account} />}
 
           {/* Engine Number or License Photo */}
@@ -640,6 +640,7 @@ export default function CarSpecsForm({ savedData }: CarSpecsFormProps) {
 
         {/* Submit section */}
         <div className="mt-8">
+          {mounted && !createdRequest && <GuestTermsCheckbox account={account} className="mb-4" />}
           <GearSubmitButton
             onClick={handleSubmit}
             disabled={!isFormValid}

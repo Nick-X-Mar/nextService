@@ -343,7 +343,7 @@ test.describe('Completing a job', () => {
     expect(zero.status()).toBe(400)
 
     const honest = await complete(request, garage, requestId, {
-      outcome: 'completed', amount: 248, vatIncluded: true, vatRate: 24,
+      outcome: 'completed', amount: 248, vatIncluded: true, vatRate: 24, reason: { code: 'less_work' },
     })
     expect(honest.status(), await honest.text()).toBe(200)
     expect((await honest.json()).amounts.net).toBe(200)
@@ -367,7 +367,7 @@ test.describe('A deactivated garage and the jobs it already holds', () => {
     await ageAppointment(requestId, 2)
 
     const done = await complete(request, shop.token, requestId, {
-      outcome: 'completed', amount: 124, vatIncluded: true, rating: 5,
+      outcome: 'completed', amount: 124, vatIncluded: true, rating: 5, reason: { code: 'less_work' },
     })
     expect(done.status(), await done.text()).toBe(200)
     const body = await done.json()
@@ -386,7 +386,7 @@ test.describe('A deactivated garage and the jobs it already holds', () => {
     expect((await review.json()).mine?.rating).toBe(5)
 
     // Still nobody else's job to close.
-    const stranger = await complete(request, await garageToken(request), requestId, { outcome: 'no_show' })
+    const stranger = await complete(request, await garageToken(request), requestId, { outcome: 'no_show', reason: { code: 'no_show' } })
     expect(stranger.status()).toBe(403)
   })
 })
@@ -420,13 +420,13 @@ test.describe('Commissions', () => {
     }
     const before = await stats()
 
-    const noShowResp = await complete(request, noShow.garage, noShow.requestId, { outcome: 'no_show' })
+    const noShowResp = await complete(request, noShow.garage, noShow.requestId, { outcome: 'no_show', reason: { code: 'no_show' } })
     expect(noShowResp.status(), await noShowResp.text()).toBe(200)
     expect((await getServiceRequest(noShow.requestId))?.completionOutcome).toBe('no_show')
 
     // Closed with no outcome, nothing declared: what jobs closed before the
     // completion flow look like.
-    const legacyResp = await complete(request, legacy.garage, legacy.requestId, { outcome: 'completed', amount: 100 })
+    const legacyResp = await complete(request, legacy.garage, legacy.requestId, { outcome: 'completed', amount: 100, reason: { code: 'less_work' } })
     expect(legacyResp.status()).toBe(200)
     await makeLegacyCompletion(legacy.requestId)
 
@@ -493,7 +493,7 @@ test.describe('Commission totals', () => {
     for (const requestId of [...jobs, unpriced]) {
       month = (await ageAppointment(requestId, 2)).slice(0, 7)
       const done = await complete(request, shop.token, requestId, {
-        outcome: 'completed', amount: 10.03, vatIncluded: false,
+        outcome: 'completed', amount: 10.03, vatIncluded: false, reason: { code: 'discount' },
       })
       expect(done.status(), await done.text()).toBe(200)
     }
@@ -551,7 +551,7 @@ test.describe('Commission rates', () => {
     /** Closes a job two days back (or `daysAgo`) declaring a net of 100. Returns its month. */
     const close = async (garageToken: string, requestId: string, daysAgo = 2) => {
       const month = (await ageAppointment(requestId, daysAgo)).slice(0, 7)
-      const done = await complete(request, garageToken, requestId, { outcome: 'completed', amount: 100, vatIncluded: false })
+      const done = await complete(request, garageToken, requestId, { outcome: 'completed', amount: 100, vatIncluded: false, reason: { code: 'discount' } })
       expect(done.status(), await done.text()).toBe(200)
       return month
     }
@@ -681,7 +681,7 @@ test.describe('Commission from the appointment day', () => {
     })
 
     // The garage says the client never came: off the bill, onto the review list.
-    const closed = await complete(request, shop.token, noShow, { outcome: 'no_show' })
+    const closed = await complete(request, shop.token, noShow, { outcome: 'no_show', reason: { code: 'no_show' } })
     expect(closed.status(), await closed.text()).toBe(200)
     page = await detail(month)
     expect(ids(page.appointments)).not.toContain(noShow)
@@ -786,7 +786,7 @@ test.describe('Admin cancel', () => {
       description: 'E2E lifecycle: admin cancel completed',
     })
     await ageAppointment(requestId, 2)
-    const done = await complete(request, garage, requestId, { outcome: 'completed', amount: 150 })
+    const done = await complete(request, garage, requestId, { outcome: 'completed', amount: 150, reason: { code: 'discount' } })
     expect(done.status()).toBe(200)
 
     const resp = await request.patch(`/api/admin/requests/${requestId}/cancel/`, {

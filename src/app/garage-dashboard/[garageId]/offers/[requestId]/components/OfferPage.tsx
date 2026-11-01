@@ -7,8 +7,6 @@ import { ServiceVehicleCard, LicensePhotoCard, Spinner, AvailabilityGrid } from 
 import {
   buildDayHours,
   sanitizeSlots,
-  datesWithNoHours,
-  fillMissingSlots,
   type AvailabilitySlots,
 } from '@/utils/availabilitySlots'
 import { athensToday, isPastAthensDate } from '@/utils/athensTime'
@@ -154,7 +152,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
   const [savedOffer, setSavedOffer] = useState<SavedOffer | null>(null)
   const [selectedDates, setSelectedDates] = useState<Date[]>([])
   // Per-date hourly availability. A date with no entry means "untouched",
-  // which the grid renders as fully available.
+  // which the grid renders as no hour picked yet.
   const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlots>({})
   // The garage's own working hours drive the grid rows.
   const [workdayHours, setWorkdayHours] = useState<{ start?: string; end?: string }>({})
@@ -175,7 +173,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
     [workdayHours]
   )
   // Drop slots for dates that are no longer selected — deselecting a day and
-  // reselecting it should bring back a clean, fully-available column.
+  // reselecting it should bring back a clean, unpicked column.
   const cleanSlots = useMemo(
     () => sanitizeSlots(availabilitySlots, selectedDateStrings),
     [availabilitySlots, selectedDateStrings]
@@ -425,23 +423,21 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
       return
     }
 
-    // A day with every hour closed would reach the customer as a bookable date
-    // with nothing to book. Make the garage either reopen an hour or drop the
-    // day, rather than silently sending a dead option.
-    const emptyDates = datesWithNoHours(cleanSlots, dates)
+    // Hours start unpicked, so a day the garage picked no hour on would reach
+    // the customer as a bookable date with nothing to book. Make the garage
+    // pick an hour or drop the day, rather than silently sending a dead option.
+    const emptyDates = dates.filter((d) => !cleanSlots[d]?.length)
     if (emptyDates.length > 0) {
       showToast({
         type: 'error',
         title: 'Ημέρα χωρίς ώρες',
-        message: `Έκλεισες όλες τις ώρες σε ${emptyDates.length === 1 ? 'μία ημερομηνία' : `${emptyDates.length} ημερομηνίες`}. Άνοιξε τουλάχιστον μία ώρα ή αφαίρεσε την ημερομηνία.`,
+        message: `Δεν επέλεξες ώρα σε ${emptyDates.length === 1 ? 'μία ημερομηνία' : `${emptyDates.length} ημερομηνίες`}. Επίλεξε τουλάχιστον μία ώρα ή αφαίρεσε την ημερομηνία.`,
         duration: 5000
       })
       return
     }
 
-    // An untouched column means "every hour open", so it is sent as exactly
-    // that. Left out, the client would book the day with no hour at all.
-    const slots = fillMissingSlots(sanitizeSlots(cleanSlots, dates), dates, dayHours)
+    const slots = sanitizeSlots(cleanSlots, dates)
 
     try {
       const response = existingOffer

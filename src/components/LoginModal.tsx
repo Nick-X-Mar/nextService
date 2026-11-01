@@ -96,9 +96,13 @@ export default function LoginModal({ isOpen, onClose, email, firstName, onLoginS
               <Icon name={showPassword ? 'visibility_off' : 'visibility'} size="md" />
             </button>
           </div>
-          {error && (
+          {error ? (
             <p className="text-xs text-error flex items-center gap-1">
               <Icon name="error" size="sm" className="text-error" /> {error}
+            </p>
+          ) : (
+            <p className="text-xs text-on-surface-variant">
+              Αν κάνατε εγγραφή στέλνοντας αίτημα, ο κωδικός είναι το κινητό σας.
             </p>
           )}
         </div>

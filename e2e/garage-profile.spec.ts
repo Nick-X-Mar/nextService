@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test'
 import { loginViaAPI, setAuthCookie, TEST_GARAGE } from './helpers'
 import { registerPendingGarage } from './c-helpers'
+import { getRow } from './a-helpers'
+import { TABLES } from '../src/lib/tables'
 
 test.describe('Garage profile', () => {
 
@@ -30,6 +32,37 @@ test.describe('Garage profile', () => {
     // Should authenticate (not 401) — may return 400 for missing required fields, that's ok
     expect(resp.status()).not.toBe(401)
   })
+})
+
+test('Registration asks for the area and the municipality, and the profile keeps them', async ({ request }) => {
+  const stamp = `${Date.now()}${Math.floor(Math.random() * 1000)}`
+  const base = {
+    companyName: `E2E Δήμος ${stamp}`,
+    contactFirstName: 'Νίκος',
+    contactLastName: 'Δοκιμή',
+    tin: stamp.slice(-9),
+    email: `e2e-garage-area-${stamp}@test.com`,
+    password: 'TestPass123',
+    taxAuthority: 'ΔΟΥ Αθηνών',
+    address: 'Πατησίων 1, Αθήνα',
+    mobile: `69${stamp.slice(-8)}`,
+    acceptedTerms: true,
+  }
+  expect((await request.post('/api/auth/register-professional/', { data: { ...base, area: 'Κυψέλη' } })).status()).toBe(400)
+  expect((await request.post('/api/auth/register-professional/', { data: { ...base, municipality: 'Δήμος Αθηναίων' } })).status()).toBe(400)
+
+  const ok = await request.post('/api/auth/register-professional/', {
+    data: { ...base, area: ' Κυψέλη ', municipality: 'Δήμος Αθηναίων' },
+  })
+  expect(ok.status()).toBe(200)
+  const id = (await ok.json()).garage.id as string
+  const row = await getRow(TABLES.Garages, id)
+  expect(row?.area).toBe('Κυψέλη')
+  expect(row?.municipality).toBe('Δήμος Αθηναίων')
+
+  // The public profile carries the municipality the client's offer card shows.
+  const pub = await (await request.get(`/api/garage/${id}/`)).json()
+  expect(pub.garage.municipality).toBe('Δήμος Αθηναίων')
 })
 
 /**

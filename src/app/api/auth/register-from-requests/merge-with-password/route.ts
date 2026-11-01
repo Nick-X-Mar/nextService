@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { signToken, setAuthCookie } from '@/utils/auth'
-import { verifyPassword } from '@/utils/passwordService'
+import { verifyAccountPassword } from '@/utils/passwordService'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
 import {
@@ -62,7 +62,7 @@ async function _POST(request: NextRequest) {
       !!account &&
       typeof account.passwordHash === 'string' &&
       !account.mergedInto &&
-      (await verifyPassword(password, account.passwordHash))
+      (await verifyAccountPassword(password, account.passwordHash))
     if (!account || !valid) {
       return NextResponse.json({ error: 'Λάθος κωδικός πρόσβασης' }, { status: 401 })
     }

@@ -12,6 +12,7 @@ import Icon from '@/components/ui/Icon'
 import MyOffers from './MyOffers'
 import AvailableRequests from './AvailableRequests'
 import Appointments from './Appointments'
+import GaragePayments from './GaragePayments'
 import GarageSettings from './GarageSettings'
 import ActivationWelcome from './ActivationWelcome'
 import { useRealtimeRequests, type BroadcastRequest, type RequestUpdatePayload } from '@/hooks/useRealtimeRequests'
@@ -33,6 +34,8 @@ interface GarageData {
   email: string
   mobile: string
   address: string
+  area?: string
+  municipality?: string
   tin: string
   taxAuthority: string
   description?: string
@@ -82,6 +85,7 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
   const activeTab = tabParam === 'offers' ? 'offers'
     : tabParam === 'appointments' ? 'appointments'
     : tabParam === 'settings' ? 'settings'
+    : tabParam === 'payments' ? 'payments'
     : 'requests'
 
   const loadGarageData = useCallback(async (garageId: string) => {
@@ -307,6 +311,24 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
         </div>
       )
     }
+    // A deactivated garage still owes the commission on the jobs it did.
+    if (activeTab === 'payments' && accountState === 'deactivated') {
+      return (
+        <div className="pt-2 pb-8">
+          <div className={styles.container}>
+            <button
+              onClick={() => navigate(statusHref)}
+              disabled={isNavigating(statusHref)}
+              className={`${styles.btnGhost} mb-4 -ml-4`}
+            >
+              {isNavigating(statusHref) ? <Spinner size="sm" /> : <Icon name="arrow_back" size="sm" />}
+              Κατάσταση λογαριασμού
+            </button>
+            <GaragePayments />
+          </div>
+        </div>
+      )
+    }
 
     return (
       <div className="pt-6 pb-12 px-4">
@@ -328,6 +350,16 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
             {isNavigating(tabHref('settings')) ? <Spinner size="sm" /> : <Icon name="storefront" size="sm" />}
             Στοιχεία συνεργείου
           </button>
+          {accountState === 'deactivated' && (
+            <button
+              onClick={() => navigate(tabHref('payments'))}
+              disabled={isNavigating(tabHref('payments'))}
+              className={`${styles.btnOutline} w-full justify-center py-3.5 mt-3`}
+            >
+              {isNavigating(tabHref('payments')) ? <Spinner size="sm" /> : <Icon name="receipt_long" size="sm" />}
+              Πληρωμές
+            </button>
+          )}
           {accountState !== 'deactivated' && (
             <p className={`${styles.smallText} text-center mt-3`}>
               Όσο περιμένετε, συμπληρώστε το ωράριο, την περιγραφή και τις παροχές σας.
@@ -370,6 +402,9 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
     // Settings tab shows settings component directly
     if (activeTab === 'settings') {
       return <GarageSettings garageData={garageData} onUpdate={setGarageData} />
+    }
+    if (activeTab === 'payments') {
+      return <GaragePayments />
     }
 
     // Other tabs show unified content with SegmentedControl

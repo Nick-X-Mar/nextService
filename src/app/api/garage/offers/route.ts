@@ -7,6 +7,7 @@ import { requireActiveGarage } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
 import { garageClientView, isWinningGarage } from '@/utils/garageClientView'
 import { TABLES } from '@/lib/tables'
+import { garageDeclines } from '@/utils/requestDeclines'
 
 async function _GET(request: NextRequest) {
   try {
@@ -16,7 +17,7 @@ async function _GET(request: NextRequest) {
     // Every offer this garage has made, via GarageOffersIndex. Drained in full:
     // the dashboard splits this one list into the offers and appointments tabs
     // and their badges, so a page boundary would silently drop appointments.
-    const items = await collectAll<Record<string, unknown>>(
+    const [items, allDeclines] = await Promise.all([collectAll<Record<string, unknown>>(
       (startKey) =>
         dynamoDB.send(new QueryCommand({
           TableName: TABLES.Offers,
@@ -27,19 +28,27 @@ async function _GET(request: NextRequest) {
           ExclusiveStartKey: startKey,
         })),
       `garage offers for ${garageId}`
-    )
+    ), garageDeclines(garageId)])
 
-    if (items.length === 0) {
+    // A request quoted after all (from a link, a second tab) is an offer, not a decline.
+    const quoted = new Set(items.map((o) => o.serviceRequestId as string))
+    const declines = allDeclines.filter((d) => !quoted.has(d.requestId))
+
+    if (items.length === 0 && declines.length === 0) {
       return NextResponse.json({
         success: true,
-        offers: []
+        offers: [],
+        declines: [],
       })
     }
 
     // Batched rather than three point reads per offer: the dashboard fetches
     // this list for its badges and again for whichever tab is open. Rows
     // missing clientId/vehicleId are skipped by the batch, not fatal to it.
-    const requests = await batchGetById(TABLES.ServiceRequests, items.map((o) => o.serviceRequestId as string))
+    const requests = await batchGetById(TABLES.ServiceRequests, [
+      ...items.map((o) => o.serviceRequestId as string),
+      ...declines.map((d) => d.requestId),
+    ])
     const requestRows = [...requests.values()]
     const [clients, vehicles] = await Promise.all([
       batchGetById(TABLES.Clients, requestRows.map((r) => r.clientId as string | undefined), {
@@ -123,9 +132,33 @@ async function _GET(request: NextRequest) {
     // Filter out null results (where service request wasn't found)
     const validOffers = offersWithDetails.filter(offer => offer !== null)
 
+    // Declined requests: nobody here won them, so the quoting view only.
+    const declinedRequests = declines.flatMap((d) => {
+      const serviceRequest = requests.get(d.requestId)
+      if (!serviceRequest) return []
+      const vehicle = vehicles.get(serviceRequest.vehicleId as string)
+      return [{
+        requestId: d.requestId,
+        reason: d.reason,
+        reasonText: d.reasonText ?? null,
+        declinedAt: d.createdAt,
+        serviceRequest: {
+          id: serviceRequest.id,
+          description: serviceRequest.description,
+          category: serviceRequest.category,
+          status: serviceRequest.status,
+          client: garageClientView(clients.get(serviceRequest.clientId as string), false),
+          vehicle: vehicle
+            ? { brand: vehicle.brand, model: vehicle.model, year: vehicle.modelYear || vehicle.year }
+            : null,
+        },
+      }]
+    })
+
     return NextResponse.json({
       success: true,
-      offers: validOffers
+      offers: validOffers,
+      declines: declinedRequests,
     })
 
   } catch (error) {

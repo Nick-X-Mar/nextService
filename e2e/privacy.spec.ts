@@ -400,10 +400,10 @@ test.describe.serial('Winner-only client PII', () => {
     await expect(card).not.toContainText('undefined')
     await expect(card.locator('a[href^="tel:"]')).toHaveCount(0)
 
-    // The "Απορρίφθηκε" chip gathers every offer that ended without a booking.
-    await page.getByRole('button', { name: 'Απορρίφθηκε' }).click()
+    // The "Απορριφθείσες" chip gathers every offer that ended without a booking.
+    await page.getByRole('button', { name: 'Απορριφθείσες' }).click()
     await expect(card).toBeVisible()
-    await page.getByRole('button', { name: 'Εκκρεμής' }).click()
+    await page.getByRole('button', { name: 'Εκκρεμείς' }).click()
     await expect(card).toBeHidden()
   })
 

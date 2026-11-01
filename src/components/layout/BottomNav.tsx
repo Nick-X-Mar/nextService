@@ -27,6 +27,7 @@ export default function BottomNav() {
     { label: 'Αρχική', icon: 'home', href: '/', matchPaths: ['/'] },
     { label: 'Αιτήματα', icon: 'build', href: `/requests/${client.id}`, matchPaths: [`/requests/${client.id}`] },
     { label: 'Μηνύματα', icon: 'chat_bubble', href: `/requests/${client.id}/chats`, matchPaths: [`/requests/${client.id}/chats`], badge: threads },
+    { label: 'Πληρωμές', icon: 'receipt_long', href: `/requests/${client.id}/payments`, matchPaths: [`/requests/${client.id}/payments`] },
     { label: 'Προφίλ', icon: 'person', href: `/profile/${client.id}`, matchPaths: [`/profile/`] },
   ] : [
     { label: 'Αρχική', icon: 'home', href: '/', matchPaths: ['/'] },

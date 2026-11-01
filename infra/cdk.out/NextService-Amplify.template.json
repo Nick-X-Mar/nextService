@@ -327,7 +327,11 @@
         "arn:aws:dynamodb:eu-central-1:766671488262:table/SiteContent",
         "arn:aws:dynamodb:eu-central-1:766671488262:table/SiteContent/index/*",
         "arn:aws:dynamodb:eu-central-1:766671488262:table/Reviews",
-        "arn:aws:dynamodb:eu-central-1:766671488262:table/Reviews/index/*"
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/Reviews/index/*",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/RequestDeclines",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/RequestDeclines/index/*",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/GarageSettlements",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/GarageSettlements/index/*"
        ],
        "Sid": "DynamoDBAccess"
       },
@@ -347,7 +351,9 @@
         "arn:aws:dynamodb:eu-central-1:766671488262:table/PerformanceMetrics",
         "arn:aws:dynamodb:eu-central-1:766671488262:table/ErrorResolutions",
         "arn:aws:dynamodb:eu-central-1:766671488262:table/SiteContent",
-        "arn:aws:dynamodb:eu-central-1:766671488262:table/Reviews"
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/Reviews",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/RequestDeclines",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/GarageSettlements"
        ],
        "Sid": "DynamoDBDescribeTable"
       },

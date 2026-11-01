@@ -12,7 +12,7 @@ interface OfferSummaryOffer {
   benefits?: string[]
   garage?: {
     companyName?: string
-    address?: string
+    municipality?: string
     benefits?: string[]
   } | null
 }
@@ -36,10 +36,8 @@ export default function OfferSummaryCard({ offer, index, isLast, onClick }: Offe
       : []
   const benefitsCount = benefits.length
 
-  // Extract area from address (last part after comma)
-  const area = offer.garage?.address
-    ? offer.garage.address.split(',').pop()?.trim() || offer.garage.address
-    : 'Άγνωστη περιοχή'
+  // Only the municipality — never the street — before the client books.
+  const area = offer.garage?.municipality || 'Δεν έχει δηλωθεί'
 
   return (
     <button

@@ -27,7 +27,7 @@ interface OfferSummary {
   benefits?: string[]
   garage?: {
     companyName?: string
-    address?: string
+    municipality?: string
     benefits?: string[]
   } | null
 }

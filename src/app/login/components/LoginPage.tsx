@@ -283,6 +283,11 @@ export default function LoginPage() {
                   <Icon name={showPassword ? 'visibility_off' : 'visibility'} size="sm" />
                 </button>
               </div>
+              {mode === 'login' && userType === 'client' && (
+                <p className="text-xs text-on-surface-variant">
+                  Αν κάνατε εγγραφή στέλνοντας αίτημα, ο κωδικός είναι το κινητό σας.
+                </p>
+              )}
               {mode === 'login' && (
                 <div className="text-right">
                   <Link href="/forgot-password/" className={`${styles.linkText} inline-block py-2 text-sm`}>

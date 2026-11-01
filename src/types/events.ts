@@ -43,6 +43,7 @@ export const EventName = {
   OfferClientAvailabilityProposed: 'offer_client_availability_proposed',
   OfferAccepted: 'offer_accepted',
   OfferRejected: 'offer_rejected',
+  GarageDeclinedRequest: 'garage_declined_request',
 
   // Phase E — Appointment & completion
   AppointmentScheduled: 'appointment_scheduled',
@@ -56,6 +57,8 @@ export const EventName = {
   PaymentFailed: 'payment_failed',
   PaymentAbandoned: 'payment_abandoned',
   WalletCredited: 'wallet_credited',
+  GarageSettlementDeclared: 'garage_settlement_declared',
+  GarageSettlementReviewed: 'garage_settlement_reviewed',
 
   // Phase F — Account recovery
   PasswordResetRequested: 'password_reset_requested',

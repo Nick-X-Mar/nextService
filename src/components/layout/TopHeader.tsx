@@ -163,6 +163,12 @@ export default function TopHeader() {
               <span className="font-medium">Πίνακας Συνεργείου</span>
             </Link>
           )}
+          {userType === 'garage' && garage?.isActive && (
+            <Link href={`/garage-dashboard/${garage.id}/?tab=payments`} onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
+              <Icon name="receipt_long" className="text-primary" />
+              <span className="font-medium">Πληρωμές</span>
+            </Link>
+          )}
           {userType && userType !== 'guest' && (
             <button onClick={() => { logout(); setMobileMenuOpen(false) }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors w-full text-tertiary">
               <Icon name="logout" className="text-tertiary" />

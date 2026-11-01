@@ -127,6 +127,22 @@
       }
     }
   ],
+  "/NextService-DynamoDB/RequestDeclinesTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "RequestDeclinesTableCB75B277"
+      }
+    }
+  ],
+  "/NextService-DynamoDB/GarageSettlementsTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "GarageSettlementsTable8BE9B8E1"
+      }
+    }
+  ],
   "/NextService-DynamoDB/ClientsTableArn": [
     {
       "type": "aws:cdk:logicalId",
@@ -287,6 +303,18 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "ReviewsTable1E51AE49"
+    }
+  ],
+  "/NextService-DynamoDB/RequestDeclinesTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RequestDeclinesTableCB75B277"
+    }
+  ],
+  "/NextService-DynamoDB/GarageSettlementsTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "GarageSettlementsTable8BE9B8E1"
     }
   ],
   "/NextService-DynamoDB/CDKMetadata/Default": [

@@ -211,6 +211,8 @@ export default function CommissionsPage() {
         </select>
       </div>
 
+      <DeclaredSettlements />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard
           icon="event_available"
@@ -296,6 +298,56 @@ export default function CommissionsPage() {
         emptyMessage="Δεν υπάρχουν ολοκληρωμένα ραντεβού για αυτόν τον μήνα"
         onRowClick={(item) => navigate(garageHref(item.garageId))}
       />
+    </div>
+  )
+}
+
+interface DeclaredSettlement {
+  settlementId: string
+  garageId: string
+  garageName: string
+  amount: number
+  paidOn: string
+  method: string
+}
+
+/** Payments garages say they made and nobody has checked yet; each opens its garage's page. */
+function DeclaredSettlements() {
+  const [rows, setRows] = useState<DeclaredSettlement[]>([])
+  const { navigate, isNavigating } = useNavigation()
+
+  useEffect(() => {
+    fetch('/api/admin/commissions/settlements/')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data?.settlements) setRows(data.settlements) })
+      .catch(() => {})
+  }, [])
+
+  if (rows.length === 0) return null
+  return (
+    <div className="bg-surface-container-lowest rounded-xl border border-primary/20 p-5 mb-6" data-testid="declared-settlements">
+      <h3 className="font-bold text-on-surface flex items-center gap-2">
+        <span className="material-symbols-outlined text-primary text-[20px]">account_balance</span>
+        Πληρωμές συνεργείων προς έλεγχο
+      </h3>
+      <div className="mt-3 space-y-2">
+        {rows.map((r) => {
+          const href = `/admin/commissions/${r.garageId}`
+          return (
+            <button
+              key={r.settlementId}
+              onClick={() => navigate(href)}
+              className="w-full flex items-center justify-between gap-3 rounded-lg border border-outline-variant/20 p-3 text-left text-sm hover:bg-surface-container"
+            >
+              <span className="min-w-0 truncate">
+                <span className="font-bold text-on-surface">{r.garageName}</span>
+                <span className="text-on-surface/60"> · {formatEUR(r.amount)} · {r.paidOn.split('-').reverse().join('/')}</span>
+              </span>
+              {isNavigating(href) ? <Spinner size="sm" /> : <span className="material-symbols-outlined text-[18px] text-on-surface/50">chevron_right</span>}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

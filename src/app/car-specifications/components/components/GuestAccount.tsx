@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import Icon from '@/components/ui/Icon'
 import LoginModal from '@/components/LoginModal'
 import { useAuth } from '@/contexts/AuthContext'
-import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 import { adoptFormData } from '@/utils/formStorage'
 import { countryList, DEFAULT_COUNTRY, dialCodeOf, toE164 } from '@/utils/phone'
 
@@ -29,20 +28,17 @@ export function useGuestAccount() {
   const isLoggedIn = justSignedIn || (isVerified && !!client)
 
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
-  // Optional. Only the garage the client books with ever sees it.
+  // Required: it is the account's password (the server stores the national
+  // number). Only the garage the client books with ever sees the number itself.
   const [phoneCountry, setPhoneCountry] = useState(DEFAULT_COUNTRY)
   const [phone, setPhone] = useState('')
-  const phoneNumber = phone.trim() ? toE164(phoneCountry, phone) : ''
+  const phoneNumber = phone.trim() ? toE164(phoneCountry, phone) : null
   const isPhoneValid = phoneNumber !== null
   const [emailExists, setEmailExists] = useState(false)
   const [isCheckingEmail, setIsCheckingEmail] = useState(false)
   const [showEmailHint, setShowEmailHint] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
-
-  const isPasswordValid = password.length >= MIN_PASSWORD_LENGTH && password === confirmPassword
 
   // Live hint only. It fails open (a 429 or 500 reads as "free"), which is fine
   // because the submit itself answers 409 for a taken email — see onEmailTaken.
@@ -78,12 +74,12 @@ export function useGuestAccount() {
 
   /** Until the session is settled we don't know which shape the submit takes. */
   const isReady = authSettled &&
-    (isLoggedIn || (isEmailValid(email) && !emailExists && isPasswordValid && isPhoneValid && acceptedTerms))
+    (isLoggedIn || (isEmailValid(email) && !emailExists && isPhoneValid && acceptedTerms))
 
   /** The fields the request body needs: none for a signed-in client. */
   const credentials = isLoggedIn
     ? {}
-    : { email, password, acceptedTerms: true as const, ...(phoneNumber ? { phoneNumber } : {}) }
+    : { email, phoneNumber: phoneNumber || '', acceptedTerms: true as const }
 
   // A different address is a fresh question; the old answer (possibly a 409) no
   // longer applies to it.
@@ -118,7 +114,7 @@ export function useGuestAccount() {
   return {
     authSettled, isLoggedIn, isReady, credentials, onEmailTaken, onSignedIn,
     // For GuestAccountFields
-    email, changeEmail, password, setPassword, confirmPassword, setConfirmPassword,
+    email, changeEmail,
     acceptedTerms, setAcceptedTerms, emailExists, isCheckingEmail, showEmailHint, setShowEmailHint,
     showLoginModal, setShowLoginModal,
     phoneCountry, setPhoneCountry, phone, setPhone, isPhoneValid,
@@ -130,8 +126,7 @@ export type GuestAccount = ReturnType<typeof useGuestAccount>
 export default function GuestAccountFields({ account }: { account: GuestAccount }) {
   const {
     authSettled, isLoggedIn, onSignedIn,
-    email, changeEmail, password, setPassword, confirmPassword, setConfirmPassword,
-    acceptedTerms, setAcceptedTerms, emailExists, isCheckingEmail, showEmailHint, setShowEmailHint,
+    email, changeEmail, emailExists, isCheckingEmail, showEmailHint, setShowEmailHint,
     showLoginModal, setShowLoginModal,
     phoneCountry, setPhoneCountry, phone, setPhone, isPhoneValid,
   } = account
@@ -153,6 +148,9 @@ export default function GuestAccountFields({ account }: { account: GuestAccount 
           )}
           {/* Email */}
           <div className="space-y-3">
+            <p className="text-sm font-bold text-on-surface">
+              Βάλτε ενεργό email για να λάβετε την προσφορά σας.
+            </p>
             <label htmlFor="guest-email" className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
               Email <span className="text-error">*</span>
             </label>
@@ -200,90 +198,16 @@ export default function GuestAccountFields({ account }: { account: GuestAccount 
             )}
           </div>
 
-          {/* Password fields - only if email is valid and doesn't exist */}
-          {isEmailValid(email) && !emailExists && (
-            <>
-              <PhoneField
-                country={phoneCountry}
-                onCountryChange={setPhoneCountry}
-                value={phone}
-                onChange={setPhone}
-                invalid={!isPhoneValid}
-              />
-
-              <div className="space-y-3">
-                <label htmlFor="guest-password" className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
-                  Κωδικός πρόσβασης <span className="text-error">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    id="guest-password"
-                    type="password"
-                    autoComplete="new-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder={`Τουλάχιστον ${MIN_PASSWORD_LENGTH} χαρακτήρες`}
-                    className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 pr-12 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
-                  />
-                  <Icon name="lock" className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/50" size="md" />
-                </div>
-                {password && password.length < MIN_PASSWORD_LENGTH && (
-                  <p className="text-xs text-error flex items-center gap-1">
-                    <Icon name="error" size="sm" className="text-error" /> Τουλάχιστον {MIN_PASSWORD_LENGTH} χαρακτήρες
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-3">
-                <label htmlFor="guest-password-confirm" className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
-                  Επιβεβαίωση κωδικού <span className="text-error">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    id="guest-password-confirm"
-                    type="password"
-                    autoComplete="new-password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Επαναλάβετε τον κωδικό"
-                    className="w-full bg-surface-container-highest border-none rounded-xl px-4 py-4 pr-12 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
-                  />
-                  <Icon name="lock" className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/50" size="md" />
-                </div>
-                {confirmPassword && password !== confirmPassword && (
-                  <p className="text-xs text-error flex items-center gap-1">
-                    <Icon name="error" size="sm" className="text-error" /> Οι κωδικοί δεν ταιριάζουν
-                  </p>
-                )}
-                {confirmPassword && password === confirmPassword && password.length >= MIN_PASSWORD_LENGTH && (
-                  <p className="text-xs text-green-600 flex items-center gap-1">
-                    <Icon name="check_circle" size="sm" className="text-green-600" /> Θα δημιουργηθεί ο λογαριασμός σας κατά την υποβολή
-                  </p>
-                )}
-              </div>
-
-              {/* Consent — required for GDPR */}
-              <label className="flex items-start gap-2 cursor-pointer select-none pt-2">
-                <input
-                  type="checkbox"
-                  checked={acceptedTerms}
-                  onChange={(e) => setAcceptedTerms(e.target.checked)}
-                  required
-                  className="mt-0.5 h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                />
-                <span className="text-xs text-on-surface-variant leading-snug">
-                  Έχω διαβάσει και αποδέχομαι τους{' '}
-                  <a href="/terms/" target="_blank" rel="noreferrer" className="text-primary underline">
-                    Όρους Χρήσης
-                  </a>
-                  {' '}και την{' '}
-                  <a href="/privacy/" target="_blank" rel="noreferrer" className="text-primary underline">
-                    Πολιτική Απορρήτου
-                  </a>
-                  .
-                </span>
-              </label>
-            </>
+          {/* The mobile is the password — so no password fields, and nothing to
+              ask when the email already has an account. */}
+          {!emailExists && (
+            <PhoneField
+              country={phoneCountry}
+              onCountryChange={setPhoneCountry}
+              value={phone}
+              onChange={setPhone}
+              invalid={!!phone.trim() && !isPhoneValid}
+            />
           )}
         </div>
       )}
@@ -304,7 +228,38 @@ export default function GuestAccountFields({ account }: { account: GuestAccount 
 }
 
 /**
- * Optional mobile with its own country picker. The native <select> sits invisibly
+ * The consent checkbox — required for GDPR. Each form renders it right above
+ * its submit button rather than inside the account fields.
+ */
+export function GuestTermsCheckbox({ account, className = '' }: { account: GuestAccount; className?: string }) {
+  const { authSettled, isLoggedIn, emailExists, acceptedTerms, setAcceptedTerms } = account
+  if (!authSettled || isLoggedIn || emailExists) return null
+  return (
+    <label className={`flex items-start gap-2 cursor-pointer select-none ${className}`}>
+      <input
+        type="checkbox"
+        checked={acceptedTerms}
+        onChange={(e) => setAcceptedTerms(e.target.checked)}
+        required
+        className="mt-0.5 h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+      />
+      <span className="text-xs text-on-surface-variant leading-snug">
+        Έχω διαβάσει και αποδέχομαι τους{' '}
+        <a href="/terms/" target="_blank" rel="noreferrer" className="text-primary underline">
+          Όρους Χρήσης
+        </a>
+        {' '}και την{' '}
+        <a href="/privacy/" target="_blank" rel="noreferrer" className="text-primary underline">
+          Πολιτική Απορρήτου
+        </a>
+        .
+      </span>
+    </label>
+  )
+}
+
+/**
+ * The mobile, which is also the account's password, with its own country picker. The native <select> sits invisibly
  * over a compact "🇬🇷 +30" label, so the phone's own picker opens with every
  * country's full name while the field stays narrow.
  */
@@ -322,17 +277,14 @@ function PhoneField({
   return (
     <div className="space-y-3">
       <div className="bg-primary-fixed/40 border border-primary/10 rounded-xl p-4 flex items-start gap-3">
-        <Icon name="phone_iphone" className="text-primary shrink-0" />
-        <div>
-          <p className="text-sm font-bold text-on-surface">Θέλεις πιο άμεση επικοινωνία;</p>
-          <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
-            Δήλωσε το κινητό σου, ώστε το συνεργείο να μπορεί να σε καλέσει για το ραντεβού. Το βλέπει μόνο το
-            συνεργείο που θα επιλέξεις, αφού κλείσεις ραντεβού.
-          </p>
-        </div>
+        <Icon name="key" className="text-primary shrink-0" />
+        <p className="text-sm text-on-surface leading-relaxed">
+          Το email σας θα είναι το <strong>όνομα χρήστη</strong> και ο αριθμός του κινητού σας θα είναι ο{' '}
+          <strong>κωδικός</strong> για την είσοδό σας στην πλατφόρμα μας.
+        </p>
       </div>
       <label htmlFor="guest-phone" className="text-[0.7rem] font-black uppercase tracking-widest text-on-surface-variant/80">
-        Κινητό <span className="normal-case tracking-normal font-medium">(προαιρετικό)</span>
+        Κινητό <span className="text-error">*</span>
       </label>
       <div className="flex gap-2">
         <div className="relative shrink-0">
@@ -368,10 +320,14 @@ function PhoneField({
           className="min-w-0 flex-1 bg-surface-container-highest border-none rounded-xl px-4 py-4 font-medium text-on-surface focus:ring-2 focus:ring-primary/20 transition-all"
         />
       </div>
-      {invalid && (
+      {invalid ? (
         <p className="text-xs text-error flex items-center gap-1">
           <Icon name="error" size="sm" className="text-error" />
           {country === 'GR' ? 'Το κινητό ξεκινά από 69 και έχει 10 ψηφία' : 'Μη έγκυρος αριθμός κινητού'}
+        </p>
+      ) : (
+        <p className="text-xs text-on-surface-variant">
+          Τον αριθμό τον βλέπει μόνο το συνεργείο με το οποίο θα κλείσετε ραντεβού.
         </p>
       )}
     </div>

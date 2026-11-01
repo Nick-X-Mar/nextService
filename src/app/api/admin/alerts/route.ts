@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { QueryCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { getAdminFromRequest } from '@/utils/adminAuth'
 import { withMetrics } from '@/utils/withMetrics'
 import { createTtlCache } from '@/utils/ttlCache'
 import { ensurePaymentsTable } from '@/utils/ensurePaymentTables'
+import { ensureGarageSettlementsTable } from '@/utils/ensureLedgerTables'
 import { TABLES } from '@/lib/tables'
 
 /**
@@ -23,6 +24,8 @@ interface AdminAlerts {
   pendingGarages: number
   failedPayments: number
   openErrorGroups: number
+  /** Payments garages declared that nobody has checked against the bank. */
+  declaredSettlements: number
 }
 
 const cache = createTtlCache<AdminAlerts>(60_000)
@@ -31,7 +34,7 @@ async function compute(): Promise<AdminAlerts> {
   const paymentsTable = TABLES.Payments
   const errorsTable = TABLES.ErrorResolutions
 
-  const [garages, payments, errors] = await Promise.all([
+  const [garages, payments, errors, settlements] = await Promise.all([
     dynamoDB.send(new ScanCommand({
       TableName: TABLES.Garages,
       FilterExpression: 'attribute_not_exists(isActive) OR isActive = :false',
@@ -56,12 +59,24 @@ async function compute(): Promise<AdminAlerts> {
       ExpressionAttributeValues: { ':open': 'open' },
       Select: 'COUNT',
     })).catch(() => ({ Count: 0 })),
+
+    ensureGarageSettlementsTable()
+      .then(() => dynamoDB.send(new QueryCommand({
+        TableName: TABLES.GarageSettlements,
+        IndexName: 'StatusIndex',
+        KeyConditionExpression: '#s = :declared',
+        ExpressionAttributeNames: { '#s': 'status' },
+        ExpressionAttributeValues: { ':declared': 'declared' },
+        Select: 'COUNT',
+      })))
+      .catch(() => ({ Count: 0 })),
   ])
 
   return {
     pendingGarages: garages.Count ?? 0,
     failedPayments: payments.Count ?? 0,
     openErrorGroups: errors.Count ?? 0,
+    declaredSettlements: settlements.Count ?? 0,
   }
 }
 

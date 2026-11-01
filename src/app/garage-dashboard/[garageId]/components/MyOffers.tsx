@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { styles } from '@/styles/styles'
-import { OfferStatus } from '@/types/statuses'
+import { OfferStatus, ServiceRequestStatus } from '@/types/statuses'
 import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
 import { useNavigation } from '@/hooks/useNavigation'
@@ -11,6 +11,7 @@ import { isGarageInactive } from './garageInactive'
 import { formatAppointment, garageOfferState, offerStatusClass, offerStatusIcon, offerStatusLabel } from './offerStatus'
 import { clientDisplayName, clientInitials } from './clientLabel'
 import { PLUS_VAT } from '@/utils/vat'
+import { declineReasonLabel } from '@/types/declines'
 
 interface Offer {
   id: string
@@ -29,6 +30,7 @@ interface Offer {
     category: string
     status?: string
     acceptedOfferId?: string | null
+    finalAmounts?: { net: number; gross: number } | null
     /** First name only unless this garage won; may be empty altogether. */
     client: {
       firstName?: string
@@ -42,6 +44,30 @@ interface Offer {
   }
 }
 
+/** A request this garage said it cannot take (POST /api/garage/declines). */
+interface Decline {
+  requestId: string
+  reason: string
+  reasonText: string | null
+  declinedAt: string
+  serviceRequest: {
+    id: string
+    description?: string
+    category: string
+    client: { firstName?: string } | null
+    vehicle: { brand: string; model: string; year: number } | null
+  }
+}
+
+type Filter = 'all' | 'pending' | 'completed' | 'rejected'
+
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: 'all', label: 'Όλες' },
+  { value: 'pending', label: 'Εκκρεμείς' },
+  { value: 'completed', label: 'Ολοκληρωμένες' },
+  { value: 'rejected', label: 'Απορριφθείσες' },
+]
+
 interface MyOffersProps {
   garageId: string
   /** Called when the API says this garage is not (or no longer) approved. */
@@ -51,8 +77,9 @@ interface MyOffersProps {
 export default function MyOffers({ garageId, onInactive }: MyOffersProps) {
   const { navigate, isNavigating } = useNavigation()
   const [offers, setOffers] = useState<Offer[]>([])
+  const [declines, setDeclines] = useState<Decline[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | OfferStatus>('all')
+  const [filter, setFilter] = useState<Filter>('all')
 
   const loadOffers = useCallback(async () => {
     try {
@@ -67,6 +94,7 @@ export default function MyOffers({ garageId, onInactive }: MyOffersProps) {
       }
       if (response.ok && data.success) {
         setOffers(data.offers)
+        setDeclines(data.declines || [])
       } else {
         console.error('Error loading offers:', data.error)
         setOffers([])
@@ -90,17 +118,26 @@ export default function MyOffers({ garageId, onInactive }: MyOffersProps) {
   const stateOf = (o: Offer) => garageOfferState(o.status, o.serviceRequest, o.id)
   const isClosed = (state: ReturnType<typeof stateOf>) => state === OfferStatus.REJECTED || state === 'cancelled'
 
+  // A booking this garage carried out and has declared.
+  const isCompleted = (o: Offer) =>
+    o.status === OfferStatus.ACCEPTED && o.serviceRequest.status === ServiceRequestStatus.COMPLETED
+
   const filteredOffers = offers.filter(offer => {
-    // Exclude accepted offers with appointmentDate (they should be in Appointments tab)
+    if (isCompleted(offer)) return filter === 'all' || filter === 'completed'
+    // Bookings still ahead live in the Ραντεβού tab.
     if (offer.status === OfferStatus.ACCEPTED && offer.appointmentDate) {
       return false
     }
 
     if (filter === 'all') return true
+    if (filter === 'completed') return false
     const state = stateOf(offer)
-    // The "Απορρίφθηκε" chip collects every offer that is over without a booking.
-    return filter === OfferStatus.REJECTED ? isClosed(state) : state === filter
+    // "Απορριφθείσες" collects every offer that is over without a booking.
+    return filter === 'rejected' ? isClosed(state) : state === OfferStatus.PENDING
   })
+  // Requests the garage declined sit with the offers that went nowhere.
+  const filteredDeclines = filter === 'all' || filter === 'rejected' ? declines : []
+  const total = filteredOffers.length + filteredDeclines.length
 
   const requestsHref = `/garage-dashboard/${garageId}/?tab=requests`
 
@@ -121,13 +158,13 @@ export default function MyOffers({ garageId, onInactive }: MyOffersProps) {
           Οι Προσφορές μου
         </h2>
         <p className="text-base text-secondary leading-relaxed mt-1">
-          {filteredOffers.length === 1 ? '1 προσφορά' : `${filteredOffers.length} προσφορές`} συνολικά
+          {total === 1 ? '1 προσφορά' : `${total} προσφορές`} συνολικά
         </p>
       </div>
 
       {/* Filter Chips */}
       <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-        {(['all', OfferStatus.PENDING, OfferStatus.REJECTED] as const).map((status) => (
+        {FILTERS.map(({ value: status, label }) => (
           <button
             key={status}
             onClick={() => setFilter(status)}
@@ -136,13 +173,13 @@ export default function MyOffers({ garageId, onInactive }: MyOffersProps) {
               : 'bg-secondary-container text-on-secondary-container px-5 py-2 rounded-full text-sm font-bold whitespace-nowrap hover:bg-surface-container-high transition-colors cursor-pointer'
             }
           >
-            {status === 'all' ? 'Όλες' : offerStatusLabel(status)}
+            {label}
           </button>
         ))}
       </div>
 
       {/* Offers List */}
-      {filteredOffers.length === 0 ? (
+      {total === 0 ? (
         <article className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10">
           <div className="text-center py-8">
             <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mx-auto mb-4">
@@ -154,7 +191,7 @@ export default function MyOffers({ garageId, onInactive }: MyOffersProps) {
             <p className="text-base text-secondary leading-relaxed mb-4">
               {filter === 'all'
                 ? 'Δεν έχετε κάνει ακόμα καμία προσφορά.'
-                : `Δεν υπάρχουν προσφορές με κατάσταση «${offerStatusLabel(filter)}».`
+                : `Δεν υπάρχουν ${FILTERS.find((f) => f.value === filter)?.label.toLowerCase()} προσφορές.`
               }
             </p>
             {filter === 'all' && (
@@ -175,9 +212,13 @@ export default function MyOffers({ garageId, onInactive }: MyOffersProps) {
         <div className="space-y-4">
           {filteredOffers.map((offer) => {
             const href = offerHref(offer)
-            const price = typeof offer.appointmentPrice === 'number' ? offer.appointmentPrice : offer.offerAmount
+            const declaredNet = offer.serviceRequest.finalAmounts?.net
+            const price = typeof declaredNet === 'number'
+              ? declaredNet
+              : typeof offer.appointmentPrice === 'number' ? offer.appointmentPrice : offer.offerAmount
             const state = stateOf(offer)
             const closed = isClosed(state)
+            const completed = isCompleted(offer)
             return (
             <article
               key={offer.id}
@@ -192,8 +233,8 @@ export default function MyOffers({ garageId, onInactive }: MyOffersProps) {
             >
               {/* Status + Price row */}
               <div className="flex items-start justify-between mb-4">
-                <span className={offerStatusClass(state)}>
-                  {offerStatusLabel(state)}
+                <span className={completed ? styles.statusCompleted : offerStatusClass(state)}>
+                  {completed ? 'Ολοκληρώθηκε' : offerStatusLabel(state)}
                 </span>
                 <div className="text-right">
                   <p className="text-2xl font-black text-primary tracking-tight">
@@ -296,6 +337,37 @@ export default function MyOffers({ garageId, onInactive }: MyOffersProps) {
             </article>
             )
           })}
+          {filteredDeclines.map((decline) => (
+            <article
+              key={`decline-${decline.requestId}`}
+              data-testid="declined-request"
+              className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10 opacity-70"
+            >
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <span className={styles.statusCancelled}>Δεν αναλήφθηκε</span>
+                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
+                  {new Date(decline.declinedAt).toLocaleDateString('el-GR')}
+                </p>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-surface-container-low rounded-lg mb-3">
+                <Icon name="directions_car" size="sm" className="text-outline" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-on-surface truncate">
+                    {[decline.serviceRequest.vehicle?.brand, decline.serviceRequest.vehicle?.model, decline.serviceRequest.vehicle?.year]
+                      .filter(Boolean)
+                      .join(' ') || '-'}
+                  </p>
+                  <p className="text-xs text-secondary truncate">
+                    {getCategoryText(decline.serviceRequest.category)} · {clientDisplayName(decline.serviceRequest.client)}
+                  </p>
+                </div>
+              </div>
+              <p className="text-sm text-on-surface-variant">
+                <span className="font-bold text-on-surface">Λόγος: </span>
+                {declineReasonLabel(decline.reason, decline.reasonText ?? undefined)}
+              </p>
+            </article>
+          ))}
         </div>
       )}
     </div>

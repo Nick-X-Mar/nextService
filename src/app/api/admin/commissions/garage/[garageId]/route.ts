@@ -13,7 +13,9 @@ import {
   type OutcomeReviewStatus,
 } from '@/lib/commission-basis'
 import { athensToday } from '@/utils/athensTime'
-import type { CompletionAmounts } from '@/types/reviews'
+import { completionReasonLabel, type ClientConfirmation, type CompletionAmounts, type CompletionReason } from '@/types/reviews'
+import { garageLedger } from '@/utils/garageLedger'
+import type { LedgerTotals, Settlement } from '@/types/settlements'
 import { billedJobsForMonth } from '../../billedJobs'
 import { TABLES } from '@/lib/tables'
 
@@ -40,6 +42,10 @@ interface AppointmentRow {
   rateSource: CommissionRateSource
   /** The appointment day came and the garage has not declared: billed on the agreed price meanwhile. */
   undeclared: boolean
+  /** Why the garage charged less than it quoted. */
+  reason: string | null
+  /** The client's word on the declaration, from their Πληρωμές page. */
+  clientConfirmation: Omit<ClientConfirmation, 'at'> | null
 }
 
 /** A job the garage closed as not having happened — to check with the client. */
@@ -60,6 +66,10 @@ interface FlaggedRow {
   /** What the job bills if the claim is rejected: the quote's net at the job's rate. */
   commissionIfBilled: number
   reviewStatus: OutcomeReviewStatus
+  /** Why it did not happen, picked by the garage. */
+  reason: string | null
+  /** Whether the client agrees it did not happen. */
+  clientConfirmation: Omit<ClientConfirmation, 'at'> | null
   reviewedAt?: string
   reviewedBy?: string
   reviewNote?: string
@@ -82,6 +92,18 @@ interface GarageCommissionsResponse {
   }
   appointments: AppointmentRow[]
   flagged: FlaggedRow[]
+  /** All time, not just this month: what the garage owes and what it says it paid. */
+  ledger: { totals: LedgerTotals; settlements: Settlement[] }
+}
+
+function confirmationOf(r: Record<string, unknown>): Omit<ClientConfirmation, 'at'> | null {
+  const c = r.clientConfirmation as ClientConfirmation | undefined
+  if (!c) return null
+  return {
+    status: c.status,
+    ...(typeof c.amountPaid === 'number' ? { amountPaid: c.amountPaid } : {}),
+    ...(c.note ? { note: c.note } : {}),
+  }
 }
 
 function isValidMonth(value: string | null): value is string {
@@ -107,7 +129,10 @@ async function _GET(
     const monthParam = searchParams.get('month')
     const month = isValidMonth(monthParam) ? monthParam : currentMonth()
 
-    const { jobs, flagged, garages } = await billedJobsForMonth(month, garageId)
+    const [{ jobs, flagged, garages }, ledger] = await Promise.all([
+      billedJobsForMonth(month, garageId),
+      garageLedger(garageId),
+    ])
     const garage = garages.get(garageId)
     const garageName = (garage?.companyName as string) || (garage?.email as string) || garageId
     const garageRequests = jobs.map((job) => ({ r: job.request, line: job.line, percent: job.percent, rateSource: job.rateSource, undeclared: job.undeclared }))
@@ -184,6 +209,8 @@ async function _GET(
         commissionPercent: percent,
         rateSource,
         undeclared,
+        reason: completionReasonLabel(r.completionReason as CompletionReason | undefined),
+        clientConfirmation: confirmationOf(r),
       }
     })
 
@@ -205,6 +232,8 @@ async function _GET(
         appointmentPrice: roundCents(typeof r.appointmentPrice === 'number' ? r.appointmentPrice : 0),
         commissionIfBilled: roundCents(roundCents(quoteNet) * (percent / 100)),
         reviewStatus,
+        reason: completionReasonLabel(r.completionReason as CompletionReason | undefined),
+        clientConfirmation: confirmationOf(r),
         ...(review?.reviewedAt ? { reviewedAt: review.reviewedAt } : {}),
         ...(review?.reviewedBy ? { reviewedBy: review.reviewedBy } : {}),
         ...(review?.note ? { reviewNote: review.note } : {}),
@@ -235,6 +264,7 @@ async function _GET(
       },
       appointments,
       flagged: flaggedRows,
+      ledger: { totals: ledger.totals, settlements: ledger.settlements },
     }
 
     return NextResponse.json(response)

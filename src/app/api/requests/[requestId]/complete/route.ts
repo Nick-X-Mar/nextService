@@ -14,9 +14,12 @@ import { createReview, DuplicateReviewError } from '@/utils/reviewService'
 import { DECLARABLE_VAT_RATES, garageCommissionPercent } from '@/lib/commission-basis'
 import {
   DEFAULT_VAT_RATE,
+  LOWER_AMOUNT_REASONS,
+  NOT_DONE_REASONS,
   isCompletionDue,
   splitVat,
   type CompletionOutcome,
+  type CompletionReason,
 } from '@/types/reviews'
 import { TABLES } from '@/lib/tables'
 
@@ -38,6 +41,19 @@ import { TABLES } from '@/lib/tables'
 const checkRate = createRateLimiter('request-complete', 30, 3600000)
 
 const OUTCOMES: CompletionOutcome[] = ['completed', 'no_show', 'not_done']
+
+/** `{ code, text }` from the body when the code is on `list`, else null. */
+function parseReason(
+  raw: unknown,
+  list: readonly { code: string }[]
+): { code: string; text?: string } | null {
+  if (!raw || typeof raw !== 'object') return null
+  const { code, text } = raw as { code?: unknown; text?: unknown }
+  if (typeof code !== 'string' || !list.some((r) => r.code === code)) return null
+  const trimmed = typeof text === 'string' ? text.trim().slice(0, 500) : ''
+  if (code === 'other' && !trimmed) return null
+  return { code, ...(code === 'other' ? { text: trimmed } : {}) }
+}
 
 /**
  * Which garage owns this appointment.
@@ -93,6 +109,18 @@ async function _POST(
       return NextResponse.json({ error: 'Δήλωσε αν έγινε η εργασία.' }, { status: 400 })
     }
     const outcome: CompletionOutcome = body.outcome
+
+    // A job that did not happen says why, from the form's list; the reason
+    // must match the outcome (only "δεν ήρθε" is a no-show).
+    let reason: CompletionReason | null = null
+    if (outcome !== 'completed') {
+      const parsed = parseReason(body.reason, NOT_DONE_REASONS)
+      const def = NOT_DONE_REASONS.find((r) => r.code === parsed?.code)
+      if (!parsed || !def || def.outcome !== outcome) {
+        return NextResponse.json({ error: 'Διάλεξε τον λόγο που δεν έγινε η εργασία.' }, { status: 400 })
+      }
+      reason = { kind: 'not_done', ...parsed }
+    }
 
     const res = await dynamoDB.send(
       new GetCommand({ TableName: TABLES.ServiceRequests, Key: { id: requestId } })
@@ -156,6 +184,19 @@ async function _POST(
           { status: 400 }
         )
       }
+      // Less than the quote (which is net): the garage says why. Commission
+      // follows the declared figure, so this is what an admin checks it by.
+      const quoted = serviceRequest.appointmentPrice
+      if (typeof quoted === 'number' && amounts.net < quoted - 0.005) {
+        const parsed = parseReason(body.reason, LOWER_AMOUNT_REASONS)
+        if (!parsed) {
+          return NextResponse.json(
+            { error: 'Το ποσό είναι μικρότερο από την προσφορά. Διάλεξε τον λόγο.' },
+            { status: 400 }
+          )
+        }
+        reason = { kind: 'lower_amount', ...parsed }
+      }
     }
 
     const now = new Date().toISOString()
@@ -183,6 +224,7 @@ async function _POST(
             // before the commission is waived (admin → Προμήθειες).
             (outcome === 'completed' ? '' : ', outcomeReview = :review') +
             (amounts ? ', finalAmounts = :amounts' : '') +
+            (reason ? ', completionReason = :reason' : '') +
             (notes ? ', completionNotes = :notes' : ''),
           // Re-checked at write time: two tabs, or a retry after a slow
           // response, must not both succeed.
@@ -198,6 +240,7 @@ async function _POST(
             ':rate': commissionPercent,
             ...(outcome === 'completed' ? {} : { ':review': { status: 'pending' } }),
             ...(amounts ? { ':amounts': amounts } : {}),
+            ...(reason ? { ':reason': reason } : {}),
             ...(notes ? { ':notes': notes } : {}),
           },
         })
@@ -239,6 +282,7 @@ async function _POST(
       clientId: serviceRequest.clientId,
       metadata: {
         outcome,
+        ...(reason ? { reason: reason.code } : {}),
         ...(amounts ? { net: amounts.net, gross: amounts.gross, vatRate: amounts.vatRate } : {}),
         quotedPrice: serviceRequest.appointmentPrice,
       },

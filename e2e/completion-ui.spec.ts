@@ -88,9 +88,10 @@ test('A garage closes a past appointment from the dashboard and the client revie
   const modal = page.getByRole('heading', { name: 'Ολοκλήρωση εργασίας' })
   await expect(modal).toBeVisible()
 
-  // The quoted price is pre-filled, net of VAT as garages quote; the garage
-  // overrides it with what it took.
-  const amount = page.getByPlaceholder('0.00')
+  // It happened, for a different amount than the quote: the garage types
+  // the final figure, net of VAT as garages quote.
+  await page.getByRole('button', { name: 'Όχι, άλλο ποσό' }).click()
+  const amount = page.getByLabel('Τελικό ποσό χωρίς ΦΠΑ')
   await amount.fill('200')
 
   // The net/VAT split is shown live — that is the number commission uses.

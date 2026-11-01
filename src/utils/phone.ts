@@ -71,6 +71,42 @@ export function toE164(iso: string, typed: string): string | null {
   return isValidPhoneNumber(e164) ? e164 : null
 }
 
+/** The calling code an E.164 number starts with (the longest one that fits). */
+function dialPrefix(digits: string): string | undefined {
+  let best: string | undefined
+  for (const c of countryList()) {
+    if (digits.startsWith(c.dial) && (!best || c.dial.length > best.length)) best = c.dial
+  }
+  return best
+}
+
+/**
+ * The number without its calling code (`+306912345678` → `6912345678`). A client
+ * who signs up through the request form has this as their password.
+ */
+export function nationalNumber(e164: string): string {
+  const digits = e164.replace(/\D/g, '')
+  const dial = dialPrefix(digits)
+  return dial ? digits.slice(dial.length) : digits
+}
+
+/**
+ * What a typed password could be if it is that mobile written another way:
+ * with spaces, a `+30`/`0030` in front or a leading 0. Empty for anything that
+ * isn't phone-shaped, so an ordinary password costs no extra hash compare.
+ */
+export function phonePasswordCandidates(typed: string): string[] {
+  if (!/^[\d\s+().-]{6,30}$/.test(typed)) return []
+  let digits = typed.replace(/\D/g, '')
+  if (digits.startsWith('00')) digits = digits.slice(2)
+  const found = new Set<string>([digits.replace(/^0+/, '')])
+  const dial = dialPrefix(digits)
+  if (dial && digits.length - dial.length >= 6) found.add(digits.slice(dial.length))
+  found.delete(typed)
+  found.delete('')
+  return [...found]
+}
+
 /** E.164, and for Greece a real mobile (69 + 8 digits). */
 export function isValidPhoneNumber(value: string): boolean {
   if (!/^\+[1-9]\d{7,14}$/.test(value)) return false

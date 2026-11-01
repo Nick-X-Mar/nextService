@@ -15,6 +15,8 @@ interface GarageData {
   email: string
   mobile: string
   address: string
+  area?: string
+  municipality?: string
   tin: string
   taxAuthority: string
   description?: string
@@ -110,6 +112,9 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
     { icon: 'mail', label: 'EMAIL', field: 'email' as keyof GarageData, placeholder: 'info@garage.gr', required: true, type: 'email' },
     { icon: 'phone', label: 'ΤΗΛΕΦΩΝΟ', field: 'mobile' as keyof GarageData, placeholder: '+306984959044', required: true },
     { icon: 'location_on', label: 'ΔΙΕΥΘΥΝΣΗ', field: 'address' as keyof GarageData, placeholder: 'Λεωφόρος Πατησίων 123, Αθήνα', required: true, fullWidth: true },
+    { icon: 'map', label: 'ΠΕΡΙΟΧΗ', field: 'area' as keyof GarageData, placeholder: 'Κυψέλη', required: true },
+    // The only part of the location a client sees before booking.
+    { icon: 'location_city', label: 'ΔΗΜΟΣ', field: 'municipality' as keyof GarageData, placeholder: 'Δήμος Αθηναίων', required: true },
     { icon: 'account_balance', label: 'ΔΟΥ', field: 'taxAuthority' as keyof GarageData, placeholder: 'ΔΟΥ Αθηνών', required: true },
     // These two drive the hourly availability grid on every offer: the rows of
     // that grid are the hours between them. Shown to the customer too, so

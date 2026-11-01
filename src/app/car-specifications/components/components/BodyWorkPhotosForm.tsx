@@ -12,7 +12,7 @@ import { compressImages } from '@/utils/imageCompression'
 import { getCategoryText } from '@/utils/categoryLabels'
 import { useFileDrop } from '@/hooks/useFileDrop'
 import EstimatedCostCard from './EstimatedCostCard'
-import GuestAccountFields, { useGuestAccount } from './GuestAccount'
+import GuestAccountFields, { GuestTermsCheckbox, useGuestAccount } from './GuestAccount'
 import Image from 'next/image'
 import { track } from '@/lib/track'
 
@@ -202,7 +202,7 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
   }
 
   return (
-    <section className="pb-40 pt-8">
+    <section className="pb-52 pt-8">
       <div className="max-w-lg mx-auto px-5">
         {/* Step progress indicator - 4 bars */}
         <div className="flex gap-2 mb-6">
@@ -249,7 +249,7 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
         {/* Main form area */}
         <div className="mt-6 space-y-6">
 
-          {/* Email & Password for guest users — bodywork used to have none, so a
+          {/* Email & mobile for guest users — bodywork used to have none, so a
               guest could never actually send one. */}
           <GuestAccountFields account={account} />
 
@@ -377,6 +377,8 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
             back link. */}
         <div className="fixed bottom-20 md:bottom-0 left-0 right-0 bg-surface/80 backdrop-blur-xl border-t border-outline-variant/10 px-5 pt-4 pb-4 md:pb-8 z-40">
           <div className="max-w-lg mx-auto">
+            <GuestTermsCheckbox account={account} className="mb-3" />
+
             {/* CTA Button */}
             <GearSubmitButton
               onClick={handleSubmit}

@@ -39,7 +39,9 @@ interface Offer {
 interface GarageSummary {
   id: string
   companyName?: string
+  /** Only for the booked garage's "Οδηγίες" link; offers show the municipality. */
   address?: string
+  municipality?: string
   mobile?: string
   /** e.g. "09:00" — when the shop opens, so a date isn't just a bare day. */
   workdayStartTime?: string
@@ -223,19 +225,6 @@ export default function RequestDetailsContent({
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(numericValue)
-  }
-
-  const getGarageAreaText = (address?: string | null) => {
-    if (!address) {
-      return 'Δεν έχει δηλωθεί'
-    }
-
-    const parts = address.split(',').map((part) => part.trim()).filter(Boolean)
-    if (parts.length === 0) {
-      return address
-    }
-
-    return parts[parts.length - 1]
   }
 
   const parseDateString = (dateString: string): Date | null => {
@@ -678,6 +667,7 @@ export default function RequestDetailsContent({
               id: garageData?.garage?.id ?? offer.garageId,
               companyName: garageData?.garage?.companyName,
               address: garageData?.garage?.address,
+              municipality: garageData?.garage?.municipality,
               mobile: garageData?.garage?.mobile,
               workdayStartTime: garageData?.garage?.workdayStartTime,
               benefits: normalizedBenefits
@@ -1037,7 +1027,7 @@ export default function RequestDetailsContent({
                         )}
                         <p className="text-sm text-on-surface-variant mt-1 flex items-center gap-1">
                           <Icon name="location_on" size="sm" />
-                          {getGarageAreaText(offer.garage?.address)}
+                          {offer.garage?.municipality || 'Δεν έχει δηλωθεί'}
                         </p>
                       </div>
                       <div className="text-right flex items-start justify-end gap-2">

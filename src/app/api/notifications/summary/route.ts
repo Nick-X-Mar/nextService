@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { garageDeclines } from '@/utils/requestDeclines'
 import { requireAuth, requireActiveGarage } from '@/utils/requireAuth'
 import { withMetrics } from '@/utils/withMetrics'
 import { unreadCache, unreadCacheKey, pendingMarket } from '@/utils/unreadCache'
@@ -184,6 +185,28 @@ async function computeForClient(clientId: string): Promise<NotificationSummary> 
     }
   }
 
+  // The garage has said how the job went; the client's word on it is missing.
+  // Asked for in the same window as the review, then left alone.
+  for (const req of ws.requests) {
+    if (req.status !== ServiceRequestStatus.COMPLETED || req.clientConfirmation) continue
+    if (!withinReviewWindow(req.completedAt)) continue
+    const vehicle = labelOf(req)
+    const gross = (req.finalAmounts as { gross?: number } | undefined)?.gross
+    const notDone = req.completionOutcome === 'no_show' || req.completionOutcome === 'not_done'
+    alerts.push({
+      id: `client-confirm-${req.id}`,
+      kind: 'job-confirm',
+      severity: 'info',
+      icon: 'receipt_long',
+      title: notDone ? 'Το συνεργείο δήλωσε ότι η εργασία δεν έγινε' : 'Επιβεβαίωσε τη χρέωση',
+      detail: [vehicle, notDone ? 'Ισχύει;' : typeof gross === 'number' ? `${gross.toFixed(2)}€ με ΦΠΑ` : undefined]
+        .filter(Boolean)
+        .join(' — ') || undefined,
+      href: `${base}/payments/`,
+      cta: 'Επιβεβαίωση',
+    })
+  }
+
   return {
     threads,
     appointmentThreads,
@@ -200,24 +223,31 @@ async function computeForClient(clientId: string): Promise<NotificationSummary> 
 type DraftAlert = Alert & { labelFor?: string }
 
 async function computeForGarage(garageId: string): Promise<NotificationSummary> {
-  const [ws, market] = await Promise.all([
+  const [ws, market, declines] = await Promise.all([
     loadGarageWorkspace(garageId, { scope: 'summary' }),
     // Every open request in the market, shared across garages — see pendingMarket.
     pendingMarket(),
+    garageDeclines(garageId),
   ])
 
   const { offers, requests } = ws
 
-  // Requests this garage has already answered drop out of the badge, exactly as
-  // they drop out of the feed.
-  const answered = new Set(offers.map((o) => o.serviceRequestId as string))
+  // Requests this garage has already answered — quoted or declined — drop out
+  // of the badge, exactly as they drop out of the feed.
+  const answered = new Set([
+    ...offers.map((o) => o.serviceRequestId as string),
+    ...declines.map((d) => d.requestId),
+  ])
   const availableRequestIds = market.ids.filter((id) => !answered.has(id))
   // Bids on requests the snapshot may not hold yet, so the browser — which
   // learned of them over realtime — can drop them too.
   const answeredAfter = new Date(market.asOf).getTime() - MARKET_SNAPSHOT_MARGIN_MS
-  const recentlyAnsweredIds = offers
-    .filter((o) => typeof o.createdAt !== 'string' || new Date(o.createdAt).getTime() > answeredAfter)
-    .map((o) => o.serviceRequestId as string)
+  const recentlyAnsweredIds = [
+    ...offers.map((o) => ({ at: o.createdAt, id: o.serviceRequestId as string })),
+    ...declines.map((d) => ({ at: d.createdAt, id: d.requestId })),
+  ]
+    .filter((a) => typeof a.at !== 'string' || new Date(a.at).getTime() > answeredAfter)
+    .map((a) => a.id)
     .filter((id) => !!id)
 
   const base = `/garage-dashboard/${garageId}`

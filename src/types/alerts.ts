@@ -22,6 +22,8 @@ export interface Alert {
     | 'completion-due'
     /** Either side: the job is closed and their review is still missing. */
     | 'review-due'
+    /** Client: the garage closed the job; is what it declared right? */
+    | 'job-confirm'
   /** Drives colour only: info reads calm, action asks for a decision, urgent is time-boxed. */
   severity: 'info' | 'action' | 'urgent'
   /** Material Symbols glyph name. */

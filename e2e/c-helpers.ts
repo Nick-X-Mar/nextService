@@ -134,6 +134,8 @@ export async function registerPendingGarage(request: APIRequestContext) {
       password: 'TestPass123',
       taxAuthority: 'ΔΟΥ Αθηνών',
       address: 'Πατησίων 1, Αθήνα',
+      area: 'Κυψέλη',
+      municipality: 'Δήμος Αθηναίων',
       mobile: `69${String(stamp).slice(-8)}`,
       acceptedTerms: true,
     },

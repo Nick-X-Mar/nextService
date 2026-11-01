@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { QueryCommand } from '@aws-sdk/lib-dynamodb'
-import { verifyPassword } from '@/utils/passwordService'
+import { verifyAccountPassword } from '@/utils/passwordService'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { signToken, setAuthCookie } from '@/utils/auth'
@@ -87,7 +87,7 @@ async function _POST(request: NextRequest) {
       return invalidCredentials
     }
 
-    const passwordValid = await verifyPassword(password, user.passwordHash)
+    const passwordValid = await verifyAccountPassword(password, user.passwordHash)
     if (!passwordValid) {
       return invalidCredentials
     }

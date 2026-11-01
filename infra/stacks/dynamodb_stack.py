@@ -388,6 +388,26 @@ class DynamoDBStack(Stack):
             ],
         )
 
+        # Made by the stack from the start (not imported). One row per garage
+        # per request it said it cannot take — the key makes a second one
+        # structurally impossible.
+        self.request_declines_table = self._app_table(
+            "RequestDeclinesTable", "RequestDeclines", ("declineId", S),
+            indexes=[
+                ("GarageDeclinesIndex", ("garageId", S), ("createdAt", S)),
+                ("RequestDeclinesIndex", ("requestId", S), ("createdAt", S)),
+            ],
+        )
+        # What a garage says it paid NextService towards its commission, and
+        # whether an admin has matched it to the bank.
+        self.garage_settlements_table = self._app_table(
+            "GarageSettlementsTable", "GarageSettlements", ("settlementId", S),
+            indexes=[
+                ("GarageSettlementsIndex", ("garageId", S), ("createdAt", S)),
+                ("StatusIndex", ("status", S), ("createdAt", S)),
+            ],
+        )
+
         # ── Outputs ─────────────────────────────────────────────
         tables = {
             "Clients": self.clients_table,

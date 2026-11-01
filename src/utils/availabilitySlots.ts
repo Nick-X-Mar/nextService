@@ -98,10 +98,8 @@ export function sanitizeSlots(
  * Gives every date that has no slot entry the garage's whole working day.
  *
  * No entry means "book by day, no hour" (see `slotsForDate`) — right for an
- * offer made before slots existed, wrong for a new one: the grid showed the
- * garage every hour as open, and leaving it untouched means exactly that. Sent
- * as-is, the client would book a day with no hour, contradicting the "pick one
- * of the available hours" the garage was promised.
+ * offer made before slots existed, wrong for a new one. The admin assign route
+ * has no grid, so it offers the garage's whole working day.
  */
 export function fillMissingSlots(
   slots: AvailabilitySlots,
@@ -141,14 +139,6 @@ export function parseAvailabilityDates(
     return { error: 'Μία ή περισσότερες ημερομηνίες έχουν ήδη περάσει' }
   }
   return { dates }
-}
-
-/** Dates the garage kept but left with no bookable hour. */
-export function datesWithNoHours(
-  slots: AvailabilitySlots,
-  dates: string[]
-): string[] {
-  return dates.filter((d) => Array.isArray(slots[d]) && slots[d].length === 0)
 }
 
 /** Is `time` bookable on `date` for this offer? */
