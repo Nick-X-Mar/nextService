@@ -3,6 +3,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { ensureEmailLogsTable } from '@/utils/ensureEventTables'
 import { ServiceRequestStatus } from '@/types/statuses'
+import { collectAll } from '@/utils/pagination'
 import { withMetrics } from '@/utils/withMetrics'
 import { TABLES } from '@/lib/tables'
 
@@ -20,6 +21,8 @@ async function _GET() {
       emailsSentResult,
       emailsFailedResult,
       customVehiclesResult,
+      pendingRequests,
+      offerRows,
       ...statusResults
     ] = await Promise.all([
       // Total clients
@@ -51,6 +54,21 @@ async function _GET() {
         ExpressionAttributeValues: { ':true': true },
         Select: 'COUNT'
       })),
+      // Pending requests and which requests have offers, for "no offers yet"
+      collectAll<{ id: string }>((startKey) => dynamoDB.send(new QueryCommand({
+        TableName: TABLES.ServiceRequests,
+        IndexName: 'StatusIndex',
+        KeyConditionExpression: '#status = :status',
+        ExpressionAttributeNames: { '#status': 'status' },
+        ExpressionAttributeValues: { ':status': ServiceRequestStatus.PENDING },
+        ProjectionExpression: 'id',
+        ExclusiveStartKey: startKey,
+      })) as Promise<{ Items?: { id: string }[]; LastEvaluatedKey?: Record<string, unknown> }>, 'dashboard pending requests'),
+      collectAll<{ serviceRequestId: string }>((startKey) => dynamoDB.send(new ScanCommand({
+        TableName: TABLES.Offers,
+        ProjectionExpression: 'serviceRequestId',
+        ExclusiveStartKey: startKey,
+      })) as Promise<{ Items?: { serviceRequestId: string }[]; LastEvaluatedKey?: Record<string, unknown> }>, 'dashboard offers'),
       // Service requests by status
       ...Object.values(ServiceRequestStatus).map((status) =>
         dynamoDB.send(new QueryCommand({
@@ -76,6 +94,8 @@ async function _GET() {
       totalRequests += count
     })
 
+    const quoted = new Set(offerRows.map((o) => o.serviceRequestId))
+
     return NextResponse.json({
       totalClients: clientsResult.Count || 0,
       totalGarages: garages.length,
@@ -85,6 +105,7 @@ async function _GET() {
       emailsFailed24h: emailsFailedResult.Count || 0,
       requestsByStatus,
       totalRequests,
+      pendingNoOffers: pendingRequests.filter((r) => !quoted.has(r.id)).length,
       customVehicles: customVehiclesResult.Count || 0
     })
   } catch (error) {

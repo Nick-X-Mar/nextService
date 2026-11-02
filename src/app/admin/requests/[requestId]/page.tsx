@@ -10,6 +10,7 @@ import 'react-day-picker/dist/style.css'
 import RequestTimeline from './components/RequestTimeline'
 import Spinner from '@/components/Spinner'
 import { isCommissionable } from '@/lib/commission-basis'
+import { completionReasonLabel, type ClientConfirmation, type CompletionReason } from '@/types/reviews'
 import { useConfirm } from '@/hooks/useConfirm'
 import { useToast } from '@/hooks/useToast'
 
@@ -31,6 +32,8 @@ interface RequestDetail {
   completedBy?: 'garage' | 'admin'
   completionOutcome?: 'completed' | 'no_show' | 'not_done'
   completionNotes?: string
+  completionReason?: CompletionReason
+  clientConfirmation?: ClientConfirmation
   completionPromptedAt?: string
   finalAmounts?: { gross: number; net: number; vat: number; vatRate: number }
   photoUrls: string[]
@@ -40,14 +43,20 @@ interface RequestDetail {
     lastName: string
     email: string
     phoneNumber: string
+    address?: string
   } | null
   vehicle: {
     brand: string
     model: string
-    year: string
+    nickname?: string
+    modelYear: string
     licensePlate: string
+    vinNumber?: string
+    engineNumber?: string
+    color?: string
     engineCC?: string
     fuelType?: string
+    licensePhotoUrl?: string
     is4x4?: boolean
     isAutomatic?: boolean
     isTurbo?: boolean
@@ -56,9 +65,29 @@ interface RequestDetail {
     id: string
     garageId: string
     garageName: string
-    price: number
-    message: string
+    offerAmount: number
+    benefits: string[]
+    availabilityDates: string[]
+    clientAvailabilityDates: string[]
     status: string
+    createdAt: string
+  }>
+  threads: Array<{
+    garageId: string
+    garageName: string
+    messages: Array<{
+      id: string
+      senderType: string
+      senderName?: string
+      message: string
+      timestamp: string
+      attachments: string[]
+    }>
+  }>
+  declines: Array<{
+    garageId: string
+    garageName: string
+    reason: string
     createdAt: string
   }>
 }
@@ -319,6 +348,19 @@ export default function RequestDetailPage() {
               </p>
             )}
 
+            {completionReasonLabel(data.completionReason) && (
+              <p className="text-sm text-green-900 mt-3">
+                <span className="font-medium">Λόγος:</span> {completionReasonLabel(data.completionReason)}
+              </p>
+            )}
+            {data.clientConfirmation && (
+              <p className="text-sm text-green-900 mt-1">
+                <span className="font-medium">Ο πελάτης:</span>{' '}
+                {data.clientConfirmation.status === 'confirmed' ? 'επιβεβαίωσε' : 'διαφώνησε'}
+                {data.clientConfirmation.amountPaid !== undefined ? ` · πλήρωσε ${data.clientConfirmation.amountPaid}€` : ''}
+                {data.clientConfirmation.note ? ` · ${data.clientConfirmation.note}` : ''}
+              </p>
+            )}
             {data.completionNotes && (
               <p className="text-sm text-green-900 mt-3 whitespace-pre-wrap">
                 {data.completionNotes}
@@ -389,6 +431,12 @@ export default function RequestDetailPage() {
                 <span className="text-xs text-on-surface/50">Τηλέφωνο</span>
                 <span className="text-sm text-on-surface">{data.client.phoneNumber || '-'}</span>
               </div>
+              {data.client.address && (
+                <div className="flex justify-between gap-4">
+                  <span className="text-xs text-on-surface/50">Διεύθυνση</span>
+                  <span className="text-sm text-on-surface text-right">{data.client.address}</span>
+                </div>
+              )}
               <button
                 onClick={() => router.push(`/admin/users/${data.client!.id}/`)}
                 className="text-xs text-primary hover:underline mt-1"
@@ -413,14 +461,38 @@ export default function RequestDetailPage() {
                 <span className="text-xs text-on-surface/50">Μάρκα / Μοντέλο</span>
                 <span className="text-sm text-on-surface">{data.vehicle.brand} {data.vehicle.model}</span>
               </div>
+              {data.vehicle.nickname && (
+                <div className="flex justify-between">
+                  <span className="text-xs text-on-surface/50">Όνομα οχήματος</span>
+                  <span className="text-sm text-on-surface">{data.vehicle.nickname}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-xs text-on-surface/50">Έτος</span>
-                <span className="text-sm text-on-surface">{data.vehicle.year || '-'}</span>
+                <span className="text-sm text-on-surface">{data.vehicle.modelYear || '-'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-xs text-on-surface/50">Πινακίδα</span>
                 <span className="text-sm text-on-surface font-mono">{data.vehicle.licensePlate || '-'}</span>
               </div>
+              {data.vehicle.vinNumber && (
+                <div className="flex justify-between gap-4">
+                  <span className="text-xs text-on-surface/50">VIN</span>
+                  <span className="text-sm text-on-surface font-mono break-all text-right">{data.vehicle.vinNumber}</span>
+                </div>
+              )}
+              {data.vehicle.engineNumber && (
+                <div className="flex justify-between gap-4">
+                  <span className="text-xs text-on-surface/50">Αριθμός κινητήρα</span>
+                  <span className="text-sm text-on-surface font-mono break-all text-right">{data.vehicle.engineNumber}</span>
+                </div>
+              )}
+              {data.vehicle.color && (
+                <div className="flex justify-between">
+                  <span className="text-xs text-on-surface/50">Χρώμα</span>
+                  <span className="text-sm text-on-surface">{data.vehicle.color}</span>
+                </div>
+              )}
               {data.vehicle.engineCC && (
                 <div className="flex justify-between">
                   <span className="text-xs text-on-surface/50">Κυβικά</span>
@@ -438,6 +510,16 @@ export default function RequestDetailPage() {
                 {data.vehicle.isAutomatic && <span className="text-xs bg-surface-container-high text-on-surface/60 px-2 py-0.5 rounded">Αυτόματο</span>}
                 {data.vehicle.isTurbo && <span className="text-xs bg-surface-container-high text-on-surface/60 px-2 py-0.5 rounded">Turbo</span>}
               </div>
+              {data.vehicle.licensePhotoUrl && (
+                <a
+                  href={data.vehicle.licensePhotoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block text-xs text-primary hover:underline mt-1"
+                >
+                  Φωτογραφία άδειας →
+                </a>
+              )}
             </div>
           ) : (
             <p className="text-sm text-on-surface/50">Μη διαθέσιμα στοιχεία</p>
@@ -496,10 +578,16 @@ export default function RequestDetailPage() {
                       </span>
                     )}
                   </div>
-                  <span className="text-lg font-bold text-on-surface">{offer.price}€</span>
+                  <span className="text-lg font-bold text-on-surface">{offer.offerAmount}€ + ΦΠΑ</span>
                 </div>
-                {offer.message && (
-                  <p className="text-sm text-on-surface/70 whitespace-pre-wrap">{offer.message}</p>
+                {offer.benefits.length > 0 && (
+                  <p className="text-sm text-on-surface/70">{offer.benefits.join(' · ')}</p>
+                )}
+                {offer.availabilityDates.length > 0 && (
+                  <p className="text-xs text-on-surface/60 mt-1">Διαθεσιμότητα συνεργείου: {offer.availabilityDates.join(', ')}</p>
+                )}
+                {offer.clientAvailabilityDates.length > 0 && (
+                  <p className="text-xs text-on-surface/60 mt-1">Προτάσεις πελάτη: {offer.clientAvailabilityDates.join(', ')}</p>
                 )}
                 <p className="text-xs text-on-surface/40 mt-1">
                   {new Date(offer.createdAt).toLocaleString('el-GR')}
@@ -509,6 +597,79 @@ export default function RequestDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Conversations */}
+      <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 overflow-hidden mt-6" data-testid="admin-threads">
+        <div className="px-5 py-3 border-b border-outline-variant/20">
+          <h2 className="text-sm font-semibold text-on-surface flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px] text-primary">forum</span>
+            Συνομιλίες ({data.threads.length})
+          </h2>
+        </div>
+        {data.threads.length === 0 ? (
+          <p className="px-5 py-6 text-sm text-on-surface/50 text-center">Δεν έχει γραφτεί κανένα μήνυμα</p>
+        ) : (
+          <div className="divide-y divide-outline-variant/10">
+            {data.threads.map((thread) => (
+              <div key={thread.garageId || 'legacy'} className="px-5 py-4">
+                <p className="text-sm font-medium text-on-surface mb-3">
+                  {thread.garageName}
+                  <span className="text-xs font-normal text-on-surface/50"> · {thread.messages.length} μηνύματα</span>
+                </p>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {thread.messages.map((message) => {
+                    const fromGarage = message.senderType === 'garage'
+                    return (
+                      <div key={message.id} className={`flex ${fromGarage ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[85%] rounded-xl px-3 py-2 ${fromGarage ? 'bg-primary-fixed' : 'bg-surface-container'}`}>
+                          <p className="text-xs text-on-surface/60 mb-0.5">
+                            {fromGarage ? 'Συνεργείο' : 'Πελάτης'} · {new Date(message.timestamp).toLocaleString('el-GR')}
+                          </p>
+                          {message.message && (
+                            <p className="text-sm text-on-surface whitespace-pre-wrap break-words">{message.message}</p>
+                          )}
+                          {message.attachments.map((url, i) => (
+                            <a
+                              key={url}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block text-xs text-primary hover:underline mt-1"
+                            >
+                              Συνημμένο {i + 1} →
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Garages that passed on the request */}
+      {data.declines.length > 0 && (
+        <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 overflow-hidden mt-6" data-testid="admin-declines">
+          <div className="px-5 py-3 border-b border-outline-variant/20">
+            <h2 className="text-sm font-semibold text-on-surface flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px] text-primary">block</span>
+              Απορρίψεις ({data.declines.length})
+            </h2>
+          </div>
+          <div className="divide-y divide-outline-variant/10">
+            {data.declines.map((decline) => (
+              <div key={decline.garageId} className="px-5 py-3">
+                <p className="text-sm font-medium text-on-surface">{decline.garageName}</p>
+                <p className="text-sm text-on-surface/70">{decline.reason}</p>
+                <p className="text-xs text-on-surface/40 mt-1">{new Date(decline.createdAt).toLocaleString('el-GR')}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Timeline */}
       <RequestTimeline requestId={requestId} />

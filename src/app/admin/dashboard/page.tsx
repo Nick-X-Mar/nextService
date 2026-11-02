@@ -13,6 +13,7 @@ interface DashboardStats {
   emailsSent24h: number
   emailsFailed24h: number
   totalRequests: number
+  pendingNoOffers: number
   customVehicles: number
 }
 
@@ -66,6 +67,24 @@ export default function DashboardPage() {
         </Link>
       )}
 
+      {/* Requests nobody has quoted yet */}
+      {(stats?.pendingNoOffers ?? 0) > 0 && (
+        <Link href="/admin/requests/?status=pending&offers=none&sort=oldest" className="block mb-3">
+          <div className="bg-tertiary/10 border border-tertiary/30 rounded-2xl p-4 flex items-center gap-4 hover:bg-tertiary/15 transition-colors">
+            <span className="material-symbols-outlined text-tertiary text-3xl">hourglass_top</span>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-on-surface">
+                {stats!.pendingNoOffers} pending {stats!.pendingNoOffers === 1 ? 'request has' : 'requests have'} no offers yet
+              </p>
+              <p className="text-xs text-on-surface-variant mt-0.5">
+                These clients are still waiting. Oldest first
+              </p>
+            </div>
+            <span className="material-symbols-outlined text-tertiary">arrow_forward</span>
+          </div>
+        </Link>
+      )}
+
       {/* Custom vehicles alert */}
       {(stats?.customVehicles ?? 0) > 0 && (
         <Link href="/admin/custom-vehicles/" className="block mb-6">
@@ -89,24 +108,28 @@ export default function DashboardPage() {
         <StatCard
           icon="people"
           label="Total Clients"
+          href="/admin/users/"
           value={stats?.totalClients ?? 0}
           color="primary"
         />
         <StatCard
           icon="garage"
           label="Total Garages"
+          href="/admin/garages/"
           value={stats?.totalGarages ?? 0}
           color="secondary"
         />
         <StatCard
           icon="pending"
           label="Pending Approvals"
+          href="/admin/garages/?tab=pending"
           value={stats?.pendingGarages ?? 0}
           color="tertiary"
         />
         <StatCard
           icon="build"
           label="Total Requests"
+          href="/admin/requests/"
           value={stats?.totalRequests ?? 0}
           color="primary"
         />
@@ -116,24 +139,28 @@ export default function DashboardPage() {
         <StatCard
           icon="check_circle"
           label="Active Garages"
+          href="/admin/garages/"
           value={stats?.activeGarages ?? 0}
           color="primary"
         />
         <StatCard
           icon="mail"
           label="Emails Sent (24h)"
+          href="/admin/emails/"
           value={stats?.emailsSent24h ?? 0}
           color="secondary"
         />
         <StatCard
           icon="error"
           label="Emails Failed (24h)"
+          href="/admin/emails/"
           value={stats?.emailsFailed24h ?? 0}
           color="error"
         />
         <StatCard
           icon="schedule"
           label="Pending Requests"
+          href="/admin/requests/?status=pending"
           value={stats?.requestsByStatus?.['pending'] ?? 0}
           color="secondary"
         />
@@ -145,10 +172,14 @@ export default function DashboardPage() {
           <h2 className="text-lg font-semibold text-on-surface mb-4">Requests by Status</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {Object.entries(stats.requestsByStatus).map(([status, count]) => (
-              <div key={status} className="bg-surface-container rounded-lg p-3 text-center">
+              <Link
+                key={status}
+                href={`/admin/requests/?status=${status}`}
+                className="bg-surface-container hover:bg-surface-container-high transition-colors rounded-lg p-3 text-center"
+              >
                 <p className="text-xl font-bold text-on-surface">{count}</p>
                 <p className="text-xs text-on-surface/60 capitalize mt-1">{status.replace(/-/g, ' ')}</p>
-              </div>
+              </Link>
             ))}
           </div>
         </div>

@@ -5,6 +5,8 @@ interface DateRangePickerProps {
   to: string
   onChange: (from: string, to: string) => void
   presets?: boolean
+  /** Offers an "All time" preset, which clears both dates. */
+  allTime?: boolean
 }
 
 const presetRanges = [
@@ -24,11 +26,23 @@ function today(): string {
   return new Date().toISOString().split('T')[0]
 }
 
-export default function DateRangePicker({ from, to, onChange, presets = true }: DateRangePickerProps) {
+export default function DateRangePicker({ from, to, onChange, presets = true, allTime = false }: DateRangePickerProps) {
   return (
     <div className="flex items-center gap-3 flex-wrap">
       {presets && (
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-wrap">
+          {allTime && (
+            <button
+              onClick={() => onChange('', '')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                !from && !to
+                  ? 'bg-primary text-on-primary'
+                  : 'bg-surface-container-high text-on-surface/70 hover:bg-surface-container-highest'
+              }`}
+            >
+              All time
+            </button>
+          )}
           {presetRanges.map((p) => {
             const presetFrom = daysAgo(p.days)
             const presetTo = today()

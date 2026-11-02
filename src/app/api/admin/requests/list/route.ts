@@ -1,112 +1,192 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
-import { ScanCommand, QueryCommand, BatchGetCommand } from '@aws-sdk/lib-dynamodb'
+import { ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { ServiceRequestStatus } from '@/types/statuses'
+import type { AdminRequestList, AdminRequestRow } from '@/types/adminRequests'
+import { batchGetById } from '@/utils/batchGetById'
+import { collectAll } from '@/utils/pagination'
+import { foldText } from '@/utils/searchText'
 import { withMetrics } from '@/utils/withMetrics'
 import { TABLES } from '@/lib/tables'
 
+const MAX_PAGE_SIZE = 100
+const DEFAULT_PAGE_SIZE = 25
+
+const WON_STATUSES: string[] = [
+  ServiceRequestStatus.APPOINTMENT,
+  ServiceRequestStatus.IN_PROGRESS,
+  ServiceRequestStatus.COMPLETED,
+]
+
+function clientName(client: Record<string, unknown> | undefined): string {
+  if (!client) return 'Unknown'
+  return [client.firstName, client.lastName].filter(Boolean).join(' ')
+    || String(client.email || client.phoneNumber || 'Guest')
+}
+
+/**
+ * The admin's request list. Filtering spans the joined client and vehicle, which
+ * DynamoDB cannot do, so every request in the date range is read and joined here
+ * and the filters, the counts and the page are all taken from that one result.
+ * That is why the counts always agree with the rows. The tables are small enough
+ * for an admin screen; a cursor per filter could not give it a total or page numbers.
+ */
 async function _GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const from = searchParams.get('from')
     const to = searchParams.get('to')
-    const status = searchParams.get('status')
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
-    const cursor = searchParams.get('cursor')
+    const status = searchParams.get('status') || ''
+    const category = searchParams.get('category') || ''
+    const clientId = searchParams.get('clientId') || ''
+    const offers = searchParams.get('offers') || ''
+    const oldestFirst = searchParams.get('sort') === 'oldest'
+    const query = foldText(searchParams.get('q')?.trim() || '')
+    const digits = query.replace(/\D/g, '')
+    const pageSize = Math.min(parseInt(searchParams.get('pageSize') || '', 10) || DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE)
 
     const fromISO = from ? (from.includes('T') ? from : `${from}T00:00:00.000Z`) : undefined
     const toISO = to ? (to.includes('T') ? to : `${to}T23:59:59.999Z`) : undefined
+    const dateFilters = [
+      ...(fromISO ? ['createdAt >= :from'] : []),
+      ...(toISO ? ['createdAt <= :to'] : []),
+    ]
 
-    let result
-
-    if (status) {
-      const keyCondition = fromISO && toISO
-        ? '#status = :status AND createdAt BETWEEN :from AND :to'
-        : '#status = :status'
-      const values: Record<string, string> = { ':status': status }
-      if (fromISO && toISO) {
-        values[':from'] = fromISO
-        values[':to'] = toISO
-      }
-
-      result = await dynamoDB.send(new QueryCommand({
+    const [requests, offerRows, messageRows, declineRows] = await Promise.all([
+      collectAll<Record<string, string>>((startKey) => dynamoDB.send(new ScanCommand({
         TableName: TABLES.ServiceRequests,
-        IndexName: 'StatusIndex',
-        KeyConditionExpression: keyCondition,
+        ProjectionExpression: 'id, clientId, vehicleId, category, serviceCategory, #status, createdAt, acceptedOfferId, acceptedGarageId, appointmentDate, appointmentTime',
         ExpressionAttributeNames: { '#status': 'status' },
-        ExpressionAttributeValues: values,
-        ScanIndexForward: false,
-        Limit: limit,
-        ...(cursor ? { ExclusiveStartKey: JSON.parse(Buffer.from(cursor, 'base64').toString()) } : {})
-      }))
-    } else {
-      result = await dynamoDB.send(new ScanCommand({
-        TableName: TABLES.ServiceRequests,
-        ...(fromISO && toISO ? {
-          FilterExpression: 'createdAt BETWEEN :from AND :to',
-          ExpressionAttributeValues: { ':from': fromISO, ':to': toISO }
+        ...(dateFilters.length > 0 ? {
+          FilterExpression: dateFilters.join(' AND '),
+          ExpressionAttributeValues: {
+            ...(fromISO ? { ':from': fromISO } : {}),
+            ...(toISO ? { ':to': toISO } : {}),
+          },
         } : {}),
-        Limit: limit,
-        ...(cursor ? { ExclusiveStartKey: JSON.parse(Buffer.from(cursor, 'base64').toString()) } : {})
-      }))
+        ExclusiveStartKey: startKey,
+      })) as Promise<{ Items?: Record<string, string>[]; LastEvaluatedKey?: Record<string, unknown> }>, 'admin requests'),
+      collectAll<Record<string, string>>((startKey) => dynamoDB.send(new ScanCommand({
+        TableName: TABLES.Offers,
+        ProjectionExpression: 'serviceRequestId',
+        ExclusiveStartKey: startKey,
+      })) as Promise<{ Items?: Record<string, string>[]; LastEvaluatedKey?: Record<string, unknown> }>, 'admin request offers'),
+      collectAll<Record<string, string>>((startKey) => dynamoDB.send(new ScanCommand({
+        TableName: TABLES.ChatMessages,
+        ProjectionExpression: 'requestId',
+        ExclusiveStartKey: startKey,
+      })) as Promise<{ Items?: Record<string, string>[]; LastEvaluatedKey?: Record<string, unknown> }>, 'admin request messages'),
+      collectAll<Record<string, string>>((startKey) => dynamoDB.send(new ScanCommand({
+        TableName: TABLES.RequestDeclines,
+        ProjectionExpression: 'requestId',
+        ExclusiveStartKey: startKey,
+      })) as Promise<{ Items?: Record<string, string>[]; LastEvaluatedKey?: Record<string, unknown> }>, 'admin request declines'),
+    ])
+
+    const countBy = (rows: Record<string, string>[], key: string) => {
+      const counts = new Map<string, number>()
+      for (const row of rows) counts.set(row[key], (counts.get(row[key]) ?? 0) + 1)
+      return counts
     }
+    const offerCounts = countBy(offerRows, 'serviceRequestId')
+    const messageCounts = countBy(messageRows, 'requestId')
+    const declineCounts = countBy(declineRows, 'requestId')
 
-    const requests = result.Items || []
+    const [clients, vehicles, garages] = await Promise.all([
+      batchGetById(TABLES.Clients, requests.map((r) => r.clientId), {
+        projection: 'id, firstName, lastName, email, phoneNumber',
+      }),
+      batchGetById(TABLES.Vehicles, requests.map((r) => r.vehicleId), {
+        projection: 'id, brand, model, modelYear, licensePlate',
+      }),
+      batchGetById(TABLES.Garages, requests.map((r) => r.acceptedGarageId), {
+        projection: 'id, companyName',
+      }),
+    ])
 
-    // Get client names for display
-    const clientIds = [...new Set(requests.map((r) => r.clientId).filter(Boolean))]
-    const clientMap: Record<string, string> = {}
-
-    if (clientIds.length > 0) {
-      const batchResult = await dynamoDB.send(new BatchGetCommand({
-        RequestItems: {
-          [TABLES.Clients]: {
-            Keys: clientIds.slice(0, 100).map((id) => ({ id })),
-            ProjectionExpression: 'id, firstName, lastName, email'
-          }
-        }
-      }))
-
-      for (const client of batchResult.Responses?.[TABLES.Clients] || []) {
-        clientMap[client.id] = [client.firstName, client.lastName].filter(Boolean).join(' ') || client.email
+    const rows = requests.map((r) => {
+      const client = clients.get(r.clientId)
+      const vehicle = vehicles.get(r.vehicleId)
+      const row: AdminRequestRow & { accepted: boolean; search: string } = {
+        id: r.id,
+        createdAt: r.createdAt,
+        status: r.status,
+        category: r.serviceCategory || r.category || '-',
+        client: r.clientId ? {
+          id: r.clientId,
+          name: clientName(client),
+          phone: String(client?.phoneNumber ?? ''),
+          email: String(client?.email ?? ''),
+        } : null,
+        vehicle: vehicle ? {
+          label: [vehicle.brand, vehicle.model, vehicle.modelYear].filter(Boolean).join(' '),
+          plate: String(vehicle.licensePlate ?? ''),
+        } : null,
+        offerCount: offerCounts.get(r.id) ?? 0,
+        messageCount: messageCounts.get(r.id) ?? 0,
+        declineCount: declineCounts.get(r.id) ?? 0,
+        garageName: r.acceptedGarageId ? String(garages.get(r.acceptedGarageId)?.companyName ?? r.acceptedGarageId) : null,
+        appointmentDate: r.appointmentDate ?? null,
+        appointmentTime: r.appointmentTime ?? null,
+        accepted: Boolean(r.acceptedOfferId) || WON_STATUSES.includes(r.status),
+        search: foldText([
+          clientName(client), client?.email, client?.phoneNumber,
+          vehicle?.brand, vehicle?.model, vehicle?.modelYear, vehicle?.licensePlate, r.id,
+        ].filter(Boolean).join(' ')),
       }
+      return row
+    })
+
+    const categoryCounts = new Map<string, number>()
+    for (const row of rows) categoryCounts.set(row.category, (categoryCounts.get(row.category) ?? 0) + 1)
+
+    const scoped = rows.filter((row) => {
+      if (category && row.category !== category) return false
+      if (clientId && row.client?.id !== clientId) return false
+      if (offers === 'none' && row.offerCount > 0) return false
+      if (offers === 'some' && row.offerCount === 0) return false
+      if (query) {
+        const matched = row.search.includes(query)
+          || (digits.length >= 3 && row.search.replace(/\D/g, '').includes(digits))
+        if (!matched) return false
+      }
+      return true
+    })
+
+    const byStatus: Record<string, number> = {}
+    for (const value of Object.values(ServiceRequestStatus)) byStatus[value] = 0
+    for (const row of scoped) byStatus[row.status] = (byStatus[row.status] ?? 0) + 1
+
+    const matching = (status ? scoped.filter((row) => row.status === status) : scoped)
+      .sort((a, b) => (oldestFirst ? 1 : -1) * (a.createdAt || '').localeCompare(b.createdAt || ''))
+
+    const lastPage = Math.max(1, Math.ceil(matching.length / pageSize))
+    const page = Math.min(Math.max(parseInt(searchParams.get('page') || '', 10) || 1, 1), lastPage)
+
+    const items = matching
+      .slice((page - 1) * pageSize, page * pageSize)
+      .map(({ accepted: _accepted, search: _search, ...row }) => row)
+
+    const filteredClient = clientId ? rows.find((row) => row.client?.id === clientId)?.client : null
+
+    const body: AdminRequestList = {
+      items,
+      total: matching.length,
+      page,
+      pageSize,
+      byStatus,
+      funnel: {
+        created: scoped.length,
+        offered: scoped.filter((row) => row.offerCount > 0).length,
+        accepted: scoped.filter((row) => row.accepted).length,
+        completed: byStatus[ServiceRequestStatus.COMPLETED] ?? 0,
+      },
+      pendingNoOffers: scoped.filter((row) => row.status === ServiceRequestStatus.PENDING && row.offerCount === 0).length,
+      categories: [...categoryCounts].map(([value, count]) => ({ value, count })),
+      client: filteredClient ? { id: filteredClient.id, name: filteredClient.name } : null,
     }
 
-    // Count offers per request
-    const offerCounts = await Promise.all(
-      requests.slice(0, 50).map((r) =>
-        dynamoDB.send(new QueryCommand({
-          TableName: TABLES.Offers,
-          IndexName: 'ServiceRequestOffersIndex',
-          KeyConditionExpression: 'serviceRequestId = :reqId',
-          ExpressionAttributeValues: { ':reqId': r.id },
-          Select: 'COUNT'
-        })).then((res) => ({ id: r.id, count: res.Count || 0 }))
-      )
-    )
-
-    const offerCountMap: Record<string, number> = {}
-    for (const { id, count } of offerCounts) {
-      offerCountMap[id] = count
-    }
-
-    const items = requests.map((r) => ({
-      id: r.id,
-      clientName: clientMap[r.clientId] || r.clientId || 'Unknown',
-      category: r.serviceCategory || r.category || '-',
-      status: r.status,
-      createdAt: r.createdAt,
-      offerCount: offerCountMap[r.id] ?? 0
-    }))
-
-    if (!status) {
-      items.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    }
-
-    const nextCursor = result.LastEvaluatedKey
-      ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
-      : null
-
-    return NextResponse.json({ items, cursor: nextCursor })
+    return NextResponse.json(body)
   } catch (error) {
     console.error('Request list error:', error)
     return NextResponse.json({ error: 'Failed to fetch requests' }, { status: 500 })

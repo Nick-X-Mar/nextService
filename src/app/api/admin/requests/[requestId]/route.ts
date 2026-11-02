@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
 import { generatePresignedUrls } from '@/utils/s3Service'
+import { batchGetById } from '@/utils/batchGetById'
+import { presignAttachmentList, type ChatAttachment } from '@/utils/chatAttachments'
+import { collectAll } from '@/utils/pagination'
+import { declineReasonLabel } from '@/types/declines'
 import { withMetrics } from '@/utils/withMetrics'
 import { TABLES } from '@/lib/tables'
 
@@ -24,7 +28,7 @@ async function _GET(
     }
 
     // Fetch client, vehicle, and offers in parallel
-    const [clientResult, vehicleResult, offersResult] = await Promise.all([
+    const [clientResult, vehicleResult, offersResult, messages, declines] = await Promise.all([
       sr.clientId
         ? dynamoDB.send(new GetCommand({
             TableName: TABLES.Clients,
@@ -42,30 +46,43 @@ async function _GET(
         IndexName: 'ServiceRequestOffersIndex',
         KeyConditionExpression: 'serviceRequestId = :reqId',
         ExpressionAttributeValues: { ':reqId': requestId }
-      }))
+      })),
+      collectAll<Record<string, unknown>>((startKey) => dynamoDB.send(new QueryCommand({
+        TableName: TABLES.ChatMessages,
+        IndexName: 'RequestMessagesIndex',
+        KeyConditionExpression: 'requestId = :reqId',
+        ExpressionAttributeValues: { ':reqId': requestId },
+        ExclusiveStartKey: startKey
+      })), 'admin request messages'),
+      collectAll<Record<string, unknown>>((startKey) => dynamoDB.send(new QueryCommand({
+        TableName: TABLES.RequestDeclines,
+        IndexName: 'RequestDeclinesIndex',
+        KeyConditionExpression: 'requestId = :reqId',
+        ExpressionAttributeValues: { ':reqId': requestId },
+        ExclusiveStartKey: startKey
+      })), 'admin request declines')
     ])
 
     const client = clientResult.Item
     const vehicle = vehicleResult.Item
     const offers = offersResult.Items || []
 
-    // If there are offers, batch-fetch garage names
-    const garageIds = [...new Set(offers.map((o) => o.garageId).filter(Boolean))]
-    const garageMap: Record<string, string> = {}
+    // A garage can be in this request through an offer, a chat or a decline.
+    // A garage's message carries its id as the sender; a client's as `garageId`.
+    // A client row with neither predates per-garage threads.
+    const threadOf = (m: Record<string, unknown>) =>
+      (m.senderType === 'garage' ? m.senderId : m.garageId) as string | undefined
+    const garages = await batchGetById(TABLES.Garages, [
+      ...offers.map((o) => o.garageId),
+      ...messages.map(threadOf),
+      ...declines.map((d) => d.garageId as string),
+    ], { projection: 'id, companyName' })
+    const garageName = (id: string) => String(garages.get(id)?.companyName || id)
 
-    if (garageIds.length > 0) {
-      const garageResults = await Promise.all(
-        garageIds.map((gId) =>
-          dynamoDB.send(new GetCommand({
-            TableName: TABLES.Garages,
-            Key: { id: gId },
-            ProjectionExpression: 'id, companyName'
-          })).then((res) => res.Item)
-        )
-      )
-      for (const g of garageResults) {
-        if (g) garageMap[g.id] = g.companyName || g.id
-      }
+    const threads = new Map<string, Record<string, unknown>[]>()
+    for (const message of messages) {
+      const key = threadOf(message) ?? ''
+      threads.set(key, [...(threads.get(key) ?? []), message])
     }
 
     // Generate presigned URLs for photos
@@ -73,6 +90,9 @@ async function _GET(
     const photoUrls = rawPhotoUrls.length > 0
       ? await generatePresignedUrls(rawPhotoUrls)
       : []
+    const licensePhotoUrl = vehicle?.licensePhotoUrl
+      ? (await generatePresignedUrls([vehicle.licensePhotoUrl as string]))[0]
+      : undefined
 
     return NextResponse.json({
       id: sr.id,
@@ -95,6 +115,8 @@ async function _GET(
       completedBy: sr.completedBy,
       completionOutcome: sr.completionOutcome,
       completionNotes: sr.completionNotes,
+      completionReason: sr.completionReason,
+      clientConfirmation: sr.clientConfirmation,
       completionPromptedAt: sr.completionPromptedAt,
       finalAmounts: sr.finalAmounts,
       photoUrls,
@@ -104,17 +126,23 @@ async function _GET(
             firstName: client.firstName,
             lastName: client.lastName,
             email: client.email,
-            phoneNumber: client.phoneNumber
+            phoneNumber: client.phoneNumber,
+            address: client.address
           }
         : null,
       vehicle: vehicle
         ? {
             brand: vehicle.brand,
             model: vehicle.model,
-            year: vehicle.year,
+            nickname: vehicle.nickname,
+            modelYear: vehicle.modelYear,
             licensePlate: vehicle.licensePlate,
+            vinNumber: vehicle.vinNumber,
+            engineNumber: vehicle.engineNumber,
+            color: vehicle.color,
             engineCC: vehicle.engineCC,
             fuelType: vehicle.fuelType,
+            licensePhotoUrl,
             is4x4: vehicle.is4x4,
             isAutomatic: vehicle.isAutomatic,
             isTurbo: vehicle.isTurbo
@@ -123,12 +151,38 @@ async function _GET(
       offers: offers.map((o) => ({
         id: o.id,
         garageId: o.garageId,
-        garageName: garageMap[o.garageId] || o.garageId,
-        price: o.price,
-        message: o.message,
+        garageName: garageName(o.garageId),
+        offerAmount: o.offerAmount,
+        benefits: o.benefits || [],
+        availabilityDates: o.availabilityDates || [],
+        clientAvailabilityDates: o.clientAvailabilityDates || [],
         status: o.status,
         createdAt: o.createdAt
-      }))
+      })),
+      threads: await Promise.all([...threads].map(async ([garageId, rows]) => ({
+        garageId,
+        garageName: garageId ? garageName(garageId) : 'Χωρίς συνεργείο',
+        messages: await Promise.all(
+          rows
+            .sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)))
+            .map(async (m) => ({
+              id: m.id,
+              senderType: m.senderType,
+              senderName: m.senderName,
+              message: m.message,
+              timestamp: m.timestamp,
+              attachments: m.attachments
+                ? (await presignAttachmentList(m.attachments as ChatAttachment[])).map((a) => a.url)
+                : [],
+            }))
+        ),
+      }))),
+      declines: declines.map((d) => ({
+        garageId: d.garageId,
+        garageName: garageName(d.garageId as string),
+        reason: declineReasonLabel(d.reason as string, d.reasonText as string | undefined),
+        createdAt: d.createdAt,
+      })),
     })
   } catch (error) {
     console.error('Admin request detail error:', error)
