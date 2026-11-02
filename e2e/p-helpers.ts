@@ -152,14 +152,15 @@ export async function newRequest(
 
 /**
  * The parts of a request the submit flow writes on later calls, set directly:
- * an άδεια key (presigned on read, never fetched) and the estimate the client saw.
+ * an άδεια key (presigned on read, never fetched), the colour and name the client
+ * gives the car on their profile, and the estimate the client saw.
  */
 export async function decorateRequest(requestId: string, vehicleId: string, estimatedCost: number) {
   await ddb.send(new UpdateCommand({
     TableName: TABLES.Vehicles,
     Key: { id: vehicleId },
-    UpdateExpression: 'SET licensePhotoUrl = :k',
-    ExpressionAttributeValues: { ':k': `license-photos/e2e-p/${vehicleId}.jpg` },
+    UpdateExpression: 'SET licensePhotoUrl = :k, color = :c, nickname = :n',
+    ExpressionAttributeValues: { ':k': `license-photos/e2e-p/${vehicleId}.jpg`, ':c': 'Μπλε', ':n': 'Το μπλε' },
   }))
   await ddb.send(new UpdateCommand({
     TableName: TABLES.ServiceRequests,
@@ -212,4 +213,4 @@ export async function signInGarage(page: Page, garage: Party) {
 
 /** Every identifying field a garage must not see before it wins, wherever it sits. */
 export const CLIENT_PII = ['lastName', 'phoneNumber', 'email', 'address'] as const
-export const VEHICLE_PII = ['licensePlate', 'vinNumber', 'engineNumber'] as const
+export const VEHICLE_PII = ['licensePlate'] as const

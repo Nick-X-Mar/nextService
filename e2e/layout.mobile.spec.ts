@@ -45,6 +45,15 @@ test.describe('Public pages fit the screen', () => {
       await expectNoSidewaysScroll(page)
     })
   }
+
+  // The logo's charcoal SERVICE and gear disappear on the landing photo.
+  test('The header logo is the light one on the photo and the dark one on the plain header', async ({ page }) => {
+    const logo = page.locator('header img[alt="NextService"]')
+    await page.goto('/')
+    await expect(logo).toHaveAttribute('src', /next_logo_on_dark\.svg/)
+    await page.goto('/about/')
+    await expect(logo).toHaveAttribute('src', /next_logo\.svg/)
+  })
 })
 
 test.describe.serial('Signed-in screens', () => {

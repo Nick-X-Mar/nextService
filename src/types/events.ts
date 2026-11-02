@@ -14,6 +14,7 @@ export const EventName = {
   GarageLogin: 'garage_login',
   GarageLoginPendingValidation: 'garage_login_pending_validation',
   GarageValidated: 'garage_validated',
+  GarageEditedByAdmin: 'garage_edited_by_admin',
   GarageCommissionRateChanged: 'garage_commission_rate_changed',
   CommissionOutcomeReviewed: 'commission_outcome_reviewed',
   GuestRegisteredFromRequest: 'guest_registered_from_request',

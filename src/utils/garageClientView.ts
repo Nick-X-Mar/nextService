@@ -7,14 +7,17 @@ import { TABLES } from '@/lib/tables'
  * What a garage may see of a client and their car.
  *
  * Client PII is winner-only. While a request is on the open market every active
- * garage gets what it needs to quote — the car, the job, the photos and the
- * client's first name — and talks to the client through the in-app chat. Only
- * the garage whose offer was accepted, and only from the acceptance on, gets
- * the surname, phone, email, plate, VIN, engine number and άδεια. A garage that
- * lost, or whose job was cancelled, keeps the quoting view of its own history.
+ * garage gets what it needs to quote — the car with its VIN, engine number, colour
+ * and name, the job, the photos, the client's first name and, on the request page,
+ * the άδεια — and talks to the client through the in-app chat. Only the garage
+ * whose offer was accepted, and only from the acceptance on, gets the surname,
+ * phone, email and plate. A garage whose job was cancelled keeps the quoting view
+ * of its own history, without the άδεια.
  *
  * Every garage-facing response that carries a client or a vehicle goes through
- * these two functions, so the rule lives in one place.
+ * these two functions, so the rule lives in one place. The άδεια is the exception:
+ * it is presigned, so only the request detail route hands it out. It shows what is
+ * printed on it (name, address, plate), and the client chose to upload it.
  */
 
 /** The states in which the accepted garage still holds the job. CANCELLED is not one. */
@@ -123,7 +126,7 @@ export function garageClientView(client: Row | null | undefined, isWinner: boole
   }
 }
 
-/** The vehicle fields a quote needs — none of them identify the car or its owner. */
+/** The vehicle fields a quote needs: parts are priced by the VIN and the engine number. */
 export function garageVehicleView(vehicle: Row | null | undefined, isWinner: boolean) {
   if (!vehicle) return null
   const quoting = {
@@ -136,18 +139,20 @@ export function garageVehicleView(vehicle: Row | null | undefined, isWinner: boo
     isAutomatic: vehicle.isAutomatic as boolean | undefined,
     is4x4: vehicle.is4x4 as boolean | undefined,
     isTurbo: vehicle.isTurbo as boolean | undefined,
+    vinNumber: str(vehicle.vinNumber),
+    engineNumber: str(vehicle.engineNumber),
+    color: str(vehicle.color),
+    nickname: str(vehicle.nickname),
   }
   if (!isWinner) return quoting
   return {
     ...quoting,
     licensePlate: str(vehicle.licensePlate),
-    vinNumber: str(vehicle.vinNumber),
-    engineNumber: str(vehicle.engineNumber),
   }
 }
 
 /** DynamoDB projections for the reads behind the quoting view — the rest is never loaded. */
 export const QUOTING_CLIENT_PROJECTION = 'id, firstName, email'
 export const QUOTING_VEHICLE_PROJECTION =
-  'id, brand, #model, #year, modelYear, engineCC, fuelType, isAutomatic, is4x4, isTurbo'
+  'id, brand, #model, #year, modelYear, engineCC, fuelType, isAutomatic, is4x4, isTurbo, vinNumber, engineNumber, color, nickname'
 export const QUOTING_VEHICLE_NAMES = { '#model': 'model', '#year': 'year' }

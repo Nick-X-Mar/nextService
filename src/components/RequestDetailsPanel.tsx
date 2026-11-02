@@ -265,9 +265,9 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
                 )}
               </div>
 
-              {/* License Plate. Plate, engine number and VIN are winner-only: a
-                  garage that has not won the job is sent none of them, so read-only
-                  rows without a value are left out rather than shown empty. */}
+              {/* License Plate. The plate is winner-only: a garage that has not won
+                  the job is not sent it, so read-only rows without a value are left
+                  out rather than shown empty. */}
               {((isEditing && allowEdit) || request.vehicle.licensePlate) && (
                 <div>
                   <label className={styles.label}>Αριθμός Κυκλοφορίας</label>

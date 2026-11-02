@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   applicationName: "NextService",
   icons: {
     icon: "/favicon.ico",
-    apple: "/logo.png",
+    apple: "/apple-touch-icon.png",
   },
   openGraph: {
     type: "website",

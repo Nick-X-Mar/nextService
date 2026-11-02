@@ -124,11 +124,15 @@ async function _GET(
     const isOwner = auth.userType === 'client'
     // Who may see the identifying fields: the owner, and the garage that won.
     const seesPii = isOwner || isWinner
+    // The άδεια also goes to every garage still quoting, for the numbers on it. It
+    // shows the owner's name and address, so it stops once the request has left
+    // the market: a garage whose booking was cancelled does not need it to quote.
+    const seesLicense = seesPii || serviceRequest.status === ServiceRequestStatus.PENDING
 
     // The άδεια κυκλοφορίας lives in a private bucket, so it travels as a
     // short-lived presigned URL like the damage photos do — and is not even
     // signed for a caller who may not see it.
-    const licensePhotoUrl = seesPii && vehicle?.licensePhotoUrl
+    const licensePhotoUrl = seesLicense && vehicle?.licensePhotoUrl
       ? (await generatePresignedUrls([vehicle.licensePhotoUrl as string]))[0]
       : null
 
@@ -146,18 +150,17 @@ async function _GET(
         requestId,
         source: 'api/requests/[requestId]',
         metadata: {
-          fieldsExposed: isWinner
-            ? [
-                'client.firstName',
-                'client.lastName',
-                'client.phoneNumber',
-                'client.email',
-                'vehicle.licensePlate',
-                'vehicle.vinNumber',
-                'vehicle.engineNumber',
-                'vehicle.licensePhoto'
-              ]
-            : ['client.firstName']
+          fieldsExposed: [
+            'client.firstName',
+            'vehicle.vinNumber',
+            'vehicle.engineNumber',
+            'vehicle.color',
+            'vehicle.nickname',
+            ...(licensePhotoUrl ? ['vehicle.licensePhoto'] : []),
+            ...(isWinner
+              ? ['client.lastName', 'client.phoneNumber', 'client.email', 'vehicle.licensePlate']
+              : [])
+          ]
         }
       })
     }

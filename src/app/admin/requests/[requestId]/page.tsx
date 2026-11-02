@@ -8,6 +8,8 @@ import { addDays, addMonths, isWeekend, format } from 'date-fns'
 import { el } from 'date-fns/locale'
 import 'react-day-picker/dist/style.css'
 import RequestTimeline from './components/RequestTimeline'
+import { WaitingOnChip, waitingFor } from '../../components/WaitingOnBadge'
+import type { RequestWaiting } from '@/types/adminRequests'
 import Spinner from '@/components/Spinner'
 import { isCommissionable } from '@/lib/commission-basis'
 import { completionReasonLabel, type ClientConfirmation, type CompletionReason } from '@/types/reviews'
@@ -31,6 +33,7 @@ interface RequestDetail {
   completedAt?: string
   completedBy?: 'garage' | 'admin'
   completionOutcome?: 'completed' | 'no_show' | 'not_done'
+  waiting: RequestWaiting[]
   completionNotes?: string
   completionReason?: CompletionReason
   clientConfirmation?: ClientConfirmation
@@ -408,6 +411,39 @@ export default function RequestDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Whom to call */}
+      {data.waiting.length > 0 && (
+        <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-5 mb-6" data-testid="waiting-panel">
+          <h2 className="text-sm font-semibold text-on-surface mb-3 flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px] text-primary">phone_in_talk</span>
+            Τι περιμένουμε
+          </h2>
+          <div className="space-y-3">
+            {data.waiting.map((item, i) => {
+              const phone = item.on === 'client' ? data.client?.phoneNumber : item.garagePhone
+              return (
+                <div key={i} className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <WaitingOnChip on={item.on} />
+                      {item.garageName && <span className="text-sm font-medium text-on-surface">{item.garageName}</span>}
+                      {item.since && <span className="text-xs text-on-surface/50">εδώ και {waitingFor(item.since)}</span>}
+                    </div>
+                    <p className="text-sm text-on-surface/70 mt-1">{item.reason}</p>
+                  </div>
+                  {phone && (
+                    <a href={`tel:${phone}`} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+                      <span className="material-symbols-outlined text-[16px]">call</span>
+                      {phone}
+                    </a>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Client & Vehicle */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { getOfferBySlug } from '@/lib/offers'
-import { loadLogoDataUri } from '@/lib/og-logo'
+import { LOGO_ASPECT_RATIO, loadLogoDataUri } from '@/lib/og-logo'
 import { getCategoryText } from '@/utils/categoryLabels'
 import { PLUS_VAT } from '@/utils/vat'
 
@@ -142,9 +142,8 @@ export default async function Image({ params }: Params) {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            {/* White plate is required, not stylistic: the logo's letters are
-                knockouts and take the colour of whatever is behind them, so on
-                a photo background the wordmark would be unreadable. */}
+            {/* White plate is required, not stylistic: the logo's charcoal
+                "SERVICE" and gear would be unreadable on this dark photo. */}
             {logo ? (
               <div
                 style={{
@@ -157,7 +156,7 @@ export default async function Image({ params }: Params) {
                 }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={logo} alt="NextService" width={125} height={100} />
+                <img src={logo} alt="NextService" width={225} height={Math.round(225 / LOGO_ASPECT_RATIO)} />
               </div>
             ) : (
               <div style={{ fontSize: 32, fontWeight: 900, letterSpacing: -1, display: 'flex' }}>

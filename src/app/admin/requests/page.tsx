@@ -6,12 +6,13 @@ import Link from 'next/link'
 import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
 import { useNavigation } from '@/hooks/useNavigation'
-import type { AdminRequestList, AdminRequestRow } from '@/types/adminRequests'
+import type { AdminRequestList, AdminRequestRow, WaitingOn } from '@/types/adminRequests'
 import { getCategoryText } from '@/utils/categoryLabels'
 import StatCard from '../components/StatCard'
 import DataTable, { type Column } from '../components/DataTable'
 import DateRangePicker from '../components/DateRangePicker'
 import Pager from '../components/Pager'
+import { WaitingList, WaitingOnChip } from '../components/WaitingOnBadge'
 
 const athensDateTime = new Intl.DateTimeFormat('el-GR', {
   timeZone: 'Europe/Athens',
@@ -52,6 +53,7 @@ function RequestsPageContent() {
   const status = param('status')
   const category = param('category')
   const offers = param('offers')
+  const waiting = param('waiting')
   const sort = param('sort')
   const from = param('from')
   const to = param('to')
@@ -152,6 +154,7 @@ function RequestsPageContent() {
         </div>
       ) : '-',
     },
+    { key: 'waiting', header: 'Waiting on', render: (item) => <WaitingList waiting={item.waiting} /> },
     { key: 'category', header: 'Category', render: (item) => <span className="whitespace-nowrap">{getCategoryText(item.category)}</span> },
     {
       key: 'status',
@@ -186,7 +189,7 @@ function RequestsPageContent() {
   const statusTiles = Object.entries(data?.byStatus ?? {})
     // Nothing ever writes in-progress; an empty tile would only be noise.
     .filter(([value, count]) => count > 0 || value !== 'in-progress')
-  const hasFilters = Boolean(status || category || offers || q || clientId)
+  const hasFilters = Boolean(status || category || offers || waiting || q || clientId)
   const categoryOptions = [...(data?.categories ?? [])]
     .sort((a, b) => getCategoryText(a.value).localeCompare(getCategoryText(b.value), 'el'))
 
@@ -295,6 +298,30 @@ function RequestsPageContent() {
         </div>
       )}
 
+      {/* Whom to call */}
+      {data && (
+        <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-5 mb-6">
+          <h2 className="text-lg font-semibold text-on-surface mb-3">Waiting On</h2>
+          <div className="grid grid-cols-3 gap-3">
+            {(['client', 'garage', 'admin'] as WaitingOn[]).map((on) => (
+              <button
+                key={on}
+                type="button"
+                aria-pressed={waiting === on}
+                data-testid={`waiting-${on}`}
+                onClick={() => setFilters({ waiting: waiting === on ? '' : on })}
+                className={`rounded-lg p-3 flex flex-col items-center gap-1.5 transition-colors ${
+                  waiting === on ? 'bg-primary-fixed ring-1 ring-primary' : 'bg-surface-container hover:bg-surface-container-high'
+                }`}
+              >
+                <span className="text-xl font-bold text-on-surface">{data.byWaiting[on]}</span>
+                <WaitingOnChip on={on} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Request List */}
       <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-4 mb-3">
         <div className="flex flex-wrap gap-3 items-center">
@@ -355,7 +382,7 @@ function RequestsPageContent() {
           {hasFilters && (
             <button
               type="button"
-              onClick={() => setFilters({ status: '', category: '', offers: '', q: '', clientId: '' })}
+              onClick={() => setFilters({ status: '', category: '', offers: '', waiting: '', q: '', clientId: '' })}
               className="text-sm font-medium text-primary hover:underline"
             >
               Clear filters

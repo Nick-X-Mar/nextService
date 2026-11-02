@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
+import { garageCommissionPercent } from '@/lib/commission-basis'
+import { collectAll } from '@/utils/pagination'
 import { withMetrics } from '@/utils/withMetrics'
 import { TABLES } from '@/lib/tables'
 
@@ -10,20 +12,20 @@ async function _GET(request: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
     const status = searchParams.get('status') || 'all'
     const search = searchParams.get('search')?.toLowerCase()
-    const cursor = searchParams.get('cursor')
 
-    const result = await dynamoDB.send(new ScanCommand({
+    const garages = await collectAll<Record<string, unknown>>((startKey) => dynamoDB.send(new ScanCommand({
       TableName: TABLES.Garages,
-      ...(cursor && !search ? { ExclusiveStartKey: JSON.parse(Buffer.from(cursor, 'base64').toString()) } : {})
-    }))
+      ExclusiveStartKey: startKey,
+    })) as Promise<{ Items?: Record<string, unknown>[]; LastEvaluatedKey?: Record<string, unknown> }>, 'admin garages')
 
-    let items = (result.Items || []).map((item) => ({
-      id: item.id,
-      name: item.companyName || item.email,
-      email: item.email,
-      phone: item.mobile || '',
-      createdAt: item.createdAt || '',
-      isActive: item.isActive ?? false
+    let items = garages.map((item) => ({
+      id: String(item.id),
+      name: String(item.companyName || item.email || ''),
+      email: String(item.email || ''),
+      phone: String(item.mobile || ''),
+      createdAt: String(item.createdAt || ''),
+      isActive: item.isActive === true,
+      commissionPercent: garageCommissionPercent(item),
     }))
 
     // Filter by status
@@ -43,11 +45,7 @@ async function _GET(request: NextRequest) {
 
     items.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 
-    const nextCursor = result.LastEvaluatedKey && !search
-      ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64')
-      : null
-
-    return NextResponse.json({ items: items.slice(0, limit), cursor: nextCursor, total: items.length })
+    return NextResponse.json({ items: items.slice(0, limit), total: items.length })
   } catch (error) {
     console.error('Admin garages list error:', error)
     return NextResponse.json({ error: 'Failed to fetch garages' }, { status: 500 })

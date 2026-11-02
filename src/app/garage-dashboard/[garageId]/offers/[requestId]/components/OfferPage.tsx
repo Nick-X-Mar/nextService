@@ -48,6 +48,8 @@ interface Vehicle {
   modelYear?: string
   fuelType?: string
   vinNumber?: string
+  color?: string
+  nickname?: string
   is4x4?: boolean
   isAutomatic?: boolean
   isTurbo?: boolean
@@ -694,7 +696,9 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
             is4x4: serviceRequest.vehicle?.is4x4,
             isTurbo: serviceRequest.vehicle?.isTurbo,
             vinNumber: serviceRequest.vehicle?.vinNumber,
-            engineNumber: serviceRequest.vehicle?.engineNumber
+            engineNumber: serviceRequest.vehicle?.engineNumber,
+            color: serviceRequest.vehicle?.color,
+            nickname: serviceRequest.vehicle?.nickname
           }}
           photoCount={serviceRequest.photoUrls?.length || 0}
           showEstimatedCost={false}

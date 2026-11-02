@@ -1,14 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Spinner from '@/components/Spinner'
 import { useNavigation } from '@/hooks/useNavigation'
 import StatCard from '../../components/StatCard'
 
 interface UserDetail {
   id: string
-  type: 'client' | 'garage'
   email: string
   name: string
   phone: string
@@ -19,15 +18,12 @@ interface UserDetail {
   lastName?: string
   vehicles?: Array<{ id: string; make: string; model: string; year: string }>
   requestCount?: number
-  // Garage fields
-  companyName?: string
-  tin?: string
   address?: string
-  offerCount?: number
 }
 
 export default function UserDetailPage() {
   const { userId } = useParams<{ userId: string }>()
+  const router = useRouter()
   const { back, isNavigating } = useNavigation()
   const [user, setUser] = useState<UserDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -35,11 +31,12 @@ export default function UserDetailPage() {
   useEffect(() => {
     async function fetchUser() {
       try {
-        // Try client first, then garage
-        let res = await fetch(`/api/admin/users/clients/${userId}/`)
-        if (!res.ok) {
-          res = await fetch(`/api/admin/users/garages/${userId}/`)
+        // Garages have their own page; an old link to one lands there.
+        if (userId.startsWith('garage-')) {
+          router.replace(`/admin/garages/${userId}/`)
+          return
         }
+        const res = await fetch(`/api/admin/users/clients/${userId}/`)
         if (res.ok) {
           setUser(await res.json())
         }
@@ -47,7 +44,7 @@ export default function UserDetailPage() {
       setLoading(false)
     }
     fetchUser()
-  }, [userId])
+  }, [userId, router])
 
   if (loading) {
     return (
@@ -83,7 +80,7 @@ export default function UserDetailPage() {
         {isNavigating()
           ? <Spinner size="sm" />
           : <span className="material-symbols-outlined text-[18px]">arrow_back</span>}
-        Back to users
+        Back to clients
       </button>
 
       <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-6 mb-6">
@@ -92,11 +89,6 @@ export default function UserDetailPage() {
             <h1 className="text-xl font-bold font-headline text-on-surface">{user.name}</h1>
             <p className="text-sm text-on-surface/60 mt-1">{user.email}</p>
             <div className="flex items-center gap-3 mt-2">
-              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                user.type === 'client' ? 'bg-primary-container/30 text-on-primary-container' : 'bg-secondary-container text-on-secondary-container'
-              }`}>
-                {user.type}
-              </span>
               {user.isActive !== undefined && (
                 <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
                   user.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
@@ -119,12 +111,6 @@ export default function UserDetailPage() {
             <p className="text-xs text-on-surface/50">Registered</p>
             <p className="text-sm text-on-surface">{new Date(user.createdAt).toLocaleDateString()}</p>
           </div>
-          {user.tin && (
-            <div>
-              <p className="text-xs text-on-surface/50">TIN</p>
-              <p className="text-sm text-on-surface">{user.tin}</p>
-            </div>
-          )}
           {user.address && (
             <div>
               <p className="text-xs text-on-surface/50">Address</p>
@@ -136,15 +122,14 @@ export default function UserDetailPage() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        {user.type === 'client' && (
-          <>
-            <StatCard icon="directions_car" label="Vehicles" value={user.vehicles?.length ?? 0} color="primary" />
-            <StatCard icon="build" label="Requests" value={user.requestCount ?? 0} color="secondary" />
-          </>
-        )}
-        {user.type === 'garage' && (
-          <StatCard icon="local_offer" label="Total Offers" value={user.offerCount ?? 0} color="primary" />
-        )}
+        <StatCard icon="directions_car" label="Vehicles" value={user.vehicles?.length ?? 0} color="primary" />
+        <StatCard
+          icon="build"
+          label="Requests"
+          value={user.requestCount ?? 0}
+          color="secondary"
+          href={`/admin/requests/?clientId=${user.id}`}
+        />
       </div>
 
       {/* Vehicles List (for clients) */}

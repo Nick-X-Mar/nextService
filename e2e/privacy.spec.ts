@@ -21,11 +21,11 @@ import {
  * Client PII is winner-only.
  *
  * While a request is pending every active garage gets what it needs to quote:
- * the car (no plate, VIN or engine number), the job, the photos, the estimate
- * and the client's first name. Only the garage whose offer was accepted, and
- * only from the acceptance on, gets the surname, phone, email, plate, VIN,
- * engine number and άδεια. A garage that lost, or whose booking was cancelled,
- * keeps the quoting view of its own history.
+ * the car with its VIN, engine number, colour and name (no plate), the άδεια on the
+ * request page, the job, the photos, the estimate and the client's first name. Only
+ * the garage whose offer was accepted, and only from the acceptance on, gets the
+ * surname, phone, email and plate. A garage whose booking was cancelled keeps the
+ * quoting view of its own history, without the άδεια. One that lost gets nothing.
  *
  * Before this, any garage that had ever bid read the client's phone, plate, VIN
  * and άδεια from the request detail long after a competitor won; the feed and
@@ -60,9 +60,9 @@ let cancelledRequest: { requestId: string; vehicleId: string }
 let unnamedRequest: { requestId: string; vehicleId: string }
 let winnerOfferId: string
 
-/** Every value that identifies the owner or the car — none may appear in a quoting view. */
+/** Every value that identifies the owner — none may appear in a quoting view. */
 function ownerSecrets(ids = MAIN_IDS): string[] {
-  return [OWNER_PROFILE.lastName, OWNER_PROFILE.phoneNumber, OWNER_PROFILE.address, owner.email, ...Object.values(ids)]
+  return [OWNER_PROFILE.lastName, OWNER_PROFILE.phoneNumber, OWNER_PROFILE.address, owner.email, ids.licensePlate]
 }
 
 function expectNoneOf(payload: unknown, secrets: string[]) {
@@ -77,6 +77,9 @@ function expectQuotingClient(client: Record<string, unknown> | null) {
 function expectQuotingVehicle(vehicle: Record<string, unknown> | null) {
   expect(vehicle).toMatchObject({ brand: 'Peugeot', model: '208', modelYear: '2019', engineCC: '1199', fuelType: 'petrol', isTurbo: true })
   for (const field of VEHICLE_PII) expect(vehicle?.[field], `vehicle.${field}`).toBeUndefined()
+  // For quoting: parts are priced by these.
+  expect(vehicle?.vinNumber).toBeTruthy()
+  expect(vehicle?.engineNumber).toBeTruthy()
 }
 
 async function offerFor(garage: Party, requestId: string) {
@@ -132,7 +135,8 @@ test.describe.serial('Winner-only client PII', () => {
 
     expectQuotingClient(request.client)
     expectQuotingVehicle(request.vehicle)
-    expect(request.vehicle.licensePhotoUrl).toBeNull()
+    expect(request.vehicle).toMatchObject({ color: 'Μπλε', nickname: 'Το μπλε' })
+    expect(request.vehicle.licensePhotoUrl).toContain('X-Amz-Signature')
     // The hint the offer page shows: «Ο πελάτης είδε ενδεικτική εκτίμηση από X€».
     expect(request.estimatedCost).toBe(ESTIMATE)
     expect(request.category).toBe('allagi-ladion')
@@ -238,7 +242,7 @@ test.describe.serial('Winner-only client PII', () => {
     const res = await api(`/api/requests/${mainRequest.requestId}/?viewerGarageId=${loser.id}`, { token: loser.token })
     expect(res.status).toBe(403)
     expect(res.data.code).toBe('ASSIGNED_ELSEWHERE')
-    expectNoneOf(res.data, [...ownerSecrets(), winner.id])
+    expectNoneOf(res.data, [...ownerSecrets(), MAIN_IDS.vinNumber, MAIN_IDS.engineNumber, winner.id])
 
     const offers = await api('/api/garage/offers/', { token: loser.token })
     expect(offers.status).toBe(200)
@@ -353,6 +357,8 @@ test.describe.serial('Winner-only client PII', () => {
     await page.goto(`/garage-dashboard/${quoting.id}/offers/${unnamedRequest.requestId}/`)
     // Read off `request.estimatedCost`, which the garage's view never carried.
     await expect(page.getByText(`Ο πελάτης είδε ενδεικτική εκτίμηση από ${ESTIMATE}€`)).toBeVisible({ timeout: 45_000 })
+    await expect(page.getByText('Το μπλε')).toBeVisible()
+    await expect(page.getByText('Άδεια Κυκλοφορίας')).toBeVisible()
   })
 
   test('UI: the winner gets the contact details on its appointment', async ({ page }) => {

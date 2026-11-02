@@ -11,7 +11,7 @@ const navItems = [
   { icon: 'article', label: 'Content', href: '/admin/content' },
   { icon: 'mail', label: 'Emails', href: '/admin/emails' },
   { icon: 'error', label: 'Errors', href: '/admin/errors' },
-  { icon: 'people', label: 'Users', href: '/admin/users' },
+  { icon: 'people', label: 'Clients', href: '/admin/users' },
   { icon: 'garage', label: 'Garages', href: '/admin/garages', badgeKey: 'pendingGarages' as const },
   { icon: 'build', label: 'Requests', href: '/admin/requests' },
   { icon: 'star', label: 'Reviews', href: '/admin/reviews' },
@@ -63,7 +63,7 @@ export default function AdminSidebar({
     >
       {/* Logo */}
       <div className="h-14 flex items-center px-5 border-b border-white/10">
-        <Image src="/images/next_logo.svg" alt="NextService" width={100} height={80} className="h-7 w-auto brightness-0 invert" />
+        <Image src="/images/next_logo_on_dark.svg" alt="NextService" width={83} height={28} className="h-7 w-auto" />
         <span className="ml-2 text-xs font-medium bg-inverse-primary/20 text-inverse-primary px-2 py-0.5 rounded-full">
           Admin
         </span>

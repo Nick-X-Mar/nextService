@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
 import { TEST_GARAGE } from './helpers'
+import { newGarage } from './E-helpers'
 import {
   adminCookie,
   athensDatePlus,
@@ -36,6 +37,9 @@ async function fileRequest(request: APIRequestContext, client: TestClient, categ
   expect(resp.status(), await resp.text()).toBe(200)
   return (await resp.json()).serviceRequestId as string
 }
+
+let tins = 0
+const uniqueTin = () => String(Date.now() + tins++).slice(-9)
 
 async function signInAdmin(page: Page, admin: string) {
   await page.context().addCookies([{
@@ -135,6 +139,48 @@ test.describe.serial('Admin requests', () => {
     expect(past.page).toBe(2)
   })
 
+  test('each request says who it is waiting on', async ({ request }) => {
+    const waitingFor = async (id: string) =>
+      (await (await request.get(`/api/admin/requests/${id}/`, { headers: { Cookie: admin } })).json()).waiting as
+        { on: string; reason: string; garageId?: string }[]
+
+    // No offer and no chat: the garages have to answer.
+    expect(await waitingFor(declined)).toEqual([
+      expect.objectContaining({ on: 'garage', reason: 'Κανένα συνεργείο δεν έχει απαντήσει ακόμα' }),
+    ])
+
+    // The garage asked something and quoted: both are the client's turn.
+    const asked = await waitingFor(quoted)
+    expect(asked.map((w) => w.on)).toEqual(['client', 'client'])
+    expect(asked[0].reason).toContain('Να απαντήσει στο μήνυμα')
+    expect(asked[1].reason).toBe('Να αποδεχτεί την προσφορά και να κλείσει ημερομηνία')
+
+    // The client answers: the conversation is back with the garage.
+    const reply = await request.post(`/api/chat/${quoted}/messages/`, {
+      headers: { Cookie: `auth-token=${client.token}` },
+      data: { message: 'Ορίστε', garageId: TEST_GARAGE.id },
+    })
+    expect(reply.status(), await reply.text()).toBe(200)
+    const answered = await waitingFor(quoted)
+    expect(answered[0]).toMatchObject({ on: 'garage', reason: 'Να απαντήσει στον πελάτη', garageId: TEST_GARAGE.id })
+
+    // The client asks for a day the offer does not have.
+    const offerId = ((await (await request.get(`/api/admin/requests/${quoted}/`, { headers: { Cookie: admin } })).json()).offers[0]).id
+    const dates = await request.patch(`/api/offers/${offerId}/client-availability/`, {
+      headers: { Cookie: `auth-token=${client.token}` },
+      data: { clientAvailabilityDates: [athensDatePlus(9)] },
+    })
+    expect(dates.status(), await dates.text()).toBe(200)
+    const proposed = await waitingFor(quoted)
+    expect(proposed.map((w) => w.reason)).toContain('Να απαντήσει στις ημερομηνίες που πρότεινε ο πελάτης')
+
+    const list = await (await request.get(`/api/admin/requests/list/?clientId=${client.clientId}&waiting=client`, {
+      headers: { Cookie: admin },
+    })).json()
+    expect(list.total).toBe(0)
+    expect(list.byWaiting).toMatchObject({ client: 0, garage: 2 })
+  })
+
   test('the clients list finds a client and counts their requests', async ({ request }) => {
     const resp = await request.get(`/api/admin/users/clients/?search=${encodeURIComponent(client.email)}`, {
       headers: { Cookie: admin },
@@ -144,8 +190,9 @@ test.describe.serial('Admin requests', () => {
     expect(data.total).toBe(1)
     expect(data.items[0].requestCount).toBe(2)
 
-    const newest = await (await request.get('/api/admin/users/clients/?pageSize=1', { headers: { Cookie: admin } })).json()
-    expect(newest.items[0].id).toBe(client.clientId)
+    const newest = await (await request.get('/api/admin/users/clients/?pageSize=25', { headers: { Cookie: admin } })).json()
+    const dates = (newest.items as { createdAt: string }[]).map((c) => c.createdAt)
+    expect(dates).toEqual([...dates].sort().reverse())
   })
 
   test('Pending Requests on the dashboard opens the list filtered to pending', async ({ page }) => {
@@ -160,6 +207,7 @@ test.describe.serial('Admin requests', () => {
   test('the status tiles, the search and the client filter drive the list', async ({ page }) => {
     await signInAdmin(page, admin)
     await page.goto('/admin/requests/')
+    await expect(page.getByRole('row').nth(1)).toBeVisible({ timeout: 60_000 })
     await page.getByLabel('Search requests').fill(client.email)
     await expect(page).toHaveURL(/q=/)
     await expect(page.getByRole('row')).toHaveCount(3)
@@ -171,6 +219,14 @@ test.describe.serial('Admin requests', () => {
     // Pressing the active tile takes its filter off.
     await page.getByTestId('status-cancelled').click()
     await expect(page).not.toHaveURL(/status=/)
+    await expect(page.getByRole('row')).toHaveCount(3)
+
+    await page.getByTestId('waiting-garage').click()
+    await expect(page).toHaveURL(/waiting=garage/)
+    await expect(page.getByRole('row')).toHaveCount(3)
+    await page.getByTestId('waiting-client').click()
+    await expect(page.getByText('No requests match these filters')).toBeVisible()
+    await page.getByTestId('waiting-client').click()
     await expect(page.getByRole('row')).toHaveCount(3)
 
     await page.getByTitle("Show this client's requests").first().click()
@@ -188,6 +244,7 @@ test.describe.serial('Admin requests', () => {
     await expect(page.getByText('1999', { exact: true })).toBeVisible()
     await expect(page.getByText(VIN)).toBeVisible()
     await expect(page.getByText('120€ + ΦΠΑ')).toBeVisible()
+    await expect(page.getByTestId('waiting-panel')).toContainText('Να απαντήσει στον πελάτη')
     await expect(page.getByTestId('admin-threads')).toContainText('Χρειάζομαι φωτογραφία του κινητήρα')
 
     await page.goto(`/admin/requests/${declined}/`)
@@ -204,5 +261,124 @@ test.describe.serial('Admin requests', () => {
       const width = await page.evaluate(() => document.documentElement.scrollWidth)
       expect(width, path).toBeLessThanOrEqual(360)
     }
+  })
+})
+
+test.describe('A garage\'s page', () => {
+  test('shows and edits everything about it, under Garages', async ({ page, request }) => {
+    const admin = await adminCookie(request)
+    const garage = await newGarage(request, { prefix: 'admin-page' })
+    await signInAdmin(page, admin)
+    await page.goto('/admin/garages/')
+    await expect(page.getByRole('row').nth(1)).toBeVisible({ timeout: 60_000 })
+    await page.getByPlaceholder('Search by name or email...').fill(garage.email)
+    await expect(page.getByRole('row')).toHaveCount(2, { timeout: 60_000 })
+    await page.getByRole('cell', { name: garage.email }).click()
+    await expect(page).toHaveURL(new RegExp(`/admin/garages/${garage.id}/`), { timeout: 60_000 })
+
+    // Still under Garages in the menu, with the rate and the money on the page.
+    await expect(page.getByRole('link', { name: 'Garages' })).toHaveClass(/inverse|primary|bg-/)
+    await expect(page.getByTestId('commission-rate')).toContainText('15%')
+    await page.getByLabel('Ποσοστό προμήθειας', { exact: true }).fill('10')
+    await page.getByRole('button', { name: 'Αποθήκευση', exact: true }).click()
+    await expect(page.getByTestId('commission-rate')).toContainText('(συμφωνημένο)')
+
+    await page.getByLabel('Κινητό').fill('6912345678')
+    await page.getByLabel('ΑΦΜ', { exact: true }).fill(uniqueTin())
+    await page.getByLabel('Περιοχή').fill('Χαλάνδρι')
+    await page.getByRole('button', { name: 'Αποθήκευση στοιχείων' }).click()
+    await expect(page.getByText('Τα στοιχεία αποθηκεύτηκαν')).toBeVisible({ timeout: 30_000 })
+
+    const stored = await (await request.get(`/api/admin/users/garages/${garage.id}/`, { headers: { Cookie: admin } })).json()
+    expect(stored.area).toBe('Χαλάνδρι')
+    expect(stored.rate.commissionPercent).toBe(10)
+    expect(stored.ledger.totals).toBeTruthy()
+    expect(JSON.stringify(stored)).not.toContain('passwordHash')
+  })
+
+  test('an old /admin/users link to a garage lands on its page', async ({ page, request }) => {
+    const admin = await adminCookie(request)
+    const garage = await newGarage(request, { prefix: 'admin-old-link' })
+    await signInAdmin(page, admin)
+    await page.goto(`/admin/users/${garage.id}/`)
+    await expect(page).toHaveURL(new RegExp(`/admin/garages/${garage.id}/`), { timeout: 60_000 })
+  })
+
+  test('a bad or taken ΑΦΜ is refused', async ({ request }) => {
+    const admin = await adminCookie(request)
+    const [garage, other] = [
+      await newGarage(request, { prefix: 'admin-edit' }),
+      await newGarage(request, { prefix: 'admin-edit-other' }),
+    ]
+    const current = await (await request.get(`/api/admin/users/garages/${garage.id}/`, { headers: { Cookie: admin } })).json()
+    const base = { ...current, mobile: '6912345678', tin: uniqueTin() }
+    const taken = await (await request.get(`/api/admin/users/garages/${other.id}/`, { headers: { Cookie: admin } })).json()
+
+    const bad = await request.put(`/api/admin/users/garages/${garage.id}/`, {
+      headers: { Cookie: admin },
+      data: { ...base, tin: '12' },
+    })
+    expect(bad.status()).toBe(400)
+
+    const clash = await request.put(`/api/admin/users/garages/${garage.id}/`, {
+      headers: { Cookie: admin },
+      data: { ...base, email: taken.email },
+    })
+    expect(clash.status()).toBe(409)
+  })
+})
+
+test.describe('Approving a garage', () => {
+  test('the rate agreed on the call is stored with the approval', async ({ page, request }) => {
+    const admin = await adminCookie(request)
+    const garage = await newGarage(request, { active: false, prefix: 'approve-rate' })
+    await signInAdmin(page, admin)
+    await page.goto('/admin/garages/?tab=pending')
+    await expect(page.getByRole('row').nth(1)).toBeVisible({ timeout: 60_000 })
+    await page.getByPlaceholder('Search by name or email...').fill(garage.email)
+    await expect(page.getByRole('row')).toHaveCount(2, { timeout: 60_000 })
+    await expect(page.getByRole('link', { name: '15%' })).toHaveAttribute('href', `/admin/commissions/${garage.id}/`)
+
+    await page.getByRole('button', { name: 'Approve' }).click()
+    await expect(page.getByLabel('Ποσοστό προμήθειας (%)')).toHaveValue('15')
+    await page.getByLabel('Ποσοστό προμήθειας (%)').fill('150')
+    await page.getByRole('button', { name: 'Έγκριση' }).click()
+    await expect(page.getByLabel('Ποσοστό προμήθειας (%)')).toBeVisible()
+
+    await page.getByLabel('Ποσοστό προμήθειας (%)').fill('12.5')
+    await page.getByRole('button', { name: 'Έγκριση' }).click()
+    await expect(page.getByText('No garages found')).toBeVisible()
+
+    const commissions = await (await request.get(`/api/admin/commissions/garage/${garage.id}/`, {
+      headers: { Cookie: admin },
+    })).json()
+    expect(commissions.commissionPercent).toBe(12.5)
+    expect(commissions.hasCustomRate).toBe(true)
+  })
+
+  test('approved at the default it stays on the default, and a bad rate approves nothing', async ({ request }) => {
+    const admin = await adminCookie(request)
+    const garage = await newGarage(request, { active: false, prefix: 'approve-default' })
+
+    const refused = await request.post(`/api/admin/users/garages/${garage.id}/activate/`, {
+      headers: { Cookie: admin },
+      data: { commissionPercent: 150 },
+    })
+    expect(refused.status()).toBe(400)
+    const still = await (await request.get(`/api/admin/users/garages/?status=pending&search=${encodeURIComponent(garage.email)}`, {
+      headers: { Cookie: admin },
+    })).json()
+    expect(still.total).toBe(1)
+
+    const ok = await request.post(`/api/admin/users/garages/${garage.id}/activate/`, {
+      headers: { Cookie: admin },
+      data: {},
+    })
+    expect(ok.status()).toBe(200)
+    const commissions = await (await request.get(`/api/admin/commissions/garage/${garage.id}/`, {
+      headers: { Cookie: admin },
+    })).json()
+    expect(commissions.commissionPercent).toBe(15)
+    expect(commissions.hasCustomRate).toBe(false)
   })
 })

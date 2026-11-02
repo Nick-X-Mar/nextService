@@ -11,9 +11,9 @@ import { TABLES } from '@/lib/tables'
  * PUT /api/admin/commissions/garage/[garageId]/rate
  * Body: { commissionPercent: number | null } — null returns the garage to the default.
  *
- * Applies to jobs the garage completes from now on: each completion freezes
- * the rate in force on the job, so months already billed keep theirs. The
- * admin and the time are recorded with the rate.
+ * Applies to bookings made from now on: accepting an offer freezes the rate in
+ * force on the job, so jobs already booked and months already billed keep
+ * theirs. The admin and the time are recorded with the rate.
  */
 async function _PUT(
   request: NextRequest,

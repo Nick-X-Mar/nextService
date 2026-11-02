@@ -17,6 +17,8 @@ interface VehicleDetails {
   isTurbo?: boolean | string | null
   vinNumber?: string | null
   engineNumber?: string | null
+  color?: string | null
+  nickname?: string | null
 }
 
 interface ServiceVehicleCardProps {
@@ -235,6 +237,18 @@ export default function ServiceVehicleCard({
           <div className={styles.specCell}>
             <p className={styles.specLabel}>Αρ. Κινητήρα</p>
             <p className={`${styles.specValue} text-[10px]`}>{vehicle.engineNumber}</p>
+          </div>
+        )}
+        {vehicle?.color && (
+          <div className={styles.specCell}>
+            <p className={styles.specLabel}>Χρώμα</p>
+            <p className={`${styles.specValue} text-[10px]`}>{vehicle.color}</p>
+          </div>
+        )}
+        {vehicle?.nickname && (
+          <div className={styles.specCell}>
+            <p className={styles.specLabel}>Όνομα Οχήματος</p>
+            <p className={`${styles.specValue} text-[10px] break-words`}>{vehicle.nickname}</p>
           </div>
         )}
       </div>

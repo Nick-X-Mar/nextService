@@ -139,7 +139,7 @@ async function _GET(request: NextRequest) {
 
     // Batched, and projected down to the quoting view: this feed goes to every
     // active garage, so the client's surname, phone and email and the car's
-    // plate, VIN and engine number are not even read. A row missing clientId or
+    // plate are not even read. A row missing clientId or
     // vehicleId is skipped by the batch rather than failing the whole feed.
     const [clients, vehicles, presignedByRequest] = await Promise.all([
       batchGetById(TABLES.Clients, availableRequests.map((r) => r.clientId as string | undefined), {

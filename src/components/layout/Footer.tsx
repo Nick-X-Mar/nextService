@@ -45,7 +45,7 @@ export default function Footer() {
             <Image
               src="/images/next_logo.svg"
               alt="NextService"
-              width={120}
+              width={118}
               height={40}
               className="h-10 w-auto"
             />

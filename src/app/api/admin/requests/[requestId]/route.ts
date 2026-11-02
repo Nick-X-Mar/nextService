@@ -6,6 +6,7 @@ import { batchGetById } from '@/utils/batchGetById'
 import { presignAttachmentList, type ChatAttachment } from '@/utils/chatAttachments'
 import { collectAll } from '@/utils/pagination'
 import { declineReasonLabel } from '@/types/declines'
+import { messageThread, requestWaiting, type WaitingMessage, type WaitingOffer, type WaitingRequest } from '@/utils/requestWaiting'
 import { withMetrics } from '@/utils/withMetrics'
 import { TABLES } from '@/lib/tables'
 
@@ -68,15 +69,13 @@ async function _GET(
     const offers = offersResult.Items || []
 
     // A garage can be in this request through an offer, a chat or a decline.
-    // A garage's message carries its id as the sender; a client's as `garageId`.
-    // A client row with neither predates per-garage threads.
-    const threadOf = (m: Record<string, unknown>) =>
-      (m.senderType === 'garage' ? m.senderId : m.garageId) as string | undefined
+    const threadOf = (m: Record<string, unknown>) => messageThread(m as WaitingMessage)
     const garages = await batchGetById(TABLES.Garages, [
+      sr.acceptedGarageId,
       ...offers.map((o) => o.garageId),
       ...messages.map(threadOf),
       ...declines.map((d) => d.garageId as string),
-    ], { projection: 'id, companyName' })
+    ], { projection: 'id, companyName, mobile' })
     const garageName = (id: string) => String(garages.get(id)?.companyName || id)
 
     const threads = new Map<string, Record<string, unknown>[]>()
@@ -99,6 +98,12 @@ async function _GET(
       description: sr.description,
       category: sr.serviceCategory || sr.category || '-',
       status: sr.status,
+      waiting: requestWaiting(
+        sr as WaitingRequest,
+        offers as unknown as WaitingOffer[],
+        messages as WaitingMessage[],
+        garages
+      ),
       createdAt: sr.createdAt,
       updatedAt: sr.updatedAt,
       estimatedCost: sr.estimatedCost,

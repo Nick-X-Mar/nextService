@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { ServiceRequestStatus } from '@/types/statuses'
-import type { AdminRequestList, AdminRequestRow } from '@/types/adminRequests'
+import type { AdminRequestList, AdminRequestRow, WaitingOn } from '@/types/adminRequests'
 import { batchGetById } from '@/utils/batchGetById'
 import { collectAll } from '@/utils/pagination'
+import { messageThread, requestWaiting, type WaitingMessage, type WaitingOffer, type WaitingRequest } from '@/utils/requestWaiting'
 import { foldText } from '@/utils/searchText'
 import { withMetrics } from '@/utils/withMetrics'
 import { TABLES } from '@/lib/tables'
@@ -40,6 +41,7 @@ async function _GET(request: NextRequest) {
     const category = searchParams.get('category') || ''
     const clientId = searchParams.get('clientId') || ''
     const offers = searchParams.get('offers') || ''
+    const waitingOn = searchParams.get('waiting') || ''
     const oldestFirst = searchParams.get('sort') === 'oldest'
     const query = foldText(searchParams.get('q')?.trim() || '')
     const digits = query.replace(/\D/g, '')
@@ -55,7 +57,7 @@ async function _GET(request: NextRequest) {
     const [requests, offerRows, messageRows, declineRows] = await Promise.all([
       collectAll<Record<string, string>>((startKey) => dynamoDB.send(new ScanCommand({
         TableName: TABLES.ServiceRequests,
-        ProjectionExpression: 'id, clientId, vehicleId, category, serviceCategory, #status, createdAt, acceptedOfferId, acceptedGarageId, appointmentDate, appointmentTime',
+        ProjectionExpression: 'id, clientId, vehicleId, category, serviceCategory, #status, createdAt, acceptedOfferId, acceptedGarageId, appointmentDate, appointmentTime, completedAt, completionOutcome, outcomeReview, clientConfirmation',
         ExpressionAttributeNames: { '#status': 'status' },
         ...(dateFilters.length > 0 ? {
           FilterExpression: dateFilters.join(' AND '),
@@ -68,12 +70,14 @@ async function _GET(request: NextRequest) {
       })) as Promise<{ Items?: Record<string, string>[]; LastEvaluatedKey?: Record<string, unknown> }>, 'admin requests'),
       collectAll<Record<string, string>>((startKey) => dynamoDB.send(new ScanCommand({
         TableName: TABLES.Offers,
-        ProjectionExpression: 'serviceRequestId',
+        ProjectionExpression: 'serviceRequestId, garageId, #status, createdAt, availabilityDates, clientAvailabilityDates, clientAvailabilityProposedAt',
+        ExpressionAttributeNames: { '#status': 'status' },
         ExclusiveStartKey: startKey,
       })) as Promise<{ Items?: Record<string, string>[]; LastEvaluatedKey?: Record<string, unknown> }>, 'admin request offers'),
       collectAll<Record<string, string>>((startKey) => dynamoDB.send(new ScanCommand({
         TableName: TABLES.ChatMessages,
-        ProjectionExpression: 'requestId',
+        ProjectionExpression: 'requestId, senderType, senderId, garageId, #timestamp',
+        ExpressionAttributeNames: { '#timestamp': 'timestamp' },
         ExclusiveStartKey: startKey,
       })) as Promise<{ Items?: Record<string, string>[]; LastEvaluatedKey?: Record<string, unknown> }>, 'admin request messages'),
       collectAll<Record<string, string>>((startKey) => dynamoDB.send(new ScanCommand({
@@ -92,6 +96,14 @@ async function _GET(request: NextRequest) {
     const messageCounts = countBy(messageRows, 'requestId')
     const declineCounts = countBy(declineRows, 'requestId')
 
+    const groupBy = <T extends Record<string, string>>(rows: T[], key: string) => {
+      const groups = new Map<string, T[]>()
+      for (const row of rows) groups.set(row[key], [...(groups.get(row[key]) ?? []), row])
+      return groups
+    }
+    const offersByRequest = groupBy(offerRows, 'serviceRequestId')
+    const messagesByRequest = groupBy(messageRows, 'requestId')
+
     const [clients, vehicles, garages] = await Promise.all([
       batchGetById(TABLES.Clients, requests.map((r) => r.clientId), {
         projection: 'id, firstName, lastName, email, phoneNumber',
@@ -99,8 +111,12 @@ async function _GET(request: NextRequest) {
       batchGetById(TABLES.Vehicles, requests.map((r) => r.vehicleId), {
         projection: 'id, brand, model, modelYear, licensePlate',
       }),
-      batchGetById(TABLES.Garages, requests.map((r) => r.acceptedGarageId), {
-        projection: 'id, companyName',
+      batchGetById(TABLES.Garages, [
+        ...requests.map((r) => r.acceptedGarageId),
+        ...offerRows.map((o) => o.garageId),
+        ...(messageRows as WaitingMessage[]).map(messageThread),
+      ], {
+        projection: 'id, companyName, mobile',
       }),
     ])
 
@@ -128,6 +144,12 @@ async function _GET(request: NextRequest) {
         garageName: r.acceptedGarageId ? String(garages.get(r.acceptedGarageId)?.companyName ?? r.acceptedGarageId) : null,
         appointmentDate: r.appointmentDate ?? null,
         appointmentTime: r.appointmentTime ?? null,
+        waiting: requestWaiting(
+          r as WaitingRequest,
+          (offersByRequest.get(r.id) ?? []) as unknown as WaitingOffer[],
+          (messagesByRequest.get(r.id) ?? []) as WaitingMessage[],
+          garages
+        ),
         accepted: Boolean(r.acceptedOfferId) || WON_STATUSES.includes(r.status),
         search: foldText([
           clientName(client), client?.email, client?.phoneNumber,
@@ -153,11 +175,19 @@ async function _GET(request: NextRequest) {
       return true
     })
 
+    // Each set of tiles keeps its numbers under its own filter, and follows the other.
+    const byWaiting: Record<WaitingOn, number> = { client: 0, garage: 0, admin: 0 }
+    for (const row of scoped.filter((r) => !status || r.status === status)) {
+      for (const on of new Set(row.waiting.map((w) => w.on))) byWaiting[on]++
+    }
+
+    const counted = waitingOn ? scoped.filter((row) => row.waiting.some((w) => w.on === waitingOn)) : scoped
+
     const byStatus: Record<string, number> = {}
     for (const value of Object.values(ServiceRequestStatus)) byStatus[value] = 0
-    for (const row of scoped) byStatus[row.status] = (byStatus[row.status] ?? 0) + 1
+    for (const row of counted) byStatus[row.status] = (byStatus[row.status] ?? 0) + 1
 
-    const matching = (status ? scoped.filter((row) => row.status === status) : scoped)
+    const matching = (status ? counted.filter((row) => row.status === status) : counted)
       .sort((a, b) => (oldestFirst ? 1 : -1) * (a.createdAt || '').localeCompare(b.createdAt || ''))
 
     const lastPage = Math.max(1, Math.ceil(matching.length / pageSize))
@@ -175,13 +205,14 @@ async function _GET(request: NextRequest) {
       page,
       pageSize,
       byStatus,
+      byWaiting,
       funnel: {
-        created: scoped.length,
-        offered: scoped.filter((row) => row.offerCount > 0).length,
-        accepted: scoped.filter((row) => row.accepted).length,
+        created: counted.length,
+        offered: counted.filter((row) => row.offerCount > 0).length,
+        accepted: counted.filter((row) => row.accepted).length,
         completed: byStatus[ServiceRequestStatus.COMPLETED] ?? 0,
       },
-      pendingNoOffers: scoped.filter((row) => row.status === ServiceRequestStatus.PENDING && row.offerCount === 0).length,
+      pendingNoOffers: counted.filter((row) => row.status === ServiceRequestStatus.PENDING && row.offerCount === 0).length,
       categories: [...categoryCounts].map(([value, count]) => ({ value, count })),
       client: filteredClient ? { id: filteredClient.id, name: filteredClient.name } : null,
     }

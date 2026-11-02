@@ -1,3 +1,18 @@
+export type WaitingOn = 'client' | 'garage' | 'admin'
+
+/** One thing a request is waiting for, and from whom: see `requestWaiting`. */
+export interface RequestWaiting {
+  on: WaitingOn
+  /** What they have to do, in the words the admin reads. */
+  reason: string
+  /** Since when, a timestamp or an appointment date. */
+  since?: string
+  /** The garage to call, when it is one garage's turn. */
+  garageId?: string
+  garageName?: string
+  garagePhone?: string
+}
+
 /** One row of the admin's request list (/admin/requests). */
 export interface AdminRequestRow {
   id: string
@@ -15,6 +30,7 @@ export interface AdminRequestRow {
   garageName: string | null
   appointmentDate: string | null
   appointmentTime: string | null
+  waiting: RequestWaiting[]
 }
 
 export interface AdminRequestList {
@@ -26,6 +42,8 @@ export interface AdminRequestList {
   /** Per status, under every filter except the status itself. */
   byStatus: Record<string, number>
   funnel: { created: number; offered: number; accepted: number; completed: number }
+  /** How many requests wait on each side, under the same filters as `byStatus`. */
+  byWaiting: Record<WaitingOn, number>
   /** Still pending with no offer at all: the requests that need someone to act. */
   pendingNoOffers: number
   /** The categories in the date range, for the filter's options. */

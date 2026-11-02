@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { loadLogoDataUri } from '@/lib/og-logo'
+import { LOGO_ASPECT_RATIO, loadLogoDataUri } from '@/lib/og-logo'
 
 export const alt = 'NextService — Βρες συνεργείο αυτοκινήτου με την καλύτερη τιμή'
 export const size = { width: 1200, height: 630 }
@@ -41,10 +41,9 @@ export default async function Image() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          {/* The white plate is not decoration — the logo's letterforms are
-              knockouts, so whatever sits behind shows through them. Straight on
-              this card's orange gradient the word "next" disappears entirely.
-              White is the only backing that renders it correctly. */}
+          {/* The white plate is not decoration — straight on this card's orange
+              gradient the logo's orange "NEXT" disappears entirely. White is the
+              only backing that renders it correctly. */}
           {logo ? (
             <div
               style={{
@@ -57,7 +56,7 @@ export default async function Image() {
               }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logo} alt="NextService" width={150} height={120} />
+              <img src={logo} alt="NextService" width={270} height={Math.round(270 / LOGO_ASPECT_RATIO)} />
             </div>
           ) : (
             <div style={{ fontSize: 40, fontWeight: 900, letterSpacing: -1, display: 'flex' }}>
