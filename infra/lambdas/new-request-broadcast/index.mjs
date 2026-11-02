@@ -52,22 +52,23 @@ const ses = new SESClient({ region: REGION })
 // import it — so keep the two in step. Without it the email printed the raw
 // slug, e.g. "(oliki-vafi)".
 const CATEGORY_LABELS = {
-  service: 'Service Αυτοκινήτων',
+  service: 'Τακτικό service αυτοκινήτου',
   brakes: 'Φρένα',
   oils: 'Λάδια',
-  'allagi-ladion': 'Αλλαγή Λαδιών',
-  imantas: 'Ιμάντας Χρονισμού',
-  symplektis: 'Δίσκος Πλατό',
-  'oliki-vafi': 'Ολική Βαφή',
-  'meriki-vafi': 'Μερική Βαφή',
-  aisthitires: 'Αισθητήρες Παρκαρίσματος',
+  'allagi-ladion': 'Αλλαγή λαδιών',
+  imantas: 'Αλλαγή ιμάντα χρονισμού',
+  symplektis: 'Αλλαγή δίσκου πλατό',
+  'oliki-vafi': 'Ολική βαφή αυτοκινήτου',
+  'meriki-vafi': 'Μερική βαφή αυτοκινήτου',
+  aisthitires: 'Τοποθέτηση αισθητήρων παρκαρίσματος',
   fanopeia: 'Φανοποιεία',
   disk: 'Δισκόφρενα',
   tires: 'Λάστιχα',
   engine: 'Κινητήρας',
   electrical: 'Ηλεκτρικά',
   kteo: 'ΚΤΕΟ',
-  elastika: 'Ελαστικά'
+  elastika: 'Ελαστικά',
+  other: 'Άλλη εργασία'
 }
 
 function categoryLabel(category) {

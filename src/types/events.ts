@@ -33,6 +33,7 @@ export const EventName = {
   ServiceRequestSubmitted: 'service_request_submitted',
   DamagePhotosUploaded: 'damage_photos_uploaded',
   ClientAvailabilityDatesSubmitted: 'client_availability_dates_submitted',
+  RequestDetailsChanged: 'request_details_changed',
 
   // Phase C — Discovery & engagement (garage side)
   GarageViewedAvailableRequests: 'garage_viewed_available_requests',
@@ -128,7 +129,8 @@ export const EmailTemplate = {
   CancellationNotificationGarage: 'cancellation_notification_garage',
   AccountMergeConfirmation: 'account_merge_confirmation',
   NewRequestForGarages: 'new_request_for_garages',
-  CompletionPromptGarage: 'completion_prompt_garage'
+  CompletionPromptGarage: 'completion_prompt_garage',
+  RequestDetailsChanged: 'request_details_changed'
 } as const
 
 export type EmailTemplateName = typeof EmailTemplate[keyof typeof EmailTemplate]

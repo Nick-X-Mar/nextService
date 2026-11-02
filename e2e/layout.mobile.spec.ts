@@ -139,6 +139,22 @@ test('A sheet opens above the bottom bar: the last category can be tapped', asyn
   expect(await isTappable(last)).toBe(true)
 })
 
+test('The homepage search opens with its last option tappable and the scroll cue clear of it', async ({ page }) => {
+  await page.goto('/')
+  const last = page.getByText('Αλλαγή λαδιών')
+  await expect(last).toBeVisible({ timeout: 30_000 })
+  await page.waitForTimeout(800) // the opening animation
+  await last.scrollIntoViewIfNeeded()
+  expect(await isTappable(last)).toBe(true)
+
+  const cue = page.getByRole('button', { name: 'Ολοκληρωμένες εργασίες' })
+  await cue.scrollIntoViewIfNeeded()
+  const [lastBox, cueBox] = await Promise.all([last.boundingBox(), cue.boundingBox()])
+  expect(cueBox!.y).toBeGreaterThan(lastBox!.y + lastBox!.height)
+  expect(await isTappable(cue)).toBe(true)
+  await expectNoSidewaysScroll(page)
+})
+
 test('The offer page leaves the footer reachable under its sticky button', async ({ page }) => {
   await page.goto('/offer/set_disk_all_cars/')
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))

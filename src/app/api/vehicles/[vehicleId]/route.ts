@@ -8,6 +8,7 @@ import { withMetrics } from '@/utils/withMetrics'
 import { presentVehicle } from '@/app/api/vehicles/vehicleView'
 import { normalizeEngineCC } from '@/app/api/vehicles/engineCC'
 import { TABLES } from '@/lib/tables'
+import { notifyGaragesOfChanges, type ChangedField } from '@/utils/requestChangeNotice'
 
 /**
  * Editable text fields and how each one is checked. `required` fields can be changed
@@ -86,6 +87,7 @@ async function _PATCH(
 
     let hasUpdates = false
     const stored = vehicleResult.Item
+    const changed: ChangedField[] = []
 
     for (const [field, rule] of Object.entries(STRING_FIELDS)) {
       if (!(field in body)) continue
@@ -105,6 +107,7 @@ async function _PATCH(
         }
         removeExpressions.push(`#${field}`)
         expressionAttributeNames[`#${field}`] = field
+        if (stored[field]) changed.push(field as ChangedField)
         continue
       }
 
@@ -125,6 +128,7 @@ async function _PATCH(
       setExpressions.push(`#${field} = :${field}`)
       expressionAttributeNames[`#${field}`] = field
       expressionAttributeValues[`:${field}`] = value
+      if (value !== String(stored[field] ?? '')) changed.push(field as ChangedField)
     }
 
     for (const field of BOOLEAN_FIELDS) {
@@ -136,6 +140,8 @@ async function _PATCH(
           setExpressions.push(`#${field} = :${field}`)
           expressionAttributeNames[`#${field}`] = field
           expressionAttributeValues[`:${field}`] = value
+          // The profile sends these back on every save.
+          if (Boolean(stored[field]) !== value) changed.push(field)
         } else {
           return NextResponse.json(
             { error: `Invalid boolean value for ${field}` },
@@ -195,6 +201,8 @@ async function _PATCH(
         { status: 404 }
       )
     }
+
+    await notifyGaragesOfChanges(auth.userId, changed, { vehicleId })
 
     return NextResponse.json({
       success: true,

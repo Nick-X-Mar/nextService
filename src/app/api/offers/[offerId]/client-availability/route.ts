@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { GetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
 import { logEvent } from '@/utils/eventLogger'
+import { notifyGaragesOfChanges } from '@/utils/requestChangeNotice'
 import { EventName } from '@/types/events'
 import { OfferStatus, ServiceRequestStatus } from '@/types/statuses'
 import { requireClient } from '@/utils/requireAuth'
@@ -129,6 +130,11 @@ async function _PATCH(
       requestId: offer.serviceRequestId,
       source: 'api/offers/[offerId]/client-availability',
       metadata: { dateCount: uniqueDates.length }
+    })
+
+    await notifyGaragesOfChanges(clientId, ['availability'], {
+      requestId: offer.serviceRequestId as string,
+      onlyGarageId: offer.garageId as string,
     })
 
     return NextResponse.json({

@@ -1,13 +1,13 @@
 const categoryLabels: Record<string, string> = {
-  service: 'Service Αυτοκινήτων',
+  service: 'Τακτικό service αυτοκινήτου',
   brakes: 'Φρένα',
   oils: 'Λάδια',
-  'allagi-ladion': 'Αλλαγή Λαδιών',
-  imantas: 'Ιμάντας Χρονισμού',
-  symplektis: 'Δίσκος Πλατό',
-  'oliki-vafi': 'Ολική Βαφή',
-  'meriki-vafi': 'Μερική Βαφή',
-  aisthitires: 'Αισθητήρες Παρκαρίσματος',
+  'allagi-ladion': 'Αλλαγή λαδιών',
+  imantas: 'Αλλαγή ιμάντα χρονισμού',
+  symplektis: 'Αλλαγή δίσκου πλατό',
+  'oliki-vafi': 'Ολική βαφή αυτοκινήτου',
+  'meriki-vafi': 'Μερική βαφή αυτοκινήτου',
+  aisthitires: 'Τοποθέτηση αισθητήρων παρκαρίσματος',
   fanopeia: 'Φανοποιεία',
   disk: 'Δισκόφρενα',
   tires: 'Λάστιχα',
@@ -15,7 +15,15 @@ const categoryLabels: Record<string, string> = {
   electrical: 'Ηλεκτρικά',
   kteo: 'ΚΤΕΟ',
   elastika: 'Ελαστικά',
+  other: 'Άλλη εργασία',
 }
+
+/**
+ * Where a request goes when the client wrote or dictated what they need instead
+ * of picking from the list. The text is its description. It is not one of the
+ * pickers' categories, and it asks for everything a mechanical job does.
+ */
+export const OTHER_CATEGORY = 'other'
 
 export function getCategoryText(category: string): string {
   return categoryLabels[category] || category
@@ -23,12 +31,12 @@ export function getCategoryText(category: string): string {
 
 /** What the category pickers (hero, ServiceCategoryModal) offer, in display order. */
 export const SERVICE_CATEGORIES = [
-  { icon: 'settings', label: 'Δίσκος Πλατό', value: 'symplektis' },
-  { icon: 'conveyor_belt', label: 'Ιμάντας Χρονισμού', value: 'imantas' },
-  { icon: 'build', label: 'Service Αυτοκινήτων', value: 'service' },
-  { icon: 'format_paint', label: 'Ολική Βαφή', value: 'oliki-vafi' },
-  { icon: 'brush', label: 'Μερική Βαφή', value: 'meriki-vafi' },
-  { icon: 'sensors', label: 'Αισθητήρες Παρκαρίσματος', value: 'aisthitires' },
+  { icon: 'settings', label: 'Αλλαγή δίσκου πλατό', value: 'symplektis' },
+  { icon: 'conveyor_belt', label: 'Αλλαγή ιμάντα χρονισμού', value: 'imantas' },
+  { icon: 'build', label: 'Τακτικό service αυτοκινήτου', value: 'service' },
+  { icon: 'format_paint', label: 'Ολική βαφή αυτοκινήτου', value: 'oliki-vafi' },
+  { icon: 'brush', label: 'Μερική βαφή αυτοκινήτου', value: 'meriki-vafi' },
+  { icon: 'sensors', label: 'Τοποθέτηση αισθητήρων παρκαρίσματος', value: 'aisthitires' },
   { icon: 'oil_barrel', label: 'Αλλαγή λαδιών', value: 'allagi-ladion' },
 ]
 

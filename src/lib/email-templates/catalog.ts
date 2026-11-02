@@ -113,8 +113,8 @@ export const EMAIL_DEFINITIONS: EmailDefinition[] = [
     audience: 'client',
     trigger: 'Μόλις ο πελάτης στείλει νέο αίτημα.',
     sentBy: 'app',
-    variables: [car, field('category', 'κατηγορία', 'Εργασία', 'Service Αυτοκινήτων')],
-    example: { ...EXAMPLE_IDS, brand: 'Toyota', model: 'Yaris', category: 'Service Αυτοκινήτων' },
+    variables: [car, field('category', 'κατηγορία', 'Εργασία', 'Τακτικό service αυτοκινήτου')],
+    example: { ...EXAMPLE_IDS, brand: 'Toyota', model: 'Yaris', category: 'Τακτικό service αυτοκινήτου' },
     copy: {
       subject: 'Λάβαμε το αίτημά σου',
       heading: 'Ευχαριστούμε!',
@@ -309,14 +309,14 @@ export const EMAIL_DEFINITIONS: EmailDefinition[] = [
     variables: [
       field('companyName', 'επωνυμία', 'Επωνυμία συνεργείου', 'Auto Fix Παπαδόπουλος'),
       car,
-      field('category', 'κατηγορία', 'Εργασία', 'Service Αυτοκινήτων'),
+      field('category', 'κατηγορία', 'Εργασία', 'Τακτικό service αυτοκινήτου'),
     ],
     example: {
       ...EXAMPLE_IDS,
       companyName: 'Auto Fix Παπαδόπουλος',
       brand: 'Toyota',
       model: 'Yaris',
-      category: 'Service Αυτοκινήτων',
+      category: 'Τακτικό service αυτοκινήτου',
     },
     copy: {
       subject: 'Νέο αίτημα για προσφορά στο NextService',
@@ -374,6 +374,37 @@ export const EMAIL_DEFINITIONS: EmailDefinition[] = [
       note: '',
     },
     ctaUrl: (v) => link(`/garage-dashboard/${v.garageId || ''}/?tab=appointments`),
+  },
+  {
+    name: EmailTemplate.RequestDetailsChanged,
+    label: 'Νέα στοιχεία σε αίτημα',
+    audience: 'garage',
+    trigger:
+      'Όταν ο πελάτης αλλάζει κάτι που βλέπει το συνεργείο: στοιχεία αυτοκινήτου, άδεια, φωτογραφίες, ημερομηνίες ή όνομα. Πάει στα συνεργεία με ενεργή προσφορά στο αίτημα και στο συνεργείο του ραντεβού, που μαθαίνει και για αλλαγές σε επώνυμο, κινητό, email και πινακίδα. Γράφει ποια στοιχεία άλλαξαν, όχι τις νέες τιμές.',
+    sentBy: 'app',
+    variables: [
+      car,
+      field('category', 'εργασία', 'Εργασία', 'Αλλαγή λαδιών'),
+      field('changes', 'αλλαγές', 'Τι άλλαξε', 'Αριθμός πλαισίου, Χρώμα'),
+    ],
+    example: {
+      ...EXAMPLE_IDS,
+      brand: 'Toyota',
+      model: 'Yaris',
+      category: 'Αλλαγή λαδιών',
+      changes: 'Αριθμός πλαισίου, Χρώμα',
+    },
+    copy: {
+      subject: 'Νέα στοιχεία στο αίτημα για {αυτοκίνητο}',
+      heading: 'Ο πελάτης άλλαξε στοιχεία',
+      body:
+        'Ο πελάτης ενημέρωσε το αίτημα **{εργασία}** για **{αυτοκίνητο}**.\n\n' +
+        'Τι άλλαξε: **{αλλαγές}**\n\n' +
+        'Πάτα το κουμπί για να δεις τα νέα στοιχεία.',
+      ctaLabel: 'Δες τα νέα στοιχεία',
+      note: '',
+    },
+    ctaUrl: (v) => link(`/garage-dashboard/${v.garageId || ''}/offers/${v.requestId || ''}/`),
   },
   {
     name: EmailTemplate.CompletionPromptGarage,

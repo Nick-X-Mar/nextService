@@ -7,8 +7,19 @@ import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
 import { useNavigation } from '@/hooks/useNavigation'
 import { startNewRequest } from '@/utils/formStorage'
-import { SERVICE_CATEGORIES as categories } from '@/utils/categoryLabels'
+import { SERVICE_CATEGORIES as categories, OTHER_CATEGORY } from '@/utils/categoryLabels'
 import { track } from '@/lib/track'
+import { useSpeechInput, type SpeechFailure } from '@/hooks/useSpeechInput'
+import { useToast } from '@/hooks/useToast'
+
+/** Long enough for the page to settle, so the opening is seen rather than missed. */
+const AUTO_OPEN_DELAY_MS = 800
+
+const SPEECH_FAILURES: Record<SpeechFailure, [string, string]> = {
+  denied: ['Δεν δόθηκε πρόσβαση στο μικρόφωνο', 'Επίτρεψέ την από τις ρυθμίσεις του browser ή γράψε το κείμενο.'],
+  'no-speech': ['Δεν ακούστηκε κάτι', 'Δοκίμασε ξανά ή γράψε το κείμενο.'],
+  unavailable: ['Το μικρόφωνο δεν είναι διαθέσιμο εδώ', 'Γράψε το κείμενο στο πεδίο.'],
+}
 
 /**
  * Opens the category menu on `/?open=1` — where the "Νέο Αίτημα" buttons send
@@ -31,7 +42,11 @@ function OpenOnParam({ onOpen }: { onOpen: () => void }) {
 
 export default function HeroSection() {
   const { navigate } = useNavigation()
+  const { error } = useToast()
   const [selectedCategory, setSelectedCategory] = useState('')
+  const [text, setText] = useState('')
+  // Whether the text in the field came from the microphone, for the funnel.
+  const spokenRef = useRef(false)
   // The category tap fires a 500ms close animation before the push, so without
   // this the row sits there looking inert for the whole wait.
   const [pendingCategory, setPendingCategory] = useState('')
@@ -50,31 +65,55 @@ export default function HeroSection() {
     const ctx = gsap.context(() => {
       gsap.set(itemsRef.current, { y: 30, opacity: 0 })
       const tl = gsap.timeline({ paused: true })
-      tl.to(containerRef.current, { height: 380, duration: 0.4, ease: 'power3.out' })
+      tl.to(containerRef.current, { height: 'auto', duration: 0.4, ease: 'power3.out' })
         .to(itemsRef.current, { y: 0, opacity: 1, duration: 0.3, ease: 'power3.out', stagger: 0.06 }, '-=0.2')
       tlRef.current = tl
     }, containerRef)
     return () => ctx.revert()
   }, [])
 
+  const openMenu = () => {
+    if (!tlRef.current || isOpenRef.current) return
+    isOpenRef.current = true
+    tlRef.current.play()
+    setIsOpen(true)
+  }
+
   // Auto-open when navigated with ?open=1
   const openFromParam = () => {
-    if (!tlRef.current || isOpenRef.current) return
-    setTimeout(() => {
-      tlRef.current?.play()
-      setIsOpen(true)
-    }, 300)
+    setTimeout(openMenu, 300)
   }
+
+  // Opens by itself so it is clear the list is there to pick from. The field is
+  // not focused: on a phone that would raise the keyboard over the list.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (window.scrollY > 0) return
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) tlRef.current?.progress(1)
+      openMenu()
+    }, AUTO_OPEN_DELAY_MS)
+    return () => clearTimeout(timer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const toggleMenu = () => {
     if (!tlRef.current) return
     if (isOpen) {
+      isOpenRef.current = false
       tlRef.current.reverse()
+      setIsOpen(false)
     } else {
-      tlRef.current.play()
+      openMenu()
     }
-    setIsOpen(!isOpen)
   }
+
+  const speech = useSpeechInput({
+    onText: (spoken) => {
+      spokenRef.current = true
+      setText(spoken)
+    },
+    onFailure: (failure) => error(...SPEECH_FAILURES[failure]),
+  })
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -84,17 +123,30 @@ export default function HeroSection() {
     if (pendingCategory) return
     setSelectedCategory(value)
     setPendingCategory(value)
+    isOpenRef.current = false
     if (tlRef.current) tlRef.current.reverse()
     setIsOpen(false)
-    startNewRequest({ category: value })
+    const description = text.trim()
+    startNewRequest({ category: value, ...(description ? { description } : {}) })
     track('category_selected', { category: value })
     setTimeout(() => {
       navigate('/car-details/')
     }, 500)
   }
 
+  const submitText = (event: React.FormEvent) => {
+    event.preventDefault()
+    const description = text.trim()
+    if (!description || pendingCategory) return
+    setPendingCategory(OTHER_CATEGORY)
+    startNewRequest({ category: OTHER_CATEGORY, description })
+    // The source, never the text: it can name people and cars.
+    track('category_selected', { category: OTHER_CATEGORY, source: spokenRef.current ? 'voice' : 'typed' })
+    navigate('/car-details/')
+  }
+
   return (
-    <section className="relative min-h-screen flex flex-col justify-center">
+    <section className="relative min-h-screen flex flex-col">
       {/* Overlay removed — now applied globally in LandingPage */}
 
       <Suspense fallback={null}>
@@ -106,32 +158,67 @@ export default function HeroSection() {
       </h1>
 
       {/* Content */}
-      <div className="relative z-10 px-5 flex flex-col items-center">
+      <div className="relative z-10 flex-1 px-5 pt-20 pb-6 flex flex-col items-center justify-center">
         {/* Animated Command Menu */}
         <div
           ref={containerRef}
           className="w-full max-w-[480px] h-[60px] bg-surface-container-lowest/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-outline-variant/10 overflow-hidden"
         >
           {/* Search Bar */}
-          <div className="absolute inset-x-0 top-0 h-[60px] flex items-center justify-between px-4 z-10">
-            <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => !isOpen && toggleMenu()}>
-              <Icon name="search" size="md" className="text-on-surface-variant/50" />
-              {selectedCategory ? (
-                <span className="text-sm font-bold text-on-surface">{selectedLabel}</span>
-              ) : (
-                <span className="text-sm text-on-surface-variant/50">Τι χρειάζεται το αυτοκίνητό σου;</span>
-              )}
-            </div>
+          <form onSubmit={submitText} className="h-[60px] flex items-center gap-1 pl-4 pr-2">
+            <Icon name="search" size="md" className="mr-2 flex-shrink-0 text-on-surface-variant/50" />
+            <input
+              type="text"
+              value={selectedCategory ? selectedLabel : text}
+              onChange={(e) => {
+                spokenRef.current = false
+                setText(e.target.value)
+              }}
+              onFocus={openMenu}
+              readOnly={!!pendingCategory}
+              maxLength={2000}
+              enterKeyHint="go"
+              autoComplete="off"
+              aria-label="Τι χρειάζεται το αυτοκίνητό σου;"
+              placeholder={speech.listening ? 'Σε ακούω...' : 'Γράψε τι χρειάζεσαι'}
+              className="flex-1 min-w-0 h-full bg-transparent border-none outline-none focus:ring-0 text-sm font-bold text-on-surface placeholder:font-normal placeholder:text-on-surface-variant/70"
+            />
+            {text.trim() && !speech.listening ? (
+              <button
+                type="submit"
+                aria-label="Συνέχεια"
+                className="w-10 h-10 flex-shrink-0 rounded-full machined-gradient text-on-primary flex items-center justify-center active:scale-95 transition-transform"
+              >
+                {pendingCategory === OTHER_CATEGORY ? <Spinner size="sm" /> : <Icon name="arrow_forward" size="sm" />}
+              </button>
+            ) : speech.supported && (
+              <button
+                type="button"
+                onClick={speech.toggle}
+                aria-label={speech.listening ? 'Σταμάτα την ηχογράφηση' : 'Πες το με τη φωνή σου'}
+                aria-pressed={speech.listening}
+                className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center active:scale-95 transition-colors ${
+                  speech.listening
+                    ? 'machined-gradient text-on-primary animate-pulse'
+                    : 'text-primary hover:bg-surface-container-high'
+                }`}
+              >
+                <Icon name="mic" size="md" filled={speech.listening} />
+              </button>
+            )}
             <button
+              type="button"
               onClick={toggleMenu}
-              className="text-xs font-bold text-on-surface-variant bg-surface-container-high px-3 py-1.5 rounded-lg"
+              aria-label={isOpen ? 'Κλείσιμο επιλογών' : 'Άνοιγμα επιλογών'}
+              aria-expanded={isOpen}
+              className="w-9 h-10 flex-shrink-0 rounded-lg text-on-surface-variant flex items-center justify-center hover:bg-surface-container-high active:scale-95 transition-colors"
             >
-              {isOpen ? 'Κλείσιμο' : 'Άνοιγμα'}
+              <Icon name={isOpen ? 'expand_less' : 'expand_more'} size="md" />
             </button>
-          </div>
+          </form>
 
           {/* Dropdown Items */}
-          <div className="absolute inset-x-0 top-[60px] p-2 space-y-1">
+          <div className="p-2 pt-0 space-y-1">
             {categories.map((cat, i) => (
               <div
                 key={cat.value}
@@ -172,13 +259,10 @@ export default function HeroSection() {
       </div>
 
       {/* Scroll cue — the only signal that the completed-jobs carousel and the FAQ
-          exist below the fold. Sits above BottomNav on mobile, and fades out while
-          the category menu is open so it never collides with it on short screens. */}
-      <div
-        className={`absolute bottom-32 md:bottom-16 inset-x-0 z-10 flex flex-col items-center gap-2 transition-opacity duration-300 ${
-          isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
-        }`}
-      >
+          exist below the fold. In the flow under the menu, since the menu now opens
+          by itself: on a short screen the hero grows rather than the two colliding.
+          The padding keeps it above BottomNav on mobile. */}
+      <div className="relative z-10 pb-28 md:pb-16 flex flex-col items-center gap-2">
         <div className="flex flex-wrap items-center justify-center gap-2 px-4">
           <button
             type="button"

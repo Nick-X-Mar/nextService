@@ -6,6 +6,7 @@ import { requireAuth } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
 import { TABLES } from '@/lib/tables'
+import { notifyGaragesOfChanges } from '@/utils/requestChangeNotice'
 
 const checkUploadRate = createRateLimiter('license-photo-upload', 20, 3600000)
 
@@ -99,6 +100,8 @@ async function _POST(
         ':now': new Date().toISOString(),
       },
     }))
+
+    await notifyGaragesOfChanges(auth.userId, ['licensePhoto'], { vehicleId })
 
     return NextResponse.json({ success: true, key: upload.key })
   } catch (error) {

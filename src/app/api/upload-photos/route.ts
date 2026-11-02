@@ -10,6 +10,7 @@ import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName } from '@/types/events'
 import { requireAuth } from '@/utils/requireAuth'
+import { notifyGaragesOfChanges } from '@/utils/requestChangeNotice'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
 import { broadcastRequestPhotos } from '@/utils/requestBroadcast'
@@ -224,6 +225,7 @@ async function _POST(request: NextRequest) {
     // which is before these photos exist. Push the now-complete photo set so
     // the open dashboards stop showing a photoless card until someone reloads.
     await broadcastRequestPhotos(serviceRequestId)
+    await notifyGaragesOfChanges(auth.userId, ['photos'], { requestId: serviceRequestId })
 
     return NextResponse.json({
       success: true,

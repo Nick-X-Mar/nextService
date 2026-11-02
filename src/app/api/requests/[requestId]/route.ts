@@ -8,6 +8,7 @@ import { requireActiveGarage, requireAuth, requireOwner } from '@/utils/requireA
 import { generatePresignedUrls } from '@/utils/s3Service'
 import { withMetrics } from '@/utils/withMetrics'
 import { ServiceRequestStatus } from '@/types/statuses'
+import { notifyGaragesOfChanges } from '@/utils/requestChangeNotice'
 import { garageClientView, garageVehicleView, resolveWinningGarageId, wonByAnotherGarage } from '@/utils/garageClientView'
 import { TABLES } from '@/lib/tables'
 
@@ -388,6 +389,10 @@ async function _PATCH(
       source: 'api/requests/[requestId]',
       metadata: { dateCount: normalizedDates.length }
     })
+
+    if (normalizedDates.join() !== (serviceRequest.clientAvailabilityDates || []).join()) {
+      await notifyGaragesOfChanges(ownerCheck.userId, ['availability'], { requestId })
+    }
 
     // Fetch client + vehicle + presigned photo URLs in parallel.
     const rawPatchPhotoUrls = updatedRequest.photoUrls || []

@@ -3,6 +3,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import { requireClientOwner } from '@/app/api/clients/requireClientOwner'
 import { withMetrics } from '@/utils/withMetrics'
+import { notifyGaragesOfChanges } from '@/utils/requestChangeNotice'
 import { TABLES } from '@/lib/tables'
 
 async function _GET(
@@ -121,12 +122,12 @@ async function _PUT(
     // a job, and `quotingFirstName` hides such a value only while it still
     // matches the current address — so when the address changes, the old local
     // part becomes the placeholder instead of outliving the email it came from.
+    const current = (await dynamoDB.send(new GetCommand({
+      TableName: TABLES.Clients,
+      Key: { id: clientId },
+      ProjectionExpression: 'email, firstName, lastName, phoneNumber',
+    }))).Item
     if (firstName) {
-      const current = (await dynamoDB.send(new GetCommand({
-        TableName: TABLES.Clients,
-        Key: { id: clientId },
-        ProjectionExpression: 'email',
-      }))).Item
       const oldLocal = typeof current?.email === 'string' ? current.email.split('@')[0].toLowerCase() : ''
       if (oldLocal && firstName.toLowerCase() === oldLocal && email !== String(current?.email).toLowerCase()) {
         firstName = ''
@@ -221,6 +222,10 @@ async function _PUT(
     if (!Attributes) {
       return NextResponse.json({ error: 'Client not found' }, { status: 404 })
     }
+
+    const changed = (['firstName', 'lastName', 'phoneNumber', 'email'] as const)
+      .filter((field) => (current?.[field] ?? '') !== (Attributes?.[field] ?? ''))
+    await notifyGaragesOfChanges(clientId, changed)
 
     return NextResponse.json({
       success: true,

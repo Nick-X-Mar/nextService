@@ -336,7 +336,7 @@ test.describe('Profile in the browser', () => {
     await page.goto(`/profile/${clientId}/`)
     // The one on the car itself — the header and sidebar have their own.
     await page.locator('#vehicles-section').getByRole('button', { name: 'Νέο Αίτημα' }).click()
-    await page.getByRole('button', { name: 'Ιμάντας' }).click()
+    await page.getByRole('button', { name: 'Αλλαγή ιμάντα' }).click()
     await page.waitForURL('**/car-details/**')
 
     // car-details used to clear the draft on mount, so this arrived empty.
