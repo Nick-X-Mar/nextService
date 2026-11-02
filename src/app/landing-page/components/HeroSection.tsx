@@ -52,6 +52,8 @@ export default function HeroSection() {
   const [pendingCategory, setPendingCategory] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const fieldRef = useRef<HTMLTextAreaElement>(null)
   const itemsRef = useRef<HTMLDivElement[]>([])
   const tlRef = useRef<gsap.core.Timeline | null>(null)
   // Read by OpenOnParam's callback, which can fire without this component
@@ -65,7 +67,8 @@ export default function HeroSection() {
     const ctx = gsap.context(() => {
       gsap.set(itemsRef.current, { y: 30, opacity: 0 })
       const tl = gsap.timeline({ paused: true })
-      tl.to(containerRef.current, { height: 'auto', duration: 0.4, ease: 'power3.out' })
+      // The list, not the box: the bar has to keep its height for a long text.
+      tl.to(listRef.current, { height: 'auto', duration: 0.4, ease: 'power3.out' })
         .to(itemsRef.current, { y: 0, opacity: 1, duration: 0.3, ease: 'power3.out', stagger: 0.06 }, '-=0.2')
       tlRef.current = tl
     }, containerRef)
@@ -115,6 +118,20 @@ export default function HeroSection() {
     onFailure: (failure) => error(...SPEECH_FAILURES[failure]),
   })
 
+  // The whole text stays readable, typed or dictated, so the field follows it.
+  const fieldValue = selectedCategory ? selectedLabel : text
+  useLayoutEffect(() => {
+    const fit = () => {
+      const field = fieldRef.current
+      if (!field) return
+      field.style.height = 'auto'
+      field.style.height = `${field.scrollHeight}px`
+    }
+    fit()
+    window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+  }, [fieldValue])
+
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
@@ -134,7 +151,7 @@ export default function HeroSection() {
     }, 500)
   }
 
-  const submitText = (event: React.FormEvent) => {
+  const submitText = (event: React.SyntheticEvent) => {
     event.preventDefault()
     const description = text.trim()
     if (!description || pendingCategory) return
@@ -162,17 +179,21 @@ export default function HeroSection() {
         {/* Animated Command Menu */}
         <div
           ref={containerRef}
-          className="w-full max-w-[480px] h-[60px] bg-surface-container-lowest/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-outline-variant/10 overflow-hidden"
+          className="w-full max-w-[480px] bg-surface-container-lowest/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-outline-variant/10 overflow-hidden"
         >
           {/* Search Bar */}
-          <form onSubmit={submitText} className="h-[60px] flex items-center gap-1 pl-4 pr-2">
-            <Icon name="search" size="md" className="mr-2 flex-shrink-0 text-on-surface-variant/50" />
-            <input
-              type="text"
-              value={selectedCategory ? selectedLabel : text}
+          <form onSubmit={submitText} className="min-h-[60px] flex items-end gap-1 pl-4 pr-2">
+            <Icon name="search" size="md" className="mr-2 mb-5 flex-shrink-0 text-on-surface-variant/50" />
+            <textarea
+              ref={fieldRef}
+              rows={1}
+              value={fieldValue}
               onChange={(e) => {
                 spokenRef.current = false
                 setText(e.target.value)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) submitText(e)
               }}
               onFocus={openMenu}
               readOnly={!!pendingCategory}
@@ -181,13 +202,13 @@ export default function HeroSection() {
               autoComplete="off"
               aria-label="Τι χρειάζεται το αυτοκίνητό σου;"
               placeholder={speech.listening ? 'Σε ακούω...' : 'Γράψε τι χρειάζεσαι'}
-              className="flex-1 min-w-0 h-full bg-transparent border-none outline-none focus:ring-0 text-sm font-bold text-on-surface placeholder:font-normal placeholder:text-on-surface-variant/70"
+              className="flex-1 min-w-0 py-[18px] px-0 resize-none overflow-hidden bg-transparent border-none outline-none focus:ring-0 text-sm leading-6 font-bold text-on-surface placeholder:font-normal placeholder:text-on-surface-variant/70"
             />
             {text.trim() && !speech.listening ? (
               <button
                 type="submit"
                 aria-label="Συνέχεια"
-                className="w-10 h-10 flex-shrink-0 rounded-full machined-gradient text-on-primary flex items-center justify-center active:scale-95 transition-transform"
+                className="w-10 h-10 mb-2.5 flex-shrink-0 rounded-full machined-gradient text-on-primary flex items-center justify-center active:scale-95 transition-transform"
               >
                 {pendingCategory === OTHER_CATEGORY ? <Spinner size="sm" /> : <Icon name="arrow_forward" size="sm" />}
               </button>
@@ -197,7 +218,7 @@ export default function HeroSection() {
                 onClick={speech.toggle}
                 aria-label={speech.listening ? 'Σταμάτα την ηχογράφηση' : 'Πες το με τη φωνή σου'}
                 aria-pressed={speech.listening}
-                className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center active:scale-95 transition-colors ${
+                className={`w-10 h-10 mb-2.5 flex-shrink-0 rounded-full flex items-center justify-center active:scale-95 transition-colors ${
                   speech.listening
                     ? 'machined-gradient text-on-primary animate-pulse'
                     : 'text-primary hover:bg-surface-container-high'
@@ -211,48 +232,50 @@ export default function HeroSection() {
               onClick={toggleMenu}
               aria-label={isOpen ? 'Κλείσιμο επιλογών' : 'Άνοιγμα επιλογών'}
               aria-expanded={isOpen}
-              className="w-9 h-10 flex-shrink-0 rounded-lg text-on-surface-variant flex items-center justify-center hover:bg-surface-container-high active:scale-95 transition-colors"
+              className="w-9 h-10 mb-2.5 flex-shrink-0 rounded-lg text-on-surface-variant flex items-center justify-center hover:bg-surface-container-high active:scale-95 transition-colors"
             >
               <Icon name={isOpen ? 'expand_less' : 'expand_more'} size="md" />
             </button>
           </form>
 
           {/* Dropdown Items */}
-          <div className="p-2 pt-0 space-y-1">
-            {categories.map((cat, i) => (
-              <div
-                key={cat.value}
-                ref={el => { itemsRef.current[i] = el! }}
-                onClick={() => selectCategory(cat.value)}
-                className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
-                  selectedCategory === cat.value
-                    ? 'bg-primary/10'
-                    : 'bg-surface-container hover:bg-surface-container-high'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Icon
-                    name={cat.icon}
-                    size="sm"
-                    className={selectedCategory === cat.value ? 'text-primary' : 'text-on-surface-variant/60'}
-                  />
-                  <span className={`text-sm font-bold ${
-                    selectedCategory === cat.value ? 'text-primary' : 'text-on-surface'
-                  }`}>
-                    {cat.label}
-                  </span>
+          <div ref={listRef} className="h-0 overflow-hidden">
+            <div className="p-2 pt-0 space-y-1">
+              {categories.map((cat, i) => (
+                <div
+                  key={cat.value}
+                  ref={el => { itemsRef.current[i] = el! }}
+                  onClick={() => selectCategory(cat.value)}
+                  className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
+                    selectedCategory === cat.value
+                      ? 'bg-primary/10'
+                      : 'bg-surface-container hover:bg-surface-container-high'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon
+                      name={cat.icon}
+                      size="sm"
+                      className={selectedCategory === cat.value ? 'text-primary' : 'text-on-surface-variant/60'}
+                    />
+                    <span className={`text-sm font-bold ${
+                      selectedCategory === cat.value ? 'text-primary' : 'text-on-surface'
+                    }`}>
+                      {cat.label}
+                    </span>
+                  </div>
+                  {pendingCategory === cat.value ? (
+                    <Spinner size="sm" className="text-primary" />
+                  ) : (
+                    <Icon
+                      name="arrow_forward"
+                      size="sm"
+                      className={selectedCategory === cat.value ? 'text-primary' : 'text-on-surface-variant/30'}
+                    />
+                  )}
                 </div>
-                {pendingCategory === cat.value ? (
-                  <Spinner size="sm" className="text-primary" />
-                ) : (
-                  <Icon
-                    name="arrow_forward"
-                    size="sm"
-                    className={selectedCategory === cat.value ? 'text-primary' : 'text-on-surface-variant/30'}
-                  />
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
 

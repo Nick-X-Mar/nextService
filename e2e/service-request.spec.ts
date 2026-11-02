@@ -835,6 +835,47 @@ test.describe('Request funnel in the browser', () => {
     expect(await readDraft(page)).toMatchObject({ category: 'other', description: 'Ακούγεται θόρυβος από το εμπρός δεξί' })
   })
 
+  test('The field grows with the text, typed or dictated, and with the options closed', async ({ page }) => {
+    const speech = 'Το αυτοκίνητό μου κάνει έναν περίεργο θόρυβο από μπροστά όταν στρίβω δεξιά και μετά από λίγα χιλιόμετρα ανάβει το λαμπάκι του κινητήρα στο καντράν'
+    await page.addInitScript((phrase) => {
+      class FakeRecognition {
+        onresult: ((event: unknown) => void) | null = null
+        onend: (() => void) | null = null
+        start() {
+          setTimeout(() => {
+            this.onresult?.({ results: [[{ transcript: phrase }]] })
+            this.onend?.()
+          }, 50)
+        }
+        stop() {}
+        abort() {}
+      }
+      const w = window as unknown as Record<string, unknown>
+      w.SpeechRecognition = FakeRecognition
+      w.webkitSpeechRecognition = FakeRecognition
+    }, speech)
+    await page.setViewportSize({ width: 360, height: 740 })
+    await page.goto('/')
+    const field = page.getByLabel('Τι χρειάζεται το αυτοκίνητό σου;')
+    await expect(page.getByRole('button', { name: 'Κλείσιμο επιλογών' })).toBeVisible({ timeout: 10_000 })
+    const showsAll = () => field.evaluate((el) => el.clientHeight >= el.scrollHeight)
+    const oneLine = (await field.boundingBox())!.height
+
+    await page.getByRole('button', { name: 'Πες το με τη φωνή σου' }).click()
+    await expect(field).toHaveValue(speech)
+    expect((await field.boundingBox())!.height).toBeGreaterThan(oneLine * 2)
+    expect(await showsAll()).toBe(true)
+
+    await page.getByRole('button', { name: 'Κλείσιμο επιλογών' }).click()
+    await expect(page.getByRole('button', { name: 'Άνοιγμα επιλογών' })).toBeVisible()
+    await page.waitForTimeout(700)
+    const [box, card] = await Promise.all([field.boundingBox(), field.locator('../..').boundingBox()])
+    expect(box!.y + box!.height).toBeLessThanOrEqual(card!.y + card!.height + 1)
+
+    await field.fill('Μικρό κείμενο')
+    expect((await field.boundingBox())!.height).toBeLessThan(oneLine + 1)
+  })
+
   test('The microphone dictates in Greek into the field, and the text then goes on the same way', async ({ page }) => {
     await page.addInitScript(() => {
       class FakeRecognition {
