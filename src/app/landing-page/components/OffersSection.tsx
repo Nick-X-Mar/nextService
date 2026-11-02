@@ -7,7 +7,7 @@ import Image from 'next/image'
 import Icon from '@/components/ui/Icon'
 import PlusVat from '@/components/PlusVat'
 import { Badge } from '@/components/ui/badge'
-import { motion, useMotionValue, useSpring } from 'motion/react'
+import { motion, useMotionValue, useSpring, type PanInfo } from 'motion/react'
 
 interface Offer {
   id?: string
@@ -28,6 +28,10 @@ interface Offer {
 }
 
 const GAP = 24
+/** A swipe counts past either of these: far enough, or a quick flick. */
+const SWIPE_DISTANCE = 50
+const SWIPE_VELOCITY = 300
+const MAX_CARDS_PER_SWIPE = 3
 
 export default function OffersSection() {
   const [offers, setOffers] = useState<Offer[]>(staticOffers)
@@ -45,6 +49,9 @@ export default function OffersSection() {
   const [containerW, setContainerW] = useState(0)
   const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const recenterTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const panStartX = useRef(0)
+  // A swipe ends in a click on the card it began on, which would open that card.
+  const justPanned = useRef(false)
 
   const logicalIndex = ((activePhysical % N) + N) % N
 
@@ -150,8 +157,32 @@ export default function OffersSection() {
     }
   }, [])
 
+  const handlePanStart = useCallback(() => {
+    // A swipe right after another: start from the middle copy, or the row runs out.
+    if (recenterTimer.current) clearTimeout(recenterTimer.current)
+    recenter()
+    panStartX.current = x.get()
+    justPanned.current = true
+  }, [recenter, x])
+
+  const handlePan = useCallback((_: PointerEvent, info: PanInfo) => {
+    x.set(panStartX.current + info.offset.x)
+  }, [x])
+
+  const handlePanEnd = useCallback((_: PointerEvent, info: PanInfo) => {
+    setTimeout(() => { justPanned.current = false }, 0)
+    const { offset, velocity } = info
+    if (Math.abs(offset.x) < SWIPE_DISTANCE && Math.abs(velocity.x) < SWIPE_VELOCITY) {
+      animateTo(physicalRef.current)
+      return
+    }
+    const direction = (offset.x || velocity.x) < 0 ? 1 : -1
+    const cards = Math.round(Math.abs(offset.x) / (cardW + GAP))
+    animateTo(physicalRef.current + direction * Math.min(Math.max(cards, 1), MAX_CARDS_PER_SWIPE, N))
+  }, [animateTo, cardW, N])
+
   const handleCardClick = useCallback((extIndex: number) => {
-    if (cardW <= 0) return
+    if (cardW <= 0 || justPanned.current) return
 
     if (extIndex === physicalRef.current) {
       setRevealedIndex(prev => prev === extIndex ? null : extIndex)
@@ -198,8 +229,12 @@ export default function OffersSection() {
         <div ref={containerRef} className="overflow-hidden">
           <motion.div
             ref={wrapRef}
-            className="flex"
-            style={{ x: springX, gap: GAP }}
+            className="flex select-none"
+            // pan-y: the page still scrolls under a vertical swipe.
+            style={{ x: springX, gap: GAP, touchAction: 'pan-y' }}
+            onPanStart={handlePanStart}
+            onPan={handlePan}
+            onPanEnd={handlePanEnd}
           >
           {extendedOffers.map((offer, extIndex) => {
             const isRevealed = revealedIndex === extIndex
@@ -220,6 +255,7 @@ export default function OffersSection() {
                         alt={offer.title}
                         fill
                         sizes="(max-width: 768px) 80vw, (max-width: 1280px) 38vw, 28vw"
+                        draggable={false}
                         className="object-cover"
                       />
                     ) : (
@@ -318,6 +354,8 @@ export default function OffersSection() {
           <button
             key={index}
             onClick={() => scrollToLogical(index)}
+            aria-label={`Εργασία ${index + 1}`}
+            aria-current={index === logicalIndex}
             className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
               index === logicalIndex
                 ? 'bg-[#ff9900] scale-125'

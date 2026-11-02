@@ -78,7 +78,6 @@ export default async function Image({ params }: Params) {
   const bg = offer ? await loadOfferImage(offer.image) : null
 
   const title = offer?.title ?? 'NextService'
-  const subtitle = offer?.subtitle ?? ''
   const price = offer?.price ?? ''
   const category = offer ? getCategoryText(offer.category) : 'Service'
 
@@ -125,112 +124,73 @@ export default async function Image({ params }: Params) {
             width: '100%',
             height: '100%',
             background:
-              'linear-gradient(100deg, rgba(27,28,28,0.92) 0%, rgba(27,28,28,0.82) 45%, rgba(138,81,0,0.55) 100%)',
+              'linear-gradient(180deg, rgba(27,28,28,0.84) 0%, rgba(27,28,28,0.9) 100%)',
             display: 'flex',
           }}
         />
 
+        {/* Everything sits in the middle 630px: Messenger crops this card to a
+            centred square, which cut the logo and the title along the edges. */}
         <div
           style={{
             position: 'relative',
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'space-between',
-            padding: 72,
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 20,
             width: '100%',
             height: '100%',
+            textAlign: 'center',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            {/* White plate is required, not stylistic: the logo's charcoal
-                "SERVICE" and gear would be unreadable on this dark photo. */}
-            {logo ? (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: 10,
-                  borderRadius: 18,
-                  background: '#ffffff',
-                }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={logo} alt="NextService" width={225} height={Math.round(225 / LOGO_ASPECT_RATIO)} />
-              </div>
-            ) : (
-              <div style={{ fontSize: 32, fontWeight: 900, letterSpacing: -1, display: 'flex' }}>
-                NextService
-              </div>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <div
-              style={{
-                display: 'flex',
-                alignSelf: 'flex-start',
-                padding: '8px 20px',
-                borderRadius: 999,
-                background: 'rgba(255,153,0,0.22)',
-                border: '2px solid #ff9900',
-                color: '#ffb86f',
-                fontSize: 22,
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: 2,
-              }}
-            >
-              {category}
-            </div>
-            <div
-              style={{
-                fontSize: title.length > 18 ? 84 : 104,
-                fontWeight: 900,
-                lineHeight: 1.02,
-                letterSpacing: -3,
-                maxWidth: 1000,
-              }}
-            >
-              {title}
-            </div>
-            {subtitle && (
-              <div style={{ fontSize: 32, fontWeight: 500, opacity: 0.92, maxWidth: 960 }}>
-                {subtitle}
-              </div>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-            {price && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div style={{ fontSize: 22, fontWeight: 600, opacity: 0.8, textTransform: 'uppercase', letterSpacing: 2 }}>
-                  Κόστισε
-                </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
-                  <div style={{ fontSize: 108, fontWeight: 900, color: '#ff9900', lineHeight: 1, letterSpacing: -3 }}>
-                    {price}
-                  </div>
-                  <div style={{ fontSize: 40, fontWeight: 700, color: '#ff9900' }}>{PLUS_VAT}</div>
-                </div>
-              </div>
-            )}
+          {/* White plate is required, not stylistic: the logo's charcoal
+              "SERVICE" and gear would be unreadable on this dark photo. */}
+          {logo ? (
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 12,
-                padding: '16px 28px',
-                borderRadius: 16,
-                background: '#ff9900',
-                color: '#1b1c1c',
-                fontSize: 26,
-                fontWeight: 900,
+                justifyContent: 'center',
+                padding: 14,
+                borderRadius: 20,
+                background: '#ffffff',
               }}
             >
-              Πάρε Προσφορά →
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={logo} alt="NextService" width={320} height={Math.round(320 / LOGO_ASPECT_RATIO)} />
             </div>
+          ) : (
+            <div style={{ fontSize: 44, fontWeight: 900, letterSpacing: -1, display: 'flex' }}>
+              NextService
+            </div>
+          )}
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              width: 590,
+              fontSize: title.length > 24 ? 48 : 60,
+              fontWeight: 900,
+              lineHeight: 1.08,
+              letterSpacing: -1,
+            }}
+          >
+            {title}
           </div>
+
+          {price ? (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+              <div style={{ fontSize: 30, fontWeight: 700, opacity: 0.85 }}>Κόστισε</div>
+              <div style={{ fontSize: 84, fontWeight: 900, color: '#ff9900', lineHeight: 1, letterSpacing: -2 }}>
+                {price}
+              </div>
+              <div style={{ fontSize: 32, fontWeight: 700, color: '#ff9900' }}>{PLUS_VAT}</div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', fontSize: 30, fontWeight: 700 }}>{category}</div>
+          )}
         </div>
       </div>
     ),

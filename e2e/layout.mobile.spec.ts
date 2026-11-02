@@ -155,6 +155,36 @@ test('The homepage search opens with its last option tappable and the scroll cue
   await expectNoSidewaysScroll(page)
 })
 
+test('The hot deals move under a finger, and the page still scrolls over them', async ({ page }) => {
+  await page.goto('/')
+  const section = page.locator('#offers')
+  await section.scrollIntoViewIfNeeded()
+  const first = section.getByRole('button', { name: 'Εργασία 1', exact: true })
+  await expect(first).toHaveAttribute('aria-current', 'true', { timeout: 30_000 })
+
+  const card = section.locator('.select-none')
+  await expect(card).toHaveCSS('touch-action', 'pan-y')
+  await page.waitForTimeout(500)
+  const box = (await section.getByRole('heading', { level: 2 }).boundingBox())!
+  const y = box.y + 220
+  await page.mouse.move(300, y)
+  await page.mouse.down()
+  await page.mouse.move(220, y, { steps: 5 })
+  await page.mouse.move(120, y, { steps: 5 })
+  await page.mouse.up()
+  await expect(first).toHaveAttribute('aria-current', 'false')
+  await expect(section.getByRole('button', { name: 'Εργασία 2', exact: true })).toHaveAttribute('aria-current', 'true')
+
+  // Back the other way.
+  await page.waitForTimeout(700)
+  await page.mouse.move(120, y)
+  await page.mouse.down()
+  await page.mouse.move(220, y, { steps: 5 })
+  await page.mouse.move(300, y, { steps: 5 })
+  await page.mouse.up()
+  await expect(first).toHaveAttribute('aria-current', 'true')
+})
+
 test('The offer page leaves the footer reachable under its sticky button', async ({ page }) => {
   await page.goto('/offer/set_disk_all_cars/')
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))

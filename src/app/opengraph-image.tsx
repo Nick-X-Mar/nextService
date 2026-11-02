@@ -26,79 +26,46 @@ export default async function Image() {
 
   return new ImageResponse(
     (
+      // Everything sits in the middle 630px: Messenger crops this card to a centred
+      // square, which cut the logo and the headline when they ran along the edges.
+      // White, because the logo's orange NEXT vanishes on the brand's own orange.
       <div
         style={{
           width: '100%',
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'space-between',
-          background:
-            'linear-gradient(135deg, #8a5100 0%, #ff9900 55%, #ffb86f 100%)',
-          color: '#ffffff',
-          padding: 72,
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#ffffff',
+          color: '#161616',
+          borderBottom: '16px solid #ff9900',
           fontFamily: 'Inter',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          {/* The white plate is not decoration — straight on this card's orange
-              gradient the logo's orange "NEXT" disappears entirely. White is the
-              only backing that renders it correctly. */}
-          {logo ? (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 12,
-                borderRadius: 20,
-                background: '#ffffff',
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logo} alt="NextService" width={270} height={Math.round(270 / LOGO_ASPECT_RATIO)} />
-            </div>
-          ) : (
-            <div style={{ fontSize: 40, fontWeight: 900, letterSpacing: -1, display: 'flex' }}>
-              NextService
-            </div>
-          )}
-          <div style={{ fontSize: 24, fontWeight: 600, opacity: 0.92, display: 'flex' }}>
-            Πλατφόρμα συνεργείων αυτοκινήτου · Αθήνα
-          </div>
+        {logo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logo} alt="NextService" width={560} height={Math.round(560 / LOGO_ASPECT_RATIO)} />
+        ) : (
+          <div style={{ fontSize: 72, fontWeight: 900, letterSpacing: -2, display: 'flex' }}>NextService</div>
+        )}
+        <div
+          style={{
+            display: 'flex',
+            marginTop: 32,
+            width: 580,
+            justifyContent: 'center',
+            textAlign: 'center',
+            fontSize: 46,
+            fontWeight: 900,
+            lineHeight: 1.15,
+            letterSpacing: -1,
+          }}
+        >
+          Βρες συνεργείο με την καλύτερη τιμή
         </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <div
-            style={{
-              fontSize: 78,
-              fontWeight: 900,
-              lineHeight: 1.05,
-              letterSpacing: -2,
-              maxWidth: 980,
-            }}
-          >
-            Βρες συνεργείο με την καλύτερη τιμή.
-          </div>
-          <div style={{ fontSize: 30, fontWeight: 500, opacity: 0.95, maxWidth: 900 }}>
-            Πραγματικές τιμές από ολοκληρωμένες εργασίες σε service, συμπλέκτη, ιμάντα χρονισμού & φανοποιεία.
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 24, fontWeight: 700 }}>
-          <div
-            style={{
-              background: 'rgba(0,0,0,0.25)',
-              borderRadius: 999,
-              padding: '10px 22px',
-              display: 'flex',
-            }}
-          >
-            nextservice.gr
-          </div>
-          <div style={{ opacity: 0.85, display: 'flex' }}>
-            Στείλε αίτημα · Πάρε προσφορές
-          </div>
+        <div style={{ display: 'flex', marginTop: 18, fontSize: 28, fontWeight: 700, color: '#554434' }}>
+          Στείλε αίτημα · Πάρε προσφορές
         </div>
       </div>
     ),
