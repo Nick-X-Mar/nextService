@@ -8,7 +8,7 @@ import { requireActiveGarage, requireAuth, requireOwner } from '@/utils/requireA
 import { generatePresignedUrls } from '@/utils/s3Service'
 import { withMetrics } from '@/utils/withMetrics'
 import { ServiceRequestStatus } from '@/types/statuses'
-import { garageClientView, garageVehicleView, resolveWinningGarageId } from '@/utils/garageClientView'
+import { garageClientView, garageVehicleView, resolveWinningGarageId, wonByAnotherGarage } from '@/utils/garageClientView'
 import { TABLES } from '@/lib/tables'
 
 async function _GET(
@@ -78,14 +78,21 @@ async function _GET(
     //
     // Reading it is not seeing the client, though: only the winner, from the
     // acceptance on, gets the PII (see garageClientView). Everyone else who may
-    // read — a garage quoting, one that lost, one whose job was cancelled — gets
-    // the quoting view.
+    // read — a garage quoting, one whose job was cancelled — gets the quoting
+    // view. A garage that lost the job to another may not read it at all.
     let isWinner = false
     if (auth.userType === 'garage') {
       const isOpenMarket = serviceRequest.status === ServiceRequestStatus.PENDING
       isWinner = (await resolveWinningGarageId(serviceRequest)) === auth.userId
 
       if (!isOpenMarket && !isWinner) {
+        if (await wonByAnotherGarage(serviceRequest, auth.userId)) {
+          return NextResponse.json(
+            { error: 'Το αίτημα ανατέθηκε σε άλλο συνεργείο.', code: 'ASSIGNED_ELSEWHERE' },
+            { status: 403 }
+          )
+        }
+
         const offersOnRequest = await dynamoDB.send(new QueryCommand({
           TableName: TABLES.Offers,
           IndexName: 'ServiceRequestOffersIndex',

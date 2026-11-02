@@ -59,6 +59,22 @@ export async function resolveWinningGarageId(serviceRequest: Row): Promise<strin
 }
 
 /**
+ * Whether another garage got this job. Unlike the winner above it stays true
+ * after the booking is cancelled: the garages that lost it lost it for good.
+ *
+ * The request then leaves those garages altogether: their offer, the request
+ * and their chat with the client. Nothing is deleted, the admin still sees it
+ * all and the client keeps the conversation.
+ */
+export async function wonByAnotherGarage(serviceRequest: Row, garageId: string): Promise<boolean> {
+  const direct = str(serviceRequest.acceptedGarageId)
+  if (direct) return direct !== garageId
+  const offer = await getByIdOrNull(TABLES.Offers, str(serviceRequest.acceptedOfferId))
+  const winner = str(offer?.garageId)
+  return !!winner && winner !== garageId
+}
+
+/**
  * The client's first name as a garage that has not won may see it.
  *
  * Accounts made from the request form or the plain register route have no name

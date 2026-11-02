@@ -195,15 +195,30 @@ test.describe.serial('Read-only once the request leaves the market', () => {
     await acceptOffer(request, client, requestId, winnerOfferId)
   })
 
-  test('The losing garage reads the thread but is told it is read-only', async ({ request }) => {
+  test('The chat is gone for the losing garage, and kept for the client and the admin', async ({ request }) => {
     const resp = await request.get(`/api/chat/${requestId}/messages/?garageId=${loser.id}`, {
       headers: cookie(loser.token),
     })
-    expect(resp.status()).toBe(200)
-    const data = await resp.json()
-    expect(data.messages.length).toBe(2)
-    expect(data.canWrite).toBe(false)
-    expect(data.readOnlyNotice).toContain('άλλο συνεργείο')
+    expect(resp.status()).toBe(403)
+    const refused = await resp.json()
+    expect(refused.code).toBe('ASSIGNED_ELSEWHERE')
+    expect(refused.messages).toBeUndefined()
+
+    const chats = await (await request.get('/api/chat/garage-chats/', { headers: cookie(loser.token) })).json()
+    expect(chats.requestIds).not.toContain(requestId)
+
+    const clientView = await (await request.get(`/api/chat/${requestId}/messages/?garageId=${loser.id}`, {
+      headers: cookie(client.token),
+    })).json()
+    expect(clientView.messages.length).toBe(2)
+    expect(clientView.canWrite).toBe(false)
+
+    const admin = await loginAdmin(request)
+    const adminView = await (await request.get(`/api/admin/requests/${requestId}/`, {
+      headers: { Cookie: admin },
+    })).json()
+    const thread = adminView.threads.find((t: { garageId: string }) => t.garageId === loser.id)
+    expect(thread.messages.map((m: { message: string }) => m.message)).toEqual(['Μπορώ αύριο', 'Ευχαριστώ'])
 
     const post = await postMessage(request, loser.token, requestId, 'Ακόμα εδώ;')
     expect(post.status()).toBe(403)
@@ -221,10 +236,8 @@ test.describe.serial('Read-only once the request leaves the market', () => {
     const clientPost = await postMessage(request, client.token, requestId, 'Γεια', loser.id)
     expect(clientPost.status()).toBe(403)
 
-    const loserView = await (await request.get(`/api/chat/${requestId}/messages/`, {
-      headers: cookie(loser.token),
-    })).json()
-    expect(loserView.canWrite).toBe(false)
+    const loserView = await request.get(`/api/chat/${requestId}/messages/`, { headers: cookie(loser.token) })
+    expect(loserView.status()).toBe(403)
   })
 
   test('After completion the garage that did the job and its client still can', async ({ request }) => {
@@ -238,12 +251,15 @@ test.describe.serial('Read-only once the request leaves the market', () => {
     expect(view.readOnlyNotice).toBeNull()
   })
 
-  test('The chat pages mirror it: the losing garage and the client see a notice, not a composer', async ({ page, request }) => {
+  test('The chat pages mirror it: the losing garage gets no chat, the client a notice and no composer', async ({ page, request }) => {
     await signInGarage(page, loser)
     await page.goto(`/garage-dashboard/${loser.id}/chat/${requestId}/`)
-    await expect(page.getByText('Μπορώ αύριο')).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByText('Το αίτημα ανατέθηκε σε άλλο συνεργείο', { exact: false })).toBeVisible()
+    await expect(page.getByTestId('assigned-elsewhere')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText('Μπορώ αύριο')).toHaveCount(0)
     await expect(page.getByPlaceholder('Γράψτε μήνυμα...')).toHaveCount(0)
+
+    await page.goto(`/garage-dashboard/${loser.id}/offers/${requestId}/`)
+    await expect(page.getByTestId('assigned-elsewhere')).toBeVisible({ timeout: 30_000 })
 
     await page.context().clearCookies()
     await loginAsClient(page, request, client.email, PASSWORD)
@@ -326,12 +342,10 @@ test.describe('A photo sent into a thread that has since closed', () => {
 
     // …then the client books the other garage.
     await acceptOffer(request, client, requestId, winnerOffer)
-    for (const token of [loser.token, client.token]) {
-      const view = await (await request.get(`/api/chat/${requestId}/messages/?garageId=${loser.id}`, {
-        headers: cookie(token),
-      })).json()
-      expect(view.canWrite).toBe(false)
-    }
+    const view = await (await request.get(`/api/chat/${requestId}/messages/?garageId=${loser.id}`, {
+      headers: cookie(client.token),
+    })).json()
+    expect(view.canWrite).toBe(false)
 
     for (const [p, notice] of [
       [page, 'Το αίτημα ανατέθηκε σε άλλο συνεργείο'],
@@ -572,10 +586,12 @@ test.describe.serial('The client is named to each garage by the winner-only rule
     expect(await clientNames(request, loser)).toEqual(['Άννα', 'Άννα'])
   })
 
-  test('Once booked, the winner sees the full name and the loser still the first name', async ({ request }) => {
+  test('Once booked, the winner sees the full name and the loser nothing at all', async ({ request }) => {
     await acceptOffer(request, client, requestId, winnerOfferId)
     expect(await clientNames(request, winner)).toEqual(['Άννα Μαρία Παπαδοπούλου'])
-    expect(await clientNames(request, loser)).toEqual(['Άννα', 'Άννα'])
+    const lost = await request.get(`/api/chat/${requestId}/messages/`, { headers: cookie(loser.token) })
+    expect(lost.status()).toBe(403)
+    expect(await lost.text()).not.toContain('Άννα')
 
     // The client's own view is untouched.
     const own = await (await request.get(`/api/chat/${requestId}/messages/?garageId=${winner.id}`, {
@@ -703,8 +719,12 @@ test.describe.serial('Pre-thread client messages reach only the garages that wer
   test('Once booked: only the garage that got the job', async ({ request }) => {
     await acceptOffer(request, client, requestId, bidderOffer)
     expect(await sees(request, bidder)).toBe(true)
-    expect(await sees(request, writer)).toBe(false)
-    expect(await sees(request, stranger)).toBe(false)
+    // Nobody else won it, so the two others are shut out altogether.
+    for (const garage of [writer, stranger]) {
+      const resp = await request.get(`/api/chat/${requestId}/messages/`, { headers: cookie(garage.token) })
+      expect(resp.status()).toBe(403)
+      expect(await resp.text()).not.toContain(LEGACY)
+    }
   })
 })
 

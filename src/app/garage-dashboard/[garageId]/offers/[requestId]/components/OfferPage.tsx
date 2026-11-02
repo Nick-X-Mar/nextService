@@ -22,6 +22,7 @@ import { addDays, addMonths, isWeekend, format } from 'date-fns'
 import { el } from 'date-fns/locale'
 import 'react-day-picker/dist/style.css'
 import { isGarageInactive } from '../../../components/garageInactive'
+import AssignedElsewhere, { isAssignedElsewhere } from '../../../components/AssignedElsewhere'
 import { formatAppointment, garageOfferState, offerStatusClass, offerStatusLabel } from '../../../components/offerStatus'
 import { clientDisplayName } from '../../../components/clientLabel'
 
@@ -147,6 +148,8 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
   const [isLoading, setIsLoading] = useState(true)
   // The API refused this garage as not (or no longer) approved.
   const [inactive, setInactive] = useState(false)
+  // Another garage got the job: the request is gone for this garage.
+  const [assignedElsewhere, setAssignedElsewhere] = useState(false)
 
   const [existingOffer, setExistingOffer] = useState<StoredOffer | null>(null)
   const [savedOffer, setSavedOffer] = useState<SavedOffer | null>(null)
@@ -270,6 +273,11 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
 
       if (isGarageInactive(requestResponse, requestData) || isGarageInactive(offersResponse, offersData)) {
         setInactive(true)
+        return
+      }
+
+      if (isAssignedElsewhere(requestResponse, requestData)) {
+        setAssignedElsewhere(true)
         return
       }
 
@@ -493,6 +501,8 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
 
   const isSubmitting = isPending('submit') || isNavigating(offersHref)
   const canSubmit = !isSubmitting && (!existingOffer || hasChanges())
+
+  if (assignedElsewhere) return <AssignedElsewhere garageId={garageId} />
 
   if (isLoading) {
     return (

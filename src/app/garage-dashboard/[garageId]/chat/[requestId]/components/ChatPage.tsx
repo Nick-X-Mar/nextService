@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/useToast'
 import { useNavigation } from '@/hooks/useNavigation'
 import { getCategoryText } from '@/utils/categoryLabels'
 import { isGarageInactive } from '../../../components/garageInactive'
+import AssignedElsewhere, { isAssignedElsewhere } from '../../../components/AssignedElsewhere'
 import GaragePendingView from '../../../chats/components/GaragePendingView'
 import { chatChannel } from '@/lib/realtime-channels'
 import { MAX_CHAT_MESSAGE_LENGTH } from '@/types/chat'
@@ -65,6 +66,8 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
   // The server answered GARAGE_INACTIVE: not approved yet, or deactivated
   // since the session was cached. The pending screen replaces the chat.
   const [inactive, setInactive] = useState(false)
+  // Another garage got the job: this chat no longer exists for this garage.
+  const [assignedElsewhere, setAssignedElsewhere] = useState(false)
   const isWinner = !!requestData?.acceptedGarageId && requestData.acceptedGarageId === garageId
 
   // Subscription refs
@@ -215,6 +218,11 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
         return
       }
       setInactive(false)
+
+      if (isAssignedElsewhere(messagesResponse, messagesResult)) {
+        setAssignedElsewhere(true)
+        return
+      }
 
       if (requestResponse.ok && requestResult) {
         // Some endpoints return { success, request }, others may return just { request }
@@ -443,6 +451,8 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
   if (inactive) {
     return <GaragePendingView garageId={garageId} onApproved={loadChatData} />
   }
+
+  if (assignedElsewhere) return <AssignedElsewhere garageId={garageId} />
 
   if (isLoading) {
     return (

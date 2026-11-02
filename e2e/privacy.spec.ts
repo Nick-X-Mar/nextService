@@ -234,23 +234,16 @@ test.describe.serial('Winner-only client PII', () => {
     expect((offer.serviceRequest.vehicle as Record<string, unknown>).licensePlate).toBe(MAIN_IDS.licensePlate)
   })
 
-  test('The losing garage keeps only the quoting view of its own history', async () => {
+  test('The request is gone for the losing garage: no detail, no offer in its list', async () => {
     const res = await api(`/api/requests/${mainRequest.requestId}/?viewerGarageId=${loser.id}`, { token: loser.token })
-    expect(res.status).toBe(200)
-    const request = res.data.request
-    expect(request.status).toBe('appointment')
-    expectQuotingClient(request.client)
-    expectQuotingVehicle(request.vehicle)
-    expect(request.vehicle.licensePhotoUrl).toBeNull()
-    // It learns that it lost — not who won, when, or for how much.
-    expect(request.acceptedGarageId).toBeNull()
-    expect(request.appointmentDate).toBeUndefined()
-    expect(request.appointmentPrice).toBeUndefined()
+    expect(res.status).toBe(403)
+    expect(res.data.code).toBe('ASSIGNED_ELSEWHERE')
     expectNoneOf(res.data, [...ownerSecrets(), winner.id])
 
-    const offer = await offerFor(loser, mainRequest.requestId)
-    expectQuotingClient(offer.serviceRequest.client as Record<string, unknown>)
-    expectNoneOf(offer, ownerSecrets())
+    const offers = await api('/api/garage/offers/', { token: loser.token })
+    expect(offers.status).toBe(200)
+    const listed = offers.data.offers as Array<{ serviceRequestId: string }>
+    expect(listed.map((o) => o.serviceRequestId)).not.toContain(mainRequest.requestId)
 
     // A garage that never bid has no history with this request at all.
     const stranger = await api(`/api/requests/${mainRequest.requestId}/`, { token: quoting.token })
@@ -375,16 +368,12 @@ test.describe.serial('Winner-only client PII', () => {
 
   // Its own browser context: switching garages inside one would hit the
   // dashboard's stale-identity redirect, not the screen under test.
-  test('UI: the losing garage sees the first name on its offer, and no contact buttons', async ({ page }) => {
+  test('UI: a lost job is not in the losing garage\'s offers', async ({ page }) => {
     await signInGarage(page, loser)
     await page.goto(`/garage-dashboard/${loser.id}/?tab=offers`)
-    const lost = page.locator('article').filter({ hasText: `E2E privacy main ${tag}` })
-    await expect(lost).toBeVisible({ timeout: 45_000 })
-    await expect(lost).toContainText(OWNER_PROFILE.firstName)
-    await expect(lost).not.toContainText(OWNER_PROFILE.lastName)
-    await expect(lost).not.toContainText('undefined')
-    await expect(lost.locator('a[href^="tel:"]')).toHaveCount(0)
-    await expect(lost).toContainText('Απορρίφθηκε')
+    await expect(page.getByRole('button', { name: 'Απορριφθείσες' })).toBeVisible({ timeout: 45_000 })
+    await page.getByRole('button', { name: 'Απορριφθείσες' }).click()
+    await expect(page.getByText(`E2E privacy main ${tag}`)).toHaveCount(0)
   })
 
   test('UI: a booking the client cancelled reads «Ακυρώθηκε», with the first name only', async ({ page }) => {
@@ -423,10 +412,8 @@ test.describe.serial('Winner-only client PII', () => {
     const won = await offerFor(winner, mainRequest.requestId)
     expect(won.serviceRequest.finalAmounts).toBeTruthy()
 
-    const lost = await offerFor(loser, mainRequest.requestId)
-    expect(lost.serviceRequest.status).toBe('completed')
-    expect(lost.serviceRequest.finalAmounts).toBeUndefined()
-    expect(lost.serviceRequest.completionOutcome).toBeUndefined()
-    expectQuotingClient(lost.serviceRequest.client as Record<string, unknown>)
+    const lost = await api(`/api/requests/${mainRequest.requestId}/`, { token: loser.token })
+    expect(lost.status).toBe(403)
+    expect(lost.data.finalAmounts).toBeUndefined()
   })
 })

@@ -79,6 +79,14 @@ async function _GET(request: NextRequest) {
       const legacyWinner = ownOfferIds.has(serviceRequest.acceptedOfferId as string) ? garageId : null
       const isWinner = isWinningGarage(serviceRequest, garageId, legacyWinner)
 
+      // A job another garage got leaves this list (see wonByAnotherGarage). The
+      // same test without its read: this garage's own offers are all at hand.
+      const acceptedOffer = serviceRequest.acceptedOfferId as string | undefined
+      const acceptedGarage = serviceRequest.acceptedGarageId as string | undefined
+      if (acceptedGarage ? acceptedGarage !== garageId : !!acceptedOffer && !ownOfferIds.has(acceptedOffer)) {
+        return null
+      }
+
       // Offers rows carry `offerAmount`; the `price`/`currency`/`description`
       // this used to return have never existed on them, which is why the
       // offers tab showed blank prices.

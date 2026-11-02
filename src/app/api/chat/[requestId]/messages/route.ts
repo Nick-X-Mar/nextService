@@ -16,6 +16,7 @@ import {
   garageMayReadLegacyMessages,
 } from '@/utils/chatService'
 import { presignChatAttachments } from '@/utils/chatAttachments'
+import { wonByAnotherGarage } from '@/utils/garageClientView'
 import { TABLES } from '@/lib/tables'
 
 const checkMessageRate = createRateLimiter('chat-message', 60, 3600000)
@@ -62,6 +63,14 @@ async function _GET(
         return NextResponse.json({ error: 'Δεν έχετε πρόσβαση' }, { status: 403 })
       }
       garageId = auth.userId
+      // The chat of a job another garage got is gone for this garage. It stays
+      // in the table: the client still has it, and so does the admin.
+      if (await wonByAnotherGarage(requestResult.Item, garageId)) {
+        return NextResponse.json(
+          { error: 'Το αίτημα ανατέθηκε σε άλλο συνεργείο.', code: 'ASSIGNED_ELSEWHERE' },
+          { status: 403 }
+        )
+      }
     }
 
     // Query messages by requestId via the RequestMessagesIndex GSI.
