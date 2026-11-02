@@ -32,12 +32,12 @@ function hashToken(token: string): string {
 async function _POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, userType = 'client' } = body || {}
+    const { email, userType: requestedType = 'client' } = body || {}
 
     if (!email || typeof email !== 'string') {
       return NextResponse.json({ error: 'Το email είναι υποχρεωτικό' }, { status: 400 })
     }
-    if (!['client', 'garage'].includes(userType)) {
+    if (!['client', 'garage'].includes(requestedType)) {
       return NextResponse.json({ error: 'Μη έγκυρος τύπος λογαριασμού' }, { status: 400 })
     }
 
@@ -61,20 +61,33 @@ async function _POST(request: NextRequest) {
     }
 
     const normalizedEmail = email.trim().toLowerCase()
-    const tableName = userType === 'garage' ? TABLES.Garages : TABLES.Clients
 
     // Both Clients and Garages carry an EmailIndex keyed on email, so this
     // resolves without reading the table.
-    const result = await dynamoDB.send(
-      new QueryCommand({
-        TableName: tableName,
-        IndexName: 'EmailIndex',
-        KeyConditionExpression: 'email = :email',
-        ExpressionAttributeValues: { ':email': normalizedEmail },
-        Limit: 1
-      })
-    )
-    const user = result.Items?.[0]
+    const findByEmail = async (type: 'client' | 'garage') => {
+      const result = await dynamoDB.send(
+        new QueryCommand({
+          TableName: type === 'garage' ? TABLES.Garages : TABLES.Clients,
+          IndexName: 'EmailIndex',
+          KeyConditionExpression: 'email = :email',
+          ExpressionAttributeValues: { ':email': normalizedEmail },
+          Limit: 1
+        })
+      )
+      return result.Items?.[0]
+    }
+
+    // The page's Πελάτης/Συνεργείο switch defaults to Πελάτης, and a garage
+    // that left it there silently got no email. The chosen type wins when the
+    // address has both kinds of account; otherwise the other one is tried.
+    let userType: 'client' | 'garage' = requestedType
+    let user = await findByEmail(userType)
+    if (!user) {
+      const otherType = userType === 'garage' ? 'client' : 'garage'
+      user = await findByEmail(otherType)
+      if (user) userType = otherType
+    }
+    const tableName = userType === 'garage' ? TABLES.Garages : TABLES.Clients
 
     // Generic success response — same regardless of whether the user exists.
     const genericSuccess = NextResponse.json({

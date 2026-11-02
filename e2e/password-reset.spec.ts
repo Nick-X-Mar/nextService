@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
-import { registerClient, loginViaAPI } from './helpers'
+import { registerClient, loginViaAPI, TEST_GARAGE } from './helpers'
+import { getGarage } from './dynamo-helpers'
 
 const CLIENT_EMAIL = `e2e-pwd-${Date.now()}@test.com`
 const CLIENT_PASSWORD = 'TestPass123'
@@ -29,6 +30,17 @@ test.describe.serial('Password Reset flow', () => {
     const data = await resp.json()
     // Should still return success to prevent account enumeration
     expect(data.success).toBe(true)
+  })
+
+  test('A garage email sent with the default Πελάτης type still gets its reset link', async ({ request }) => {
+    const before = await getGarage(TEST_GARAGE.id)
+    const resp = await request.post('/api/auth/forgot-password', {
+      data: { email: TEST_GARAGE.email, userType: 'client' },
+    })
+    expect(resp.status()).toBe(200)
+    const after = await getGarage(TEST_GARAGE.id)
+    expect(after?.passwordResetTokenHash).toBeTruthy()
+    expect(after?.passwordResetTokenHash).not.toBe(before?.passwordResetTokenHash)
   })
 
   test('Reset password with invalid token fails', async ({ request }) => {
