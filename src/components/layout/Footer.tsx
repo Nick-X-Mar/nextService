@@ -2,7 +2,9 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import Icon from '@/components/ui/Icon'
+import { OPEN_CONSENT_EVENT, isMeasuredHost } from '@/lib/analytics'
 
 const socialLinks = [
   { icon: 'mail', label: 'Email', href: 'mailto:info@nextservice.gr' },
@@ -22,6 +24,9 @@ const footerLinks = [
 ]
 
 export default function Footer() {
+  // After mount: the host is only known in the browser, and only there is the question asked.
+  const [measured, setMeasured] = useState(false)
+  useEffect(() => setMeasured(isMeasuredHost()), [])
   const handleShare = async () => {
     if (navigator.share) {
       try {
@@ -72,6 +77,15 @@ export default function Footer() {
                 {link.label}
               </Link>
             ))}
+            {measured && (
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new Event(OPEN_CONSENT_EVENT))}
+                className="inline-block py-2.5 text-sm text-on-surface-variant hover:text-on-surface transition-colors"
+              >
+                Ρυθμίσεις cookies
+              </button>
+            )}
           </nav>
 
           {/* Social Links */}

@@ -50,7 +50,9 @@ export default function OffersSection() {
   const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const recenterTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const panStartX = useRef(0)
-  // A swipe ends in a click on the card it began on, which would open that card.
+  // With a mouse a swipe ends in a click on the card under the pointer, which would
+  // move the row straight back. Held until the next press, since that click comes
+  // after the pan's end in some browsers and before it in others.
   const justPanned = useRef(false)
 
   const logicalIndex = ((activePhysical % N) + N) % N
@@ -170,7 +172,6 @@ export default function OffersSection() {
   }, [x])
 
   const handlePanEnd = useCallback((_: PointerEvent, info: PanInfo) => {
-    setTimeout(() => { justPanned.current = false }, 0)
     const { offset, velocity } = info
     if (Math.abs(offset.x) < SWIPE_DISTANCE && Math.abs(velocity.x) < SWIPE_VELOCITY) {
       animateTo(physicalRef.current)
@@ -232,6 +233,7 @@ export default function OffersSection() {
             className="flex select-none"
             // pan-y: the page still scrolls under a vertical swipe.
             style={{ x: springX, gap: GAP, touchAction: 'pan-y' }}
+            onPointerDownCapture={() => { justPanned.current = false }}
             onPanStart={handlePanStart}
             onPan={handlePan}
             onPanEnd={handlePanEnd}

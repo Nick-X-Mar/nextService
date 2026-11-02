@@ -28,6 +28,15 @@ async function isTappable(target: Locator) {
   })
 }
 
+/** WebKit keeps scrolling after the call returns, and the geometry read then is stale. */
+async function scrollSettled(page: Page) {
+  await expect.poll(async () => {
+    const before = await page.evaluate(() => window.scrollY)
+    await page.waitForTimeout(150)
+    return before === (await page.evaluate(() => window.scrollY))
+  }).toBe(true)
+}
+
 async function signInClient(page: Page, client: Party) {
   await setAuthCookie(page, client.token)
   await page.goto('/')
@@ -142,13 +151,18 @@ test('A sheet opens above the bottom bar: the last category can be tapped', asyn
 test('The homepage search opens with its last option tappable and the scroll cue clear of it', async ({ page }) => {
   await page.goto('/')
   const last = page.getByText('Αλλαγή λαδιών')
-  await expect(last).toBeVisible({ timeout: 30_000 })
-  await page.waitForTimeout(800) // the opening animation
-  await last.scrollIntoViewIfNeeded()
+  // Before hydration every row is opaque in a list still closed, so the button
+  // says it opened, and then the last row's opacity says the opening finished.
+  await expect(page.getByRole('button', { name: 'Κλείσιμο επιλογών' })).toBeVisible({ timeout: 30_000 })
+  await expect(last.locator('../..')).toHaveCSS('opacity', '1')
+  // The centre, as a thumb would bring it: "in view" also holds under the BottomNav.
+  await last.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+  await scrollSettled(page)
   expect(await isTappable(last)).toBe(true)
 
   const cue = page.getByRole('button', { name: 'Ολοκληρωμένες εργασίες' })
-  await cue.scrollIntoViewIfNeeded()
+  await cue.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+  await scrollSettled(page)
   const [lastBox, cueBox] = await Promise.all([last.boundingBox(), cue.boundingBox()])
   expect(cueBox!.y).toBeGreaterThan(lastBox!.y + lastBox!.height)
   expect(await isTappable(cue)).toBe(true)
@@ -164,7 +178,7 @@ test('The hot deals move under a finger, and the page still scrolls over them', 
 
   const card = section.locator('.select-none')
   await expect(card).toHaveCSS('touch-action', 'pan-y')
-  await page.waitForTimeout(500)
+  await scrollSettled(page)
   const box = (await section.getByRole('heading', { level: 2 }).boundingBox())!
   const y = box.y + 220
   await page.mouse.move(300, y)

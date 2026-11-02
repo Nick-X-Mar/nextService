@@ -12,6 +12,7 @@ import AppShell from "@/components/layout/AppShell";
 import { ToastProvider } from "@/components/ToastProvider";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import InAppBrowserEscape from "@/components/InAppBrowserEscape";
+import AnalyticsConsent from "@/components/AnalyticsConsent";
 import NumberWheelGuard from "@/components/NumberWheelGuard";
 import { UserProvider } from "@/contexts/UserContext";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -98,6 +99,7 @@ export default function RootLayout({
               </ConfirmProvider>
             </ToastProvider>
             <InAppBrowserEscape />
+            <AnalyticsConsent />
             <NumberWheelGuard />
           </UserProvider>
         </AuthProvider>

@@ -812,9 +812,11 @@ test.describe('Request funnel in the browser', () => {
 
   test('The homepage search opens by itself, without raising the keyboard', async ({ page }) => {
     await page.goto('/')
-    // A closed list still renders, clipped and transparent, so its row's opacity is the test.
+    // Before hydration every row is opaque in a list still closed, so the button
+    // says it opened, and then a row's opacity says the opening finished.
     const firstOption = page.getByText('Αλλαγή δίσκου πλατό').locator('../..')
-    await expect(firstOption).toHaveCSS('opacity', '1', { timeout: 10_000 })
+    await expect(page.getByRole('button', { name: 'Κλείσιμο επιλογών' })).toBeVisible({ timeout: 10_000 })
+    await expect(firstOption).toHaveCSS('opacity', '1')
     await expect(page.getByText('Τοποθέτηση αισθητήρων παρκαρίσματος')).toBeInViewport()
     await expect(page.getByLabel('Τι χρειάζεται το αυτοκίνητό σου;')).not.toBeFocused()
     await expect(page.getByRole('button', { name: 'Ολοκληρωμένες εργασίες' })).toBeVisible()
