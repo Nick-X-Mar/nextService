@@ -39,6 +39,12 @@ body {
   letter-spacing: normal;
   text-transform: none;
   display: inline-block;
+  /* The glyph's own box. Until the font arrives an icon is its ligature name in
+     invisible text ("receipt_long"), wide enough to wrap the hero's pills onto
+     a second row and shift the page when they snap back. */
+  width: 1em;
+  height: 1em;
+  overflow: hidden;
   white-space: nowrap;
   word-wrap: normal;
   direction: ltr;
