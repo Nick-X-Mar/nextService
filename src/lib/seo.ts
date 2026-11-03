@@ -41,8 +41,8 @@ export const organizationNode = {
   },
   image: `${SITE_URL}/opengraph-image/`,
   description:
-    'Πλατφόρμα συνεργείων αυτοκινήτου. Οι ιδιοκτήτες οχημάτων στέλνουν αίτημα service και λαμβάνουν προσφορές από επαγγελματικά συνεργεία της περιοχής τους. Προς το παρόν καλύπτουμε την Αθήνα.',
-  areaServed: { '@type': 'Country', name: 'GR' },
+    'Πλατφόρμα συνεργείων αυτοκινήτου. Οι ιδιοκτήτες οχημάτων στέλνουν αίτημα service και λαμβάνουν προσφορές από επαγγελματικά συνεργεία της περιοχής τους. Εξυπηρετούμε την Αττική.',
+  areaServed: { '@type': 'AdministrativeArea', name: 'Αττική' },
   sameAs: SOCIAL_PROFILES,
   contactPoint: {
     '@type': 'ContactPoint',

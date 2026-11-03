@@ -11,7 +11,7 @@ import { SITE_URL } from '@/lib/site-url'
  * crawl time is telling Google the whole site changed on every visit, which
  * Google responds to by ignoring `lastModified` for the domain entirely.
  */
-const CONTENT_LAST_MODIFIED = new Date('2026-11-02')
+const CONTENT_LAST_MODIFIED = new Date('2026-11-03')
 
 /**
  * Hot deals are edited through the admin panel, so `updatedAt` is only as

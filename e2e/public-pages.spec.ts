@@ -41,11 +41,23 @@ test.describe('FAQ accordion', () => {
   test('Answers stay in the HTML while collapsed, for crawlers', async ({ page }) => {
     const response = await page.goto('/faq/')
     const html = (await response?.text()) ?? ''
-    expect(html).toContain('Προς το παρόν συνεργαζόμαστε μόνο με συνεργεία στην Αθήνα')
+    expect(html).toContain('Συνεργαζόμαστε με συνεργεία στην Αττική.')
   })
 })
 
 test.describe('Public copy', () => {
+  // AI search quotes these back as a reason not to use the site. Where no garage
+  // exists the pages claim nothing; they do not apologise for it either.
+  test('The copy does not talk down the network', async ({ request }) => {
+    const paths = ['/', '/faq/', '/about/', '/locations/', '/location/athens-center/', '/location/notia-proastia/', '/location/peiraias/', '/llms.txt']
+    for (const path of paths) {
+      const body = await (await request.get(path)).text()
+      for (const phrase of ['ακόμη μικρό', 'ξεκίνησε πρόσφατα', 'Όχι ακόμη', 'Προς το παρόν', 'επεκτείνεται', 'υπό επέκταση', 'Άγιο Δημήτριο', 'ή και καμία', 'Ενεργά συνεργεία', 'Σύντομα']) {
+        expect(body, `${path}: ${phrase}`).not.toContain(phrase)
+      }
+    }
+  })
+
   test('We call ourselves a platform, not a marketplace', async ({ page }) => {
     for (const path of ['/faq/', '/about/']) {
       const response = await page.goto(path)
@@ -54,7 +66,7 @@ test.describe('Public copy', () => {
     }
   })
 
-  test('Athens-only coverage is stated', async ({ page }) => {
+  test('The coverage question is answered: Attica', async ({ page }) => {
     await page.goto('/faq/')
     // The answers ship collapsed (present in the HTML, hidden by CSS), so open the
     // coverage question before asserting the reader can actually see it.
@@ -62,7 +74,7 @@ test.describe('Public copy', () => {
       hasText: 'Σε ποιες περιοχές λειτουργείτε;',
     }).first()
     await coverage.click()
-    await expect(coverage.getByText('μόνο με συνεργεία στην Αθήνα')).toBeVisible()
+    await expect(coverage.getByText('Συνεργαζόμαστε με συνεργεία στην Αττική.')).toBeVisible()
   })
 })
 

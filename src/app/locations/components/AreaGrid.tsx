@@ -25,15 +25,6 @@ export default function AreaGrid({ areas }: { areas: AreaContent[] }) {
                   {a.region}
                 </span>
               </div>
-              <span
-                className={
-                  a.coverage === 'active'
-                    ? 'text-[0.65rem] font-black uppercase tracking-[0.1em] text-green-700 bg-green-100 px-2 py-1 rounded-sm'
-                    : 'text-[0.65rem] font-black uppercase tracking-[0.1em] text-amber-800 bg-amber-100 px-2 py-1 rounded-sm'
-                }
-              >
-                {a.coverage === 'active' ? 'Ενεργό' : 'Σύντομα'}
-              </span>
             </div>
             <h2 className="text-lg font-bold text-on-surface mb-2">{a.name}</h2>
             <p className="text-sm text-secondary leading-relaxed">{a.description}</p>

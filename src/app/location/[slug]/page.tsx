@@ -3,7 +3,6 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
 import PlusVat from '@/components/PlusVat'
-import { ACTIVE_GARAGE_LOCATIONS } from '@/data/locations'
 import { getAllAreas, getAreaContent } from '@/lib/site-content'
 import { RichLine } from '@/components/content/RichText'
 import type { AreaContent as Area } from '@/types/siteContent'
@@ -166,43 +165,11 @@ export default async function LocationPage({ params }: PageProps) {
               <span className="text-primary">{area.nameGenitive}</span>
             </h1>
 
-            {/* Coverage status, stated before anything else on the page. A
-                visitor searching for a garage here must not have to read to the
-                bottom to find out whether we actually have one. */}
-            <div
-              className={`mt-5 flex items-start gap-3 rounded-xl p-4 border ${
-                area.coverage === 'active'
-                  ? 'bg-green-50 border-green-200'
-                  : 'bg-amber-50 border-amber-300'
-              }`}
-            >
-              <Icon
-                name={area.coverage === 'active' ? 'check_circle' : 'info'}
-                size="md"
-                className={
-                  area.coverage === 'active' ? 'text-green-700 shrink-0' : 'text-amber-800 shrink-0'
-                }
-              />
-              <p
-                className={`text-sm leading-relaxed ${
-                  area.coverage === 'active' ? 'text-green-900' : 'text-amber-900'
-                }`}
-              >
-                {area.coverage === 'active' ? (
-                  <>
-                    <strong>Ενεργά συνεργεία στην περιοχή:</strong>{' '}
-                    {area.activeIn.join(', ')}. Στείλε αίτημα και θα δεις ποια μπορούν να
-                    αναλάβουν την εργασία σου και πότε.
-                  </>
-                ) : (
-                  <>
-                    <strong>Δεν έχουμε ακόμη ενεργό συνεργείο {area.nameGenitive}.</strong>{' '}
-                    Τα εγγεγραμμένα μας συνεργεία βρίσκονται σε{' '}
-                    {ACTIVE_GARAGE_LOCATIONS.join(' και ')}, και το δίκτυο επεκτείνεται.
-                    Μπορείς να στείλεις αίτημα — είναι δωρεάν και χωρίς δέσμευση, και θα σου
-                    απαντήσουν όσα συνεργεία μπορούν να σε εξυπηρετήσουν.
-                  </>
-                )}
+            <div className="mt-5 flex items-start gap-3 rounded-xl p-4 border bg-surface-container-low border-outline-variant/30">
+              <Icon name="info" size="md" className="text-primary shrink-0" />
+              <p className="text-sm leading-relaxed text-on-surface">
+                <strong>Εξυπηρετούμε την Αττική.</strong> Στείλε αίτημα: είναι δωρεάν και χωρίς
+                δέσμευση, και θα σου απαντήσουν όσα συνεργεία μπορούν να σε εξυπηρετήσουν.
               </p>
             </div>
 
