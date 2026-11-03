@@ -17,6 +17,7 @@ import NumberWheelGuard from "@/components/NumberWheelGuard";
 import { UserProvider } from "@/contexts/UserContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SITE_URL, IS_INDEXABLE } from "@/lib/site-url";
+import { ICON_FONT_URL } from "@/lib/icons";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -89,6 +90,12 @@ export default function RootLayout({
           href={`${SITE_URL}/llms.txt`}
           title="llms.txt"
         />
+        {/* Inter comes from next/font (self-hosted, preloaded). The icon font is
+            linked here, not @imported from globals.css: an @import is found only
+            after that stylesheet downloads, one more round trip before any paint. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="stylesheet" href={ICON_FONT_URL} />
         <AuthProvider>
           <UserProvider>
             <ToastProvider>

@@ -196,9 +196,9 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
 
           {/* Details */}
           <div className="mt-6 p-5 rounded-2xl bg-surface-container-lowest border border-outline-variant/15 space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
               Τι περιλάμβανε η εργασία
-            </h3>
+            </h2>
             <div className="space-y-2">
               {offer.details.map((detail) => (
                 <div key={detail} className="flex items-center gap-3">

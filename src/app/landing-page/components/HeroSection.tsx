@@ -175,8 +175,10 @@ export default function HeroSection() {
       </h1>
 
       {/* Content */}
-      <div className="relative z-10 flex-1 px-5 pt-20 pb-6 flex flex-col items-center justify-center">
-        {/* Animated Command Menu */}
+      <div className="relative z-10 flex-1 px-5 pt-24 pb-6 flex flex-col items-center justify-center">
+        {/* Animated Command Menu. Its open height is reserved, so the list opening
+            by itself pushes nothing: a moving page counted as a layout shift. */}
+        <div className="w-full max-w-[480px] min-h-[468px] md:min-h-[420px]">
         <div
           ref={containerRef}
           className="w-full max-w-[480px] bg-surface-container-lowest/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-outline-variant/10 overflow-hidden"
@@ -277,6 +279,7 @@ export default function HeroSection() {
               ))}
             </div>
           </div>
+        </div>
         </div>
 
       </div>

@@ -66,9 +66,9 @@ module.exports = {
         "inverse-primary": "#ffb86f",
       },
       fontFamily: {
-        "headline": ["Inter", "sans-serif"],
-        "body": ["Inter", "sans-serif"],
-        "label": ["Inter", "sans-serif"],
+        "headline": ["var(--font-inter)", "sans-serif"],
+        "body": ["var(--font-inter)", "sans-serif"],
+        "label": ["var(--font-inter)", "sans-serif"],
       },
       borderRadius: {
         "DEFAULT": "0.5rem",

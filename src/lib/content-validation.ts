@@ -5,6 +5,7 @@ import {
   type ContentBlock,
   type SitePage,
 } from '@/types/siteContent'
+import { isKnownIcon } from '@/lib/icons'
 
 /**
  * Server-side validation for admin-authored content.
@@ -63,6 +64,14 @@ function str(value: unknown, field: string, max: number, { required = true } = {
     fail(`Το πεδίο «${field}» ξεπερνά τους ${max} χαρακτήρες.`)
   }
   return trimmed
+}
+
+/** An icon outside the downloaded set would show as its word on the public page. */
+function knownIcon(name: string, field: string): string {
+  if (name && !isKnownIcon(name)) {
+    fail(`${field}: το «${name}» δεν είναι στα εικονίδια του site (src/lib/icons.ts). Διάλεξε ένα από αυτά ή ζήτα να προστεθεί.`)
+  }
+  return name
 }
 
 function strList(value: unknown, field: string, maxItems: number, maxLen: number): string[] {
@@ -138,7 +147,7 @@ function validateBlock(raw: unknown, index: number): ContentBlock {
         id,
         type,
         ...(block.title ? { title: str(block.title, 'τίτλος ομάδας', LIMITS.heading) } : {}),
-        ...(block.icon ? { icon: str(block.icon, 'εικονίδιο', LIMITS.icon) } : {}),
+        ...(block.icon ? { icon: knownIcon(str(block.icon, 'εικονίδιο', LIMITS.icon), 'εικονίδιο') } : {}),
         items: block.items.map((item, i) => {
           const entry = (item || {}) as Record<string, unknown>
           return {
@@ -164,7 +173,7 @@ function validateBlock(raw: unknown, index: number): ContentBlock {
             fail(`Ο σύνδεσμος στην κάρτα #${i + 1} δεν επιτρέπεται.`)
           }
           return {
-            icon: str(entry.icon, `κάρτα #${i + 1} εικονίδιο`, LIMITS.icon, { required: false }),
+            icon: knownIcon(str(entry.icon, `κάρτα #${i + 1} εικονίδιο`, LIMITS.icon, { required: false }), `κάρτα #${i + 1} εικονίδιο`),
             title: str(entry.title, `κάρτα #${i + 1} τίτλος`, LIMITS.cardTitle),
             body: str(entry.body, `κάρτα #${i + 1} κείμενο`, LIMITS.cardBody),
             ...(href ? { href } : {}),

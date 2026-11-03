@@ -281,9 +281,9 @@ export default function OffersSection() {
                     <div className={`absolute inset-0 flex flex-col items-center justify-end gap-3 p-6 pb-8 transition-all duration-500 ease-out ${
                       isRevealed ? '-translate-y-[45%]' : 'translate-y-0'
                     }`}>
-                      <h4 className="font-bold text-xl text-white text-center drop-shadow-lg">
+                      <h3 className="font-bold text-xl text-white text-center drop-shadow-lg">
                         {offer.title}
-                      </h4>
+                      </h3>
                       <p className="text-white/80 text-sm text-center drop-shadow">
                         {offer.subtitle}
                       </p>
@@ -351,19 +351,24 @@ export default function OffersSection() {
       </div>
 
       {/* Bullets */}
-      <div className="flex justify-center gap-2 mt-6">
+      <div className="flex justify-center gap-4 mt-6">
         {offers.map((_, index) => (
           <button
             key={index}
             onClick={() => scrollToLogical(index)}
             aria-label={`Εργασία ${index + 1}`}
             aria-current={index === logicalIndex}
-            className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-              index === logicalIndex
-                ? 'bg-[#ff9900] scale-125'
-                : 'bg-white/50 hover:bg-white/70'
-            }`}
-          />
+            // The dot is 10px; the button around it is a 24px target.
+            className="p-[7px] -m-[7px] rounded-full"
+          >
+            <span
+              className={`block w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                index === logicalIndex
+                  ? 'bg-[#ff9900] scale-125'
+                  : 'bg-white/50 hover:bg-white/70'
+              }`}
+            />
+          </button>
         ))}
       </div>
     </section>

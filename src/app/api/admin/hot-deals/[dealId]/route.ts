@@ -3,6 +3,7 @@ import { dynamoDB } from '@/utils/dynamoService'
 import { GetCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb'
 import { ensureHotDealsTable } from '@/utils/ensureHotDealsTable'
 import { withMetrics } from '@/utils/withMetrics'
+import { isKnownIcon } from '@/lib/icons'
 import { TABLES } from '@/lib/tables'
 
 // GET — single deal
@@ -39,6 +40,10 @@ async function _PUT(
     await ensureHotDealsTable()
     const { dealId } = await params
     const body = await request.json()
+    // Outside the downloaded icon set it would show as its word on the homepage.
+    if (body.icon && !isKnownIcon(String(body.icon))) {
+      return NextResponse.json({ error: `Το εικονίδιο «${body.icon}» δεν είναι στα εικονίδια του site. Διάλεξε ένα από τη λίστα.` }, { status: 400 })
+    }
 
     const fields = [
       'title', 'subtitle', 'description', 'price', 'priceNum',

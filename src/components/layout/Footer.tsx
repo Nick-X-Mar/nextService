@@ -126,7 +126,7 @@ export default function Footer() {
 
         {/* Bottom: Copyright */}
         <div className="border-t border-outline-variant/20 pt-6">
-          <p className="text-xs text-on-surface-variant/60 text-center">
+          <p className="text-xs text-on-surface-variant text-center">
             &copy; {new Date().getFullYear()} NextService. Με επιφύλαξη παντός δικαιώματος.
           </p>
         </div>

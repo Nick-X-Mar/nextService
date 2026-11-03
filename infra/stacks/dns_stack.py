@@ -69,6 +69,9 @@ SES_DKIM_DOMAINS = {
     "production": "dkim.eu-south-1.amazonses.com",
 }
 
+# Google Search Console ownership of the nextservice.gr domain property.
+GOOGLE_SITE_VERIFICATION = "google-site-verification=Wuhcrj12sHz3pglHPcSOC_wRVwc8elIQzDAMFHqDXyY"
+
 # Plesk's DKIM key for mail sent from the Pointer mailboxes. Longer than one
 # 255-byte TXT string; CDK splits it into chunks on synth.
 PLESK_DKIM_KEY = (
@@ -145,8 +148,15 @@ class DnsStack(Stack):
         srv("SmtpsSrv", "_smtps._tcp", 465)
 
         # ── Sender authentication ──
-        txt("Spf", None,
-            "v=spf1 +a +mx include:spf.linux45.name-servers.gr include:amazonses.com -all")
+        # The apex's only TXT record set: Route 53 holds one per name and type,
+        # so every apex TXT value goes here. Keep the "Spf" id — a new one would
+        # make CloudFormation create a second set for the name, which fails.
+        # The Google value verifies the Search Console domain property (www and
+        # apex, http and https); it outlives any rebuild of the site itself.
+        route53.TxtRecord(self, "Spf", zone=zone, ttl=TTL, values=[
+            "v=spf1 +a +mx include:spf.linux45.name-servers.gr include:amazonses.com -all",
+            GOOGLE_SITE_VERIFICATION,
+        ])
         # Strict alignment: SES mail passes on its DKIM signature (d=nextservice.gr),
         # never on SPF, since its MAIL FROM is SES's own domain.
         txt("Dmarc", "_dmarc", "v=DMARC1; p=quarantine; adkim=s; aspf=s")
