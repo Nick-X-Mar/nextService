@@ -1,6 +1,6 @@
 # NextService
 
-> Marketplace συνεργείων αυτοκινήτου στην Ελλάδα. NextService is a Greek car service marketplace connecting vehicle owners with vetted garages: customers submit service requests with vehicle details and photos, receive offers from local garages, chat in real-time, and book online. Completed jobs are published with the real price a garage charged for that specific car, as a reference point — they are not a fixed price list.
+> Πλατφόρμα συνεργείων αυτοκινήτου στην Αττική. NextService is a Greek car service marketplace connecting vehicle owners with vetted garages: customers submit service requests with vehicle details and photos, receive offers from local garages, chat in real-time, and book online. Completed jobs are published with the real price a garage charged for that specific car, as a reference point — they are not a fixed price list.
 
 ## Τι προσφέρουμε / What we offer
 
