@@ -150,7 +150,7 @@ test('A sheet opens above the bottom bar: the last category can be tapped', asyn
 
 test('The homepage search opens with its last option tappable and the scroll cue clear of it', async ({ page }) => {
   await page.goto('/')
-  const last = page.getByText('Αλλαγή λαδιών')
+  const last = page.getByText('Πολλαπλές ή Άλλες εργασίες')
   // Before hydration every row is opaque in a list still closed, so the button
   // says it opened, and then the last row's opacity says the opening finished.
   await expect(page.getByRole('button', { name: 'Κλείσιμο επιλογών' })).toBeVisible({ timeout: 30_000 })

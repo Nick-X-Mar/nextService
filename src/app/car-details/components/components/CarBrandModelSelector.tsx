@@ -16,6 +16,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useNavigation } from '@/hooks/useNavigation'
 import { useConfirm } from '@/hooks/useConfirm'
 import { track } from '@/lib/track'
+import { OTHER_CATEGORY } from '@/utils/categoryLabels'
 
 // Greek to Latin phonetic transliteration for search matching
 const greekToLatinMap: Record<string, string> = {
@@ -395,9 +396,12 @@ export default function CarBrandModelSelector({ category }: { category: string }
   }
 
   const isBodywork = BODYWORK_CATEGORIES.has(category)
+  // An «other» request has no category to say what it is: the text is all of it.
+  const descriptionRequired = category === OTHER_CATEGORY
 
   // Form validation
   const isFormValid =
+    (!descriptionRequired || description.trim() !== '') &&
     currentBrand.trim() !== '' &&
     currentModel.trim() !== '' &&
     isYearValid(modelYear) &&
@@ -445,7 +449,7 @@ export default function CarBrandModelSelector({ category }: { category: string }
           {/* Description */}
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
-              Περιγραφή Προβλήματος
+              Περιγραφή Αιτήματος {descriptionRequired && <span className="text-error">*</span>}
             </label>
             <textarea
               className="w-full bg-surface-container-highest rounded-xl px-4 py-3 border-none focus:ring-2 focus:ring-primary font-medium text-sm resize-none"

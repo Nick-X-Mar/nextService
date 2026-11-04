@@ -15,12 +15,13 @@ const categoryLabels: Record<string, string> = {
   electrical: 'Ηλεκτρικά',
   kteo: 'ΚΤΕΟ',
   elastika: 'Ελαστικά',
-  other: 'Άλλη εργασία',
+  other: 'Πολλαπλές ή Άλλες εργασίες',
 }
 
 /**
- * Where a request goes when the client wrote or dictated what they need instead
- * of picking from the list. The text is its description. It is not one of the
+ * Where a request goes when the client wrote or dictated what they need, or
+ * picked the homepage's last option, instead of one of the categories. The text
+ * is its description, so it cannot go without one. It is not one of the
  * pickers' categories, and it asks for everything a mechanical job does.
  */
 export const OTHER_CATEGORY = 'other'

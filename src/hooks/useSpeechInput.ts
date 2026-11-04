@@ -29,8 +29,9 @@ function recognitionConstructor(): SpeechRecognitionConstructor | undefined {
  * Dictation in Greek through the browser's own speech recognition.
  *
  * `onText` gets the whole phrase so far on every result, so the field fills in
- * while the person speaks. `continuous` stays off: it stops at the first pause,
- * which suits a short phrase, and Chrome on Android repeats words with it on.
+ * while the person speaks. `continuous` stays off, because Chrome on Android
+ * repeats words with it on. It then stops at the first pause, even a breath, so
+ * the caller keeps the microphone on offer to go on from there.
  */
 export function useSpeechInput({
   onText,

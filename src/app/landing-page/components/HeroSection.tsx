@@ -7,7 +7,7 @@ import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
 import { useNavigation } from '@/hooks/useNavigation'
 import { startNewRequest } from '@/utils/formStorage'
-import { SERVICE_CATEGORIES as categories, OTHER_CATEGORY } from '@/utils/categoryLabels'
+import { SERVICE_CATEGORIES as categories, OTHER_CATEGORY, getCategoryText } from '@/utils/categoryLabels'
 import { track } from '@/lib/track'
 import { useSpeechInput, type SpeechFailure } from '@/hooks/useSpeechInput'
 import { useToast } from '@/hooks/useToast'
@@ -61,7 +61,7 @@ export default function HeroSection() {
   const isOpenRef = useRef(false)
   useEffect(() => { isOpenRef.current = isOpen }, [isOpen])
 
-  const selectedLabel = categories.find(c => c.value === selectedCategory)?.label || ''
+  const selectedLabel = selectedCategory ? getCategoryText(selectedCategory) : ''
 
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {
@@ -110,13 +110,21 @@ export default function HeroSection() {
     }
   }
 
+  // What the field held when the microphone started. Dictation stops at the
+  // first pause, so the microphone stays on offer and a new phrase goes on after
+  // the text instead of replacing it.
+  const spokenPrefixRef = useRef('')
   const speech = useSpeechInput({
     onText: (spoken) => {
       spokenRef.current = true
-      setText(spoken)
+      setText(spokenPrefixRef.current ? `${spokenPrefixRef.current} ${spoken}` : spoken)
     },
     onFailure: (failure) => error(...SPEECH_FAILURES[failure]),
   })
+  const toggleSpeech = () => {
+    if (!speech.listening) spokenPrefixRef.current = text.trim()
+    speech.toggle()
+  }
 
   // The whole text stays readable, typed or dictated, so the field follows it.
   const fieldValue = selectedCategory ? selectedLabel : text
@@ -178,7 +186,7 @@ export default function HeroSection() {
       <div className="relative z-10 flex-1 px-5 pt-24 pb-6 flex flex-col items-center justify-center">
         {/* Animated Command Menu. Its open height is reserved, so the list opening
             by itself pushes nothing: a moving page counted as a layout shift. */}
-        <div className="w-full max-w-[480px] min-h-[468px] md:min-h-[420px]">
+        <div className="w-full max-w-[480px] min-h-[504px] md:min-h-[488px]">
         <div
           ref={containerRef}
           className="w-full max-w-[480px] bg-surface-container-lowest/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-outline-variant/10 overflow-hidden"
@@ -206,19 +214,15 @@ export default function HeroSection() {
               placeholder={speech.listening ? 'Σε ακούω...' : 'Γράψε τι χρειάζεσαι'}
               className="flex-1 min-w-0 py-[18px] px-0 resize-none overflow-hidden bg-transparent border-none outline-none focus:ring-0 text-sm leading-6 font-bold text-on-surface placeholder:font-normal placeholder:text-on-surface-variant/70"
             />
-            {text.trim() && !speech.listening ? (
-              <button
-                type="submit"
-                aria-label="Συνέχεια"
-                className="w-10 h-10 mb-2.5 flex-shrink-0 rounded-full machined-gradient text-on-primary flex items-center justify-center active:scale-95 transition-transform"
-              >
-                {pendingCategory === OTHER_CATEGORY ? <Spinner size="sm" /> : <Icon name="arrow_forward" size="sm" />}
-              </button>
-            ) : speech.supported && (
+            {speech.supported && (
               <button
                 type="button"
-                onClick={speech.toggle}
-                aria-label={speech.listening ? 'Σταμάτα την ηχογράφηση' : 'Πες το με τη φωνή σου'}
+                onClick={toggleSpeech}
+                aria-label={
+                  speech.listening ? 'Σταμάτα την ηχογράφηση'
+                    : text.trim() ? 'Συνέχισε με τη φωνή σου'
+                      : 'Πες το με τη φωνή σου'
+                }
                 aria-pressed={speech.listening}
                 className={`w-10 h-10 mb-2.5 flex-shrink-0 rounded-full flex items-center justify-center active:scale-95 transition-colors ${
                   speech.listening
@@ -227,6 +231,16 @@ export default function HeroSection() {
                 }`}
               >
                 <Icon name="mic" size="md" filled={speech.listening} />
+              </button>
+            )}
+            {text.trim() && !speech.listening && (
+              <button
+                type="submit"
+                aria-label="Συνέχεια"
+                className="w-10 h-10 mb-2.5 flex-shrink-0 rounded-full machined-gradient text-on-primary flex items-center justify-center active:scale-95 transition-transform"
+              >
+                {/* Picked from the list, the option's own row spins instead. */}
+                {pendingCategory === OTHER_CATEGORY && !selectedCategory ? <Spinner size="sm" /> : <Icon name="arrow_forward" size="sm" />}
               </button>
             )}
             <button
@@ -277,6 +291,30 @@ export default function HeroSection() {
                   )}
                 </div>
               ))}
+              {/* Not one more job but the way out of the list, so it looks apart:
+                  the same «other» request the field files, its text written on
+                  the next page if it was not typed here. */}
+              <div
+                ref={el => { itemsRef.current[categories.length] = el! }}
+                onClick={() => selectCategory(OTHER_CATEGORY)}
+                className={`!mt-2 flex items-center justify-between p-3 rounded-xl cursor-pointer border border-dashed transition-colors ${
+                  selectedCategory === OTHER_CATEGORY
+                    ? 'bg-primary/10 border-primary/60'
+                    : 'border-primary/40 hover:bg-primary/5'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Icon name="edit_note" size="sm" className="text-primary" />
+                  <span className="text-sm font-bold text-primary">
+                    {getCategoryText(OTHER_CATEGORY)}
+                  </span>
+                </div>
+                {pendingCategory === OTHER_CATEGORY ? (
+                  <Spinner size="sm" className="text-primary" />
+                ) : (
+                  <Icon name="arrow_forward" size="sm" className="text-primary" />
+                )}
+              </div>
             </div>
           </div>
         </div>

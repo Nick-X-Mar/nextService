@@ -832,9 +832,38 @@ test.describe('Request funnel in the browser', () => {
     await page.keyboard.press('Enter')
     await page.waitForURL('**/car-details/**')
 
-    await expect(page.getByText('Άλλη εργασία')).toBeVisible()
+    await expect(page.getByText('Πολλαπλές ή Άλλες εργασίες')).toBeVisible()
     await expect(page.getByPlaceholder('Περιγράψτε τι χρειάζεται το αυτοκίνητό σας...')).toHaveValue('Ακούγεται θόρυβος από το εμπρός δεξί')
     expect(await readDraft(page)).toMatchObject({ category: 'other', description: 'Ακούγεται θόρυβος από το εμπρός δεξί' })
+  })
+
+  test('The list\'s last option files the same «other» request, and its text is then asked for', async ({ page }) => {
+    await page.goto('/')
+    const option = page.getByText('Πολλαπλές ή Άλλες εργασίες')
+    await expect(page.getByRole('button', { name: 'Κλείσιμο επιλογών' })).toBeVisible({ timeout: 10_000 })
+    await expect(option.locator('../..')).toHaveCSS('opacity', '1')
+    await expect(option.locator('../..')).toHaveCSS('border-style', 'dashed')
+    await option.click()
+    await page.waitForURL('**/car-details/**')
+    expect(await readDraft(page)).toMatchObject({ category: 'other' })
+    const description = page.getByPlaceholder('Περιγράψτε τι χρειάζεται το αυτοκίνητό σας...')
+    await expect(description).toHaveValue('')
+    await expect(page.getByText('Περιγραφή Αιτήματος *')).toBeVisible()
+
+    // With the car filled in, the text is what is still missing.
+    await seedDraft(page, mechanicalRequest({ category: 'other', description: '' }), '/car-details/')
+    const next = page.getByRole('button', { name: 'ΣΥΝΕΧΕΙΑ' })
+    await expect(page.getByPlaceholder('1600')).toHaveValue('1400')
+    await expect(next).toBeDisabled()
+    await description.fill('Service και αλλαγή τακακιών')
+    await expect(next).toBeEnabled()
+  })
+
+  test('A picked category leaves the description optional', async ({ page }) => {
+    await seedDraft(page, mechanicalRequest({ description: '' }), '/car-details/')
+    await expect(page.getByPlaceholder('1600')).toHaveValue('1400')
+    await expect(page.getByText('Περιγραφή Αιτήματος', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'ΣΥΝΕΧΕΙΑ' })).toBeEnabled()
   })
 
   test('The field grows with the text, typed or dictated, and with the options closed', async ({ page }) => {
@@ -909,6 +938,42 @@ test.describe('Request funnel in the browser', () => {
     expect(await readDraft(page)).toMatchObject({ category: 'other', description: 'Αλλαγή μπαταρίας' })
   })
 
+  test('Dictation stopped by a pause goes on from the microphone, after what is already there', async ({ page }) => {
+    await page.addInitScript(() => {
+      const phrases = ['Αλλαγή μπαταρίας', 'και έλεγχος στα φρένα']
+      class FakeRecognition {
+        onresult: ((event: unknown) => void) | null = null
+        onend: (() => void) | null = null
+        // Each start hears the next phrase, then the pause ends it.
+        start() {
+          const phrase = phrases.shift() ?? ''
+          setTimeout(() => {
+            this.onresult?.({ results: [[{ transcript: phrase }]] })
+            this.onend?.()
+          }, 50)
+        }
+        stop() {}
+        abort() {}
+      }
+      const w = window as unknown as Record<string, unknown>
+      w.SpeechRecognition = FakeRecognition
+      w.webkitSpeechRecognition = FakeRecognition
+    })
+    await page.goto('/')
+    const field = page.getByLabel('Τι χρειάζεται το αυτοκίνητό σου;')
+    await page.getByRole('button', { name: 'Πες το με τη φωνή σου' }).click()
+    await expect(field).toHaveValue('Αλλαγή μπαταρίας')
+
+    // Both on offer: go on speaking, or send.
+    await expect(page.getByRole('button', { name: 'Συνέχεια' })).toBeVisible()
+    await page.getByRole('button', { name: 'Συνέχισε με τη φωνή σου' }).click()
+    await expect(field).toHaveValue('Αλλαγή μπαταρίας και έλεγχος στα φρένα')
+
+    await page.getByRole('button', { name: 'Συνέχεια' }).click()
+    await page.waitForURL('**/car-details/**')
+    expect(await readDraft(page)).toMatchObject({ category: 'other', description: 'Αλλαγή μπαταρίας και έλεγχος στα φρένα' })
+  })
+
   test('With no speech recognition in the browser there is no microphone button', async ({ page }) => {
     await page.addInitScript(() => {
       const w = window as unknown as Record<string, unknown>
@@ -934,6 +999,15 @@ test.describe('Request funnel in the browser', () => {
     const { serviceRequestId } = await created.json()
     const { request } = await (await api.get(`/api/requests/${serviceRequestId}/`)).json()
     expect(request).toMatchObject({ category: 'other', description: 'Αλλαγή μπαταρίας' })
+  })
+
+  test('An «other» request with no description is refused', async ({ playwright }) => {
+    const { api } = await freshClient(playwright, 'other-empty')
+    const created = await api.post('/api/service-request/', {
+      data: mechanicalRequest({ category: 'other', description: '   ' }),
+    })
+    expect(created.status()).toBe(400)
+    expect((await created.json()).error).toContain('περιγραφή')
   })
 
   test('With no category, the category is asked for first', async ({ page }) => {

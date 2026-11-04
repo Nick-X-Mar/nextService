@@ -205,7 +205,7 @@ export default function OffersSection() {
           Ολοκληρωμένες εργασίες
         </h2>
         <p className="text-white/70 text-sm mt-1 drop-shadow">
-          Πραγματικές τιμές από εργασίες που έγιναν — η δική σου μπορεί να διαφέρει
+          Πραγματικές τιμές από εργασίες μέσω της πλατφόρμας μας.
         </p>
       </div>
 

@@ -13,7 +13,7 @@ import { signToken, setAuthCookie } from '@/utils/auth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
 import { broadcastNewRequest } from '@/utils/requestBroadcast'
-import { getCategoryText } from '@/utils/categoryLabels'
+import { getCategoryText, OTHER_CATEGORY } from '@/utils/categoryLabels'
 import { estimateFor } from '@/app/api/price-estimation/estimate'
 import { isValidEngineCC, normalizeEngineCC } from '@/app/api/vehicles/engineCC'
 import { GUEST_PLACEHOLDER_NAME } from '@/types/clients'
@@ -255,6 +255,7 @@ async function _POST(request: NextRequest) {
     const category = text(body.category)
     const description = text(body.description)
     if (description.length > 2000) return badRequest('Η περιγραφή έχει όριο 2000 χαρακτήρες')
+    if (category === OTHER_CATEGORY && !description) return badRequest('Γράψτε στην περιγραφή τι χρειάζεται το αυτοκίνητο')
 
     // ── The saved vehicle, if the client picked one ─────────────────────────────
     // Only ever one of their own. The id and the "original" data both used to be
