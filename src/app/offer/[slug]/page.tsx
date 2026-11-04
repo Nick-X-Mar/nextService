@@ -1,11 +1,11 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import Icon from '@/components/ui/Icon'
 import OfferDetailPage from './components/OfferDetailPage'
 import { getOfferBySlug, type Offer } from '@/lib/offers'
 import { SITE_URL } from '@/lib/site-url'
-import { getCategoryText } from '@/utils/categoryLabels'
+import { getCategoryText, REQUEST_CATEGORIES } from '@/utils/categoryLabels'
 import { withPlusVat } from '@/utils/vat'
 import {
   ORGANIZATION_ID,
@@ -18,6 +18,19 @@ import {
 interface PageProps {
   params: Promise<{ slug: string }>
 }
+
+/** The request-form name of a deal's category, when it is one of them. */
+function categoryLabelFor(category: string): string | null {
+  return REQUEST_CATEGORIES.includes(category) ? getCategoryText(category) : null
+}
+
+/**
+ * Old WordPress offers with no page yet. Until a hot deal takes the slug they
+ * go to the homepage, temporarily (307), so Google keeps the URL rather than
+ * moving it for good; a permanent redirect in next.config.ts would also run
+ * before this route and shadow the deal once it exists.
+ */
+const AWAITING_DEAL = new Set(['aisthitires-parkarismatos'])
 
 function absoluteImage(image: string | undefined): string {
   if (!image) return `${SITE_URL}/logo.png`
@@ -37,10 +50,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const url = `${SITE_URL}/offer/${offer.slug}/`
-  // Title ≤ 60 chars for Google SERP. The car is part of the claim — the price
-  // only means something next to it — so it goes in the title whenever it fits.
-  const titleWithCar = `${offer.title} ${offer.subtitle} — ${withPlusVat(offer.price)}`
-  const title = titleWithCar.length <= 60 ? titleWithCar : `${offer.title} — ${withPlusVat(offer.price)}`
+  // The job as people search for it — the category's name, not the deal's own
+  // wording — and no car: these URLs rank for the generic job ("αλλαγή ιμάντα
+  // χρονισμού"), which the old WordPress titles named, and a title opening on
+  // one car lost those searches. The car is in the description and the page.
+  const title = `${categoryLabelFor(offer.category) ?? offer.title}: ${withPlusVat(offer.price)}`
   const ogTitle = `${title} | NextService`
   // Description 110-160 chars.
   const description = `${offer.title} σε ${offer.subtitle}: ${withPlusVat(offer.price)}. Πραγματική τιμή από εργασία που έγινε μέσω NextService. ${offer.details.slice(0, 2).join(' · ')}.`
@@ -162,7 +176,10 @@ export default async function OfferPage({ params }: PageProps) {
 
   // A real 404, not a 200 page that says "not found": crawlers index soft 404s, and
   // the retired WordPress slugs still get hit.
-  if (!offer) notFound()
+  if (!offer) {
+    if (AWAITING_DEAL.has(decodedSlug)) redirect('/')
+    notFound()
+  }
 
   const url = `${SITE_URL}/offer/${offer.slug}/`
   const faqs = buildOfferFaqs(offer)

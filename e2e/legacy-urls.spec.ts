@@ -45,12 +45,10 @@ const REDIRECTED: [string, string][] = [
   ['/offer/megalo-service-autokinitou/', '/offer/service-auto/'],
   ['/offer/%ce%b1%ce%bd%cf%84%ce%b9%ce%ba%ce%b1%cf%84%ce%ac%cf%83%cf%84%ce%b1%cf%83%ce%b7-%ce%b5%ce%bd%cf%8c%cf%82-%cf%83%ce%b5%cf%84-%ce%b9%ce%bc%ce%ac%ce%bd%cf%84%ce%b1-%cf%87%cf%81%ce%bf%ce%bd%ce%b9%cf%83/', '/offer/set-imantas-xronismou/'],
   ['/offer/auto-service-smart-diesel/', '/offer/service-auto/'],
-  ['/offer/aisthitires-parkarismatos/', '/'],
   ['/offer/%ce%b1%ce%bb%ce%bb%ce%b1%ce%b3%ce%ae-%ce%bb%ce%b1%ce%b4%ce%b9%cf%8e%ce%bd-%cf%83%cf%84%ce%bf%ce%bd-%cf%87%cf%8e%cf%81%ce%bf-%cf%83%ce%b1%cf%82/', '/offer/service-auto/'],
   ['/offer/%cf%83%cf%84%ce%bf-%cf%87%cf%8e%cf%81%ce%bf-%cf%83%ce%b1%cf%82-100e-service-%ce%b1%cf%85%cf%84%ce%bf%ce%ba%ce%b9%ce%bd%ce%ae%cf%84%ce%bf%cf%85-%ce%bc%ce%b5-%ce%b5%cf%81%ce%b3%ce%b1%cf%83%ce%af%ce%b1/', '/offer/service-auto/'],
   ['/offer/60e-%ce%b5%cf%81%ce%b3%ce%b1%cf%83%ce%af%ce%b1-%ce%ba%ce%b1%ce%b9-%ce%b1%ce%bd%cf%84%ce%b1%ce%bb%ce%bb%ce%b1%ce%ba%cf%84%ce%b9%ce%ba%ce%ac%cf%84%ce%bf-%ce%ad%ce%bd%ce%b1-%ce%b6%ce%b5%cf%85%ce%b3/', '/'],
   ['/offer/vstrom-service-%ce%bc%ce%bf%cf%84%ce%bf%cf%83%cf%85%ce%ba%ce%bb%ce%b5%cf%84%ce%b1%cf%82/', '/'],
-  ['/offer/160e-%ce%b5%cf%81%ce%b3%ce%b1%cf%83%ce%af%ce%b1-%ce%ba%ce%b1%ce%b9-%ce%b1%ce%bd%cf%84%ce%b1%ce%bb%ce%bb%ce%b1%ce%ba%cf%84%ce%b9%ce%ba%ce%ac-%ce%b3%ce%b9%ce%b1-%ce%b1%ce%bd%cf%84%ce%b9%ce%ba%ce%b1/', '/'],
   ['/offer/service-smart/', '/offer/service-auto/'],
   ['/offer/allagi-ladion-autokinitou/', '/offer/service-auto/'],
   ['/store/mosxato/', '/location/notia-proastia/'],
@@ -89,8 +87,22 @@ const REDIRECTED: [string, string][] = [
   ['/letter/notia-athens/', '/location/notia-proastia/'],
 ]
 
-/** WordPress theme demo pages, never real content: left to 404 on purpose. */
+/** Old offers waiting for a hot deal on the same slug: until one exists, a temporary hop home. */
+const AWAITING_DEAL = [
+  '/offer/aisthitires-parkarismatos/',
+]
+
+/** Not in the old sitemap, but Search Console still shows clicks on them. */
+const FROM_SEARCH_CONSOLE: [string, string][] = [
+  ['/offer/%cf%83%cf%84%ce%bf-%cf%87%cf%8e%cf%81%ce%bf-%cf%83%ce%b1%cf%85-%ce%b1%cf%85%cf%84%ce%bf%ce%ba%ce%b9%ce%bd%ce%ae%cf%84%ce%bf%cf%85-%ce%bc%ce%b5-%ce%b5%cf%81%ce%b3%ce%b1%cf%83%ce%af%ce%b1-%ce%ba%ce%b1%ce%b9-/', '/offer/service-auto/'],
+]
+
+/**
+ * Left to 404 on purpose: WordPress theme demo pages, never real content, and
+ * offers that no longer hold (the 160€ clutch price), which no page should stand in for.
+ */
 const GONE = [
+  '/offer/160e-%ce%b5%cf%81%ce%b3%ce%b1%cf%83%ce%af%ce%b1-%ce%ba%ce%b1%ce%b9-%ce%b1%ce%bd%cf%84%ce%b1%ce%bb%ce%bb%ce%b1%ce%ba%cf%84%ce%b9%ce%ba%ce%ac-%ce%b3%ce%b9%ce%b1-%ce%b1%ce%bd%cf%84%ce%b9%ce%ba%ce%b1/',
   '/full-width/',
   '/sidebar-left/',
   '/sidebar-right/',
@@ -98,7 +110,7 @@ const GONE = [
 ]
 
 test('the list covers every URL of the old sitemap', () => {
-  expect(SERVED_AS_IS.length + REDIRECTED.length + GONE.length).toBe(76)
+  expect(SERVED_AS_IS.length + REDIRECTED.length + AWAITING_DEAL.length + GONE.length).toBe(76)
 })
 
 test.describe('Old URLs Google knows keep working', () => {
@@ -109,13 +121,23 @@ test.describe('Old URLs Google knows keep working', () => {
     })
   }
 
-  for (const [from, to] of REDIRECTED) {
+  for (const [from, to] of [...REDIRECTED, ...FROM_SEARCH_CONSOLE]) {
     test(`${decodeURIComponent(from)} → ${to}`, async ({ request }) => {
       // One permanent hop, straight to the final page: a chain leaks ranking.
       const res = await request.get(from, { maxRedirects: 0 })
       expect(res.status()).toBe(308)
       expect(res.headers()['location']).toBe(to)
       expect((await request.get(to, { maxRedirects: 0 })).status()).toBe(200)
+    })
+  }
+
+  for (const path of AWAITING_DEAL) {
+    test(`${path} is its deal's page, or a temporary hop home`, async ({ request }) => {
+      // Temporary, so Google keeps the URL for the page that will take it.
+      const res = await request.get(path, { maxRedirects: 0 })
+      if (res.status() === 200) return
+      expect(res.status()).toBe(307)
+      expect(res.headers()['location']).toBe('/')
     })
   }
 

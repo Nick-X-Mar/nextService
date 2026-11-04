@@ -25,6 +25,8 @@ import path from "path";
  *  - Deliberately NOT redirected: `/full-width/`, `/sidebar-left/`,
  *    `/sidebar-right/`, `/sample-page/`. Those are WordPress theme demo pages
  *    with no equivalent and no value; a 404 is the correct signal.
+ *    Likewise the old "160€ εργασία και ανταλλακτικά για αντικατάσταση σετ
+ *    συμπλέκτη" offer: that price no longer holds, so nothing stands in for it.
  */
 const LEGACY_REDIRECTS: { source: string; destination: string }[] = [
   // ── WordPress pages ──────────────────────────────────────
@@ -51,7 +53,8 @@ const LEGACY_REDIRECTS: { source: string; destination: string }[] = [
   { source: "/offer/service-smart", destination: "/offer/service-auto/" },
   { source: "/offer/auto-service-smart-diesel", destination: "/offer/service-auto/" },
   { source: "/offer/gyalisma-auto", destination: "/" },
-  { source: "/offer/aisthitires-parkarismatos", destination: "/" },
+  // /offer/aisthitires-parkarismatos is not here: it waits for a hot deal of its
+  // own and redirects from the offer route meanwhile (AWAITING_DEAL).
   {
     source: "/offer/αντικατάσταση-ενός-σετ-ιμάντα-χρονισ",
     destination: "/offer/set-imantas-xronismou/",
@@ -61,8 +64,10 @@ const LEGACY_REDIRECTS: { source: string; destination: string }[] = [
     source: "/offer/στο-χώρο-σας-100e-service-αυτοκινήτου-με-εργασία",
     destination: "/offer/service-auto/",
   },
+  // Not in the old sitemap (WordPress already 404'd it) but still in Search
+  // Console with clicks: the misspelt slug of an earlier at-home service offer.
+  { source: "/offer/στο-χώρο-σαυ-αυτοκινήτου-με-εργασία-και-", destination: "/offer/service-auto/" },
   { source: "/offer/60e-εργασία-και-ανταλλακτικάτο-ένα-ζευγ", destination: "/" },
-  { source: "/offer/160e-εργασία-και-ανταλλακτικά-για-αντικα", destination: "/" },
   { source: "/offer/vstrom-service-μοτοσυκλετας", destination: "/" },
 
   // ── Offer categories ─────────────────────────────────────
