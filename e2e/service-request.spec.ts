@@ -833,7 +833,7 @@ test.describe('Request funnel in the browser', () => {
     await page.waitForURL('**/car-details/**')
 
     await expect(page.getByText('Πολλαπλές ή Άλλες εργασίες')).toBeVisible()
-    await expect(page.getByPlaceholder('Περιγράψτε τι χρειάζεται το αυτοκίνητό σας...')).toHaveValue('Ακούγεται θόρυβος από το εμπρός δεξί')
+    await expect(page.getByLabel('Περιγραφή Αιτήματος')).toHaveValue('Ακούγεται θόρυβος από το εμπρός δεξί')
     expect(await readDraft(page)).toMatchObject({ category: 'other', description: 'Ακούγεται θόρυβος από το εμπρός δεξί' })
   })
 
@@ -846,7 +846,7 @@ test.describe('Request funnel in the browser', () => {
     await option.click()
     await page.waitForURL('**/car-details/**')
     expect(await readDraft(page)).toMatchObject({ category: 'other' })
-    const description = page.getByPlaceholder('Περιγράψτε τι χρειάζεται το αυτοκίνητό σας...')
+    const description = page.getByLabel('Περιγραφή Αιτήματος')
     await expect(description).toHaveValue('')
     await expect(page.getByText('Περιγραφή Αιτήματος *')).toBeVisible()
 
@@ -866,7 +866,7 @@ test.describe('Request funnel in the browser', () => {
     await expect(page.getByRole('button', { name: 'ΣΥΝΕΧΕΙΑ' })).toBeEnabled()
   })
 
-  test('The field grows with the text, typed or dictated, and with the options closed', async ({ page }) => {
+  test('The field grows with the text, typed or dictated, up to six lines, then scrolls', async ({ page }) => {
     const speech = 'Το αυτοκίνητό μου κάνει έναν περίεργο θόρυβο από μπροστά όταν στρίβω δεξιά και μετά από λίγα χιλιόμετρα ανάβει το λαμπάκι του κινητήρα στο καντράν'
     await page.addInitScript((phrase) => {
       class FakeRecognition {
@@ -889,13 +889,17 @@ test.describe('Request funnel in the browser', () => {
     await page.goto('/')
     const field = page.getByLabel('Τι χρειάζεται το αυτοκίνητό σου;')
     await expect(page.getByRole('button', { name: 'Κλείσιμο επιλογών' })).toBeVisible({ timeout: 10_000 })
-    const showsAll = () => field.evaluate((el) => el.clientHeight >= el.scrollHeight)
     const oneLine = (await field.boundingBox())!.height
 
+    // On a 360px phone this phrase is far more than six lines: the field stops
+    // there and keeps the last words in view.
     await page.getByRole('button', { name: 'Πες το με τη φωνή σου' }).click()
     await expect(field).toHaveValue(speech)
-    expect((await field.boundingBox())!.height).toBeGreaterThan(oneLine * 2)
-    expect(await showsAll()).toBe(true)
+    const grown = (await field.boundingBox())!.height
+    expect(grown).toBeGreaterThan(oneLine * 2)
+    expect(grown).toBeLessThanOrEqual(6 * 24 + 36 + 1)
+    expect(await field.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true)
+    expect(await field.evaluate((el) => el.scrollTop + el.clientHeight >= el.scrollHeight - 1)).toBe(true)
 
     await page.getByRole('button', { name: 'Κλείσιμο επιλογών' }).click()
     await expect(page.getByRole('button', { name: 'Άνοιγμα επιλογών' })).toBeVisible()
@@ -972,6 +976,48 @@ test.describe('Request funnel in the browser', () => {
     await page.getByRole('button', { name: 'Συνέχεια' }).click()
     await page.waitForURL('**/car-details/**')
     expect(await readDraft(page)).toMatchObject({ category: 'other', description: 'Αλλαγή μπαταρίας και έλεγχος στα φρένα' })
+  })
+
+  test('The request form\'s description takes dictation too, after what is already written', async ({ page }) => {
+    await page.addInitScript(() => {
+      const phrases = ['Κάνει θόρυβο στο φρενάρισμα', 'και τρέμει το τιμόνι']
+      class FakeRecognition {
+        onresult: ((event: unknown) => void) | null = null
+        onend: (() => void) | null = null
+        start() {
+          const phrase = phrases.shift() ?? ''
+          setTimeout(() => {
+            this.onresult?.({ results: [[{ transcript: phrase }]] })
+            this.onend?.()
+          }, 50)
+        }
+        stop() {}
+        abort() {}
+      }
+      const w = window as unknown as Record<string, unknown>
+      w.SpeechRecognition = FakeRecognition
+      w.webkitSpeechRecognition = FakeRecognition
+    })
+    await page.setViewportSize({ width: 360, height: 740 })
+    await seedDraft(page, mechanicalRequest({ description: '' }), '/car-details/')
+    const description = page.getByLabel('Περιγραφή Αιτήματος')
+    await expect(page.getByPlaceholder('1600')).toHaveValue('1400')
+
+    await page.getByRole('button', { name: 'Πες το με τη φωνή σου' }).click()
+    await expect(description).toHaveValue('Κάνει θόρυβο στο φρενάρισμα')
+
+    // Typed text stays, and the next phrase goes on after it.
+    await description.fill('Κάνει θόρυβο στο φρενάρισμα, μόνο όταν είναι κρύο,')
+    await page.getByRole('button', { name: 'Συνέχισε με τη φωνή σου' }).click()
+    await expect(description).toHaveValue('Κάνει θόρυβο στο φρενάρισμα, μόνο όταν είναι κρύο, και τρέμει το τιμόνι')
+    expect(await description.evaluate((el) => el.clientHeight >= el.scrollHeight)).toBe(true)
+
+    // The same field as the homepage's: six lines at most, then it scrolls.
+    await description.fill('Κάνει θόρυβο στο φρενάρισμα. '.repeat(20))
+    expect((await description.boundingBox())!.height).toBeLessThanOrEqual(6 * 24 + 24 + 1)
+    expect(await description.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true)
+    await expect.poll(async () => (await readDraft(page))?.description)
+      .toBe('Κάνει θόρυβο στο φρενάρισμα. '.repeat(20))
   })
 
   test('With no speech recognition in the browser there is no microphone button', async ({ page }) => {

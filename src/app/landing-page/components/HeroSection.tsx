@@ -9,17 +9,10 @@ import { useNavigation } from '@/hooks/useNavigation'
 import { startNewRequest } from '@/utils/formStorage'
 import { SERVICE_CATEGORIES as categories, OTHER_CATEGORY, getCategoryText } from '@/utils/categoryLabels'
 import { track } from '@/lib/track'
-import { useSpeechInput, type SpeechFailure } from '@/hooks/useSpeechInput'
-import { useToast } from '@/hooks/useToast'
+import DictationField from '@/components/DictationField'
 
 /** Long enough for the page to settle, so the opening is seen rather than missed. */
 const AUTO_OPEN_DELAY_MS = 800
-
-const SPEECH_FAILURES: Record<SpeechFailure, [string, string]> = {
-  denied: ['Δεν δόθηκε πρόσβαση στο μικρόφωνο', 'Επίτρεψέ την από τις ρυθμίσεις του browser ή γράψε το κείμενο.'],
-  'no-speech': ['Δεν ακούστηκε κάτι', 'Δοκίμασε ξανά ή γράψε το κείμενο.'],
-  unavailable: ['Το μικρόφωνο δεν είναι διαθέσιμο εδώ', 'Γράψε το κείμενο στο πεδίο.'],
-}
 
 /**
  * Opens the category menu on `/?open=1` — where the "Νέο Αίτημα" buttons send
@@ -42,7 +35,6 @@ function OpenOnParam({ onOpen }: { onOpen: () => void }) {
 
 export default function HeroSection() {
   const { navigate } = useNavigation()
-  const { error } = useToast()
   const [selectedCategory, setSelectedCategory] = useState('')
   const [text, setText] = useState('')
   // Whether the text in the field came from the microphone, for the funnel.
@@ -53,7 +45,6 @@ export default function HeroSection() {
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
-  const fieldRef = useRef<HTMLTextAreaElement>(null)
   const itemsRef = useRef<HTMLDivElement[]>([])
   const tlRef = useRef<gsap.core.Timeline | null>(null)
   // Read by OpenOnParam's callback, which can fire without this component
@@ -110,35 +101,8 @@ export default function HeroSection() {
     }
   }
 
-  // What the field held when the microphone started. Dictation stops at the
-  // first pause, so the microphone stays on offer and a new phrase goes on after
-  // the text instead of replacing it.
-  const spokenPrefixRef = useRef('')
-  const speech = useSpeechInput({
-    onText: (spoken) => {
-      spokenRef.current = true
-      setText(spokenPrefixRef.current ? `${spokenPrefixRef.current} ${spoken}` : spoken)
-    },
-    onFailure: (failure) => error(...SPEECH_FAILURES[failure]),
-  })
-  const toggleSpeech = () => {
-    if (!speech.listening) spokenPrefixRef.current = text.trim()
-    speech.toggle()
-  }
-
-  // The whole text stays readable, typed or dictated, so the field follows it.
+  // A picked category shows its name in the field until the page moves on.
   const fieldValue = selectedCategory ? selectedLabel : text
-  useLayoutEffect(() => {
-    const fit = () => {
-      const field = fieldRef.current
-      if (!field) return
-      field.style.height = 'auto'
-      field.style.height = `${field.scrollHeight}px`
-    }
-    fit()
-    window.addEventListener('resize', fit)
-    return () => window.removeEventListener('resize', fit)
-  }, [fieldValue])
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -192,15 +156,15 @@ export default function HeroSection() {
           className="w-full max-w-[480px] bg-surface-container-lowest/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-outline-variant/10 overflow-hidden"
         >
           {/* Search Bar */}
-          <form onSubmit={submitText} className="min-h-[60px] flex items-end gap-1 pl-4 pr-2">
-            <Icon name="search" size="md" className="mr-2 mb-5 flex-shrink-0 text-on-surface-variant/50" />
-            <textarea
-              ref={fieldRef}
-              rows={1}
+          <form onSubmit={submitText}>
+            <DictationField
+              variant="bar"
+              label="Τι χρειάζεται το αυτοκίνητό σου;"
+              placeholder="Γράψε τι χρειάζεσαι"
               value={fieldValue}
-              onChange={(e) => {
-                spokenRef.current = false
-                setText(e.target.value)
+              onChange={(value, source) => {
+                spokenRef.current = source === 'voice'
+                setText(value)
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) submitText(e)
@@ -210,48 +174,31 @@ export default function HeroSection() {
               maxLength={2000}
               enterKeyHint="go"
               autoComplete="off"
-              aria-label="Τι χρειάζεται το αυτοκίνητό σου;"
-              placeholder={speech.listening ? 'Σε ακούω...' : 'Γράψε τι χρειάζεσαι'}
-              className="flex-1 min-w-0 py-[18px] px-0 resize-none overflow-hidden bg-transparent border-none outline-none focus:ring-0 text-sm leading-6 font-bold text-on-surface placeholder:font-normal placeholder:text-on-surface-variant/70"
+              leading={<Icon name="search" size="md" className="mr-2 mb-5 flex-shrink-0 text-on-surface-variant/50" />}
+              trailing={({ listening }) => (
+                <>
+                  {text.trim() && !listening && (
+                    <button
+                      type="submit"
+                      aria-label="Συνέχεια"
+                      className="w-10 h-10 mb-2.5 flex-shrink-0 rounded-full machined-gradient text-on-primary flex items-center justify-center active:scale-95 transition-transform"
+                    >
+                      {/* Picked from the list, the option's own row spins instead. */}
+                      {pendingCategory === OTHER_CATEGORY && !selectedCategory ? <Spinner size="sm" /> : <Icon name="arrow_forward" size="sm" />}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={toggleMenu}
+                    aria-label={isOpen ? 'Κλείσιμο επιλογών' : 'Άνοιγμα επιλογών'}
+                    aria-expanded={isOpen}
+                    className="w-9 h-10 mb-2.5 flex-shrink-0 rounded-lg text-on-surface-variant flex items-center justify-center hover:bg-surface-container-high active:scale-95 transition-colors"
+                  >
+                    <Icon name={isOpen ? 'expand_less' : 'expand_more'} size="md" />
+                  </button>
+                </>
+              )}
             />
-            {speech.supported && (
-              <button
-                type="button"
-                onClick={toggleSpeech}
-                aria-label={
-                  speech.listening ? 'Σταμάτα την ηχογράφηση'
-                    : text.trim() ? 'Συνέχισε με τη φωνή σου'
-                      : 'Πες το με τη φωνή σου'
-                }
-                aria-pressed={speech.listening}
-                className={`w-10 h-10 mb-2.5 flex-shrink-0 rounded-full flex items-center justify-center active:scale-95 transition-colors ${
-                  speech.listening
-                    ? 'machined-gradient text-on-primary animate-pulse'
-                    : 'text-primary hover:bg-surface-container-high'
-                }`}
-              >
-                <Icon name="mic" size="md" filled={speech.listening} />
-              </button>
-            )}
-            {text.trim() && !speech.listening && (
-              <button
-                type="submit"
-                aria-label="Συνέχεια"
-                className="w-10 h-10 mb-2.5 flex-shrink-0 rounded-full machined-gradient text-on-primary flex items-center justify-center active:scale-95 transition-transform"
-              >
-                {/* Picked from the list, the option's own row spins instead. */}
-                {pendingCategory === OTHER_CATEGORY && !selectedCategory ? <Spinner size="sm" /> : <Icon name="arrow_forward" size="sm" />}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={toggleMenu}
-              aria-label={isOpen ? 'Κλείσιμο επιλογών' : 'Άνοιγμα επιλογών'}
-              aria-expanded={isOpen}
-              className="w-9 h-10 mb-2.5 flex-shrink-0 rounded-lg text-on-surface-variant flex items-center justify-center hover:bg-surface-container-high active:scale-95 transition-colors"
-            >
-              <Icon name={isOpen ? 'expand_less' : 'expand_more'} size="md" />
-            </button>
           </form>
 
           {/* Dropdown Items */}

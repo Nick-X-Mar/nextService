@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
 import GearSubmitButton from '@/components/GearSubmitButton'
+import DictationField from '@/components/DictationField'
 import PillToggle from '@/components/PillToggle'
 import {
   saveFormData,
@@ -451,12 +452,12 @@ export default function CarBrandModelSelector({ category }: { category: string }
             <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
               Περιγραφή Αιτήματος {descriptionRequired && <span className="text-error">*</span>}
             </label>
-            <textarea
-              className="w-full bg-surface-container-highest rounded-xl px-4 py-3 border-none focus:ring-2 focus:ring-primary font-medium text-sm resize-none"
+            <DictationField
+              label="Περιγραφή Αιτήματος"
               rows={3}
               placeholder="Περιγράψτε τι χρειάζεται το αυτοκίνητό σας..."
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(value) => setDescription(value)}
             />
 
             {isBodywork && (

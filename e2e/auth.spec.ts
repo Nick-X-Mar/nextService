@@ -262,3 +262,20 @@ test("Registering without a name never turns the email into the first name", asy
   expect((await getRow(TABLES.Clients, client.id))?.firstName).not.toBe(address.split('@')[0])
 })
 
+
+test('Signing in opens the account in a fresh page, not through the router', async ({ page }) => {
+  // In a production build the signed-out tab has already prefetched the
+  // dashboard links (the sidebar draws them from the expired session's cache)
+  // and holds the middleware's redirect to /login for each. A router push
+  // replayed it, leaving the garage on the login form with its sidebar around
+  // it. Dev never prefetches, so what is checked is the full load itself.
+  await page.goto('/login/')
+  await page.getByRole('button', { name: 'Συνεργείο', exact: true }).click()
+  await page.locator('input[type=email]').fill(TEST_GARAGE.email)
+  await page.locator('input[type=password]').fill(TEST_GARAGE.password)
+  await page.evaluate(() => { (window as unknown as { signedOutTab: boolean }).signedOutTab = true })
+  await page.getByRole('button', { name: 'Σύνδεση' }).last().click()
+
+  await page.waitForURL(`**/garage-dashboard/${TEST_GARAGE.id}/**`)
+  expect(await page.evaluate(() => (window as unknown as { signedOutTab?: boolean }).signedOutTab)).toBeUndefined()
+})

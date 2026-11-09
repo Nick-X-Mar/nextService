@@ -12,6 +12,19 @@ import { styles } from '@/styles/styles'
 import SegmentedControl from '@/components/SegmentedControl'
 import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 
+/**
+ * Into the account with a full page load, never a router push. The router keeps
+ * what it prefetched while this tab was signed out: the sidebar, drawn from the
+ * cached auth state of an expired session, prefetches the dashboard links, and
+ * the middleware answers each with a redirect to /login. A push after signing in
+ * replays that cached redirect without asking the server, and the user is left
+ * on the login form with the signed-in chrome around it. A new document also
+ * drops the realtime socket and alert counts built for the session before.
+ */
+function enterAccount(href: string) {
+  window.location.assign(href)
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -55,11 +68,11 @@ export default function LoginPage() {
   useEffect(() => {
     if (authLoading || !isVerified) return
     if (authUserType === 'garage' && garage) {
-      router.replace(destinationFor('garage', garage.id))
+      window.location.replace(destinationFor('garage', garage.id))
     } else if (authUserType === 'client' && client) {
-      router.replace(destinationFor('client', client.id))
+      window.location.replace(destinationFor('client', client.id))
     }
-  }, [authLoading, isVerified, authUserType, client, garage, router, destinationFor])
+  }, [authLoading, isVerified, authUserType, client, garage, destinationFor])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -86,7 +99,7 @@ export default function LoginPage() {
         localStorage.removeItem('clientId')
         localStorage.setItem('garageId', data.user.id)
         await refreshGarage(data.user.id)
-        router.push(destinationFor('garage', data.user.id))
+        enterAccount(destinationFor('garage', data.user.id))
         return
       }
 
@@ -98,22 +111,25 @@ export default function LoginPage() {
           localStorage.setItem('garageId', user.id)
           success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.companyName}!`)
           await refreshGarage(user.id)
-          router.push(destinationFor('garage', user.id))
+          enterAccount(destinationFor('garage', user.id))
+          return
         } else {
           localStorage.removeItem('garageId')
           localStorage.setItem('clientId', user.id)
           success('Επιτυχής Σύνδεση', `Καλώς ήρθατε, ${user.firstName}!`)
           await refreshClient(user.id)
-          router.push(destinationFor('client', user.id))
+          enterAccount(destinationFor('client', user.id))
+          return
         }
       } else {
         error('Σφάλμα Σύνδεσης', data.error || 'Λάθος email ή κωδικός')
       }
     } catch {
       error('Σφάλμα Σύνδεσης', 'Δεν ήταν δυνατή η σύνδεση. Δοκιμάστε ξανά.')
-    } finally {
-      setIsLoading(false)
     }
+    // Only a failure gets here: on success the button keeps spinning until the
+    // account's page replaces this one.
+    setIsLoading(false)
   }
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -200,15 +216,15 @@ export default function LoginPage() {
         await refreshClient(data.client.id)
         await refreshUser(data.client.id)
         success('Επιτυχής Εγγραφή', 'Ο λογαριασμός σας δημιουργήθηκε!')
-        router.push(`/requests/${data.client.id}/`)
+        enterAccount(`/requests/${data.client.id}/`)
+        return
       } else {
         error('Σφάλμα Εγγραφής', data.error || 'Δεν ήταν δυνατή η εγγραφή')
       }
     } catch {
       error('Σφάλμα Εγγραφής', 'Δεν ήταν δυνατή η εγγραφή. Δοκιμάστε ξανά.')
-    } finally {
-      setIsLoading(false)
     }
+    setIsLoading(false)
   }
 
   return (
