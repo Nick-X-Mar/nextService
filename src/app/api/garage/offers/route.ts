@@ -96,6 +96,9 @@ async function _GET(request: NextRequest) {
         offerNumber: offer.offerNumber,
         offerAmount: offer.offerAmount,
         benefits: offer.benefits || [],
+        notes: offer.notes ?? '',
+        // When the client last had this offer in front of them.
+        clientViewedAt: offer.clientViewedAt ?? null,
         availabilityDates: offer.availabilityDates || [],
         status: offer.status,
         createdAt: offer.createdAt,

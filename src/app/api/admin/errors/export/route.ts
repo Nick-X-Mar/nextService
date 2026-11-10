@@ -3,19 +3,22 @@ import { withMetrics } from '@/utils/withMetrics'
 import {
   getErrorGroups,
   type ErrorGroup,
+  type LogLevelFilter,
   type StatusFilter
 } from '@/utils/errorGroups'
 import { shortTitle } from '@/utils/errorFingerprint'
+import { STAGE } from '@/lib/site-url'
 
 const VALID_STATUSES: StatusFilter[] = ['open', 'all', 'resolved', 'ignored']
+const VALID_LEVELS: LogLevelFilter[] = ['all', 'error', 'warn']
 
-function toMarkdown(groups: ErrorGroup[], range: string, statusFilter: StatusFilter): string {
+function toMarkdown(groups: ErrorGroup[], range: string, statusFilter: StatusFilter, levelFilter: LogLevelFilter): string {
   const generatedAt = new Date().toISOString()
   const totalOccurrences = groups.reduce((sum, g) => sum + g.count, 0)
 
   const header = [
     `# NextService Error Report — ${generatedAt}`,
-    `Range: last ${range} • Status filter: ${statusFilter}`,
+    `Stage: ${STAGE} • Range: last ${range} • Status filter: ${statusFilter} • Level: ${levelFilter}`,
     `${groups.length} unique errors • ${totalOccurrences} total occurrences`,
     ''
   ].join('\n')
@@ -25,10 +28,12 @@ function toMarkdown(groups: ErrorGroup[], range: string, statusFilter: StatusFil
   }
 
   const sections = groups.map((g) => {
-    const title = shortTitle(g.sampleMessage)
+    const title = shortTitle(g.title)
     const lines: string[] = []
     lines.push('---', '')
     lines.push(`## ${g.fingerprint} — ${title}`)
+    lines.push(`- Level: ${g.level} • Stage: ${g.stage}`)
+    if (g.endpoint) lines.push(`- Endpoint: ${g.endpoint}`)
     lines.push(`- Status: ${g.status}`)
     lines.push(`- Occurrences: ${g.count}`)
     lines.push(`- First seen: ${g.firstSeen}`)
@@ -54,10 +59,12 @@ async function _GET(request: NextRequest) {
   const rawStatus = (searchParams.get('status') || 'open') as StatusFilter
   const statusFilter: StatusFilter = VALID_STATUSES.includes(rawStatus) ? rawStatus : 'open'
   const download = searchParams.get('download') === '1'
+  const rawLevel = (searchParams.get('level') || 'all') as LogLevelFilter
+  const levelFilter: LogLevelFilter = VALID_LEVELS.includes(rawLevel) ? rawLevel : 'all'
 
   let result
   try {
-    result = await getErrorGroups({ range, statusFilter })
+    result = await getErrorGroups({ range, statusFilter, levelFilter })
   } catch (error) {
     console.error('Errors export error:', error)
     return NextResponse.json({ error: 'Failed to build export' }, { status: 500 })
@@ -69,8 +76,10 @@ async function _GET(request: NextRequest) {
     const body = {
       version: 1,
       generatedAt: new Date().toISOString(),
+      stage: STAGE,
       range,
       statusFilter,
+      levelFilter,
       totalGroups: result.totalGroups,
       groups: result.groups
     }
@@ -84,7 +93,7 @@ async function _GET(request: NextRequest) {
   }
 
   // default: markdown
-  const md = toMarkdown(result.groups, range, statusFilter)
+  const md = toMarkdown(result.groups, range, statusFilter, levelFilter)
   const headers: Record<string, string> = {
     'Content-Type': 'text/markdown; charset=utf-8'
   }

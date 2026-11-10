@@ -159,6 +159,8 @@ async function _GET(
         garageName: garageName(o.garageId),
         offerAmount: o.offerAmount,
         benefits: o.benefits || [],
+        notes: o.notes || '',
+        clientViewedAt: o.clientViewedAt ?? null,
         availabilityDates: o.availabilityDates || [],
         clientAvailabilityDates: o.clientAvailabilityDates || [],
         status: o.status,

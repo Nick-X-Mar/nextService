@@ -60,7 +60,11 @@ export interface TestGarage {
 /** A garage written straight into DynamoDB, approved or still pending, then logged in. */
 export async function newGarage(
   request: APIRequestContext,
-  { active = true, prefix = 'garage' }: { active?: boolean; prefix?: string } = {}
+  {
+    active = true,
+    prefix = 'garage',
+    businessTypes,
+  }: { active?: boolean; prefix?: string; businessTypes?: string[] } = {}
 ): Promise<TestGarage> {
   const id = `garage-e2e-${unique()}`
   const email = `e2e-${prefix}-${unique()}@test.com`
@@ -75,6 +79,7 @@ export async function newGarage(
       companyName: `E2E Συνεργείο ${prefix}`,
       address: 'Οδός Δοκιμής 1, Αθήνα',
       isActive: active,
+      ...(businessTypes ? { businessTypes } : {}),
       createdAt: now,
       updatedAt: now,
     },
@@ -253,6 +258,7 @@ export interface Summary {
   availableRequestIds: string[]
   offersNeedingAttention: number
   alerts: { id: string; kind: string; title: string; detail?: string; href: string }[]
+  businessTypes?: string[]
 }
 
 export async function summary(request: APIRequestContext, token: string): Promise<Summary> {

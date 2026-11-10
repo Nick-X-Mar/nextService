@@ -6,26 +6,27 @@
  * Used by /api/admin/errors/recent (the live list) and
  * /api/admin/errors/export (the markdown / json export).
  */
-import {
-  CloudWatchLogsClient,
-  FilterLogEventsCommand
-} from '@aws-sdk/client-cloudwatch-logs'
-import { fromIni } from '@aws-sdk/credential-provider-ini'
-import path from 'path'
+import { FilterLogEventsCommand } from '@aws-sdk/client-cloudwatch-logs'
 import { BatchGetCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ensureErrorResolutionsTable } from '@/utils/ensureErrorResolutionsTable'
 import { fingerprintError } from '@/utils/errorFingerprint'
+import { APP_LOG_GROUP, cloudWatchLogs } from '@/utils/cloudWatchLogs'
 import { TABLES } from '@/lib/tables'
+import { STAGE, type Stage } from '@/lib/site-url'
 
-const REGION = process.env.REGION || 'eu-central-1'
-const LOG_GROUPS = [
-  '/nextservice/app',
-  '/nextservice/api',
+// The app's structured entries (src/utils/logger.ts), then the Lambdas, which
+// log in the runtime's tab-separated text format.
+const LAMBDA_LOG_GROUPS = [
   '/aws/lambda/nextservice-new-request-broadcast',
   '/aws/lambda/nextservice-ses-event-processor',
+  '/aws/lambda/nextservice-appointment-completion-sweeper',
+  '/aws/lambda/nextservice-appsync-authorizer',
   '/aws/lambda/nextservice-appsync-key-rotator'
 ]
+const APP_PATTERN = '{ $.level = "error" || $.level = "warn" }'
+const LAMBDA_PATTERN = '?ERROR ?WARN ?"Task timed out"'
+const MAX_PAGES = 5
 
 export const RANGE_MS: Record<string, number> = {
   '1h': 60 * 60 * 1000,
@@ -36,6 +37,7 @@ export const RANGE_MS: Record<string, number> = {
 
 export type ErrorStatus = 'open' | 'resolved' | 'ignored'
 export type StatusFilter = ErrorStatus | 'all'
+export type LogLevelFilter = 'error' | 'warn' | 'all'
 
 export interface ErrorGroup {
   fingerprint: string
@@ -43,6 +45,11 @@ export interface ErrorGroup {
   firstSeen: string
   lastSeen: string
   logGroup: string
+  level: 'error' | 'warn'
+  stage: Stage
+  /** The API route, ids masked — absent for a Lambda or a page render. */
+  endpoint?: string
+  title: string
   sampleMessage: string
   status: ErrorStatus
   notes?: string
@@ -52,96 +59,121 @@ export interface ErrorGroup {
 
 export interface GetErrorGroupsResult {
   groups: ErrorGroup[]
-  total5xx: number
-  total4xx: number
+  stage: Stage
+  totalErrors: number
+  totalWarnings: number
   totalEntries: number
   totalGroups: number
 }
 
-let cwClient: CloudWatchLogsClient | null = null
-function getCloudWatchClient(): CloudWatchLogsClient {
-  if (cwClient) return cwClient
-
-  const config: ConstructorParameters<typeof CloudWatchLogsClient>[0] = {
-    region: REGION,
-    requestHandler: { requestTimeout: 5_000 }
-  }
-
-  if (process.env.ACCESS_KEY_ID && process.env.SECRET_ACCESS_KEY) {
-    config.credentials = {
-      accessKeyId: process.env.ACCESS_KEY_ID,
-      secretAccessKey: process.env.SECRET_ACCESS_KEY
-    }
-  } else if (!['production', 'staging'].includes(process.env.NODE_ENV || '')) {
-    try {
-      config.credentials = fromIni({
-        filepath: path.join(process.cwd(), '.aws', 'credentials'),
-        configFilepath: path.join(process.cwd(), '.aws', 'config'),
-        profile: 'default'
-      })
-    } catch {
-      // fall through to default credential chain
-    }
-  }
-
-  cwClient = new CloudWatchLogsClient(config)
-  return cwClient
-}
-
-interface RawEntry {
+interface ParsedEntry {
   timestamp: string
-  message: string
   logGroup: string
+  level: 'error' | 'warn'
+  stage: Stage
+  endpoint?: string
+  title: string
+  /** What the fingerprint is taken over: the parts that name the error, not the occurrence. */
+  seed: string
+  detail: string
 }
 
-async function fetchCloudWatchEntries(rangeKey: string): Promise<{
-  entries: RawEntry[]
-  total5xx: number
-  total4xx: number
-}> {
+/** `/api/requests/req_8f3a…/accept/` → `/api/requests/:id/accept/` — one group per route. */
+function maskPath(path: string): string {
+  return path.replace(/\/[^/]*\d[^/]{5,}/g, '/:id')
+}
+
+function firstFrame(stack: unknown): string {
+  if (typeof stack !== 'string') return ''
+  return stack.split('\n').find((l) => /\bat\s/.test(l))?.trim() ?? ''
+}
+
+function parseAppEntry(raw: string, timestamp: string, logGroup: string): ParsedEntry | null {
+  let entry: Record<string, unknown>
+  try {
+    entry = JSON.parse(raw)
+  } catch {
+    return null
+  }
+  const level = entry.level === 'warn' ? 'warn' : entry.level === 'error' ? 'error' : null
+  if (!level) return null
+  const error = (entry.error && typeof entry.error === 'object' ? entry.error : {}) as Record<string, unknown>
+  const endpoint = typeof entry.endpoint === 'string' ? maskPath(entry.endpoint) : undefined
+  const message = typeof entry.message === 'string' ? entry.message : ''
+  const errorText = error.name ? `${error.name}: ${error.message ?? ''}` : ''
+  const title = (message && errorText && !message.includes(String(error.message ?? '')))
+    ? `${message} ${errorText}`
+    : message || errorText
+  return {
+    timestamp,
+    logGroup,
+    level,
+    stage: entry.stage === 'production' || entry.stage === 'staging' || entry.stage === 'local' ? entry.stage : STAGE,
+    endpoint,
+    title: endpoint ? maskPath(title) : title,
+    seed: [level, endpoint ?? '', maskPath(message), error.name ?? '', error.code ?? '', firstFrame(error.stack)].join(' | '),
+    detail: JSON.stringify(entry, null, 2)
+  }
+}
+
+/** `2026-11-10T09:00:00.000Z\t<requestId>\tERROR\tmessage` — or a bare runtime line. */
+function parseLambdaEntry(raw: string, timestamp: string, logGroup: string): ParsedEntry | null {
+  const parts = raw.split('\t')
+  const tag = parts.length >= 4 ? parts[2] : ''
+  if (tag === 'INFO' || tag === 'DEBUG' || tag === 'TRACE') return null
+  const message = (tag ? parts.slice(3).join('\t') : raw).trim()
+  return {
+    timestamp,
+    logGroup,
+    level: tag === 'WARN' ? 'warn' : 'error',
+    stage: STAGE,
+    title: message.split('\n')[0],
+    seed: message,
+    detail: raw
+  }
+}
+
+async function filterAll(logGroupName: string, filterPattern: string, startTime: number, endTime: number) {
+  const client = cloudWatchLogs()
+  const events: { timestamp?: number; message?: string }[] = []
+  let nextToken: string | undefined
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const res = await client.send(
+      new FilterLogEventsCommand({ logGroupName, startTime, endTime, filterPattern, limit: 1000, nextToken }),
+      { abortSignal: AbortSignal.timeout(5_000) }
+    )
+    events.push(...(res.events || []))
+    nextToken = res.nextToken
+    if (!nextToken) break
+  }
+  return events
+}
+
+async function fetchCloudWatchEntries(rangeKey: string): Promise<ParsedEntry[]> {
   const ms = RANGE_MS[rangeKey] || RANGE_MS['24h']
   const now = Date.now()
   const startTime = now - ms
 
-  const client = getCloudWatchClient()
-
+  const sources = [
+    { logGroup: APP_LOG_GROUP, pattern: APP_PATTERN, parse: parseAppEntry },
+    ...LAMBDA_LOG_GROUPS.map((logGroup) => ({ logGroup, pattern: LAMBDA_PATTERN, parse: parseLambdaEntry }))
+  ]
   const results = await Promise.allSettled(
-    LOG_GROUPS.map((logGroup) =>
-      client
-        .send(
-          new FilterLogEventsCommand({
-            logGroupName: logGroup,
-            startTime,
-            endTime: now,
-            filterPattern:
-              '?"ERROR" ?"error" ?"status: 500" ?"status: 502" ?"status: 503" ?"5xx"',
-            limit: 1000
-          }),
-          { abortSignal: AbortSignal.timeout(5_000) }
-        )
-        .then((res) => ({ logGroup, events: res.events || [] }))
+    sources.map((source) =>
+      filterAll(source.logGroup, source.pattern, startTime, now).then((events) => ({ source, events }))
     )
   )
 
-  const entries: RawEntry[] = []
-  let total5xx = 0
-  let total4xx = 0
-
+  const entries: ParsedEntry[] = []
   for (const result of results) {
     if (result.status !== 'fulfilled') continue
-    for (const event of result.value.events) {
-      const msg = event.message || ''
-      entries.push({
-        timestamp: new Date(event.timestamp || 0).toISOString(),
-        message: msg,
-        logGroup: result.value.logGroup
-      })
-      if (/status[:\s]*5\d{2}/i.test(msg) || /\b5\d{2}\b/.test(msg)) total5xx++
-      if (/status[:\s]*4\d{2}/i.test(msg)) total4xx++
+    const { source, events } = result.value
+    for (const event of events) {
+      const parsed = source.parse(event.message || '', new Date(event.timestamp || 0).toISOString(), source.logGroup)
+      if (parsed) entries.push(parsed)
     }
   }
-
-  return { entries, total5xx, total4xx }
+  return entries
 }
 
 interface ResolutionRow {
@@ -191,13 +223,18 @@ async function loadResolutions(fingerprints: string[]): Promise<Map<string, Reso
 export async function getErrorGroups(opts: {
   range: string
   statusFilter: StatusFilter
+  levelFilter?: LogLevelFilter
 }): Promise<GetErrorGroupsResult> {
-  const { entries, total5xx, total4xx } = await fetchCloudWatchEntries(opts.range)
+  const levelFilter = opts.levelFilter ?? 'all'
+  const all = await fetchCloudWatchEntries(opts.range)
+  const totalErrors = all.filter((e) => e.level === 'error').length
+  const totalWarnings = all.length - totalErrors
+  const entries = levelFilter === 'all' ? all : all.filter((e) => e.level === levelFilter)
 
   // Group entries by fingerprint.
   const byFp = new Map<string, ErrorGroup>()
   for (const entry of entries) {
-    const fp = fingerprintError(entry.message, entry.logGroup)
+    const fp = fingerprintError(entry.seed, entry.logGroup)
     const existing = byFp.get(fp)
     if (!existing) {
       byFp.set(fp, {
@@ -206,7 +243,11 @@ export async function getErrorGroups(opts: {
         firstSeen: entry.timestamp,
         lastSeen: entry.timestamp,
         logGroup: entry.logGroup,
-        sampleMessage: entry.message,
+        level: entry.level,
+        stage: entry.stage,
+        ...(entry.endpoint ? { endpoint: entry.endpoint } : {}),
+        title: entry.title,
+        sampleMessage: entry.detail,
         status: 'open'
       })
       continue
@@ -215,7 +256,7 @@ export async function getErrorGroups(opts: {
     if (entry.timestamp < existing.firstSeen) existing.firstSeen = entry.timestamp
     if (entry.timestamp > existing.lastSeen) {
       existing.lastSeen = entry.timestamp
-      existing.sampleMessage = entry.message
+      existing.sampleMessage = entry.detail
     }
   }
 
@@ -242,9 +283,10 @@ export async function getErrorGroups(opts: {
 
   return {
     groups,
-    total5xx,
-    total4xx,
-    totalEntries: entries.length,
+    stage: STAGE,
+    totalErrors,
+    totalWarnings,
+    totalEntries: all.length,
     totalGroups
   }
 }

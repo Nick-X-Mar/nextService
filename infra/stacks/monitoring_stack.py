@@ -48,30 +48,28 @@ class MonitoringStack(Stack):
         )
 
         # ── Metric Filters ──────────────────────────────────────
-        # 5xx errors
+        # The app writes one JSON entry per warning/error into /nextservice/app
+        # (src/utils/logger.ts): `level` is "error" | "warn", and the per-request
+        # line carries `type: "api_request"` and `statusCode`.
+        # Every logged error — a 5xx, a handler's caught exception, a crashed render
         filter_5xx = logs.MetricFilter(
             self, "5xxFilter",
             log_group=self.app_log_group,
-            filter_pattern=logs.FilterPattern.any_term(
-                "HTTP 500", "HTTP 502", "HTTP 503", "HTTP 504",
-                "status: 500", "status: 502", "status: 503", "status: 504",
-                "statusCode: 500", "statusCode: 502",
-            ),
+            filter_pattern=logs.FilterPattern.string_value("$.level", "=", "error"),
             metric_name="5xxErrors",
             metric_namespace="NextService",
             metric_value="1",
             default_value=0,
         )
 
-        # 4xx errors
+        # 4xx answers (401s are not logged as warnings)
         filter_4xx = logs.MetricFilter(
             self, "4xxFilter",
             log_group=self.app_log_group,
-            filter_pattern=logs.FilterPattern.any_term(
-                "HTTP 400", "HTTP 401", "HTTP 403", "HTTP 404",
-                "HTTP 409", "HTTP 422", "HTTP 429",
-                "status: 400", "status: 401", "status: 403",
-                "status: 404", "status: 429",
+            filter_pattern=logs.FilterPattern.all(
+                logs.FilterPattern.string_value("$.type", "=", "api_request"),
+                logs.FilterPattern.number_value("$.statusCode", ">=", 400),
+                logs.FilterPattern.number_value("$.statusCode", "<", 500),
             ),
             metric_name="4xxErrors",
             metric_namespace="NextService",
@@ -83,7 +81,7 @@ class MonitoringStack(Stack):
         alarm_5xx = cw.Alarm(
             self, "5xxAlarm",
             alarm_name="NextService-5xx-Errors",
-            alarm_description="At least one 5xx error in 5 minutes",
+            alarm_description="At least one server error logged in 5 minutes",
             metric=cw.Metric(
                 namespace="NextService",
                 metric_name="5xxErrors",

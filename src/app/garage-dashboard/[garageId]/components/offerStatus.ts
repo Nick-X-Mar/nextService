@@ -1,6 +1,6 @@
 import { OfferStatus, ServiceRequestStatus } from '@/types/statuses'
 import { styles } from '@/styles/styles'
-import { athensDaysUntil } from '@/utils/athensTime'
+import { athensDaysUntil, athensToday } from '@/utils/athensTime'
 
 /**
  * What an offer amounts to for the garage that made it: an offer status, or
@@ -122,4 +122,22 @@ export function isUpcomingAppointment(offer: {
     return false
   }
   return (athensDaysUntil(offer.appointmentDate) ?? -1) >= 0
+}
+
+/**
+ * 'Ο πελάτης την είδε σήμερα στις 10:40' — when the client last had this
+ * offer in front of them, in Athens time. Null while they have not.
+ */
+export function clientViewedLabel(viewedAt?: string | null): string | null {
+  if (!viewedAt) return null
+  const at = new Date(viewedAt)
+  if (Number.isNaN(at.getTime())) return null
+  const time = at.toLocaleTimeString('el-GR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Athens' })
+  const days = athensDaysUntil(athensToday(at))
+  const when = days === 0
+    ? 'σήμερα'
+    : days === -1
+      ? 'χθες'
+      : `στις ${at.toLocaleDateString('el-GR', { day: 'numeric', month: 'numeric', timeZone: 'Europe/Athens' })}`
+  return `Ο πελάτης την είδε ${when} ${days === 0 || days === -1 ? 'στις ' : ''}${time}`
 }

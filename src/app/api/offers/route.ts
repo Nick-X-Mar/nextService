@@ -14,6 +14,7 @@ import { parseAvailabilityDates, sanitizeSlots } from '@/utils/availabilitySlots
 import {
   MAX_AVAILABILITY_DATES,
   MAX_OFFER_AMOUNT,
+  MAX_OFFER_NOTES,
   REQUEST_NOT_OPEN,
   WRITE_CONFLICT,
   failedTransactItem,
@@ -40,6 +41,13 @@ const OFFER_LOCKED = {
 
 function badRequest(error: string) {
   return NextResponse.json({ success: false, error }, { status: 400 })
+}
+
+function parseNotes(raw: unknown): string | null {
+  if (raw === undefined || raw === null) return ''
+  if (typeof raw !== 'string') return null
+  const text = raw.trim()
+  return text.length <= MAX_OFFER_NOTES ? text : null
 }
 
 function parseBenefits(raw: unknown): string[] | null {
@@ -88,6 +96,9 @@ async function _POST(request: NextRequest) {
     const benefits = parseBenefits(body.benefits)
     if (benefits === null) return badRequest('Μη έγκυρες παροχές')
 
+    const notes = parseNotes(body.notes)
+    if (notes === null) return badRequest(`Η σημείωση μπορεί να έχει έως ${MAX_OFFER_NOTES} χαρακτήρες`)
+
     const requestRes = await dynamoDB.send(new GetCommand({
       TableName: TABLES.ServiceRequests,
       Key: { id: serviceRequestId },
@@ -122,6 +133,7 @@ async function _POST(request: NextRequest) {
       offerAmount,
       status: OfferStatus.PENDING,
       benefits,
+      ...(notes ? { notes } : {}),
       availabilityDates,
       // Hourly slots keyed by date. Sanitised against availabilityDates so a
       // caller cannot record hours for a day this offer never included.
@@ -336,6 +348,12 @@ async function _PUT(request: NextRequest) {
       if (parsed === null) return badRequest('Μη έγκυρες παροχές')
       benefits = parsed
     }
+    let notes = typeof existing.notes === 'string' ? existing.notes : ''
+    if (body.notes !== undefined) {
+      const parsed = parseNotes(body.notes)
+      if (parsed === null) return badRequest(`Η σημείωση μπορεί να έχει έως ${MAX_OFFER_NOTES} χαρακτήρες`)
+      notes = parsed
+    }
 
     const serviceRequestId = existing.serviceRequestId as string
     const updatedAt = new Date().toISOString()
@@ -347,7 +365,7 @@ async function _PUT(request: NextRequest) {
             Update: {
               TableName: TABLES.Offers,
               Key: { id: offerId },
-              UpdateExpression: 'SET offerAmount = :offerAmount, benefits = :benefits, availabilityDates = :availabilityDates, availabilitySlots = :availabilitySlots, updatedAt = :updatedAt',
+              UpdateExpression: 'SET offerAmount = :offerAmount, benefits = :benefits, notes = :notes, availabilityDates = :availabilityDates, availabilitySlots = :availabilitySlots, updatedAt = :updatedAt',
               // The read above is a fast path; this is what holds when the
               // client accepts in the same instant.
               ConditionExpression: '#status = :pending AND garageId = :garageId',
@@ -355,6 +373,7 @@ async function _PUT(request: NextRequest) {
               ExpressionAttributeValues: {
                 ':offerAmount': offerAmount,
                 ':benefits': benefits,
+                ':notes': notes,
                 ':availabilityDates': availabilityDates,
                 ':availabilitySlots': availabilitySlots,
                 ':updatedAt': updatedAt,
@@ -402,7 +421,7 @@ async function _PUT(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      offer: { ...existing, offerAmount, benefits, availabilityDates, availabilitySlots, updatedAt }
+      offer: { ...existing, offerAmount, benefits, notes, availabilityDates, availabilitySlots, updatedAt }
     })
 
   } catch (error) {

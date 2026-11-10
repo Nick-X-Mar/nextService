@@ -17,6 +17,8 @@ import { useToast } from '../../../hooks/useToast'
 // Navigation is handled by AppShell
 import { ServiceRequestStatus, OfferStatus } from '../../../types/statuses'
 import type { ServiceRequest } from '../../../types/requests'
+import { offersSummary, sortOffers } from '@/utils/offerSummary'
+import { PLUS_VAT } from '@/utils/vat'
 
 interface OfferSummary {
   id: string
@@ -25,6 +27,7 @@ interface OfferSummary {
   status?: OfferStatus
   garageId?: string
   benefits?: string[]
+  createdAt?: string
   garage?: {
     companyName?: string
     municipality?: string
@@ -448,8 +451,14 @@ function RequestsPageContent({ clientId }: RequestsPageProps) {
         <div className="space-y-6">
           {currentRequests.length > 0 ? (
             currentRequests.map((request) => {
-              const requestOffers = offersMap[request.id] || []
+              const isPending = request.status === ServiceRequestStatus.PENDING
+              // While the client is still choosing, cheapest first, with the
+              // spread on one line above them.
+              const requestOffers = isPending
+                ? sortOffers(offersMap[request.id] || [], 'price')
+                : offersMap[request.id] || []
               const hasRequestOffers = requestOffers.length > 0
+              const summary = isPending ? offersSummary(requestOffers) : null
 
               return (
                 <div key={request.id}>
@@ -480,6 +489,16 @@ function RequestsPageContent({ clientId }: RequestsPageProps) {
                     }
                     hasOffers={hasRequestOffers}
                   />
+                  {summary && summary.count > 1 && (
+                    <div
+                      className="px-5 py-2 bg-primary/5 border border-t-0 border-outline-variant/10 text-xs text-on-surface-variant"
+                      data-testid="offers-summary"
+                    >
+                      <span className="font-bold text-on-surface">{summary.count} προσφορές</span>
+                      {' · από '}
+                      <span className="font-bold text-primary">{summary.cheapest.toLocaleString('el-GR')}€</span> {PLUS_VAT}
+                    </div>
+                  )}
                   {hasRequestOffers && requestOffers.map((offer, index) => (
                     <OfferSummaryCard
                       key={offer.id}

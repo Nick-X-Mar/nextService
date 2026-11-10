@@ -67,7 +67,7 @@ export default function AvailableRequests({ garageId, onInactive }: AvailableReq
   // visual highlight on the corresponding card.
   const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set())
   const { navigate, isNavigating } = useNavigation()
-  const { refresh: refreshNotifications } = useNotifications()
+  const { refresh: refreshNotifications, businessTypes } = useNotifications()
   const [declining, setDeclining] = useState<ServiceRequest | null>(null)
 
   // Hold a ref to the offer-request ids the garage has already responded to so
@@ -201,6 +201,7 @@ export default function AvailableRequests({ garageId, onInactive }: AvailableReq
     onRequestPhotos: handleRequestPhotos,
     // After a reconnect we may have missed events — refetch to catch up.
     onReconnect: loadAvailableRequests,
+    businessTypes,
   })
 
   const getFuelTypeText = (fuelType: string | undefined) => {

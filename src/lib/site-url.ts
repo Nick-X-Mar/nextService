@@ -14,3 +14,13 @@ export const SITE_URL = (process.env.SITE_URL || 'https://www.nextservice.gr').r
 // that compete with www.nextservice.gr. Indexing turns on by itself once
 // SITE_URL is the domain.
 export const IS_INDEXABLE = /(^|\.)nextservice\.gr$/.test(new URL(SITE_URL).hostname)
+
+// Which deployment this server is. Each stage runs in its own region, but a log
+// line or an admin screen that says so outright needs no region lookup. A
+// local server (DynamoDB Local, or `next dev`) is never either: SITE_URL falls
+// back to the real domain there, so it can't decide this on its own.
+export type Stage = 'production' | 'staging' | 'local'
+export const STAGE: Stage =
+  process.env.DYNAMODB_ENDPOINT || process.env.NODE_ENV === 'development'
+    ? 'local'
+    : IS_INDEXABLE ? 'production' : 'staging'

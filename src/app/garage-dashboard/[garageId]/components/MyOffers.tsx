@@ -8,7 +8,7 @@ import Spinner from '@/components/Spinner'
 import { useNavigation } from '@/hooks/useNavigation'
 import { getCategoryText } from '@/utils/categoryLabels'
 import { isGarageInactive } from './garageInactive'
-import { formatAppointment, garageOfferState, offerStatusClass, offerStatusIcon, offerStatusLabel } from './offerStatus'
+import { clientViewedLabel, formatAppointment, garageOfferState, offerStatusClass, offerStatusIcon, offerStatusLabel } from './offerStatus'
 import { clientDisplayName, clientInitials } from './clientLabel'
 import { PLUS_VAT } from '@/utils/vat'
 import { declineReasonLabel } from '@/types/declines'
@@ -18,6 +18,9 @@ interface Offer {
   serviceRequestId: string
   offerAmount: number
   benefits?: string[]
+  notes?: string
+  /** When the client last opened the request with this offer on it. */
+  clientViewedAt?: string | null
   status: OfferStatus
   createdAt: string
   appointmentDate?: string
@@ -286,6 +289,17 @@ export default function MyOffers({ garageId, onInactive }: MyOffersProps) {
                 )}
               </div>
 
+              {state === OfferStatus.PENDING && (
+                <p className="flex items-center gap-1.5 text-xs text-on-surface-variant mb-4" data-testid="offer-viewed">
+                  <Icon
+                    name={offer.clientViewedAt ? 'visibility' : 'visibility_off'}
+                    size="sm"
+                    className={offer.clientViewedAt ? 'text-primary' : 'text-on-surface-variant/60'}
+                  />
+                  {clientViewedLabel(offer.clientViewedAt) ?? 'Ο πελάτης δεν την έχει δει ακόμα'}
+                </p>
+              )}
+
               {/* Client proposed dates notification */}
               {offer.clientAvailabilityDates && offer.clientAvailabilityDates.length > 0 && state === OfferStatus.PENDING && (
                 <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4 animate-pulse-subtle">
@@ -306,8 +320,7 @@ export default function MyOffers({ garageId, onInactive }: MyOffersProps) {
                 </div>
               )}
 
-              {/* What the client asked for, and what this offer throws in. Offers
-                  carry no free-text description of their own. */}
+              {/* What the client asked for, and what this offer throws in. */}
               <div className="border-t border-outline-variant/10 pt-4 space-y-3">
                 {offer.serviceRequest.description && (
                   <div>
@@ -315,6 +328,12 @@ export default function MyOffers({ garageId, onInactive }: MyOffersProps) {
                     <p className="text-sm text-on-surface-variant line-clamp-2">
                       {offer.serviceRequest.description}
                     </p>
+                  </div>
+                )}
+                {offer.notes && (
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mb-1">Η σημείωσή σας</p>
+                    <p className="text-sm text-on-surface-variant line-clamp-2 whitespace-pre-line">{offer.notes}</p>
                   </div>
                 )}
                 {offer.benefits && offer.benefits.length > 0 && (

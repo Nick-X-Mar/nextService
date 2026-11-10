@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import appSyncService from '@/lib/appsync-service'
+import { garageTakesCategory } from '@/types/businessTypes'
 
 // Channel constants (mirrored from src/utils/requestBroadcast.ts to keep the
 // client bundle free of server-side imports).
@@ -58,6 +59,12 @@ interface UseRealtimeRequestsOptions {
   // their list to fill any gap of events that occurred while disconnected.
   onReconnect?: () => void
   enabled?: boolean
+  /**
+   * What the garage says it is (`NotificationSummary.businessTypes`). A new
+   * request for another kind of shop is dropped here, as the feed and the
+   * badge drop it on the server (garageTakesCategory). Unknown → every request.
+   */
+  businessTypes?: string[]
 }
 
 // Subscribes a garage dashboard to broadcasts about new service requests
@@ -69,6 +76,7 @@ export function useRealtimeRequests({
   onRequestPhotos,
   onReconnect,
   enabled = true,
+  businessTypes,
 }: UseRealtimeRequestsOptions) {
   const [isConnected, setIsConnected] = useState(false)
 
@@ -79,6 +87,8 @@ export function useRealtimeRequests({
   const onRequestUpdateRef = useRef(onRequestUpdate)
   const onRequestPhotosRef = useRef(onRequestPhotos)
   const onReconnectRef = useRef(onReconnect)
+  const businessTypesRef = useRef(businessTypes)
+  useEffect(() => { businessTypesRef.current = businessTypes }, [businessTypes])
 
   useEffect(() => { onNewRequestRef.current = onNewRequest }, [onNewRequest])
   useEffect(() => { onRequestUpdateRef.current = onRequestUpdate }, [onRequestUpdate])
@@ -98,7 +108,9 @@ export function useRealtimeRequests({
     const disposeNew = appSyncService.subscribe(NEW_REQUESTS_CHANNEL, (payload) => {
       // Defensive: ignore subscription confirmations & cross-channel events
       if (!payload || payload.__type !== 'new-request' || !payload.request) return
-      onNewRequestRef.current?.(payload.request as BroadcastRequest)
+      const request = payload.request as BroadcastRequest
+      if (!garageTakesCategory(businessTypesRef.current, request.category)) return
+      onNewRequestRef.current?.(request)
     })
 
     const disposeUpdate = appSyncService.subscribe(REQUEST_UPDATES_CHANNEL, (payload) => {

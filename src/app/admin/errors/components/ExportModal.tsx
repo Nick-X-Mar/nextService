@@ -11,9 +11,10 @@ interface ExportModalProps {
   onClose: () => void
   range: string
   status: string
+  level: string
 }
 
-export default function ExportModal({ isOpen, onClose, range, status }: ExportModalProps) {
+export default function ExportModal({ isOpen, onClose, range, status, level }: ExportModalProps) {
   const [format, setFormat] = useState<Format>('md')
   const [content, setContent] = useState<string>('')
   const [loading, setLoading] = useState(false)
@@ -28,7 +29,7 @@ export default function ExportModal({ isOpen, onClose, range, status }: ExportMo
       setCopied(false)
       try {
         const res = await fetch(
-          `/api/admin/errors/export/?format=${format}&range=${range}&status=${status}`
+          `/api/admin/errors/export/?format=${format}&range=${range}&status=${status}&level=${level}`
         )
         const text = await res.text()
         if (!cancelled) setContent(text)
@@ -43,7 +44,7 @@ export default function ExportModal({ isOpen, onClose, range, status }: ExportMo
     return () => {
       cancelled = true
     }
-  }, [isOpen, format, range, status])
+  }, [isOpen, format, range, status, level])
 
   const handleCopy = async () => {
     try {
@@ -55,7 +56,7 @@ export default function ExportModal({ isOpen, onClose, range, status }: ExportMo
     }
   }
 
-  const downloadHref = `/api/admin/errors/export?format=${format}&range=${range}&status=${status}&download=1`
+  const downloadHref = `/api/admin/errors/export?format=${format}&range=${range}&status=${status}&level=${level}&download=1`
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Export errors για Claude" size="xl">

@@ -218,9 +218,15 @@ test.describe('Accepting an offer the garage changed or can no longer honour', (
 
     const [y, m, d] = date.split('-')
     await page.getByRole('button', { name: new RegExp(`${d}/${m}/${y}`) }).click()
-    const accept = page.waitForResponse((r) => r.url().includes('/accept-offer/'))
+    // Accepting opens the confirmation sheet; the booking goes out from there.
     await page.getByRole('button', { name: 'Αποδοχή προσφοράς' }).click()
+    const sheet = page.getByTestId('booking-confirmation')
+    await expect(sheet).toContainText('Δεν υπάρχει προκαταβολή')
+    const accept = page.waitForResponse((r) => r.url().includes('/accept-offer/'))
+    await page.getByRole('button', { name: 'Κλείσιμο ραντεβού' }).click()
     expect((await accept).status()).toBe(409)
+    // The conflict closes the sheet: the page behind it now shows the new price.
+    await expect(sheet).toHaveCount(0)
 
     await expect(page.getByText(/Η προσφορά άλλαξε/)).toBeVisible({ timeout: 15_000 })
     // Reloaded in place: the card now carries the garage's new figure.

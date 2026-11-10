@@ -70,6 +70,8 @@ interface RequestDetail {
     garageName: string
     offerAmount: number
     benefits: string[]
+    notes?: string
+    clientViewedAt?: string | null
     availabilityDates: string[]
     clientAvailabilityDates: string[]
     status: string
@@ -242,7 +244,9 @@ export default function RequestDetailPage() {
 
       {/* Header */}
       <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 p-6 mb-6">
-        <div className="flex items-start justify-between">
+        {/* Wraps on a phone: the date's length changes with the hour, and the two
+            buttons beside it pushed the page past 360px on the longer ones. */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold font-headline text-on-surface">
               {data.category}
@@ -261,7 +265,7 @@ export default function RequestDetailPage() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {canAssign && (
               <button
                 onClick={openAssignModal}
@@ -616,6 +620,14 @@ export default function RequestDetailPage() {
                   </div>
                   <span className="text-lg font-bold text-on-surface">{offer.offerAmount}€ + ΦΠΑ</span>
                 </div>
+                {offer.notes && (
+                  <p className="text-sm text-on-surface whitespace-pre-line break-words">
+                    <span className="font-medium">Σημείωση: </span>{offer.notes}
+                  </p>
+                )}
+                {offer.clientViewedAt && (
+                  <p className="text-xs text-on-surface/60">Την είδε ο πελάτης: {new Date(offer.clientViewedAt).toLocaleString('el-GR')}</p>
+                )}
                 {offer.benefits.length > 0 && (
                   <p className="text-sm text-on-surface/70">{offer.benefits.join(' · ')}</p>
                 )}
@@ -752,7 +764,7 @@ export default function RequestDetailPage() {
 
               {/* Availability dates */}
               <div>
-                <label className="text-xs text-on-surface/60 block mb-1">Διαθέσιμες ημ/νίες (Δευτ - Παρ, έως 2 μήνες)</label>
+                <label className="text-xs text-on-surface/60 block mb-1">Διαθέσιμες ημ/νίες (έως 2 μήνες, Σαββατοκύριακα με απαλό χρώμα)</label>
                 <div className="flex justify-center mt-2">
                   <DayPicker
                     mode="multiple"
@@ -761,15 +773,16 @@ export default function RequestDetailPage() {
                     locale={el}
                     disabled={[
                       { before: addDays(new Date(), 1) },
-                      (date) => isWeekend(date),
                       { after: addMonths(new Date(), 2) }
                     ]}
+                    modifiers={{ weekend: isWeekend }}
                     fromDate={addDays(new Date(), 1)}
                     toDate={addMonths(new Date(), 2)}
                     className="border border-outline-variant/20 rounded-xl p-3 bg-surface-container-lowest"
                     modifiersClassNames={{
                       selected: '!bg-primary !text-on-primary hover:!bg-primary/90 !rounded-lg',
-                      today: '!font-bold !text-primary'
+                      today: '!font-bold !text-primary',
+                      weekend: 'bg-primary-fixed/40 rounded-lg'
                     }}
                     styles={{
                       root: { color: '#1b1c1c' },

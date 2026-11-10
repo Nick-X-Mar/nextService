@@ -16,8 +16,10 @@ import { invalidatePlatformExamples } from '@/app/api/price-estimation/platformE
 
 /** Far above any real repair quote, low enough to catch a slipped finger. */
 export const MAX_OFFER_AMOUNT = 50_000
-/** The offer form allows weekdays up to two months out — about 45. */
-export const MAX_AVAILABILITY_DATES = 60
+/** The offer form allows any day up to two months out, weekends included — at most 62. */
+export const MAX_AVAILABILITY_DATES = 70
+/** The garage's note to the client: what the price includes, parts, how long it takes. */
+export const MAX_OFFER_NOTES = 500
 
 export const REQUEST_NOT_OPEN = {
   success: false,

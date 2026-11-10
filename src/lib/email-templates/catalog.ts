@@ -149,6 +149,38 @@ export const EMAIL_DEFINITIONS: EmailDefinition[] = [
     ctaUrl: (v) => link(`/requests/${v.clientId || ''}/details/${v.requestId || ''}/`),
   },
   {
+    name: EmailTemplate.OfferReminderClient,
+    label: 'Υπενθύμιση προσφορών',
+    audience: 'client',
+    trigger:
+      'Όταν ο πελάτης έχει προσφορές και δεν έχει κλείσει ραντεβού: 2 ώρες μετά την πρώτη προσφορά, το επόμενο πρωί και 24 ώρες μετά. Όχι μετά τις 22:00 ή πριν τις 08:00· όσες πέφτουν κοντά η μία στην άλλη στέλνονται ως μία.',
+    sentBy: 'lambda',
+    variables: [
+      car,
+      field('category', 'κατηγορία', 'Εργασία', 'Αλλαγή δίσκου πλατό'),
+      field('offerCount', 'προσφορές', 'Πόσες προσφορές (με τη λέξη)', '3 προσφορές'),
+      field('cheapest', 'τιμή', 'Η χαμηλότερη τιμή (χωρίς ΦΠΑ)', '180'),
+    ],
+    example: {
+      ...EXAMPLE_IDS,
+      brand: 'Toyota',
+      model: 'Yaris',
+      category: 'Αλλαγή δίσκου πλατό',
+      offerCount: '3 προσφορές',
+      cheapest: '180',
+    },
+    copy: {
+      subject: 'Έχεις {προσφορές} για {κατηγορία}, από {τιμή}€ + ΦΠΑ',
+      heading: 'Οι προσφορές σου σε περιμένουν',
+      body:
+        'Για **{κατηγορία}** στο **{αυτοκίνητο}** έχεις **{προσφορές}**, από **{τιμή}€ + ΦΠΑ**.\n\n' +
+        'Σύγκρινε τιμές και ημερομηνίες και κλείσε ραντεβού με όποιο συνεργείο σε εξυπηρετεί. Πληρώνεις απευθείας στο συνεργείο.',
+      ctaLabel: 'Δες τις προσφορές',
+      note: '',
+    },
+    ctaUrl: (v) => link(`/requests/${v.clientId || ''}/details/${v.requestId || ''}/`),
+  },
+  {
     name: EmailTemplate.AppointmentConfirmationClient,
     label: 'Επιβεβαίωση ραντεβού',
     audience: 'client',

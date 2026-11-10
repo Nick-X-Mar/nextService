@@ -1,12 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Icon from '@/components/ui/Icon'
 import { DayPicker } from 'react-day-picker'
 import 'react-day-picker/dist/style.css'
 import { addDays, addMonths, format, isWeekend } from 'date-fns'
 import { el } from 'date-fns/locale'
-import { ServiceVehicleCard, LicensePhotoCard, Modal, Input, Button, PillToggle, ExpandableCard, Spinner, RequestPhotosCard, ReviewPanel } from '@/components'
+import { ServiceVehicleCard, LicensePhotoCard, Modal, Input, Button, PillToggle, ExpandableCard, Spinner, RequestPhotosCard, ReviewPanel, SegmentedControl } from '@/components'
 import PaymentModal from './PaymentModal'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNavigation } from '@/hooks/useNavigation'
@@ -15,6 +15,7 @@ import { ServiceRequestStatus, OfferStatus } from '../../../types/statuses'
 import type { ServiceRequest } from '../../../types/requests'
 import type { SavedCard } from '@/types/payments'
 import { slotsForDate, type AvailabilitySlots } from '@/utils/availabilitySlots'
+import { offersSummary, sortOffers, type OfferSort } from '@/utils/offerSummary'
 import PlusVat from '@/components/PlusVat'
 import { PLUS_VAT } from '@/utils/vat'
 
@@ -34,7 +35,15 @@ interface Offer {
   appointmentDate?: string
   appointmentPrice?: number
   benefits?: string[]
+  /** The garage's own words on the offer: what the price includes, how long it takes. */
+  notes?: string
 }
+
+const OFFER_SORTS: { value: OfferSort; label: string }[] = [
+  { value: 'price', label: 'Τιμή' },
+  { value: 'date', label: 'Νωρίτερη ημ/νία' },
+  { value: 'arrival', label: 'Σειρά άφιξης' },
+]
 
 interface GarageSummary {
   id: string
@@ -176,6 +185,9 @@ export default function RequestDetailsContent({
   const [vehicleUpdateError, setVehicleUpdateError] = useState<string | null>(null)
   const [acceptingOfferId, setAcceptingOfferId] = useState<string | null>(null)
   const [acceptError, setAcceptError] = useState<string | null>(null)
+  // The offer whose booking the client is being asked to confirm.
+  const [confirmOffer, setConfirmOffer] = useState<OfferWithGarage | null>(null)
+  const [offerSort, setOfferSort] = useState<OfferSort>('price')
 
   // Payment state
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -195,6 +207,12 @@ export default function RequestDetailsContent({
   )?.garage
   const isOpenForOffers = request.status === ServiceRequestStatus.PENDING
   const showWaitingForResponsesBanner = isOpenForOffers && !hasOffers
+  // Comparing only makes sense while there is still a choice to make.
+  const displayedOffers = useMemo(
+    () => (isOpenForOffers ? sortOffers(offers, offerSort) : offers),
+    [offers, offerSort, isOpenForOffers]
+  )
+  const summary = isOpenForOffers ? offersSummary(offers) : null
 
   const formatAvailabilityDate = (dateString: string) => {
     const date = new Date(`${dateString}T00:00:00`)
@@ -432,7 +450,11 @@ export default function RequestDetailsContent({
 
   const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === 'true'
 
-  const executeAcceptOffer = async (offer: OfferWithGarage, paymentIntentId?: string) => {
+  /** 'conflict' is a 409: the offers were reloaded, so what was on screen is gone. */
+  const executeAcceptOffer = async (
+    offer: OfferWithGarage,
+    paymentIntentId?: string
+  ): Promise<'ok' | 'conflict' | 'error'> => {
     const selectedDate = selectedOfferDates[offer.id]
     const selectedTime = selectedOfferTimes[offer.id]
 
@@ -475,8 +497,9 @@ export default function RequestDetailsContent({
         // next tap is made on the current figures.
         if (response.status === 409) {
           await Promise.all([loadOffers({ keepSelections: true }), refreshRequest()])
+          return 'conflict'
         }
-        return
+        return 'error'
       }
 
       // What the server booked, not what this tab last loaded.
@@ -515,9 +538,11 @@ export default function RequestDetailsContent({
       if (onRequestUpdate) {
         onRequestUpdate(updatedRequest)
       }
+      return 'ok'
     } catch (error) {
       console.error('Error accepting offer:', error)
       setAcceptError('Παρουσιάστηκε σφάλμα κατά την αποδοχή της προσφοράς. Δοκιμάστε ξανά.')
+      return 'error'
     } finally {
       setAcceptingOfferId(null)
     }
@@ -587,9 +612,18 @@ export default function RequestDetailsContent({
         setPaymentLoading(false)
       }
     } else {
-      // Direct accept (no payment)
-      await executeAcceptOffer(offer)
+      // No payment step: the confirmation sheet is the last look before booking.
+      setAcceptError(null)
+      setConfirmOffer(offer)
     }
+  }
+
+  const handleConfirmBooking = async () => {
+    if (!confirmOffer) return
+    // A plain failure stays on the sheet, with its message, to try again. A
+    // conflict closes it: the offers were reloaded and the page now shows why.
+    const outcome = await executeAcceptOffer(confirmOffer)
+    if (outcome !== 'error') setConfirmOffer(null)
   }
 
   const handlePaymentSuccess = async (paymentIntentId: string) => {
@@ -682,11 +716,9 @@ export default function RequestDetailsContent({
         })
       )
 
-      const sortedOffers = offersWithGarage.sort((a, b) => {
-        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
-        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
-        return timeA - timeB
-      })
+      // Cheapest first, the order the list opens in — so the card that starts
+      // expanded is the one most clients compare the others against.
+      const sortedOffers = sortOffers(offersWithGarage, 'price')
 
       if (mountedRef.current) {
         setOffers(sortedOffers)
@@ -951,6 +983,34 @@ export default function RequestDetailsContent({
             <Icon name="local_offer" size="md" className="text-primary" />
             Προσφορές από Συνεργεία
           </h3>
+          {/* With one offer there is nothing to compare: the card says it all. */}
+          {!offersLoading && !offersError && summary && summary.count > 1 && (
+            <div className="mb-4 space-y-3">
+              <p className="text-sm text-on-surface-variant flex flex-wrap items-center gap-x-2 gap-y-1" data-testid="offers-summary">
+                <span className="font-bold text-on-surface">{summary.count} προσφορές</span>
+                <span aria-hidden>·</span>
+                <span>
+                  από{' '}
+                  <span className="font-bold text-primary">{formatCurrency(summary.cheapest)}</span> {PLUS_VAT}
+                </span>
+                {summary.soonest && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span>νωρίτερα {formatAvailabilityDate(summary.soonest)}</span>
+                  </>
+                )}
+              </p>
+              <div className="flex flex-wrap items-center gap-2" data-testid="offers-sort">
+                <span className={styles.labelUpper}>Ταξινόμηση</span>
+                <SegmentedControl
+                  options={OFFER_SORTS}
+                  value={offerSort}
+                  onChange={(value) => setOfferSort(value as OfferSort)}
+                  size="sm"
+                />
+              </div>
+            </div>
+          )}
           {offersLoading ? (
             <div className="flex items-center gap-3 text-sm text-on-surface-variant py-4">
               <div className="h-5 w-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -968,7 +1028,7 @@ export default function RequestDetailsContent({
             </div>
           ) : (
             <div className="space-y-3">
-              {offers.map((offer, index) => {
+              {displayedOffers.map((offer, index) => {
                 const availabilityDates = offer.availabilityDates || []
                 const hasAvailability = availabilityDates.length > 0
                 const selectedDate = selectedOfferDates[offer.id] || null
@@ -1059,6 +1119,16 @@ export default function RequestDetailsContent({
                     }
                   >
                       <div className="space-y-4 border-t border-outline-variant/10 pt-4">
+                        {offer.notes && (
+                          <div className="rounded-xl bg-surface-container-low p-3" data-testid="offer-notes">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mb-1 flex items-center gap-1">
+                              <Icon name="sticky_note_2" size="sm" className="text-primary" />
+                              Σημείωση συνεργείου
+                            </p>
+                            <p className="text-sm text-on-surface whitespace-pre-line break-words">{offer.notes}</p>
+                          </div>
+                        )}
+
                         {/* Benefits */}
                         <div>
                           <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant mb-2">
@@ -1252,7 +1322,7 @@ export default function RequestDetailsContent({
                             {isCustomOpen && (
                               <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
                                 <p className="text-sm text-on-surface-variant">
-                                  Επιλέξτε έως 5 ημερομηνίες (Δευτέρα - Παρασκευή) που σας εξυπηρετούν. Θα ενημερώσουμε το συνεργείο.
+                                  Επιλέξτε έως 5 ημερομηνίες που σας εξυπηρετούν. Θα ενημερώσουμε το συνεργείο. Τα Σαββατοκύριακα ξεχωρίζουν με πιο απαλό χρώμα.
                                 </p>
                                 <div className="flex justify-center">
                                   <DayPicker
@@ -1262,15 +1332,16 @@ export default function RequestDetailsContent({
                                     locale={el}
                                     disabled={[
                                       { before: addDays(new Date(), 1) },
-                                      (date) => isWeekend(date),
                                       { after: addMonths(new Date(), 2) }
                                     ]}
+                                    modifiers={{ weekend: isWeekend }}
                                     fromDate={addDays(new Date(), 1)}
                                     toDate={addMonths(new Date(), 2)}
                                     className="border border-outline-variant/10 rounded-xl p-2 sm:p-4 max-w-full"
                                     modifiersClassNames={{
-                                      selected: 'bg-primary text-on-primary hover:bg-primary-container',
-                                      today: 'font-bold text-primary'
+                                      selected: '!bg-primary !text-on-primary hover:!bg-primary-container',
+                                      today: 'font-bold text-primary',
+                                      weekend: 'bg-primary-fixed/40 rounded-lg'
                                     }}
                                     styles={{
                                       root: { color: '#1b1c1c' },
@@ -1615,6 +1686,78 @@ export default function RequestDetailsContent({
             />
           </div>
         </div>
+      </Modal>
+
+      {/* The last look before booking: what, when, how much, and what happens next. */}
+      <Modal
+        isOpen={!!confirmOffer}
+        onClose={() => { if (!acceptingOfferId) setConfirmOffer(null) }}
+        title="Επιβεβαίωση ραντεβού"
+        size="sm"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmOffer(null)}
+              disabled={!!acceptingOfferId}
+            >
+              Πίσω
+            </Button>
+            <Button onClick={handleConfirmBooking} loading={!!acceptingOfferId}>
+              Κλείσιμο ραντεβού
+            </Button>
+          </>
+        }
+      >
+        {confirmOffer && (() => {
+          const date = selectedOfferDates[confirmOffer.id]
+          const time = selectedOfferTimes[confirmOffer.id]
+          return (
+            <div className="space-y-4" data-testid="booking-confirmation">
+              <div className="rounded-xl bg-surface-container-low p-4 space-y-2">
+                <p className="text-base font-bold text-on-surface">
+                  {confirmOffer.garage?.companyName || 'Συνεργείο'}
+                </p>
+                {confirmOffer.garage?.municipality && (
+                  <p className="text-sm text-on-surface-variant flex items-center gap-1">
+                    <Icon name="location_on" size="sm" />
+                    {confirmOffer.garage.municipality}
+                  </p>
+                )}
+                {date && (
+                  <p className="text-sm text-on-surface flex items-center gap-1">
+                    <Icon name="event" size="sm" className="text-primary" />
+                    {formatAvailabilityDate(date)}{time ? `, ${time}` : ''}
+                  </p>
+                )}
+                <p className="text-sm text-on-surface flex items-center gap-1">
+                  <Icon name="payments" size="sm" className="text-primary" />
+                  <span className="font-bold">{formatCurrency(confirmOffer.offerAmount)}</span> {PLUS_VAT}
+                </p>
+              </div>
+              <ul className="space-y-2 text-sm text-on-surface-variant">
+                <li className="flex items-start gap-2">
+                  <Icon name="storefront" size="sm" className="text-primary shrink-0 mt-0.5" />
+                  Πληρώνετε απευθείας στο συνεργείο. Δεν υπάρχει προκαταβολή.
+                </li>
+                <li className="flex items-start gap-2">
+                  <Icon name="event_busy" size="sm" className="text-primary shrink-0 mt-0.5" />
+                  Μπορείτε να ακυρώσετε δωρεάν μέχρι την ώρα του ραντεβού.
+                </li>
+                <li className="flex items-start gap-2">
+                  <Icon name="call" size="sm" className="text-primary shrink-0 mt-0.5" />
+                  Το συνεργείο θα δει το τηλέφωνό σας, για να επικοινωνήσει μαζί σας αν χρειαστεί.
+                </li>
+              </ul>
+              {acceptError && (
+                <p className="text-sm text-red-700 flex items-center gap-2">
+                  <Icon name="error" size="sm" className="text-red-600" />
+                  {acceptError}
+                </p>
+              )}
+            </div>
+          )
+        })()}
       </Modal>
 
       {/* Payment Modal */}

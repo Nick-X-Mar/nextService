@@ -114,9 +114,22 @@ function summaryRequestIds(
       .filter((m) => m.senderType === 'client')
       .map((m) => m.requestId),
     ...offers
-      .filter((o) => o.status === OfferStatus.ACCEPTED || offerHasUnseenDates(o))
+      .filter((o) => o.status === OfferStatus.ACCEPTED || offerHasUnseenDates(o) || isUnseenLoss(o))
       .map((o) => o.serviceRequestId as string),
   ]
+}
+
+/** How long a lost offer is worth telling the garage about. */
+export const LOST_OFFER_ALERT_DAYS = 14
+
+/**
+ * An offer closed recently that the garage has not yet been told about. Whether
+ * it lost to another garage — and not to a cancel — is for the request to say.
+ */
+export function isUnseenLoss(offer: Record<string, unknown>): boolean {
+  if (offer.status !== OfferStatus.REJECTED || offer.garageSeenLostAt) return false
+  const closedAt = Date.parse(String(offer.updatedAt ?? ''))
+  return Number.isFinite(closedAt) && Date.now() - closedAt < LOST_OFFER_ALERT_DAYS * 86_400_000
 }
 
 /**

@@ -77,7 +77,7 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
   const [accountState, setAccountState] = useState<GarageAccountState>('pending')
   const [bookedJobs, setBookedJobs] = useState<BookedJob[]>([])
   const { success } = useToast()
-  const { markRequestsSeen } = useNotifications()
+  const { markRequestsSeen, businessTypes } = useNotifications()
   // Track which request ids we've already seen via realtime so the badge
   // counter and toast don't fire twice (e.g. an event arriving twice during
   // a flaky reconnect).
@@ -262,6 +262,7 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
     onNewRequest: handleRealtimeNewRequest,
     onRequestUpdate: handleRealtimeRequestUpdate,
     onReconnect: refreshCountsAfterReconnect,
+    businessTypes,
   })
 
   const loadBookedJobs = useCallback(async () => {

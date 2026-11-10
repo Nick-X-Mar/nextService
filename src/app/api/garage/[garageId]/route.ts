@@ -7,6 +7,8 @@ import { getAuthFromRequest } from '@/utils/auth'
 import { withMetrics } from '@/utils/withMetrics'
 import { stringList } from '@/utils/stringList'
 import { businessTypes } from '@/types/businessTypes'
+import { invalidateGarageBusinessTypes } from '@/utils/garageBusinessTypes'
+import { invalidateUnread } from '@/utils/unreadCache'
 import { TABLES } from '@/lib/tables'
 
 async function _GET(
@@ -196,6 +198,10 @@ async function _PUT(
       }
       throw err
     }
+
+    // Its feed, badge and live bell follow what it is.
+    invalidateGarageBusinessTypes(garageId)
+    invalidateUnread('garage', garageId)
 
     return NextResponse.json({
       success: true,

@@ -9,6 +9,8 @@ import ImportModal from './components/ImportModal'
 type TimeRange = '1h' | '6h' | '24h' | '7d'
 type StatusFilter = 'open' | 'resolved' | 'ignored' | 'all'
 type ErrorStatus = 'open' | 'resolved' | 'ignored'
+type LevelFilter = 'all' | 'error' | 'warn'
+type Stage = 'production' | 'staging' | 'local'
 
 interface ErrorGroup {
   fingerprint: string
@@ -16,6 +18,10 @@ interface ErrorGroup {
   firstSeen: string
   lastSeen: string
   logGroup: string
+  level: 'error' | 'warn'
+  stage: Stage
+  endpoint?: string
+  title: string
   sampleMessage: string
   status: ErrorStatus
   notes?: string
@@ -25,8 +31,9 @@ interface ErrorGroup {
 
 interface RecentResponse {
   groups: ErrorGroup[]
-  total5xx: number
-  total4xx: number
+  stage: Stage
+  totalErrors: number
+  totalWarnings: number
   totalEntries: number
   totalGroups: number
 }
@@ -44,6 +51,22 @@ const statusFilters: { value: StatusFilter; label: string }[] = [
   { value: 'ignored', label: 'Αγνοημένα' },
   { value: 'all', label: 'Όλα' }
 ]
+
+const levelFilters: { value: LevelFilter; label: string }[] = [
+  { value: 'all', label: 'Errors + Warnings' },
+  { value: 'error', label: 'Errors' },
+  { value: 'warn', label: 'Warnings' }
+]
+
+const STAGE_LABELS: Record<Stage, { label: string; classes: string }> = {
+  production: { label: 'Production', classes: 'bg-error-container text-on-error-container' },
+  staging: { label: 'Staging', classes: 'bg-amber-100 text-amber-800' },
+  local: { label: 'Local', classes: 'bg-surface-container-high text-on-surface/70' }
+}
+
+function levelBadgeClasses(level: 'error' | 'warn'): string {
+  return level === 'error' ? 'bg-error text-on-error' : 'bg-amber-100 text-amber-800'
+}
 
 function statusBadgeClasses(status: ErrorStatus): string {
   switch (status) {
@@ -65,10 +88,12 @@ function shortTitle(message: string, max = 120): string {
 export default function ErrorsPage() {
   const [timeRange, setTimeRange] = useState<TimeRange>('24h')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
+  const [levelFilter, setLevelFilter] = useState<LevelFilter>('all')
   const [data, setData] = useState<RecentResponse>({
     groups: [],
-    total5xx: 0,
-    total4xx: 0,
+    stage: 'local',
+    totalErrors: 0,
+    totalWarnings: 0,
     totalEntries: 0,
     totalGroups: 0
   })
@@ -83,7 +108,7 @@ export default function ErrorsPage() {
     setLoading(true)
     try {
       const res = await fetch(
-        `/api/admin/errors/recent/?range=${timeRange}&status=${statusFilter}`
+        `/api/admin/errors/recent/?range=${timeRange}&status=${statusFilter}&level=${levelFilter}`
       )
       if (res.ok) {
         const body = (await res.json()) as RecentResponse
@@ -94,7 +119,7 @@ export default function ErrorsPage() {
     } finally {
       setLoading(false)
     }
-  }, [timeRange, statusFilter])
+  }, [timeRange, statusFilter, levelFilter])
 
   useEffect(() => {
     fetchErrors()
@@ -127,7 +152,14 @@ export default function ErrorsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
-        <h1 className="text-2xl font-bold font-headline text-on-surface">Error Monitoring</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold font-headline text-on-surface">Error Monitoring</h1>
+          {!loading && (
+            <span className={`text-xs px-2.5 py-1 rounded-full font-bold uppercase tracking-wide ${STAGE_LABELS[data.stage].classes}`}>
+              {STAGE_LABELS[data.stage].label}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setExportOpen(true)}
@@ -147,6 +179,21 @@ export default function ErrorsPage() {
       </div>
 
       <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+        <div className="flex gap-1">
+          {levelFilters.map((l) => (
+            <button
+              key={l.value}
+              onClick={() => setLevelFilter(l.value)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                levelFilter === l.value
+                  ? 'bg-primary text-on-primary'
+                  : 'bg-surface-container-high text-on-surface/70 hover:bg-surface-container-highest'
+              }`}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
         <div className="flex gap-1">
           {statusFilters.map((s) => (
             <button
@@ -180,8 +227,8 @@ export default function ErrorsPage() {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <StatCard icon="error" label="5xx Errors" value={data.total5xx} color="error" />
-        <StatCard icon="warning" label="4xx Errors" value={data.total4xx} color="tertiary" />
+        <StatCard icon="error" label="Errors" value={data.totalErrors} color="error" />
+        <StatCard icon="warning" label="Warnings" value={data.totalWarnings} color="tertiary" />
         <StatCard icon="bug_report" label="Total Entries" value={data.totalEntries} color="secondary" />
         <StatCard icon="fingerprint" label="Unique" value={data.totalGroups} color="primary" />
       </div>
@@ -213,6 +260,12 @@ export default function ErrorsPage() {
                     className="w-full text-left px-5 py-3 hover:bg-surface-container-low transition-colors"
                   >
                     <div className="flex items-center gap-3 mb-1 flex-wrap">
+                      <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${levelBadgeClasses(g.level)}`}>
+                        {g.level === 'error' ? 'error' : 'warning'}
+                      </span>
+                      <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${STAGE_LABELS[g.stage].classes}`}>
+                        {STAGE_LABELS[g.stage].label}
+                      </span>
                       <span className="text-xs font-mono font-bold text-on-surface bg-surface-container-high px-2 py-0.5 rounded">
                         {g.fingerprint}
                       </span>
@@ -227,12 +280,12 @@ export default function ErrorsPage() {
                       <span className="text-xs text-on-surface/50 font-mono">
                         last {new Date(g.lastSeen).toLocaleString()}
                       </span>
-                      <span className="text-xs bg-surface-container-high text-on-surface/60 px-2 py-0.5 rounded ml-auto">
-                        {g.logGroup}
+                      <span className="text-xs bg-surface-container-high text-on-surface/60 px-2 py-0.5 rounded ml-auto font-mono">
+                        {g.endpoint ?? g.logGroup}
                       </span>
                     </div>
                     <div className="text-sm text-on-surface font-mono truncate">
-                      {shortTitle(g.sampleMessage, 200)}
+                      {shortTitle(g.title, 200)}
                     </div>
                   </button>
 
@@ -305,6 +358,7 @@ export default function ErrorsPage() {
         onClose={() => setExportOpen(false)}
         range={timeRange}
         status={statusFilter}
+        level={levelFilter}
       />
       <ImportModal
         isOpen={importOpen}

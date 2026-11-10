@@ -12,7 +12,8 @@ import { compressImages } from '@/utils/imageCompression'
 import { getCategoryText } from '@/utils/categoryLabels'
 import { useFileDrop } from '@/hooks/useFileDrop'
 import EstimatedCostCard from './EstimatedCostCard'
-import GuestAccountFields, { GuestTermsCheckbox, useGuestAccount } from './GuestAccount'
+import GuestAccountFields, { GuestTermsCheckbox, isEmailValid, useGuestAccount } from './GuestAccount'
+import { useFieldTracking } from '@/hooks/useFieldTracking'
 import Image from 'next/image'
 import { track } from '@/lib/track'
 
@@ -60,7 +61,9 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
 
   // Track form funnel
   useEffect(() => {
-    track('car_specs_started')
+    track('car_specs_started', { category: savedData.category })
+  // Once per visit to the step, with the category it opened for.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,6 +91,16 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
   })
 
   const isFormValid = photos.length >= 1 && account.isReady
+
+  // Where in this step people stop: each field, the first time it holds a value.
+  useFieldTracking('car_specs', savedData.category, {
+    signed_in: account.isLoggedIn,
+    email: !account.isLoggedIn && isEmailValid(account.email),
+    email_taken: account.emailExists,
+    phone: !account.isLoggedIn && account.isPhoneValid,
+    terms: !account.isLoggedIn && account.acceptedTerms,
+    damage_photos: photos.length > 0,
+  })
 
   const release = () => {
     submittingRef.current = false

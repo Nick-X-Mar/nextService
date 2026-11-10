@@ -1,5 +1,5 @@
 import { test, expect, type Page, type Locator } from '@playwright/test'
-import { newClient, newGarage, newRequest, makeOffer, signInGarage, type Party } from './p-helpers'
+import { newClient, newGarage, newRequest, makeOffer, signInGarage, OFFER_DATES, type Party } from './p-helpers'
 import { setAuthCookie } from './helpers'
 import { seedDraft } from './b-helpers'
 
@@ -70,11 +70,13 @@ test.describe.serial('Signed-in screens', () => {
   let garage: Party
   let requestId: string
 
-  test('Setup: a client with a request one garage has quoted, and a garage', async () => {
+  test('Setup: a client with a request two garages have quoted, and a garage', async () => {
     client = await newClient('mobile')
     garage = await newGarage('mobile')
     requestId = (await newRequest(client, { licensePlate: 'ΙΚΧ5555', vinNumber: 'VF3MOBILE00000001', engineNumber: 'HN05555' })).requestId
     await makeOffer(garage, requestId)
+    // A second offer brings out the summary line and the sort control.
+    await makeOffer(await newGarage('mobile-second'), requestId)
   })
 
   test('The request page, with its photo buttons and the offer, fits the screen', async ({ page }) => {
@@ -82,6 +84,26 @@ test.describe.serial('Signed-in screens', () => {
     await page.goto(`/requests/${client.id}/details/${requestId}/`)
     await expect(page.getByText('Προσφορές από Συνεργεία')).toBeVisible({ timeout: 30_000 })
     await expectNoSidewaysScroll(page)
+  })
+
+  test('The offers summary, the sort and the booking sheet fit the screen, the sheet clear of the bottom bar', async ({ page }) => {
+    await signInClient(page, client)
+    await page.goto(`/requests/${client.id}/details/${requestId}/`)
+    await expect(page.getByTestId('offers-summary')).toContainText('2 προσφορές', { timeout: 30_000 })
+    await expect(page.getByTestId('offers-sort')).toBeVisible()
+    await expectNoSidewaysScroll(page)
+
+    const [y, m, d] = OFFER_DATES[0].split('-')
+    await page.getByRole('button', { name: new RegExp(`${d}/${m}/${y}`) }).first().click()
+    await page.getByRole('button', { name: 'Αποδοχή προσφοράς' }).first().click()
+    const confirm = page.getByRole('button', { name: 'Κλείσιμο ραντεβού' })
+    await expect(confirm).toBeVisible()
+    await confirm.scrollIntoViewIfNeeded()
+    expect(await isTappable(confirm)).toBe(true)
+    await expectNoSidewaysScroll(page)
+    // Leave the request pending for the tests after this one.
+    await page.getByRole('button', { name: 'Πίσω', exact: true }).click()
+    await expect(page.getByTestId('booking-confirmation')).toHaveCount(0)
   })
 
   test('The offer form calendar stays inside its card', async ({ page }) => {

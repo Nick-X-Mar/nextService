@@ -24,6 +24,8 @@ export interface Alert {
     | 'review-due'
     /** Client: the garage closed the job; is what it declared right? */
     | 'job-confirm'
+    /** Garage: the client booked another garage's offer — no price, no name. */
+    | 'offer-lost'
   /** Drives colour only: info reads calm, action asks for a decision, urgent is time-boxed. */
   severity: 'info' | 'action' | 'urgent'
   /** Material Symbols glyph name. */
@@ -61,6 +63,11 @@ export interface NotificationSummary {
    * not in it to be filtered out, so this is how the browser learns to drop it.
    */
   recentlyAnsweredIds?: string[]
+  /**
+   * Garage only: what the garage says it is. A request broadcast over realtime
+   * for another kind of shop (garageTakesCategory) is not news to it.
+   */
+  businessTypes?: string[]
   /** Garage only: own offers waiting on a move (accepted-unopened, dates proposed). */
   offersNeedingAttention: number
   /** Everything currently waiting on this user, newest concern first. */

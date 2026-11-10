@@ -23,7 +23,7 @@ import { el } from 'date-fns/locale'
 import 'react-day-picker/dist/style.css'
 import { isGarageInactive } from '../../../components/garageInactive'
 import AssignedElsewhere, { isAssignedElsewhere } from '../../../components/AssignedElsewhere'
-import { formatAppointment, garageOfferState, offerStatusClass, offerStatusLabel } from '../../../components/offerStatus'
+import { clientViewedLabel, formatAppointment, garageOfferState, offerStatusClass, offerStatusLabel } from '../../../components/offerStatus'
 import { clientDisplayName } from '../../../components/clientLabel'
 
 /**
@@ -87,6 +87,8 @@ interface StoredOffer {
   status: OfferStatus
   createdAt?: string
   benefits?: string[]
+  notes?: string
+  clientViewedAt?: string
   availabilityDates?: string[]
   availabilitySlots?: AvailabilitySlots
   clientAvailabilityDates?: string[]
@@ -99,6 +101,7 @@ interface StoredOffer {
 interface SavedOffer {
   offerAmount: number
   benefits: string[]
+  notes: string
   availabilityDates: string[]
   availabilitySlots: AvailabilitySlots
 }
@@ -109,6 +112,14 @@ interface OfferPageProps {
 }
 
 const toDate = (date: string) => new Date(`${date}T00:00:00`)
+
+const MAX_NOTES = 500
+
+/** What the garage last quoted for this job on this car, to start the field from. */
+interface AmountSuggestion {
+  amount: number
+  quotedAt: string | null
+}
 
 /** Order-insensitive fingerprint of a slot map, for change detection. */
 const slotsKey = (slots: AvailabilitySlots) =>
@@ -147,6 +158,9 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
   const [estimatedCost, setEstimatedCost] = useState(0)
   const [offerAmount, setOfferAmount] = useState(0)
   const [selectedBenefits, setSelectedBenefits] = useState<string[]>([])
+  const [notes, setNotes] = useState('')
+  // Set only when the amount field was filled from it, so the hint says so.
+  const [suggestion, setSuggestion] = useState<AmountSuggestion | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   // The API refused this garage as not (or no longer) approved.
   const [inactive, setInactive] = useState(false)
@@ -242,12 +256,15 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
     setOfferNumber(stored.offerNumber)
     setOfferAmount(stored.offerAmount)
     setSelectedBenefits(stored.benefits ?? [])
+    setNotes(stored.notes ?? '')
+    setSuggestion(null)
     setSelectedDates(liveDates.map(toDate))
     setAvailabilitySlots(liveSlots)
     setClientAvailabilityDates(stored.clientAvailabilityDates ?? [])
     setSavedOffer({
       offerAmount: stored.offerAmount,
       benefits: stored.benefits ?? [],
+      notes: stored.notes ?? '',
       availabilityDates: liveDates,
       availabilitySlots: liveSlots,
     })
@@ -261,16 +278,19 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
     try {
       if (!silent) setIsLoading(true)
 
-      const [requestResponse, garageResponse, offersResponse] = await Promise.all([
+      const [requestResponse, garageResponse, offersResponse, suggestionResponse] = await Promise.all([
         // viewerGarageId is for the GDPR audit log.
         fetch(`/api/requests/${requestId}/?viewerGarageId=${garageId}`),
         fetch(`/api/garage/${garageId}/`),
         fetch(`/api/offers/?serviceRequestId=${requestId}&garageId=${garageId}`),
+        // A reload after a save has the offer itself; the suggestion is for a first quote.
+        silent ? null : fetch(`/api/garage/offer-suggestion/?requestId=${requestId}`).catch(() => null),
       ])
-      const [requestData, garageData, offersData] = await Promise.all([
+      const [requestData, garageData, offersData, suggestionData] = await Promise.all([
         requestResponse.json().catch(() => null),
         garageResponse.json().catch(() => null),
         offersResponse.json().catch(() => null),
+        suggestionResponse?.ok ? suggestionResponse.json().catch(() => null) : null,
       ])
 
       if (isGarageInactive(requestResponse, requestData) || isGarageInactive(offersResponse, offersData)) {
@@ -300,9 +320,14 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
         }
       }
 
-      if (offersResponse.ok && offersData?.success) {
-        const current = pickCurrentOffer(offersData.offers ?? [])
-        if (current) applyOffer(current)
+      const current = offersResponse.ok && offersData?.success ? pickCurrentOffer(offersData.offers ?? []) : null
+      if (current) {
+        applyOffer(current)
+      } else if (typeof suggestionData?.suggestion?.amount === 'number') {
+        // A first quote starts from what this garage charged the last time
+        // for the same job on the same car; the hint under the field says so.
+        setOfferAmount(suggestionData.suggestion.amount)
+        setSuggestion(suggestionData.suggestion)
       }
     } catch (error) {
       console.error('Error loading data:', error)
@@ -407,6 +432,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
     if (!savedOffer) return true
     if (offerAmount !== savedOffer.offerAmount) return true
     if (!sameList(selectedBenefits, savedOffer.benefits)) return true
+    if (notes.trim() !== savedOffer.notes) return true
     if (!sameList(selectedDateStrings, savedOffer.availabilityDates)) return true
     return slotsKey(cleanSlots) !== slotsKey(savedOffer.availabilitySlots)
   }
@@ -458,6 +484,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
               offerId: existingOffer.id,
               offerAmount,
               benefits: selectedBenefits,
+              notes: notes.trim(),
               availabilityDates: dates,
               availabilitySlots: slots,
             }),
@@ -469,6 +496,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
               serviceRequestId: requestId,
               offerAmount,
               benefits: selectedBenefits,
+              notes: notes.trim(),
               availabilityDates: dates,
               availabilitySlots: slots,
             }),
@@ -504,7 +532,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
   const isSubmitting = isPending('submit') || isNavigating(offersHref)
   const canSubmit = !isSubmitting && (!existingOffer || hasChanges())
 
-  if (assignedElsewhere) return <AssignedElsewhere garageId={garageId} />
+  if (assignedElsewhere) return <AssignedElsewhere garageId={garageId} requestId={requestId} />
 
   if (isLoading) {
     return (
@@ -770,6 +798,39 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
             )}
           </div>
 
+          {suggestion && offerAmount === suggestion.amount && (
+            <p className="mt-3 text-xs text-on-surface-variant flex items-start gap-1" data-testid="offer-amount-suggestion">
+              <Icon name="history" size="sm" className="text-on-surface-variant/70 shrink-0" />
+              <span>
+                Συμπληρώθηκε από την προσφορά σας
+                {suggestion.quotedAt
+                  ? ` της ${new Date(suggestion.quotedAt).toLocaleDateString('el-GR', { day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'Europe/Athens' })}`
+                  : ''}{' '}
+                για την ίδια εργασία στο ίδιο μοντέλο. Αλλάξτε το αν χρειάζεται.
+              </span>
+            </p>
+          )}
+
+          <div className="mt-5">
+            <label htmlFor="offer-notes" className={`${styles.label} mb-2 block`}>
+              Σημείωση προς τον πελάτη
+            </label>
+            <textarea
+              id="offer-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value.slice(0, MAX_NOTES))}
+              rows={3}
+              maxLength={MAX_NOTES}
+              placeholder="π.χ. Περιλαμβάνει γνήσια ανταλλακτικά και εργασία. Η δουλειά κρατά περίπου 3 ώρες."
+              className={`${styles.input} resize-none`}
+              disabled={readOnly}
+            />
+            <p className="mt-1 text-[11px] text-on-surface-variant flex justify-between gap-2">
+              <span>Προαιρετικό. Τι περιλαμβάνει η τιμή, τι ανταλλακτικά, πόσο κρατά.</span>
+              <span className="tabular-nums shrink-0">{notes.length}/{MAX_NOTES}</span>
+            </p>
+          </div>
+
           {estimatedCost > 0 && (
             <p className="mt-4 text-xs text-on-surface-variant flex items-center gap-1">
               <Icon name="info" size="sm" className="text-on-surface-variant/70" />
@@ -788,7 +849,8 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
             </p>
           </div>
           <p className="text-xs text-secondary mb-5">
-            Επιλέξτε τις ημέρες που μπορείτε να δεχτείτε το όχημα (Δευτέρα - Παρασκευή, έως 2 μήνες)
+            Επιλέξτε τις ημέρες που μπορείτε να δεχτείτε το όχημα (έως 2 μήνες). Τα Σαββατοκύριακα
+            ξεχωρίζουν με πιο απαλό χρώμα.
           </p>
 
           {/* p-2 on narrow phones: react-day-picker's grid has a fixed minimum
@@ -802,15 +864,16 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
               locale={el}
               disabled={[
                 { before: firstBookableDay },
-                (date) => isWeekend(date),
                 { after: lastBookableDay }
               ]}
+              modifiers={{ weekend: isWeekend }}
               fromDate={firstBookableDay}
               toDate={lastBookableDay}
               className="border border-outline-variant/20 rounded-xl p-2 sm:p-4 bg-surface-container-lowest max-w-full"
               modifiersClassNames={{
                 selected: '!bg-primary !text-on-primary hover:!bg-primary/90 !rounded-lg',
-                today: '!font-bold !text-primary'
+                today: '!font-bold !text-primary',
+                weekend: 'bg-primary-fixed/40 rounded-lg'
               }}
               styles={{
                 root: { color: '#1b1c1c' },
@@ -990,6 +1053,17 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
               </span>
             </div>
           </div>
+
+          {existingOffer && offerState === OfferStatus.PENDING && (
+            <p className="mt-3 text-xs text-on-surface-variant flex items-center gap-1.5" data-testid="offer-viewed">
+              <Icon
+                name={existingOffer.clientViewedAt ? 'visibility' : 'visibility_off'}
+                size="sm"
+                className={existingOffer.clientViewedAt ? 'text-primary' : 'text-on-surface-variant/60'}
+              />
+              {clientViewedLabel(existingOffer.clientViewedAt) ?? 'Ο πελάτης δεν την έχει δει ακόμα'}
+            </p>
+          )}
 
           {isAccepted ? (
             <div className="mt-4 p-4 bg-green-50 border border-green-100 rounded-xl flex items-start gap-3">

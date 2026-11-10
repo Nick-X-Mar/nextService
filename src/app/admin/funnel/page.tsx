@@ -5,6 +5,7 @@ import DateRangePicker from '../components/DateRangePicker'
 import FunnelChart from './components/FunnelChart'
 import RequestSankey from './components/RequestSankey'
 import CohortTable from './components/CohortTable'
+import FormFieldsTable, { type FormFieldsStep } from './components/FormFieldsTable'
 
 interface FunnelStep {
   key: string
@@ -26,6 +27,12 @@ interface SankeyResponse {
   totalRequests: number
   nodes: { name: string }[]
   links: { source: number; target: number; value: number }[]
+}
+
+interface FieldsResponse {
+  category: string
+  categories: string[]
+  steps: FormFieldsStep[]
 }
 
 interface CohortRow {
@@ -70,6 +77,8 @@ export default function FunnelPage() {
   const [garage, setGarage] = useState<SectionState<FunnelResponse>>(initialState)
   const [sankey, setSankey] = useState<SectionState<SankeyResponse>>(initialState)
   const [cohorts, setCohorts] = useState<SectionState<CohortsResponse>>(initialState)
+  const [fields, setFields] = useState<SectionState<FieldsResponse>>(initialState)
+  const [fieldsCategory, setFieldsCategory] = useState('')
 
   const fetchSection = useCallback(async <T,>(
     url: string,
@@ -97,6 +106,11 @@ export default function FunnelPage() {
     fetchSection<SankeyResponse>(`/api/admin/funnel/sankey${qs}`, setSankey)
   }, [from, to, fetchSection])
 
+  useEffect(() => {
+    const qs = `?from=${from}&to=${to}&category=${encodeURIComponent(fieldsCategory)}`
+    fetchSection<FieldsResponse>(`/api/admin/funnel/fields${qs}`, setFields)
+  }, [from, to, fieldsCategory, fetchSection])
+
   // Cohorts use a months count instead of from/to. Refresh independently.
   useEffect(() => {
     fetchSection<CohortsResponse>('/api/admin/funnel/cohorts?months=6', setCohorts)
@@ -115,6 +129,22 @@ export default function FunnelPage() {
       >
         <SectionBody state={client}>
           {(d) => <FunnelChart steps={d.steps} />}
+        </SectionBody>
+      </Section>
+
+      <Section
+        title="Πελάτες — Πεδίο προς πεδίο"
+        subtitle="Από τις επισκέψεις που άνοιξαν κάθε βήμα, πόσες συμπλήρωσαν κάθε πεδίο. Όπου η μπάρα πέφτει απότομα από το ένα πεδίο στο επόμενο, εκεί σταματούν. Μετράει από 10/11/2026."
+      >
+        <SectionBody state={fields}>
+          {(d) => (
+            <FormFieldsTable
+              steps={d.steps}
+              categories={d.categories}
+              category={fieldsCategory}
+              onCategoryChange={setFieldsCategory}
+            />
+          )}
         </SectionBody>
       </Section>
 

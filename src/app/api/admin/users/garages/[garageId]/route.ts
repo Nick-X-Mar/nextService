@@ -9,6 +9,8 @@ import { queryIndexOrScan } from '@/utils/indexQuery'
 import { withMetrics } from '@/utils/withMetrics'
 import { TABLES } from '@/lib/tables'
 import { businessTypes } from '@/types/businessTypes'
+import { invalidateGarageBusinessTypes } from '@/utils/garageBusinessTypes'
+import { invalidateUnread } from '@/utils/unreadCache'
 
 function str(value: unknown): string {
   return typeof value === 'string' ? value : ''
@@ -161,6 +163,10 @@ async function _PUT(
       }
       throw err
     }
+
+    // Its feed, badge and live bell follow what it is.
+    invalidateGarageBusinessTypes(garageId)
+    invalidateUnread('garage', garageId)
 
     await logEvent({
       eventName: EventName.GarageEditedByAdmin,

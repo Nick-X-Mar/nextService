@@ -50,7 +50,7 @@
   "5xxFilter17D0C5CE": {
    "Type": "AWS::Logs::MetricFilter",
    "Properties": {
-    "FilterPattern": "?\"HTTP 500\" ?\"HTTP 502\" ?\"HTTP 503\" ?\"HTTP 504\" ?\"status: 500\" ?\"status: 502\" ?\"status: 503\" ?\"status: 504\" ?\"statusCode: 500\" ?\"statusCode: 502\"",
+    "FilterPattern": "{ $.level = \"error\" }",
     "LogGroupName": {
      "Ref": "AppLogGroup7D8CD952"
     },
@@ -70,7 +70,7 @@
   "4xxFilterC302CCBB": {
    "Type": "AWS::Logs::MetricFilter",
    "Properties": {
-    "FilterPattern": "?\"HTTP 400\" ?\"HTTP 401\" ?\"HTTP 403\" ?\"HTTP 404\" ?\"HTTP 409\" ?\"HTTP 422\" ?\"HTTP 429\" ?\"status: 400\" ?\"status: 401\" ?\"status: 403\" ?\"status: 404\" ?\"status: 429\"",
+    "FilterPattern": "{ ($.type = \"api_request\") && ($.statusCode >= 400) && ($.statusCode < 500) }",
     "LogGroupName": {
      "Ref": "AppLogGroup7D8CD952"
     },
@@ -95,7 +95,7 @@
       "Ref": "AlertTopic2720D535"
      }
     ],
-    "AlarmDescription": "At least one 5xx error in 5 minutes",
+    "AlarmDescription": "At least one server error logged in 5 minutes",
     "AlarmName": "NextService-5xx-Errors",
     "ComparisonOperator": "GreaterThanThreshold",
     "EvaluationPeriods": 1,

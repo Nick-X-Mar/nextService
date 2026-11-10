@@ -1,7 +1,7 @@
 /**
  * NextService — Appointment Completion Sweeper
  *
- * Runs hourly on an EventBridge schedule. Finds appointments whose slot has
+ * Runs every 15 minutes on an EventBridge schedule. Finds appointments whose slot has
  * passed with nobody saying what happened, and asks the garage to confirm the
  * job, declare what it charged, and rate the client.
  *
@@ -14,6 +14,11 @@
  * schedule and no email. This Lambda is the out-of-band nudge for a garage that
  * has not opened the dashboard, and it is also what stamps `completionPromptedAt`
  * so the prompt is only ever sent once.
+ *
+ * The same run also reminds clients of offers they have not answered
+ * (`remindClientsOfOffers`): 2 hours after the first offer, the next morning and
+ * 24 hours after — the trigger is again an absence, the booking that has not
+ * happened.
  *
  * Self-contained: only the AWS SDK v3 that ships with the Node.js 20 runtime.
  * No node_modules, no bundler. The email's copy is admin-editable
@@ -39,7 +44,11 @@ const REQUESTS_TABLE = process.env.SERVICE_REQUESTS_TABLE || 'ServiceRequests'
 const GARAGES_TABLE = process.env.GARAGES_TABLE || 'Garages'
 const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
 const SITE_CONTENT_TABLE = process.env.SITE_CONTENT_TABLE || 'SiteContent'
+const OFFERS_TABLE = process.env.OFFERS_TABLE || 'Offers'
+const CLIENTS_TABLE = process.env.CLIENTS_TABLE || 'Clients'
+const VEHICLES_TABLE = process.env.VEHICLES_TABLE || 'Vehicles'
 const TEMPLATE_NAME = 'completion_prompt_garage'
+const REMINDER_TEMPLATE = 'offer_reminder_client'
 const SES_CONFIG_SET = process.env.SES_CONFIG_SET || ''
 const NOTIFICATIONS_ENABLED =
   (process.env.NOTIFICATIONS_ENABLED ?? 'false').toLowerCase() === 'true'
@@ -149,7 +158,7 @@ async function pendingAppointments(now) {
         IndexName: 'StatusIndex',
         KeyConditionExpression: '#status = :status',
         // Only rows nobody has been prompted about yet — this is what makes the
-        // sweep idempotent across hourly runs.
+        // sweep idempotent across runs.
         FilterExpression: 'attribute_not_exists(completionPromptedAt)',
         ExpressionAttributeNames: { '#status': 'status' },
         ExpressionAttributeValues: { ':status': 'appointment' },
@@ -194,16 +203,16 @@ const DEFAULT_COPY = {
 }
 
 /** The admin's edited copy over the shipped one, field by field. Never throws. */
-async function loadCopy() {
+async function loadCopy(templateName = TEMPLATE_NAME, defaults = DEFAULT_COPY) {
   try {
     const res = await ddb.send(new GetCommand({
       TableName: SITE_CONTENT_TABLE,
-      Key: { pageKey: `email:${TEMPLATE_NAME}` }
+      Key: { pageKey: `email:${templateName}` }
     }))
-    return mergeCopy(DEFAULT_COPY, res.Item)
+    return mergeCopy(defaults, res.Item)
   } catch (err) {
     console.error('[sweeper] email copy lookup failed, using the shipped copy:', err)
-    return DEFAULT_COPY
+    return defaults
   }
 }
 
@@ -325,17 +334,25 @@ async function writeEmailLog(record) {
 }
 
 async function sendPrompt(garage, request) {
-  const emailId = randomUUID()
   const { link, values } = renderEmail(garage.companyName || 'συνεργείο', request)
-  const rendered = renderCopy(await loadCopy(), values, link)
-
-  const base = {
-    emailId,
+  await sendRendered({
     to: garage.email,
     templateName: TEMPLATE_NAME,
     triggerEvent: 'service_completion_prompt',
-    garageId: request.acceptedGarageId,
-    requestId: request.id,
+    ids: { garageId: request.acceptedGarageId, requestId: request.id },
+    rendered: renderCopy(await loadCopy(), values, link),
+  })
+}
+
+/** Sends one rendered email through SES and records it in EmailLogs, as the app's emailService does. */
+async function sendRendered({ to, templateName, triggerEvent, ids, rendered }) {
+  const emailId = randomUUID()
+  const base = {
+    emailId,
+    to: to || '',
+    templateName,
+    triggerEvent,
+    ...ids,
     subject: rendered.subject,
     // The admin's email list and stats query on sentAt; a row without it
     // never showed up there.
@@ -347,8 +364,8 @@ async function sendPrompt(garage, request) {
     await writeEmailLog({ ...base, status: 'skipped' })
     return
   }
-  if (!garage.email) {
-    await writeEmailLog({ ...base, status: 'failed', errorMessage: 'no email on garage' })
+  if (!to) {
+    await writeEmailLog({ ...base, status: 'failed', errorMessage: 'no email address' })
     return
   }
 
@@ -358,7 +375,7 @@ async function sendPrompt(garage, request) {
     const boundary = `----=_Part_${randomUUID().replace(/-/g, '')}`
     const headers = [
       `From: ${FROM_NAME} <${FROM_ADDRESS}>`,
-      `To: ${garage.email}`,
+      `To: ${to}`,
       `Subject: =?UTF-8?B?${Buffer.from(SUBJECT_TAG + rendered.subject).toString('base64')}?=`,
       `MIME-Version: 1.0`,
       `Content-Type: multipart/alternative; boundary="${boundary}"`,
@@ -391,8 +408,225 @@ async function sendPrompt(garage, request) {
     await writeEmailLog({ ...base, status: 'sent', sesMessageId: result.MessageId })
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown SES error'
-    console.error(`[sweeper] SES failed for ${garage.email}:`, errorMessage)
+    console.error(`[sweeper] SES failed for ${templateName} (${ids.requestId}):`, errorMessage)
     await writeEmailLog({ ...base, status: 'failed', errorMessage })
+  }
+}
+
+// ── Offer reminders ──────────────────────────────────────────────────────
+// A client with offers and no booking is reminded 2 hours after the first
+// offer, the next morning at 09:00 and 24 hours after it (product rule), never
+// between 22:00 and 08:00 Athens time. Reminders that fall within two hours of
+// each other go out as one. Each is stamped on the request
+// (`offerReminder<Stage>At`), which is what keeps a run from repeating one.
+
+const REMINDER_STAGES = [
+  { stage: '2h', attr: 'offerReminder2hAt' },
+  { stage: 'morning', attr: 'offerReminderMorningAt' },
+  { stage: '24h', attr: 'offerReminder24hAt' },
+]
+const QUIET_FROM_HOUR = 22
+const QUIET_UNTIL_HOUR = 8
+const MORNING = '09:00'
+const MERGE_WINDOW_MS = 2 * 3600_000
+/** Past this, every reminder is long sent or no longer worth sending. */
+const REMINDER_MAX_AGE_MS = 3 * 86_400_000
+
+// A copy of the category labels in src/utils/categoryLabels.ts.
+const CATEGORY_LABELS = {
+  service: 'Τακτικό service αυτοκινήτου',
+  brakes: 'Φρένα',
+  oils: 'Λάδια',
+  'allagi-ladion': 'Αλλαγή λαδιών',
+  imantas: 'Αλλαγή ιμάντα χρονισμού',
+  symplektis: 'Αλλαγή δίσκου πλατό',
+  'oliki-vafi': 'Ολική βαφή αυτοκινήτου',
+  'meriki-vafi': 'Μερική βαφή αυτοκινήτου',
+  aisthitires: 'Τοποθέτηση αισθητήρων παρκαρίσματος',
+  fanopeia: 'Φανοποιεία',
+  other: 'Πολλαπλές ή Άλλες εργασίες',
+}
+
+// A copy of the catalog entry `offer_reminder_client` in
+// src/lib/email-templates/catalog.ts.
+const REMINDER_DEFAULT_COPY = {
+  subject: 'Έχεις {προσφορές} για {κατηγορία}, από {τιμή}€ + ΦΠΑ',
+  heading: 'Οι προσφορές σου σε περιμένουν',
+  body:
+    'Για **{κατηγορία}** στο **{αυτοκίνητο}** έχεις **{προσφορές}**, από **{τιμή}€ + ΦΠΑ**.\n\n' +
+    'Σύγκρινε τιμές και ημερομηνίες και κλείσε ραντεβού με όποιο συνεργείο σε εξυπηρετεί. Πληρώνεις απευθείας στο συνεργείο.',
+  ctaLabel: 'Δες τις προσφορές',
+  note: ''
+}
+
+function athensParts(at) {
+  const parts = ATHENS_PARTS.formatToParts(at)
+  const get = (type) => parts.find((p) => p.type === type)?.value
+  return { date: `${get('year')}-${get('month')}-${get('day')}`, hour: Number(get('hour')) }
+}
+
+function isQuiet(at) {
+  const { hour } = athensParts(at)
+  return hour >= QUIET_FROM_HOUR || hour < QUIET_UNTIL_HOUR
+}
+
+/** 09:00 Athens on the day after `at`. */
+function nextMorning(at) {
+  const [y, m, d] = athensParts(at).date.split('-').map(Number)
+  const next = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10)
+  return athensDateTime(next, MORNING)
+}
+
+function reminderSchedule(firstOfferAt) {
+  const at = {
+    '2h': new Date(firstOfferAt.getTime() + 2 * 3600_000),
+    morning: nextMorning(firstOfferAt),
+    '24h': new Date(firstOfferAt.getTime() + 24 * 3600_000),
+  }
+  return REMINDER_STAGES.map((s) => ({ ...s, at: at[s.stage] })).filter((s) => s.at)
+}
+
+/** The stages this run sends (as one email), or null to wait. */
+function stagesToSend(request, firstOfferAt, now) {
+  if (isQuiet(now)) return null
+  const open = reminderSchedule(firstOfferAt).filter((s) => !request[s.attr])
+  const due = open.filter((s) => s.at <= now)
+  if (due.length === 0) return null
+  // The next one is close and can go out in waking hours: wait and send them together.
+  const upcoming = open.filter((s) => s.at > now).sort((a, b) => a.at - b.at)[0]
+  if (upcoming && upcoming.at - now <= MERGE_WINDOW_MS && !isQuiet(upcoming.at)) return null
+  return due
+}
+
+async function pendingRequestsWithReminders() {
+  const found = []
+  let startKey
+  let pages = 0
+  do {
+    const res = await ddb.send(
+      new QueryCommand({
+        TableName: REQUESTS_TABLE,
+        IndexName: 'StatusIndex',
+        KeyConditionExpression: '#status = :status',
+        // The last reminder is the 24h one: once it is stamped, nothing is left.
+        FilterExpression: 'attribute_not_exists(offerReminder24hAt) AND attribute_not_exists(acceptedOfferId)',
+        ExpressionAttributeNames: { '#status': 'status' },
+        ExpressionAttributeValues: { ':status': 'pending' },
+        ProjectionExpression:
+          'id, clientId, vehicleId, category, createdAt, offerReminder2hAt, offerReminderMorningAt, offerReminder24hAt',
+        ExclusiveStartKey: startKey,
+      })
+    )
+    for (const item of res.Items || []) {
+      if (item.clientId) found.push(item)
+    }
+    startKey = res.LastEvaluatedKey
+    pages++
+  } while (startKey && pages < MAX_PAGES)
+  return found
+}
+
+async function liveOffersOn(requestId) {
+  const offers = []
+  let startKey
+  do {
+    const res = await ddb.send(
+      new QueryCommand({
+        TableName: OFFERS_TABLE,
+        IndexName: 'ServiceRequestOffersIndex',
+        KeyConditionExpression: 'serviceRequestId = :id',
+        ExpressionAttributeValues: { ':id': requestId },
+        ProjectionExpression: 'id, #status, offerAmount, createdAt',
+        ExpressionAttributeNames: { '#status': 'status' },
+        ExclusiveStartKey: startKey,
+      })
+    )
+    offers.push(...(res.Items || []).filter((o) => o.status === 'pending' && typeof o.offerAmount === 'number'))
+    startKey = res.LastEvaluatedKey
+  } while (startKey)
+  return offers
+}
+
+async function remindClientsOfOffers(now) {
+  const requests = await pendingRequestsWithReminders()
+  let reminded = 0
+
+  for (const request of requests) {
+    try {
+      const offers = await liveOffersOn(request.id)
+      if (offers.length === 0) continue
+      const firstOfferAt = new Date(Math.min(...offers.map((o) => new Date(o.createdAt || now).getTime())))
+      if (now - firstOfferAt > REMINDER_MAX_AGE_MS) continue
+      const stages = stagesToSend(request, firstOfferAt, now)
+      if (!stages) continue
+
+      // Stamp first, conditionally: a booking made a moment ago, or a run
+      // racing this one, means no email.
+      try {
+        await ddb.send(new UpdateCommand({
+          TableName: REQUESTS_TABLE,
+          Key: { id: request.id },
+          UpdateExpression: `SET ${stages.map((s, i) => `#r${i} = :now`).join(', ')}`,
+          ConditionExpression:
+            `#status = :pending AND attribute_not_exists(acceptedOfferId) AND ${stages.map((_, i) => `attribute_not_exists(#r${i})`).join(' AND ')}`,
+          ExpressionAttributeNames: {
+            '#status': 'status',
+            ...Object.fromEntries(stages.map((s, i) => [`#r${i}`, s.attr])),
+          },
+          ExpressionAttributeValues: { ':now': now.toISOString(), ':pending': 'pending' },
+        }))
+      } catch (err) {
+        if (err?.name !== 'ConditionalCheckFailedException') throw err
+        continue
+      }
+
+      const [client, vehicle] = await Promise.all([
+        ddb.send(new GetCommand({
+          TableName: CLIENTS_TABLE,
+          Key: { id: request.clientId },
+          ProjectionExpression: 'id, email, anonymizedAt, mergedInto',
+        })).then((r) => r.Item),
+        request.vehicleId ? loadVehicle(request.vehicleId) : null,
+      ])
+      // A closed account, or a guest merged into another one, gets nothing.
+      if (!client?.email || client.anonymizedAt || client.mergedInto) continue
+
+      const cheapest = Math.min(...offers.map((o) => o.offerAmount))
+      const values = {
+        'αυτοκίνητο': [vehicle?.brand, vehicle?.model].filter(Boolean).join(' '),
+        'κατηγορία': CATEGORY_LABELS[request.category] || request.category || '',
+        'προσφορές': offers.length === 1 ? '1 προσφορά' : `${offers.length} προσφορές`,
+        'τιμή': cheapest.toLocaleString('el-GR', { maximumFractionDigits: 2 }),
+      }
+      const link = `${APP_URL}/requests/${request.clientId}/details/${request.id}/`
+      await sendRendered({
+        to: client.email,
+        templateName: REMINDER_TEMPLATE,
+        triggerEvent: 'offer_reminder',
+        ids: { clientId: request.clientId, requestId: request.id },
+        rendered: renderCopy(await loadCopy(REMINDER_TEMPLATE, REMINDER_DEFAULT_COPY), values, link),
+      })
+      reminded++
+      console.log(`[sweeper] reminded request=${request.id} stages=${stages.map((s) => s.stage).join('+')} offers=${offers.length}`)
+    } catch (err) {
+      console.error(`[sweeper] offer reminder failed for ${request.id}:`, err)
+    }
+  }
+  return reminded
+}
+
+async function loadVehicle(vehicleId) {
+  try {
+    const res = await ddb.send(new GetCommand({
+      TableName: VEHICLES_TABLE,
+      Key: { id: vehicleId },
+      ProjectionExpression: 'brand, #model',
+      ExpressionAttributeNames: { '#model': 'model' },
+    }))
+    return res.Item || null
+  } catch (err) {
+    console.error(`[sweeper] vehicle lookup failed for ${vehicleId}:`, err)
+    return null
   }
 }
 
@@ -432,7 +666,7 @@ export const handler = async () => {
 
     try {
       // Stamp first. If the email then fails, the garage still has the in-app
-      // alert, and we do not re-send on every hourly run.
+      // alert, and we do not re-send on every run.
       await ddb.send(
         new UpdateCommand({
           TableName: REQUESTS_TABLE,
@@ -462,5 +696,14 @@ export const handler = async () => {
   }
 
   console.log(`[sweeper] prompted ${prompted} garage(s), ${promptedInactive} of them deactivated`)
-  return { examined: due.length, prompted, promptedInactive }
+
+  let reminded = 0
+  try {
+    reminded = await remindClientsOfOffers(now)
+  } catch (err) {
+    console.error('[sweeper] offer reminders failed:', err)
+  }
+  console.log(`[sweeper] reminded ${reminded} client(s) of their offers`)
+
+  return { examined: due.length, prompted, promptedInactive, reminded }
 }

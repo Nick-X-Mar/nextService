@@ -373,7 +373,7 @@ class NotificationsStack(Stack):
         self.completion_sweeper_fn = lambda_.Function(
             self, "CompletionSweeperFn",
             function_name="nextservice-appointment-completion-sweeper",
-            description="Asks garages to confirm appointments whose slot has passed",
+            description="Asks garages to confirm past appointments; reminds clients of unanswered offers",
             runtime=lambda_.Runtime.NODEJS_20_X,
             handler="index.handler",
             code=lambda_.Code.from_asset("lambdas/appointment-completion-sweeper"),
@@ -385,6 +385,9 @@ class NotificationsStack(Stack):
                 "APP_URL": app_url,
                 "SERVICE_REQUESTS_TABLE": "ServiceRequests",
                 "GARAGES_TABLE": "Garages",
+                "OFFERS_TABLE": "Offers",
+                "CLIENTS_TABLE": "Clients",
+                "VEHICLES_TABLE": "Vehicles",
                 "EMAIL_LOGS_TABLE": "EmailLogs",
                 "SITE_CONTENT_TABLE": "SiteContent",
                 "NOTIFICATIONS_ENABLED": str(notifications_enabled).lower(),
@@ -414,7 +417,29 @@ class NotificationsStack(Stack):
                 resources=[garages_table_arn],
             )
         )
-        # Admin-editable copy of the prompt (`email:completion_prompt_garage`).
+        # Offer reminders: the live offers on a pending request, and the
+        # client's email and car to word the reminder with.
+        self.completion_sweeper_fn.add_to_role_policy(
+            iam.PolicyStatement(
+                sid="ReadOffersForReminders",
+                actions=["dynamodb:Query"],
+                resources=[
+                    f"arn:aws:dynamodb:{self.region}:{self.account}:table/Offers/index/ServiceRequestOffersIndex"
+                ],
+            )
+        )
+        self.completion_sweeper_fn.add_to_role_policy(
+            iam.PolicyStatement(
+                sid="ReadClientsAndVehiclesForReminders",
+                actions=["dynamodb:GetItem"],
+                resources=[
+                    f"arn:aws:dynamodb:{self.region}:{self.account}:table/Clients",
+                    f"arn:aws:dynamodb:{self.region}:{self.account}:table/Vehicles",
+                ],
+            )
+        )
+        # Admin-editable copy of both emails (`email:completion_prompt_garage`,
+        # `email:offer_reminder_client`).
         self.completion_sweeper_fn.add_to_role_policy(
             iam.PolicyStatement(
                 sid="ReadCompletionEmailCopy",
@@ -446,14 +471,15 @@ class NotificationsStack(Stack):
             )
         )
 
-        # Hourly. The grace period is measured in hours, so anything finer just
-        # re-reads the same rows; anything coarser delays the prompt past the
-        # point where the garage still remembers the job.
+        # Every 15 minutes: the offer reminders are timed to the hour ("2 hours
+        # after the first offer", "09:00 the next morning"), and an hourly run
+        # sent them up to an hour late. The completion prompt is stamped once,
+        # so the extra runs only re-read rows.
         events.Rule(
             self, "CompletionSweeperSchedule",
             rule_name="nextservice-appointment-completion-sweeper",
-            description="Hourly sweep for appointments awaiting the garage's confirmation",
-            schedule=events.Schedule.rate(Duration.hours(1)),
+            description="Sweep for appointments awaiting confirmation and offers awaiting the client",
+            schedule=events.Schedule.rate(Duration.minutes(15)),
             targets=[events_targets.LambdaFunction(self.completion_sweeper_fn)],
         )
 

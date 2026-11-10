@@ -8,6 +8,7 @@ import {
   garageThreads,
   hydrateVehicles,
   isGarageWinner,
+  isUnseenLoss,
   offerHasUnseenDates,
   requestVehicle,
   vehicleLabel,
@@ -23,6 +24,8 @@ import {
   type NotificationSummary,
 } from '@/types/alerts'
 import { isCompletionDue } from '@/types/reviews'
+import { garageTakesCategory } from '@/types/businessTypes'
+import { garageBusinessTypes } from '@/utils/garageBusinessTypes'
 
 /**
  * Everything currently waiting on the signed-in user, in one call.
@@ -223,11 +226,12 @@ async function computeForClient(clientId: string): Promise<NotificationSummary> 
 type DraftAlert = Alert & { labelFor?: string }
 
 async function computeForGarage(garageId: string): Promise<NotificationSummary> {
-  const [ws, market, declines] = await Promise.all([
+  const [ws, market, declines, businessTypes] = await Promise.all([
     loadGarageWorkspace(garageId, { scope: 'summary' }),
     // Every open request in the market, shared across garages — see pendingMarket.
     pendingMarket(),
     garageDeclines(garageId),
+    garageBusinessTypes(garageId),
   ])
 
   const { offers, requests } = ws
@@ -238,7 +242,10 @@ async function computeForGarage(garageId: string): Promise<NotificationSummary> 
     ...offers.map((o) => o.serviceRequestId as string),
     ...declines.map((d) => d.requestId),
   ])
-  const availableRequestIds = market.ids.filter((id) => !answered.has(id))
+  // …and jobs for another kind of shop never reach it, as in the feed.
+  const availableRequestIds = market.ids.filter(
+    (id) => !answered.has(id) && garageTakesCategory(businessTypes, market.categoryById[id])
+  )
   // Bids on requests the snapshot may not hold yet, so the browser — which
   // learned of them over realtime — can drop them too.
   const answeredAfter = new Date(market.asOf).getTime() - MARKET_SNAPSHOT_MARGIN_MS
@@ -401,6 +408,26 @@ async function computeForGarage(garageId: string): Promise<NotificationSummary> 
     })
   }
 
+  // The client booked another garage. The garage that lost hears only that —
+  // not with whom or for how much. Its offer page says the same and marks it
+  // seen (kind 'lost'); the job itself is gone for it (wonByAnotherGarage).
+  for (const offer of offers) {
+    if (!isUnseenLoss(offer)) continue
+    const requestId = offer.serviceRequestId as string
+    const req = requests.get(requestId)
+    if (!req || !(req.acceptedGarageId || req.acceptedOfferId) || isGarageWinner(ws, req)) continue
+    alerts.push({
+      id: `garage-lost-${requestId}`,
+      kind: 'offer-lost',
+      severity: 'info',
+      icon: 'assignment_turned_in',
+      title: 'Ο πελάτης επέλεξε άλλη προσφορά',
+      labelFor: requestId,
+      href: `${base}/offers/${requestId}/`,
+      cta: 'Εντάξει',
+    })
+  }
+
   // Only now the cars, and only those an alert names.
   await hydrateVehicles(ws, alerts.map((a) => a.labelFor).filter((id): id is string => !!id))
 
@@ -412,6 +439,7 @@ async function computeForGarage(garageId: string): Promise<NotificationSummary> 
     availableRequestIds,
     marketAsOf: market.asOf,
     recentlyAnsweredIds,
+    businessTypes,
     offersNeedingAttention: freshlyAccepted.length + awaitingDates.length,
     alerts: alerts.map(({ labelFor, ...alert }) =>
       labelFor ? { ...alert, detail: vehicleLabel(requestVehicle(ws, requests.get(labelFor))) } : alert

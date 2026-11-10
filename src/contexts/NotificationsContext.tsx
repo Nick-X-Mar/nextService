@@ -143,6 +143,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           availableRequestIds,
           offersNeedingAttention: data.offersNeedingAttention ?? 0,
           alerts: (data.alerts ?? []) as Alert[],
+          ...(Array.isArray(data.businessTypes) ? { businessTypes: data.businessTypes } : {}),
         })
       } catch {
         /* silent — a badge is not worth surfacing an error for */
@@ -212,6 +213,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     onNewRequest: handleNewRequest,
     onRequestUpdate: handleRequestUpdate,
     onReconnect: handleReconnect,
+    businessTypes: summary.businessTypes,
   })
 
   return (

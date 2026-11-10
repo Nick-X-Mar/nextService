@@ -452,7 +452,7 @@ export default function ChatPage({ garageId, requestId }: ChatPageProps) {
     return <GaragePendingView garageId={garageId} onApproved={loadChatData} />
   }
 
-  if (assignedElsewhere) return <AssignedElsewhere garageId={garageId} />
+  if (assignedElsewhere) return <AssignedElsewhere garageId={garageId} requestId={requestId} />
 
   if (isLoading) {
     return (

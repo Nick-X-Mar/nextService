@@ -96,6 +96,19 @@ export const handler = async (event) => {
   return { statusCode: 200, processed: records.length }
 }
 
+// Copy of garageTakesCategory in src/types/businessTypes.ts (this Lambda can't
+// import from the app) — change one, change the other. Paintwork goes to the
+// Φανοποιεία, every other job to the Συνεργεία, and a garage that has not said
+// what it is gets everything.
+const BUSINESS_TYPES = ['mechanic', 'bodywork', 'tyres']
+const BODYWORK_CATEGORIES = new Set(['oliki-vafi', 'meriki-vafi', 'fanopeia'])
+
+function garageTakesCategory(rawTypes, category) {
+  const types = Array.isArray(rawTypes) ? rawTypes.filter((t) => BUSINESS_TYPES.includes(t)) : []
+  if (types.length === 0) return true
+  return types.includes(BODYWORK_CATEGORIES.has(category) ? 'bodywork' : 'mechanic')
+}
+
 async function broadcastToGarages(request) {
   const requestId = request?.id
   if (!requestId) {
@@ -119,17 +132,17 @@ async function broadcastToGarages(request) {
       TableName: GARAGES_TABLE,
       FilterExpression: 'isActive = :active',
       ExpressionAttributeValues: { ':active': true },
-      ProjectionExpression: 'id, email, companyName, isActive',
+      ProjectionExpression: 'id, email, companyName, isActive, businessTypes',
       ExclusiveStartKey
     }))
     for (const g of page.Items || []) {
-      if (g?.isActive === true) garages.push(g)
+      if (g?.isActive === true && garageTakesCategory(g.businessTypes, request.category)) garages.push(g)
     }
     ExclusiveStartKey = page.LastEvaluatedKey
   } while (ExclusiveStartKey)
 
   console.log(
-    `[broadcast] request=${requestId} active_garages=${garages.length}`
+    `[broadcast] request=${requestId} category=${request.category} matching_active_garages=${garages.length}`
   )
 
   for (let i = 0; i < garages.length; i += SEND_CONCURRENCY) {

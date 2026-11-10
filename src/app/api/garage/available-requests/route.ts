@@ -18,6 +18,8 @@ import {
 } from '@/utils/garageClientView'
 import { TABLES } from '@/lib/tables'
 import { garageDeclines } from '@/utils/requestDeclines'
+import { garageBusinessTypes } from '@/utils/garageBusinessTypes'
+import { garageTakesCategory } from '@/types/businessTypes'
 
 async function _GET(request: NextRequest) {
   try {
@@ -48,8 +50,8 @@ async function _GET(request: NextRequest) {
     // dashboard did on load — and the count came out wrong anyway, because the
     // feed is paginated and the badge only ever saw the first page.
     if (searchParams.get('countOnly') === '1') {
-      const [pendingIds, offers, declines] = await Promise.all([
-        collectAll<{ id?: string }>(
+      const [pendingIds, offers, declines, types] = await Promise.all([
+        collectAll<{ id?: string; category?: string }>(
           (startKey) =>
             dynamoDB.send(new QueryCommand({
               TableName: TABLES.ServiceRequests,
@@ -57,7 +59,7 @@ async function _GET(request: NextRequest) {
               KeyConditionExpression: '#status = :status',
               ExpressionAttributeNames: { '#status': 'status' },
               ExpressionAttributeValues: { ':status': ServiceRequestStatus.PENDING },
-              ProjectionExpression: 'id',
+              ProjectionExpression: 'id, category',
               ExclusiveStartKey: startKey,
             })),
           `available-requests count for ${garageId}`
@@ -75,18 +77,21 @@ async function _GET(request: NextRequest) {
           `available-requests count offers for ${garageId}`
         ),
         garageDeclines(garageId),
+        garageBusinessTypes(garageId),
       ])
 
-      // Quoted or declined: either way the garage has answered it.
+      // Quoted or declined: either way the garage has answered it. A job for
+      // another kind of shop was never on its feed (garageTakesCategory).
       const answered = new Set([...offers.map((o) => o.serviceRequestId), ...declines.map((d) => d.requestId)])
       const requestIds = pendingIds
+        .filter((r) => garageTakesCategory(types, r.category))
         .map((r) => r.id)
         .filter((id): id is string => !!id && !answered.has(id))
 
       return NextResponse.json({ success: true, count: requestIds.length, requestIds })
     }
 
-    const [result, garageOffers, declines] = await Promise.all([
+    const [result, garageOffers, declines, types] = await Promise.all([
       dynamoDB.send(new QueryCommand({
         TableName: TABLES.ServiceRequests,
         IndexName: 'StatusIndex',
@@ -109,6 +114,7 @@ async function _GET(request: NextRequest) {
         `available-requests offers for ${garageId}`
       ),
       garageDeclines(garageId),
+      garageBusinessTypes(garageId),
     ])
 
     if (!result.Items || result.Items.length === 0) {
@@ -124,9 +130,10 @@ async function _GET(request: NextRequest) {
       ...declines.map((d) => d.requestId),
     ])
 
-    // Filter out requests that this garage has already quoted or declined
+    // Filter out requests that this garage has already quoted or declined, and
+    // jobs for another kind of shop: paintwork only reaches the Φανοποιεία.
     const availableRequests = result.Items.filter(
-      request => !garageOfferRequestIds.has(request.id)
+      request => !garageOfferRequestIds.has(request.id) && garageTakesCategory(types, request.category)
     )
 
     if (availableRequests.length === 0) {

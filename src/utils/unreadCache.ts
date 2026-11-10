@@ -37,6 +37,8 @@ export function invalidateUnread(userType: 'client' | 'garage', userId: string):
 
 export interface PendingMarket {
   ids: string[]
+  /** Each request's category — which kinds of shop it goes to. */
+  categoryById: Record<string, string>
   /** When the query started — anything created after it may be missing. */
   asOf: string
 }
@@ -60,7 +62,7 @@ const marketCache = createTtlCache<PendingMarket>(15_000)
 export function pendingMarket(): Promise<PendingMarket> {
   return marketCache.getOrCompute('pending', async () => {
     const asOf = new Date().toISOString()
-    const rows = await collectAll<{ id?: string }>(
+    const rows = await collectAll<{ id?: string; category?: string }>(
       (startKey) =>
         dynamoDB.send(new QueryCommand({
           TableName: TABLES.ServiceRequests,
@@ -68,11 +70,16 @@ export function pendingMarket(): Promise<PendingMarket> {
           KeyConditionExpression: '#status = :status',
           ExpressionAttributeNames: { '#status': 'status' },
           ExpressionAttributeValues: { ':status': ServiceRequestStatus.PENDING },
-          ProjectionExpression: 'id',
+          ProjectionExpression: 'id, category',
           ExclusiveStartKey: startKey,
         })),
       'pending market'
     )
-    return { ids: rows.map((r) => r.id).filter((id): id is string => !!id), asOf }
+    const withId = rows.filter((r): r is { id: string; category?: string } => !!r.id)
+    return {
+      ids: withId.map((r) => r.id),
+      categoryById: Object.fromEntries(withId.map((r) => [r.id, r.category ?? ''])),
+      asOf,
+    }
   })
 }

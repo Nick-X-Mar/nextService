@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useNavigation } from '@/hooks/useNavigation'
 import { useConfirm } from '@/hooks/useConfirm'
 import { track } from '@/lib/track'
+import { useFieldTracking } from '@/hooks/useFieldTracking'
 import { OTHER_CATEGORY } from '@/utils/categoryLabels'
 
 // Greek to Latin phonetic transliteration for search matching
@@ -407,6 +408,15 @@ export default function CarBrandModelSelector({ category }: { category: string }
     currentModel.trim() !== '' &&
     isYearValid(modelYear) &&
     (isBodywork || (isCCValid(engineCC) && fuelType !== ''))
+
+  // Where in this step people stop: each field, the first time it holds a value.
+  useFieldTracking('car_details', category, {
+    description: description.trim() !== '',
+    brand: currentBrand.trim() !== '',
+    model: currentModel.trim() !== '',
+    year: isYearValid(modelYear),
+    ...(isBodywork ? {} : { engine_cc: isCCValid(engineCC) }),
+  })
 
   const handleSubmit = () => {
     if (!isFormValid) return

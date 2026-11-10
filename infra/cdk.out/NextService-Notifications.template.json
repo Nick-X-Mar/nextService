@@ -358,7 +358,7 @@
    "Properties": {
     "Code": {
      "S3Bucket": "cdk-hnb659fds-assets-766671488262-eu-central-1",
-     "S3Key": "98b5c4a91b87272be745d2413906a62d3180c6ee1abad52003adb4265f760318.zip"
+     "S3Key": "7707b5062dd12b0b6bec30b8c9d36d048bf9a1b58abf7baaa93da478921f340b.zip"
     },
     "Description": "Fan-out new service request → active garages via SES",
     "Environment": {
@@ -392,7 +392,7 @@
    ],
    "Metadata": {
     "aws:cdk:path": "NextService-Notifications/NewRequestBroadcastFn/Resource",
-    "aws:asset:path": "asset.98b5c4a91b87272be745d2413906a62d3180c6ee1abad52003adb4265f760318",
+    "aws:asset:path": "asset.7707b5062dd12b0b6bec30b8c9d36d048bf9a1b58abf7baaa93da478921f340b",
     "aws:asset:is-bundled": false,
     "aws:asset:property": "Code"
    }
@@ -547,6 +547,21 @@
        "Sid": "ReadGaragesForCompletionPrompt"
       },
       {
+       "Action": "dynamodb:Query",
+       "Effect": "Allow",
+       "Resource": "arn:aws:dynamodb:eu-central-1:766671488262:table/Offers/index/ServiceRequestOffersIndex",
+       "Sid": "ReadOffersForReminders"
+      },
+      {
+       "Action": "dynamodb:GetItem",
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/Clients",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/Vehicles"
+       ],
+       "Sid": "ReadClientsAndVehiclesForReminders"
+      },
+      {
        "Action": "dynamodb:GetItem",
        "Effect": "Allow",
        "Resource": "arn:aws:dynamodb:eu-central-1:766671488262:table/SiteContent",
@@ -592,9 +607,9 @@
    "Properties": {
     "Code": {
      "S3Bucket": "cdk-hnb659fds-assets-766671488262-eu-central-1",
-     "S3Key": "03fb109570f7b07ee7da54236ad7dfc06928ea40fcec76586964968dcee71d54.zip"
+     "S3Key": "e5c0d94ed9680fb8377d35bbea3a04c2bdde2418eda49d3a473f6b5bf1337908.zip"
     },
-    "Description": "Asks garages to confirm appointments whose slot has passed",
+    "Description": "Asks garages to confirm past appointments; reminds clients of unanswered offers",
     "Environment": {
      "Variables": {
       "SES_FROM_ADDRESS": "no-reply@nextservice.gr",
@@ -602,6 +617,9 @@
       "APP_URL": "https://dev.d3ku6yajf4j6y8.amplifyapp.com",
       "SERVICE_REQUESTS_TABLE": "ServiceRequests",
       "GARAGES_TABLE": "Garages",
+      "OFFERS_TABLE": "Offers",
+      "CLIENTS_TABLE": "Clients",
+      "VEHICLES_TABLE": "Vehicles",
       "EMAIL_LOGS_TABLE": "EmailLogs",
       "SITE_CONTENT_TABLE": "SiteContent",
       "NOTIFICATIONS_ENABLED": "true",
@@ -627,7 +645,7 @@
    ],
    "Metadata": {
     "aws:cdk:path": "NextService-Notifications/CompletionSweeperFn/Resource",
-    "aws:asset:path": "asset.03fb109570f7b07ee7da54236ad7dfc06928ea40fcec76586964968dcee71d54",
+    "aws:asset:path": "asset.e5c0d94ed9680fb8377d35bbea3a04c2bdde2418eda49d3a473f6b5bf1337908",
     "aws:asset:is-bundled": false,
     "aws:asset:property": "Code"
    }
@@ -635,9 +653,9 @@
   "CompletionSweeperScheduleEE9296AC": {
    "Type": "AWS::Events::Rule",
    "Properties": {
-    "Description": "Hourly sweep for appointments awaiting the garage's confirmation",
+    "Description": "Sweep for appointments awaiting confirmation and offers awaiting the client",
     "Name": "nextservice-appointment-completion-sweeper",
-    "ScheduleExpression": "rate(1 hour)",
+    "ScheduleExpression": "rate(15 minutes)",
     "State": "ENABLED",
     "Targets": [
      {

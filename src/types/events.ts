@@ -28,6 +28,8 @@ export const EventName = {
   CarDetailsStarted: 'car_details_started',
   CarDetailsCompleted: 'car_details_completed',
   CarSpecsStarted: 'car_specs_started',
+  /** A field of the request form first holds a usable value — see useFieldTracking. */
+  FormFieldFilled: 'form_field_filled',
 
   // Phase B — Request creation (client side)
   ServiceRequestSubmitted: 'service_request_submitted',
@@ -112,7 +114,8 @@ export interface EventLogRecord extends LogEventInput {
 /**
  * Email template names. Each one has an entry in the catalog
  * (src/lib/email-templates/catalog.ts), which holds its copy and its link.
- * The last two are sent by the Lambdas in infra/lambdas/, never by the app.
+ * NewRequestForGarages, CompletionPromptGarage and OfferReminderClient are sent
+ * by the Lambdas in infra/lambdas/, never by the app.
  */
 export const EmailTemplate = {
   WelcomeGarage: 'welcome_garage',
@@ -131,6 +134,7 @@ export const EmailTemplate = {
   AccountMergeConfirmation: 'account_merge_confirmation',
   NewRequestForGarages: 'new_request_for_garages',
   CompletionPromptGarage: 'completion_prompt_garage',
+  OfferReminderClient: 'offer_reminder_client',
   RequestDetailsChanged: 'request_details_changed'
 } as const
 

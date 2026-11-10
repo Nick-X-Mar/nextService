@@ -149,6 +149,7 @@ The NextService database consists of **6 main tables** that work together to pro
 | `estimatedCost` | Number | Estimated cost for the service | ❌ |
 | `photoUrls` | Array of Strings | Array of S3 URLs for damage photos | ❌ |
 | `photos` | Array of Objects | Detailed photo metadata (S3 URLs, keys, file info) | ❌ |
+| `offerReminder2hAt` / `offerReminderMorningAt` / `offerReminder24hAt` | String (ISO 8601) | When the sweeper Lambda sent the client each offer reminder (2h after the first offer, 09:00 the next morning, 24h after); reminders close together share one email and are stamped together | ❌ |
 | `createdAt` | String (ISO 8601) | Request creation timestamp | ✅ |
 | `updatedAt` | String (ISO 8601) | Last update timestamp | ✅ |
 
@@ -214,7 +215,7 @@ The NextService database consists of **6 main tables** that work together to pro
 | `taxAuthority` | String | Tax Authority - ΔΟΥ | ✅ |
 | `address` | String | Company physical address | ✅ |
 | `mobile` | String | Company mobile phone number | ✅ |
-| `businessTypes` | Array of Strings | What kind of shop: any of `mechanic` (Συνεργείο), `bodywork` (Φανοποιείο), `tyres` (Βουλκανιζατέρ) — `src/types/businessTypes.ts`. Required at registration; missing on garages registered before it | ❌ |
+| `businessTypes` | Array of Strings | What kind of shop: any of `mechanic` (Συνεργείο), `bodywork` (Φανοποιείο), `tyres` (Βουλκανιζατέρ) — `src/types/businessTypes.ts`. Required at registration; missing on garages registered before it. Decides which requests reach the garage (`garageTakesCategory`): paintwork only `bodywork`, everything else `mechanic`, everything when empty | ❌ |
 | `isActive` | Boolean | Whether garage is accepting new requests | ✅ |
 | `rating` | Number | Average customer rating (0-5) | ❌ |
 | `description` | String | Company description and specialties | ❌ |
@@ -258,7 +259,10 @@ The NextService database consists of **6 main tables** that work together to pro
 | `estimatedCost` | Number | System-estimated cost for the service | ❌ |
 | `offerAmount` | Number | Garage's offered price | ✅ |
 | `benefits` | Array of Strings | List of free benefits included in the offer | ❌ |
-| `availabilityDates` | Array of Strings | Available dates for service (YYYY-MM-DD format) | ❌ |
+| `notes` | String | The garage's note to the client — what the price includes, parts, duration (≤500 chars) | ❌ |
+| `clientViewedAt` | String (ISO 8601) | When the client last opened the request with this offer on it (stamped while the offer is pending); shown to the garage | ❌ |
+| `garageSeenLostAt` | String (ISO 8601) | When the garage opened the «Ο πελάτης επέλεξε άλλη προσφορά» notice for this lost offer | ❌ |
+| `availabilityDates` | Array of Strings | Available dates for service (YYYY-MM-DD format), weekends included | ❌ |
 | `status` | String | Offer status (draft/pending/accepted/rejected) | ✅ |
 | `createdAt` | String (ISO 8601) | Offer creation timestamp | ✅ |
 | `updatedAt` | String (ISO 8601) | Last update timestamp | ✅ |

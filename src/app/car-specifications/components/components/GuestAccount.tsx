@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { adoptFormData } from '@/utils/formStorage'
 import { countryList, DEFAULT_COUNTRY, dialCodeOf, toE164 } from '@/utils/phone'
 
-const isEmailValid = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
+export const isEmailValid = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
 
 /**
  * The inline sign-up a guest goes through on the last step of a request, shared by the

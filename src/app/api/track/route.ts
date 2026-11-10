@@ -14,11 +14,27 @@ const ALLOWED_EVENTS = new Set<EventNameValue>([
   EventName.CarDetailsStarted,
   EventName.CarDetailsCompleted,
   EventName.CarSpecsStarted,
+  EventName.FormFieldFilled,
   EventName.PaymentAbandoned,
 ])
 
-// 30 events per minute per IP
-const checkTrackRate = createRateLimiter('track', 30, 60000)
+const FORM_STEPS = new Set(['car_details', 'car_specs'])
+const SHORT_TOKEN = /^[a-z0-9_-]{1,40}$/i
+
+function isFieldEvent(metadata: unknown): boolean {
+  if (!metadata || typeof metadata !== 'object') return false
+  const { step, field, category, ...rest } = metadata as Record<string, unknown>
+  return (
+    Object.keys(rest).length === 0 &&
+    typeof step === 'string' && FORM_STEPS.has(step) &&
+    typeof field === 'string' && SHORT_TOKEN.test(field) &&
+    typeof category === 'string' && (category === '' || SHORT_TOKEN.test(category))
+  )
+}
+
+// 60 events per minute per IP: a filled form sends a dozen per-field events on
+// top of its steps.
+const checkTrackRate = createRateLimiter('track', 60, 60000)
 
 async function _POST(request: NextRequest) {
   try {
@@ -31,6 +47,11 @@ async function _POST(request: NextRequest) {
     const { eventName, metadata } = body
 
     if (!eventName || !ALLOWED_EVENTS.has(eventName)) {
+      return NextResponse.json({ error: 'Invalid event' }, { status: 400 })
+    }
+    // A per-field event carries exactly its step, field and category, so the
+    // funnel's table can't be filled with whatever a caller makes up.
+    if (eventName === EventName.FormFieldFilled && !isFieldEvent(metadata)) {
       return NextResponse.json({ error: 'Invalid event' }, { status: 400 })
     }
 
