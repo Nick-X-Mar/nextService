@@ -16,9 +16,10 @@ let client: CloudWatchLogsClient | null = null
 export function cloudWatchLogs(): CloudWatchLogsClient {
   if (client) return client
 
+  // No requestTimeout: the SDK only warns when one passes, and a log write left
+  // in flight when Amplify freezes the function always "passes" it on thaw.
   const config: ConstructorParameters<typeof CloudWatchLogsClient>[0] = {
     region: process.env.REGION || 'eu-central-1',
-    requestHandler: { requestTimeout: 5_000 },
   }
 
   if (process.env.ACCESS_KEY_ID && process.env.SECRET_ACCESS_KEY) {

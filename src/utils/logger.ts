@@ -208,6 +208,11 @@ export const log = {
 
 let installed = false
 
+// Framework notices that are still printed but not shipped. Next warns about
+// metadataBase on every self-hosted production server that has an
+// `opengraph-image` file, even with metadataBase set — and then uses ours.
+const NOT_SHIPPED = [/^⚠ metadataBase property in metadata export is not set/]
+
 /**
  * Turns `console.warn` / `console.error` into structured entries on a deployed
  * server. Local dev keeps the plain console, where a readable stack matters
@@ -216,6 +221,9 @@ let installed = false
 export function installConsoleCapture() {
   if (installed || !SHIPPING) return
   installed = true
-  console.warn = (...args: unknown[]) => write(entryFromArgs('warn', args), true)
+  console.warn = (...args: unknown[]) => {
+    const entry = entryFromArgs('warn', args)
+    write(entry, !NOT_SHIPPED.some((pattern) => pattern.test(entry.message)))
+  }
   console.error = (...args: unknown[]) => write(entryFromArgs('error', args), true)
 }
