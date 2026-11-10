@@ -3,6 +3,9 @@ frontend:
   phases:
     preBuild:
       commands:
+        # Node from .nvmrc: Amplify runs the SSR on the major the build used.
+        - nvm install
+        - nvm use
         - npm ci
     build:
       commands:

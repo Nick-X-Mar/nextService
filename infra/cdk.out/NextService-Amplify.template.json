@@ -462,7 +462,7 @@
    "Type": "AWS::Amplify::App",
    "Properties": {
     "AccessToken": "{{resolve:secretsmanager:nextservice/github-token:SecretString:::}}",
-    "BuildSpec": "version: 1\nfrontend:\n  phases:\n    preBuild:\n      commands:\n        - npm ci\n    build:\n      commands:\n        - npm run build\n  artifacts:\n    baseDirectory: .next\n    files:\n      - '**/*'\n  cache:\n    paths:\n      - node_modules/**/*\n      - .next/cache/**/*\n",
+    "BuildSpec": "version: 1\nfrontend:\n  phases:\n    preBuild:\n      commands:\n        # Node from .nvmrc: Amplify runs the SSR on the major the build used.\n        - nvm install\n        - nvm use\n        - npm ci\n    build:\n      commands:\n        - npm run build\n  artifacts:\n    baseDirectory: .next\n    files:\n      - '**/*'\n  cache:\n    paths:\n      - node_modules/**/*\n      - .next/cache/**/*\n",
     "EnvironmentVariables": [
      {
       "Name": "REGION",

@@ -5,6 +5,7 @@ import { ensureHotDealsTable } from '@/utils/ensureHotDealsTable'
 import { withMetrics } from '@/utils/withMetrics'
 import { isKnownIcon } from '@/lib/icons'
 import { TABLES } from '@/lib/tables'
+import { revalidateOfferPages } from '@/lib/offers'
 
 // GET — single deal
 async function _GET(
@@ -72,6 +73,7 @@ async function _PUT(
       ExpressionAttributeValues: values,
       ...(Object.keys(names).length > 0 ? { ExpressionAttributeNames: names } : {})
     }))
+    revalidateOfferPages()
 
     return NextResponse.json({ success: true })
   } catch (error) {
@@ -93,6 +95,7 @@ async function _DELETE(
       TableName: TABLES.HotDeals,
       Key: { dealId }
     }))
+    revalidateOfferPages()
 
     return NextResponse.json({ success: true })
   } catch (error) {

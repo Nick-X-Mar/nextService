@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto'
 import { withMetrics } from '@/utils/withMetrics'
 import { isKnownIcon } from '@/lib/icons'
 import { TABLES } from '@/lib/tables'
+import { revalidateOfferPages } from '@/lib/offers'
 
 // GET — list all deals (sorted by sortOrder)
 async function _GET() {
@@ -72,6 +73,7 @@ async function _POST(request: NextRequest) {
       TableName: TABLES.HotDeals,
       Item: deal
     }))
+    revalidateOfferPages()
 
     return NextResponse.json({ success: true, deal })
   } catch (error) {

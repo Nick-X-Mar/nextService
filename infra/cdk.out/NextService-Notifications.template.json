@@ -169,7 +169,7 @@
       "Arn"
      ]
     },
-    "Runtime": "nodejs20.x",
+    "Runtime": "nodejs24.x",
     "Timeout": 30
    },
    "DependsOn": [
@@ -383,7 +383,7 @@
       "Arn"
      ]
     },
-    "Runtime": "nodejs20.x",
+    "Runtime": "nodejs24.x",
     "Timeout": 120
    },
    "DependsOn": [
@@ -636,7 +636,7 @@
       "Arn"
      ]
     },
-    "Runtime": "nodejs20.x",
+    "Runtime": "nodejs24.x",
     "Timeout": 300
    },
    "DependsOn": [

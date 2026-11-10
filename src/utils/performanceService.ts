@@ -17,7 +17,7 @@ export interface PerformanceMetric {
 }
 
 /**
- * Record an API call metric. Fire-and-forget — errors are logged, not thrown.
+ * Record an API call metric. Never throws: a failed write is logged as a warning.
  */
 export async function recordMetric(metric: PerformanceMetric): Promise<void> {
   try {
@@ -38,7 +38,9 @@ export async function recordMetric(metric: PerformanceMetric): Promise<void> {
       }
     }))
   } catch (err) {
-    console.error('[performanceService] Failed to record metric:', err)
+    // A warning, not an error: a lost data point is not a failed request, and
+    // errors are what the 5xx alarm counts.
+    console.warn('[performanceService] Failed to record metric:', err)
   }
 }
 

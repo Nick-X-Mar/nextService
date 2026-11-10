@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache'
 import { ScanCommand } from '@aws-sdk/lib-dynamodb'
 import { dynamoDB } from '@/utils/dynamoService'
 import { ensureHotDealsTable } from '@/utils/ensureHotDealsTable'
@@ -51,4 +52,13 @@ export async function getAllOffers(): Promise<Offer[]> {
 export async function getOfferBySlug(slug: string): Promise<Offer | null> {
   const all = await getAllOffers()
   return all.find((o) => o.slug === slug) ?? null
+}
+
+/**
+ * After an admin create, edit or delete: every offer page, since an edit can
+ * move a deal to another slug or switch it off. The pages are ISR, so without
+ * this the change shows once the minute's window passes.
+ */
+export function revalidateOfferPages() {
+  revalidatePath('/offer/[slug]', 'page')
 }

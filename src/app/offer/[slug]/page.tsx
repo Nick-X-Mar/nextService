@@ -19,6 +19,21 @@ interface PageProps {
   params: Promise<{ slug: string }>
 }
 
+/**
+ * Statically rendered on first visit, then served from the cache and
+ * regenerated at most every minute, instead of a full HotDeals scan per visit.
+ * No page is built at deploy time: `getAllOffers()` falls back to offers.json
+ * when the table can't be read, and a build that could not reach it would
+ * have shipped the file's prices. An admin save also calls
+ * `revalidateOfferPages()`, which on Amplify reaches only the server that
+ * handled it — the window bounds the rest (see src/app/page.tsx).
+ */
+export const revalidate = 60
+
+export async function generateStaticParams() {
+  return []
+}
+
 /** The request-form name of a deal's category, when it is one of them. */
 function categoryLabelFor(category: string): string | null {
   return REQUEST_CATEGORIES.includes(category) ? getCategoryText(category) : null

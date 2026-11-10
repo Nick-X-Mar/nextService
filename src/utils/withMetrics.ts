@@ -40,8 +40,9 @@ export function withMetrics<T extends RouteHandler>(handler: T): T {
       } finally {
         const responseTimeMs = Math.round(performance.now() - start)
 
-        // Fire-and-forget — don't block the response
-        recordMetric({
+        // Awaited below: a write left in flight when Amplify freezes the
+        // function goes out on thaw with an expired signature, and is refused.
+        const metricWritten = recordMetric({
           endpoint: pathname,
           method: request.method,
           statusCode,
@@ -61,8 +62,10 @@ export function withMetrics<T extends RouteHandler>(handler: T): T {
           log.info(`HTTP ${statusCode} ${request.method} ${pathname}`, fields)
         }
 
-        // Amplify freezes the function once it responds: what this request
-        // logged has to be in CloudWatch before then.
+        // Amplify freezes the function once it responds: the metric and what
+        // this request logged (a failed metric write included) have to be
+        // written before then.
+        await metricWritten
         await flushLogs()
       }
     })
