@@ -211,6 +211,18 @@ export async function emailsTo(to: string, templateName: string): Promise<Record
   return res.Items ?? []
 }
 
+/** EmailLogs rows of one template about one request, whoever they went to. */
+export async function emailsAbout(requestId: string, templateName: string): Promise<Record<string, unknown>[]> {
+  const res = await ddb.send(new QueryCommand({
+    TableName: TABLES.EmailLogs,
+    IndexName: 'TemplateIndex',
+    KeyConditionExpression: 'templateName = :t',
+    FilterExpression: 'requestId = :r',
+    ExpressionAttributeValues: { ':t': templateName, ':r': requestId },
+  }))
+  return res.Items ?? []
+}
+
 /** Moves an appointment's slot into the past (request and accepted offer) so it can be closed. */
 export async function ageAppointment(requestId: string, offerId: string, daysAgo = 2): Promise<string> {
   const date = athensDatePlus(-daysAgo)

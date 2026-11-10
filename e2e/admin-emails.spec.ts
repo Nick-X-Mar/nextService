@@ -1,6 +1,6 @@
 import { test, expect, type APIRequestContext } from '@playwright/test'
 import { freshClient, mechanicalRequest } from './b-helpers'
-import { emailsTo } from './E-helpers'
+import { emailsAbout, emailsTo } from './E-helpers'
 
 /**
  * The email editor: every email the platform sends is listed, an admin can
@@ -126,6 +126,34 @@ test.describe.serial('Admin email editor', () => {
     expect(after.email.customized).toBe(false)
     expect(after.email.copy.subject).toBe('Λάβαμε το αίτημά σου')
     await client.api.dispose()
+  })
+
+  test('Every new request emails the admin a link to its admin page', async ({ request, playwright }) => {
+    const client = await freshClient(playwright, 'admin-notice')
+    const filed = await client.api.post('/api/service-request/', { data: mechanicalRequest() })
+    expect(filed.ok()).toBeTruthy()
+    const { serviceRequestId } = await filed.json()
+
+    await expect.poll(async () => (await emailsAbout(serviceRequestId, 'admin_new_request')).length).toBe(1)
+    const [email] = await emailsAbout(serviceRequestId, 'admin_new_request')
+    // Only the admin: never the client who filed it.
+    expect(email.to).not.toBe(client.email)
+    expect(email.subject).toContain('Peugeot 206')
+
+    const preview = await (await request.get(`/api/admin/emails/templates/admin_new_request/`, { headers: { Cookie: adminCookie } })).json()
+    expect(preview.email.audience).toBe('admin')
+    await client.api.dispose()
+  })
+
+  test('An admin link opened signed out comes back to its page after login', async ({ page }) => {
+    await page.goto('/admin/requests/sr-e2e-missing/')
+    await expect(page).toHaveURL(/\/admin\/login\/\?next=%2Fadmin%2Frequests%2Fsr-e2e-missing%2F/)
+    // Before hydration the form would submit natively and drop the query.
+    await page.waitForLoadState('networkidle')
+    await page.getByPlaceholder('admin@nextservice.gr').fill(ADMIN_EMAIL)
+    await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
+    await page.getByRole('button', { name: 'Sign in' }).click()
+    await expect(page).toHaveURL(/\/admin\/requests\/sr-e2e-missing\/$/)
   })
 
   test('The editor page shows the live preview and saves', async ({ page, context }) => {

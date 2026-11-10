@@ -5,6 +5,7 @@ import { garageCommissionPercent } from '@/lib/commission-basis'
 import { collectAll } from '@/utils/pagination'
 import { withMetrics } from '@/utils/withMetrics'
 import { TABLES } from '@/lib/tables'
+import { businessTypesLabel } from '@/types/businessTypes'
 
 async function _GET(request: NextRequest) {
   try {
@@ -23,6 +24,7 @@ async function _GET(request: NextRequest) {
       name: String(item.companyName || item.email || ''),
       email: String(item.email || ''),
       phone: String(item.mobile || ''),
+      businessTypes: businessTypesLabel(item.businessTypes),
       createdAt: String(item.createdAt || ''),
       isActive: item.isActive === true,
       commissionPercent: garageCommissionPercent(item),

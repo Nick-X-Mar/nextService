@@ -286,11 +286,13 @@ test.describe('A garage\'s page', () => {
     await page.getByLabel('Κινητό').fill('6912345678')
     await page.getByLabel('ΑΦΜ', { exact: true }).fill(uniqueTin())
     await page.getByLabel('Περιοχή').fill('Χαλάνδρι')
+    await page.getByRole('group', { name: 'Τύπος επιχείρησης' }).getByRole('button', { name: 'Βουλκανιζατέρ' }).click()
     await page.getByRole('button', { name: 'Αποθήκευση στοιχείων' }).click()
     await expect(page.getByText('Τα στοιχεία αποθηκεύτηκαν')).toBeVisible({ timeout: 30_000 })
 
     const stored = await (await request.get(`/api/admin/users/garages/${garage.id}/`, { headers: { Cookie: admin } })).json()
     expect(stored.area).toBe('Χαλάνδρι')
+    expect(stored.businessTypes).toContain('tyres')
     expect(stored.rate.commissionPercent).toBe(10)
     expect(stored.ledger.totals).toBeTruthy()
     expect(JSON.stringify(stored)).not.toContain('passwordHash')

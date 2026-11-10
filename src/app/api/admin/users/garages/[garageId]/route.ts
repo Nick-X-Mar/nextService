@@ -8,6 +8,7 @@ import { garageLedger } from '@/utils/garageLedger'
 import { queryIndexOrScan } from '@/utils/indexQuery'
 import { withMetrics } from '@/utils/withMetrics'
 import { TABLES } from '@/lib/tables'
+import { businessTypes } from '@/types/businessTypes'
 
 function str(value: unknown): string {
   return typeof value === 'string' ? value : ''
@@ -55,6 +56,7 @@ async function _GET(
       address: garage.address || '',
       area: str(garage.area),
       municipality: str(garage.municipality),
+      businessTypes: businessTypes(garage.businessTypes),
       description: str(garage.description),
       benefits: garage.benefits || [],
       workdayStartTime: str(garage.workdayStartTime),
@@ -105,6 +107,7 @@ async function _PUT(
     ) as Record<(typeof EDITABLE)[number], string>
     values.email = values.email.toLowerCase()
     values.mobile = values.mobile.replace(/\s/g, '')
+    const types = businessTypes((body as Record<string, unknown>).businessTypes)
 
     if (!values.companyName) return NextResponse.json({ error: 'Η επωνυμία είναι υποχρεωτική' }, { status: 400 })
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) {
@@ -142,12 +145,13 @@ async function _PUT(
       await dynamoDB.send(new UpdateCommand({
         TableName: TABLES.Garages,
         Key: { id: garageId },
-        UpdateExpression: `SET ${EDITABLE.map((field) => `${field} = :${field}`).join(', ')}, updatedAt = :now`,
+        UpdateExpression: `SET ${EDITABLE.map((field) => `${field} = :${field}`).join(', ')}, businessTypes = :businessTypes, updatedAt = :now`,
         // Without the condition an unknown id would create a bare garage row. A
         // closed account is anonymized for good.
         ConditionExpression: 'attribute_exists(id) AND attribute_not_exists(anonymizedAt)',
         ExpressionAttributeValues: {
           ...Object.fromEntries(EDITABLE.map((field) => [`:${field}`, values[field]])),
+          ':businessTypes': types,
           ':now': new Date().toISOString(),
         },
       }))

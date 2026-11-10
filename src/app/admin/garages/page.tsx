@@ -19,6 +19,7 @@ interface GarageRecord {
   email: string
   name: string
   phone: string
+  businessTypes: string
   createdAt: string
   isActive?: boolean
   commissionPercent: number
@@ -100,6 +101,7 @@ export default function GaragesPage() {
     { key: 'name', header: 'Company', sortable: true },
     { key: 'email', header: 'Email', sortable: true },
     { key: 'phone', header: 'Phone' },
+    { key: 'businessTypes', header: 'Τύπος', render: (item: GarageRecord) => item.businessTypes || '-' },
     { key: 'createdAt', header: 'Registered', sortable: true, render: (item: GarageRecord) => new Date(item.createdAt).toLocaleDateString() },
     {
       key: 'commissionPercent',

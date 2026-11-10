@@ -123,6 +123,7 @@ export const EmailTemplate = {
   AppointmentConfirmationClient: 'appointment_confirmation_client',
   NewChatMessage: 'new_chat_message',
   AdminNewGarageValidation: 'admin_new_garage_validation',
+  AdminNewRequest: 'admin_new_request',
   PasswordReset: 'password_reset',
   PaymentConfirmationClient: 'payment_confirmation_client',
   CancellationConfirmationClient: 'cancellation_confirmation_client',

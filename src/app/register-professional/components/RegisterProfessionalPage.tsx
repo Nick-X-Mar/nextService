@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
-import { GarageStatusPanel } from '@/components'
+import { BusinessTypePicker, GarageStatusPanel } from '@/components'
 import { useToast } from '@/hooks/useToast'
 import { useAuth } from '@/contexts/AuthContext'
 import { useGarageApprovalWatch } from '@/hooks/useGarageApprovalWatch'
@@ -12,6 +12,7 @@ import { useNavigation } from '@/hooks/useNavigation'
 import { styles } from '@/styles/styles'
 import { MIN_PASSWORD_LENGTH } from '@/utils/passwordPolicy'
 import ExtraServicesStep from './ExtraServicesStep'
+import type { BusinessType } from '@/types/businessTypes'
 
 interface GarageFormData {
   companyName: string
@@ -39,6 +40,7 @@ export default function RegisterProfessionalPage() {
     municipality: '',
     mobile: ''
   })
+  const [businessTypes, setBusinessTypes] = useState<BusinessType[]>([])
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPasswordFields, setShowPasswordFields] = useState(true)
@@ -102,6 +104,11 @@ export default function RegisterProfessionalPage() {
 
 
   const validateForm = (): boolean => {
+    if (businessTypes.length === 0) {
+      error('Σφάλμα', 'Επιλέξτε αν είστε συνεργείο, φανοποιείο ή βουλκανιζατέρ')
+      return false
+    }
+
     if (!formData.companyName.trim()) {
       error('Σφάλμα', 'Η επωνυμία της εταιρείας είναι υποχρεωτική')
       return false
@@ -210,6 +217,7 @@ export default function RegisterProfessionalPage() {
         },
         body: JSON.stringify({
           ...formData,
+          businessTypes,
           password,
           acceptedTerms: true
         }),
@@ -338,6 +346,15 @@ export default function RegisterProfessionalPage() {
 
             {/* Form Fields */}
             <div className="space-y-5">
+              <div className="space-y-2">
+                <p className={`${styles.labelUpper} flex items-center gap-2`}>
+                  <Icon name="storefront" size="sm" className="text-on-surface-variant" />
+                  Τύπος Επιχείρησης *
+                </p>
+                <p className="text-xs text-on-surface-variant">Επιλέξτε όσα ισχύουν.</p>
+                <BusinessTypePicker value={businessTypes} onChange={setBusinessTypes} disabled={isLoading} />
+              </div>
+
               {formFields.map((field) => {
                 const isEmailField = field.key === 'email'
                 const isLocked = isEmailField && emailLocked

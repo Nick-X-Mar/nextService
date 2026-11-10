@@ -211,6 +211,7 @@ export async function registerPendingGarage(tag: string) {
     address: 'Πανεπιστημίου 1, Αθήνα',
     area: 'Κέντρο',
     municipality: 'Δήμος Αθηναίων',
+    businessTypes: ['mechanic'],
     mobile: `69${stamp.slice(-8)}`,
     acceptedTerms: true,
   }

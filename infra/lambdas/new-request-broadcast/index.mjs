@@ -31,6 +31,9 @@ const REGION = process.env.AWS_REGION || 'eu-central-1'
 const FROM_ADDRESS = process.env.SES_FROM_ADDRESS || 'no-reply@nextservice.gr'
 const FROM_NAME = 'NextService'
 const APP_URL = (process.env.APP_URL || 'https://nextservice.gr').replace(/\/$/, '')
+// Same rule as the app's emailService: only production is on the real domain,
+// and every other stage tags the subject it sends.
+const SUBJECT_TAG = /(^|\.)nextservice\.gr$/.test(new URL(APP_URL).hostname) ? '' : '[Staging] '
 const GARAGES_TABLE = process.env.GARAGES_TABLE || 'Garages'
 const VEHICLES_TABLE = process.env.VEHICLES_TABLE || 'Vehicles'
 const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
@@ -197,7 +200,7 @@ async function sendToGarage(garage, request, vehicle, copy) {
     const headers = [
       `From: ${FROM_NAME} <${FROM_ADDRESS}>`,
       `To: ${email}`,
-      `Subject: =?UTF-8?B?${Buffer.from(rendered.subject).toString('base64')}?=`,
+      `Subject: =?UTF-8?B?${Buffer.from(SUBJECT_TAG + rendered.subject).toString('base64')}?=`,
       `MIME-Version: 1.0`,
       `Content-Type: multipart/alternative; boundary="${boundary}"`,
       `X-Mailer: NextService`,

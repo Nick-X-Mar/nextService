@@ -137,12 +137,16 @@ export async function middleware(request: NextRequest) {
     }
 
     const adminToken = request.cookies.get(ADMIN_COOKIE)?.value
+    // Back to the page asked for after signing in — an emailed request link
+    // otherwise lands on the dashboard once the 8h session has run out.
+    const adminLoginUrl = new URL('/admin/login/', request.url)
+    adminLoginUrl.searchParams.set('next', pathname + request.nextUrl.search)
 
     if (!adminToken) {
       if (isAdminApi) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
-      return NextResponse.redirect(new URL('/admin/login/', request.url))
+      return NextResponse.redirect(adminLoginUrl)
     }
 
     const admin = await verifyAdminToken(adminToken)
@@ -150,7 +154,7 @@ export async function middleware(request: NextRequest) {
       if (isAdminApi) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
-      return NextResponse.redirect(new URL('/admin/login/', request.url))
+      return NextResponse.redirect(adminLoginUrl)
     }
 
     const adminHeaders = withoutClientIdentity(request)

@@ -15,9 +15,14 @@ import type {
   EventNameValue
 } from '@/types/events'
 import { TABLES } from '@/lib/tables'
+import { IS_INDEXABLE } from '@/lib/site-url'
 
 const FROM_ADDRESS = process.env.SES_FROM_ADDRESS || 'no-reply@nextservice.gr'
 const FROM_NAME = 'NextService'
+// SITE_URL is the real domain on production only. Every other server tags the
+// subject it sends, so a staging mail is never read as a real customer's — and
+// the admin's mailbox files mail into staging/production by this tag.
+const SUBJECT_TAG = IS_INDEXABLE ? '' : '[Staging] '
 const SES_REGION = process.env.SES_REGION || process.env.REGION || 'eu-central-1'
 // Name of the SES Configuration Set defined in notifications_stack.py. When
 // set, every send goes through it, which enables per-email event tracking
@@ -144,7 +149,7 @@ async function sendEmailInternal(input: SendEmailInput): Promise<void> {
     const headers: string[] = [
       `From: ${FROM_NAME} <${FROM_ADDRESS}>`,
       `To: ${to}`,
-      `Subject: =?UTF-8?B?${Buffer.from(rendered.subject).toString('base64')}?=`,
+      `Subject: =?UTF-8?B?${Buffer.from(SUBJECT_TAG + rendered.subject).toString('base64')}?=`,
       `MIME-Version: 1.0`,
       `Content-Type: multipart/alternative; boundary="${boundary}"`,
       `X-Mailer: NextService`,

@@ -32,7 +32,9 @@ export default function AdminLoginPage() {
         return
       }
 
-      router.push('/admin/dashboard/')
+      // The page the middleware intercepted, if it is an admin page; never another site.
+      const next = new URLSearchParams(window.location.search).get('next')
+      router.push(next?.startsWith('/admin/') ? next : '/admin/dashboard/')
     } catch {
       setError('Network error. Please try again.')
     } finally {

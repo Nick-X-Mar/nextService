@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Input, Spinner } from '@/components'
+import { BusinessTypePicker, Input, Spinner } from '@/components'
 import InlineNudge from '@/components/InlineNudge'
 import AccountDangerZone from '@/components/AccountDangerZone'
 import NotificationSettings from './NotificationSettings'
 import { styles } from '@/styles/styles'
 import { useToast } from '@/hooks/useToast'
 import Icon from '@/components/ui/Icon'
+import type { BusinessType } from '@/types/businessTypes'
 
 interface GarageData {
   id: string
@@ -17,6 +18,7 @@ interface GarageData {
   address: string
   area?: string
   municipality?: string
+  businessTypes?: BusinessType[]
   tin: string
   taxAuthority: string
   description?: string
@@ -67,7 +69,16 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
     setHasChanges(true)
   }
 
+  const handleBusinessTypes = (businessTypes: BusinessType[]) => {
+    setFormData(prev => ({ ...prev, businessTypes }))
+    setHasChanges(true)
+  }
+
   const handleSave = async () => {
+    if ((formData.businessTypes?.length ?? 0) === 0) {
+      error('Σφάλμα', 'Επιλέξτε αν είστε συνεργείο, φανοποιείο ή βουλκανιζατέρ')
+      return
+    }
     try {
       setIsLoading(true)
 
@@ -137,6 +148,13 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
       </div>
 
       <InlineNudge
+        when={(formData.businessTypes?.length ?? 0) === 0}
+        icon="storefront"
+        title="Δηλώστε τι είδους επιχείρηση είστε"
+        detail="Συνεργείο, φανοποιείο ή βουλκανιζατέρ — επιλέξτε όσα ισχύουν στον Τύπο Επιχείρησης παρακάτω."
+      />
+
+      <InlineNudge
         when={!formData.description?.trim() || (formData.benefits?.length ?? 0) === 0}
         icon="storefront"
         title="Το προφίλ σου είναι ελλιπές"
@@ -174,6 +192,20 @@ export default function GarageSettings({ garageData, onUpdate }: GarageSettingsP
             </div>
           ))}
         </div>
+      </article>
+
+      {/* Business type */}
+      <article className="bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center justify-center h-14 w-14 rounded-full bg-surface-container text-primary">
+            <Icon name="storefront" filled size="md" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-on-surface">Τύπος Επιχείρησης *</h3>
+            <p className="text-xs text-secondary">Επιλέξτε όσα ισχύουν</p>
+          </div>
+        </div>
+        <BusinessTypePicker value={formData.businessTypes || []} onChange={handleBusinessTypes} disabled={isLoading} />
       </article>
 
       {/* Benefits / Free Services */}

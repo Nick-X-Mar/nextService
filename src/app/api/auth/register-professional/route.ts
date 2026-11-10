@@ -13,6 +13,7 @@ import { withMetrics } from '@/utils/withMetrics'
 import { randomUUID } from 'crypto'
 import { TERMS_VERSION } from '@/lib/legal'
 import { stringList } from '@/utils/stringList'
+import { businessTypes, businessTypesLabel } from '@/types/businessTypes'
 import { TABLES } from '@/lib/tables'
 
 const checkRateLimit = createRateLimiter('register-pro', 3, 3600000)
@@ -23,6 +24,7 @@ async function _POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { companyName, contactFirstName, contactLastName, tin, email, password, taxAuthority, address, area, municipality, mobile, benefits, acceptedTerms } = body
+    const types = businessTypes(body.businessTypes)
 
     if (acceptedTerms !== true) {
       return NextResponse.json(
@@ -68,6 +70,10 @@ async function _POST(request: NextRequest) {
 
     if (!optionalText(municipality)) {
       return NextResponse.json({ error: 'Ο δήμος είναι υποχρεωτικός' }, { status: 400 })
+    }
+
+    if (types.length === 0) {
+      return NextResponse.json({ error: 'Επιλέξτε αν είστε συνεργείο, φανοποιείο ή βουλκανιζατέρ' }, { status: 400 })
     }
 
     if (!mobile || typeof mobile !== 'string' || !mobile.trim()) {
@@ -181,6 +187,7 @@ async function _POST(request: NextRequest) {
       area: optionalText(area).slice(0, 100),
       municipality: optionalText(municipality).slice(0, 100),
       mobile: cleanMobile,
+      businessTypes: types,
       isActive: false,
       description: 'Εταιρεία εγγεγραμμένη στο NextService',
       benefits: stringList(benefits),
@@ -223,6 +230,7 @@ async function _POST(request: NextRequest) {
         templateName: EmailTemplate.AdminNewGarageValidation,
         variables: {
           companyName: garageData.companyName,
+          businessTypes: businessTypesLabel(types),
           tin: cleanTin,
           email: garageData.email,
           mobile: cleanMobile,

@@ -480,6 +480,7 @@ export const EMAIL_DEFINITIONS: EmailDefinition[] = [
     sentBy: 'app',
     variables: [
       field('companyName', 'επωνυμία', 'Επωνυμία', 'Auto Fix Παπαδόπουλος'),
+      field('businessTypes', 'τύπος', 'Τύπος επιχείρησης', 'Συνεργείο · Φανοποιείο'),
       field('tin', 'ΑΦΜ', 'ΑΦΜ', '123456789'),
       field('email', 'email', 'Email', 'info@autofix.gr'),
       field('mobile', 'κινητό', 'Κινητό', '6900000000'),
@@ -487,6 +488,7 @@ export const EMAIL_DEFINITIONS: EmailDefinition[] = [
     ],
     example: {
       companyName: 'Auto Fix Παπαδόπουλος',
+      businessTypes: 'Συνεργείο · Φανοποιείο',
       tin: '123456789',
       email: 'info@autofix.gr',
       mobile: '6900000000',
@@ -497,6 +499,7 @@ export const EMAIL_DEFINITIONS: EmailDefinition[] = [
       heading: 'Νέα εγγραφή συνεργείου',
       body:
         '**Επωνυμία:** {επωνυμία}\n' +
+        '**Τύπος:** {τύπος}\n' +
         '**ΑΦΜ:** {ΑΦΜ}\n' +
         '**Email:** {email}\n' +
         '**Κινητό:** {κινητό}\n' +
@@ -505,6 +508,49 @@ export const EMAIL_DEFINITIONS: EmailDefinition[] = [
       note: '',
     },
     ctaUrl: () => link('/admin/garages/'),
+  },
+  {
+    name: EmailTemplate.AdminNewRequest,
+    label: 'Νέο αίτημα πελάτη',
+    audience: 'admin',
+    trigger:
+      'Μόλις ένας πελάτης στείλει νέο αίτημα. Πηγαίνει μόνο στο email του admin (ADMIN_EMAIL), με σύνδεσμο προς το αίτημα στο admin.',
+    sentBy: 'app',
+    variables: [
+      field('category', 'κατηγορία', 'Εργασία', 'Τακτικό service αυτοκινήτου'),
+      car,
+      field('modelYear', 'έτος', 'Έτος', '2018'),
+      field('clientName', 'πελάτης', 'Όνομα πελάτη', 'Γιώργος Παπαδόπουλος'),
+      field('clientKind', 'λογαριασμός', 'Νέος ή υπάρχων πελάτης', 'νέος λογαριασμός'),
+      field('estimate', 'εκτίμηση', 'Εκτίμηση κόστους', 'από 120€ + ΦΠΑ'),
+      field('description', 'περιγραφή', 'Περιγραφή του πελάτη', 'Ακούγεται θόρυβος από μπροστά όταν φρενάρω.'),
+    ],
+    example: {
+      ...EXAMPLE_IDS,
+      category: 'Τακτικό service αυτοκινήτου',
+      brand: 'Toyota',
+      model: 'Yaris',
+      modelYear: '2018',
+      clientName: 'Γιώργος Παπαδόπουλος',
+      clientKind: 'νέος λογαριασμός',
+      estimate: 'από 120€ + ΦΠΑ',
+      description: 'Ακούγεται θόρυβος από μπροστά όταν φρενάρω.',
+    },
+    // One paragraph per line, so a missing year or estimate drops only its own line.
+    copy: {
+      subject: '[Admin] Νέο αίτημα: {κατηγορία}, {αυτοκίνητο}',
+      heading: 'Νέο αίτημα πελάτη',
+      body:
+        '**Εργασία:** {κατηγορία}\n\n' +
+        '**Αυτοκίνητο:** {αυτοκίνητο}\n\n' +
+        '**Έτος:** {έτος}\n\n' +
+        '**Πελάτης:** {πελάτης} ({λογαριασμός})\n\n' +
+        '**Εκτίμηση:** {εκτίμηση}\n\n' +
+        '**Περιγραφή:** {περιγραφή}',
+      ctaLabel: 'Άνοιγμα στο admin',
+      note: 'Τηλέφωνο, email και φωτογραφίες είναι στη σελίδα του αιτήματος. Ο σύνδεσμος ανοίγει μόνο με σύνδεση admin.',
+    },
+    ctaUrl: (v) => link(`/admin/requests/${encodeURIComponent(v.requestId || '')}/`),
   },
 ]
 

@@ -136,6 +136,7 @@ export async function registerPendingGarage(request: APIRequestContext) {
       address: 'Πατησίων 1, Αθήνα',
       area: 'Κυψέλη',
       municipality: 'Δήμος Αθηναίων',
+      businessTypes: ['mechanic'],
       mobile: `69${String(stamp).slice(-8)}`,
       acceptedTerms: true,
     },

@@ -7,6 +7,7 @@ import AlertStack from '@/components/AlertStack'
 import { useNavigation } from '@/hooks/useNavigation'
 import { styles } from '@/styles/styles'
 import { OfferStatus, ServiceRequestStatus } from '@/types/statuses'
+import type { BusinessType } from '@/types/businessTypes'
 import { useAuth } from '@/contexts/AuthContext'
 import Icon from '@/components/ui/Icon'
 import MyOffers from './MyOffers'
@@ -36,6 +37,7 @@ interface GarageData {
   address: string
   area?: string
   municipality?: string
+  businessTypes?: BusinessType[]
   tin: string
   taxAuthority: string
   description?: string

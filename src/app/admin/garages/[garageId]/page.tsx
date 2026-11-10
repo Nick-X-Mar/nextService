@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import Spinner from '@/components/Spinner'
+import BusinessTypePicker from '@/components/BusinessTypePicker'
+import type { BusinessType } from '@/types/businessTypes'
 import { useAsyncTask } from '@/hooks/useAsyncTask'
 import { useConfirm } from '@/hooks/useConfirm'
 import { useNavigation } from '@/hooks/useNavigation'
@@ -27,6 +29,7 @@ interface GarageDetail {
   address: string
   area: string
   municipality: string
+  businessTypes: BusinessType[]
   description: string
   benefits: string[]
   workdayStartTime: string
@@ -97,6 +100,7 @@ export default function GarageDetailPage() {
   const toast = useToast()
   const [garage, setGarage] = useState<GarageDetail | null>(null)
   const [form, setForm] = useState<Record<string, string>>({})
+  const [types, setTypes] = useState<BusinessType[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -118,6 +122,7 @@ export default function GarageDetailPage() {
           municipality: data.municipality,
           description: data.description,
         })
+        setTypes(data.businessTypes)
       }
     } catch { /* the not-found state below covers it */ }
     setLoading(false)
@@ -129,7 +134,7 @@ export default function GarageDetailPage() {
     const res = await fetch(`/api/admin/users/garages/${garageId}/`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, businessTypes: types }),
     })
     const body = await res.json().catch(() => null)
     if (!res.ok) {
@@ -235,6 +240,10 @@ export default function GarageDetailPage() {
 
       <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/10 p-5 mb-6">
         <h3 className="font-bold text-on-surface mb-4">Στοιχεία συνεργείου</h3>
+        <span className="block text-xs text-on-surface/60 mb-1">Τύπος επιχείρησης</span>
+        <div className="mb-4">
+          <BusinessTypePicker value={types} onChange={setTypes} />
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {FIELDS.map((field) => (
             <label key={field.key} className={`block ${field.wide ? 'sm:col-span-2' : ''}`}>

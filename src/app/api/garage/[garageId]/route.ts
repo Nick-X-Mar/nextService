@@ -6,6 +6,7 @@ import { requireOwner } from '@/utils/requireAuth'
 import { getAuthFromRequest } from '@/utils/auth'
 import { withMetrics } from '@/utils/withMetrics'
 import { stringList } from '@/utils/stringList'
+import { businessTypes } from '@/types/businessTypes'
 import { TABLES } from '@/lib/tables'
 
 async function _GET(
@@ -53,6 +54,7 @@ async function _GET(
         address: garage.address,
         area: garage.area || '',
         municipality: garage.municipality || '',
+        businessTypes: businessTypes(garage.businessTypes),
         description: garage.description,
         isActive: garage.isActive,
         activatedAt: garage.activatedAt || null,
@@ -153,6 +155,10 @@ async function _PUT(
       return NextResponse.json({ error: 'Το ΑΦΜ είναι ήδη καταχωρημένο σε άλλο συνεργείο.' }, { status: 409 })
     }
 
+    // Required on the form, but a garage registered before it existed may save
+    // the rest of its profile without it: an empty list leaves what is stored.
+    const types = businessTypes(body.businessTypes)
+
     // `isActive` is deliberately absent. Activation is an admin decision
     // (api/admin/users/garages/[garageId]/activate, which also sends the
     // activation email); this route used to set it to true on every save, so a
@@ -162,7 +168,7 @@ async function _PUT(
       result = await dynamoDB.send(new UpdateCommand({
         TableName: TABLES.Garages,
         Key: { id: garageId },
-        UpdateExpression: 'SET companyName = :companyName, email = :email, mobile = :mobile, address = :address, area = :area, municipality = :municipality, tin = :tin, taxAuthority = :taxAuthority, description = :description, benefits = :benefits, workdayStartTime = :workdayStartTime, workdayEndTime = :workdayEndTime, updatedAt = :updatedAt',
+        UpdateExpression: `SET companyName = :companyName, email = :email, mobile = :mobile, address = :address, area = :area, municipality = :municipality, tin = :tin, taxAuthority = :taxAuthority, description = :description, benefits = :benefits, workdayStartTime = :workdayStartTime, workdayEndTime = :workdayEndTime, updatedAt = :updatedAt${types.length > 0 ? ', businessTypes = :businessTypes' : ''}`,
         ConditionExpression: 'attribute_exists(id)',
         ExpressionAttributeValues: {
           ':companyName': body.companyName,
@@ -179,7 +185,8 @@ async function _PUT(
           // "HH:MM", or empty when the shop hasn't said — the client UI just omits it then.
           ':workdayStartTime': body.workdayStartTime || '',
           ':workdayEndTime': body.workdayEndTime || '',
-          ':updatedAt': new Date().toISOString()
+          ':updatedAt': new Date().toISOString(),
+          ...(types.length > 0 ? { ':businessTypes': types } : {}),
         },
         ReturnValues: 'ALL_NEW'
       }))
@@ -200,6 +207,7 @@ async function _PUT(
         address: result.Attributes?.address,
         area: result.Attributes?.area || '',
         municipality: result.Attributes?.municipality || '',
+        businessTypes: businessTypes(result.Attributes?.businessTypes),
         tin: result.Attributes?.tin,
         taxAuthority: result.Attributes?.taxAuthority,
         description: result.Attributes?.description,

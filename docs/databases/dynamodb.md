@@ -214,6 +214,7 @@ The NextService database consists of **6 main tables** that work together to pro
 | `taxAuthority` | String | Tax Authority - ΔΟΥ | ✅ |
 | `address` | String | Company physical address | ✅ |
 | `mobile` | String | Company mobile phone number | ✅ |
+| `businessTypes` | Array of Strings | What kind of shop: any of `mechanic` (Συνεργείο), `bodywork` (Φανοποιείο), `tyres` (Βουλκανιζατέρ) — `src/types/businessTypes.ts`. Required at registration; missing on garages registered before it | ❌ |
 | `isActive` | Boolean | Whether garage is accepting new requests | ✅ |
 | `rating` | Number | Average customer rating (0-5) | ❌ |
 | `description` | String | Company description and specialties | ❌ |

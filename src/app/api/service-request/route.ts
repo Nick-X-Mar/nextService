@@ -21,6 +21,7 @@ import { randomUUID } from 'crypto'
 import { TERMS_VERSION } from '@/lib/legal'
 import { TABLES } from '@/lib/tables'
 import { visitorKey } from '@/utils/visitorKey'
+import { withPlusVat } from '@/utils/vat'
 
 // Same budget as /api/auth/register: this route registers guests inline, so
 // without its own limit it was the unthrottled way to mint accounts.
@@ -519,9 +520,8 @@ async function _POST(request: NextRequest) {
 
     // Confirmation email to the client: a new registration's address is in the
     // body, a signed-in client's is one read away.
-    const confirmationTo = newClient
-      ? (newClient.email as string)
-      : await clientEmail(clientId)
+    const client = newClient || await clientRow(clientId)
+    const confirmationTo = typeof client?.email === 'string' ? client.email : undefined
     if (confirmationTo) {
       await sendEmail({
         to: confirmationTo,
@@ -531,6 +531,30 @@ async function _POST(request: NextRequest) {
           model: vehicle.model,
           category: getCategoryText(category),
           clientId
+        },
+        triggerEvent: EventName.ServiceRequestSubmitted,
+        clientId,
+        requestId: serviceRequestId
+      })
+    }
+
+    // The admin hears of every request as it lands, with a link to its admin page.
+    // Contact details stay behind that link rather than in a mailbox.
+    const adminEmail = process.env.ADMIN_EMAIL
+    if (adminEmail) {
+      await sendEmail({
+        to: adminEmail,
+        templateName: EmailTemplate.AdminNewRequest,
+        variables: {
+          requestId: serviceRequestId,
+          category: getCategoryText(category),
+          brand: vehicle.brand,
+          model: vehicle.model,
+          modelYear: vehicle.modelYear,
+          clientName: [client?.firstName, client?.lastName].filter((n) => typeof n === 'string' && n).join(' '),
+          clientKind: newClient ? 'νέος λογαριασμός' : 'υπάρχων πελάτης',
+          estimate: estimation ? withPlusVat(`από ${estimation.estimatedCost}€`) : '',
+          description,
         },
         triggerEvent: EventName.ServiceRequestSubmitted,
         clientId,
@@ -576,17 +600,17 @@ async function _POST(request: NextRequest) {
 
 export const POST = withMetrics(_POST)
 
-/** A signed-in client's email, for the confirmation mail. Never throws. */
-async function clientEmail(clientId: string): Promise<string | undefined> {
+/** A signed-in client's email and name, for the confirmation and admin mails. Never throws. */
+async function clientRow(clientId: string): Promise<Record<string, unknown> | undefined> {
   try {
     const res = await dynamoDB.send(new GetCommand({
       TableName: TABLES.Clients,
       Key: { id: clientId },
-      ProjectionExpression: 'email',
+      ProjectionExpression: 'email, firstName, lastName',
     }))
-    return typeof res.Item?.email === 'string' ? res.Item.email : undefined
+    return res.Item
   } catch (err) {
-    console.error('[service-request] client email lookup failed:', err)
+    console.error('[service-request] client lookup failed:', err)
     return undefined
   }
 }
