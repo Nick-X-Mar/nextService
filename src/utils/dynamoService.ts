@@ -2,6 +2,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb'
 import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
+import { retryAfterFreeze } from '@/utils/awsFreezeRetry'
 
 // Helper to load shared-credentials file in local dev
 const loadLocalCredentials = () =>
@@ -52,7 +53,7 @@ const getDynamoDBConfig = () => {
 }
 
 // Create DynamoDB client
-const dynamoDBClient = new DynamoDBClient(getDynamoDBConfig())
+const dynamoDBClient = retryAfterFreeze(new DynamoDBClient(getDynamoDBConfig()))
 export const dynamoDB = DynamoDBDocumentClient.from(dynamoDBClient)
 
 // Helper function to check if using local DynamoDB

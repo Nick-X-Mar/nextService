@@ -48,7 +48,10 @@ export function defaultAreas(): AreaContent[] {
 
 /**
  * One page's content. Never throws and never returns undefined — a failure
- * here means the visitor sees the shipped copy, not an error.
+ * here means the visitor sees the last copy this server read, else the shipped
+ * one, not an error. Logged as a warning: the page still renders, and a read
+ * that failed after an Amplify freeze (src/utils/awsFreezeRetry.ts) is not an
+ * outage.
  */
 export async function getSitePage(pageKey: SitePageKey): Promise<SitePage> {
   try {
@@ -62,8 +65,9 @@ export async function getSitePage(pageKey: SitePageKey): Promise<SitePage> {
       return stored
     })
   } catch (err) {
-    console.error(`[site-content] falling back to static copy for ${pageKey}:`, err)
-    return defaultPage(pageKey)
+    const lastKnown = pageCache.lastKnown(pageKey)
+    console.warn(`[site-content] falling back to the ${lastKnown ? 'last read' : 'static'} copy for ${pageKey}:`, err)
+    return lastKnown ?? defaultPage(pageKey)
   }
 }
 
@@ -97,8 +101,9 @@ export async function getAllAreas(): Promise<AreaContent[]> {
       })
     })
   } catch (err) {
-    console.error('[site-content] falling back to static areas:', err)
-    return defaultAreas()
+    const lastKnown = areaCache.lastKnown('all')
+    console.warn(`[site-content] falling back to the ${lastKnown ? 'last read' : 'static'} areas:`, err)
+    return lastKnown ?? defaultAreas()
   }
 }
 

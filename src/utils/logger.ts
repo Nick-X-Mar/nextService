@@ -51,7 +51,42 @@ interface RequestContext {
   errorLogged?: boolean
 }
 
-const requestContext = new AsyncLocalStorage<RequestContext>()
+// The server bundles this module more than once — instrumentation.ts gets its
+// own copy, apart from the routes' — so everything stateful lives on one
+// global object. Per-copy state had the routes' copy print through the console
+// the other copy had already captured (every error logged twice, the second as
+// its own JSON), and captured lines went into a queue no request flushed.
+interface LoggerState {
+  /** The console as it was before capture: printing through it cannot loop back. */
+  original: { log: typeof console.log; warn: typeof console.warn; error: typeof console.error }
+  requestContext: AsyncLocalStorage<RequestContext>
+  /** Errors already written, so a throw reaching `onRequestError` after a handler logged it is not counted twice. */
+  loggedErrors: WeakSet<object>
+  queue: LogEntry[]
+  inFlight: Promise<void>
+  timer: ReturnType<typeof setTimeout> | null
+  createdStreams: Set<string>
+  instance: string
+  installed: boolean
+}
+
+const STATE_KEY = Symbol.for('nextservice.logger')
+const state: LoggerState = ((globalThis as { [STATE_KEY]?: LoggerState })[STATE_KEY] ??= {
+  original: {
+    log: console.log.bind(console),
+    warn: console.warn.bind(console),
+    error: console.error.bind(console),
+  },
+  requestContext: new AsyncLocalStorage<RequestContext>(),
+  loggedErrors: new WeakSet<object>(),
+  queue: [],
+  inFlight: Promise.resolve(),
+  timer: null,
+  createdStreams: new Set<string>(),
+  instance: randomBytes(4).toString('hex'),
+  installed: false,
+})
+const { original, requestContext, loggedErrors, createdStreams } = state
 
 /** Runs `fn` with the request's route and caller attached to every entry it logs. */
 export function withLogContext<T>(context: Omit<RequestContext, 'requestId'>, fn: () => T): T {
@@ -66,15 +101,6 @@ export function currentLogContext(): RequestContext | undefined {
 const SHIPPING = STAGE !== 'local'
 const MAX_MESSAGE = 4_000
 const MAX_STACK = 4_000
-const INSTANCE = randomBytes(4).toString('hex')
-
-// The console as it was before capture — the logger prints through these, so
-// nothing it does can loop back into itself.
-const original = {
-  log: console.log.bind(console),
-  warn: console.warn.bind(console),
-  error: console.error.bind(console),
-}
 
 function clip(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}…` : text
@@ -97,10 +123,6 @@ function entryFromArgs(level: LogLevel, args: unknown[]): LogEntry {
   const rest = args.filter((a) => a !== err)
   return buildEntry(level, rest.length > 0 ? format(...rest) : '', { error: err })
 }
-
-// Errors already written, so the same throw reaching `onRequestError` after a
-// handler logged it is not counted twice.
-const loggedErrors = new WeakSet<object>()
 
 export function alreadyLogged(err: unknown): boolean {
   return typeof err === 'object' && err !== null && loggedErrors.has(err)
@@ -131,19 +153,14 @@ function buildEntry(level: LogLevel, message: string, fields: Record<string, unk
 
 // ── Shipping ────────────────────────────────────────────────────────────────
 
-let queue: LogEntry[] = []
-let inFlight: Promise<void> = Promise.resolve()
-let timer: ReturnType<typeof setTimeout> | null = null
-const createdStreams = new Set<string>()
-
 function enqueue(entry: LogEntry) {
   if (!SHIPPING) return
-  queue.push(entry)
+  state.queue.push(entry)
   // Catches what no request awaits (a page render, a timer). Best effort:
   // the requests that matter flush before they respond.
-  if (!timer) {
-    timer = setTimeout(() => { timer = null; void flushLogs() }, 2_000)
-    timer.unref?.()
+  if (!state.timer) {
+    state.timer = setTimeout(() => { state.timer = null; void flushLogs() }, 2_000)
+    state.timer.unref?.()
   }
 }
 
@@ -152,7 +169,7 @@ async function ship(batch: LogEntry[]) {
   // One stream per stage, day and server instance: PutLogEvents needs no
   // sequence token, but a stream per instance keeps the lines of one cold
   // start together when reading them in the console.
-  const stream = `${STAGE}/${new Date().toISOString().slice(0, 10)}/${INSTANCE}`
+  const stream = `${STAGE}/${new Date().toISOString().slice(0, 10)}/${state.instance}`
   if (!createdStreams.has(stream)) {
     try {
       await client.send(new CreateLogStreamCommand({ logGroupName: APP_LOG_GROUP, logStreamName: stream }))
@@ -172,13 +189,13 @@ async function ship(batch: LogEntry[]) {
 
 /** Writes whatever is buffered. Never rejects; a failure is printed, not re-logged. */
 export function flushLogs(): Promise<void> {
-  if (queue.length === 0) return inFlight
-  const batch = queue
-  queue = []
-  inFlight = inFlight.then(() => ship(batch)).catch((err) => {
+  if (state.queue.length === 0) return state.inFlight
+  const batch = state.queue
+  state.queue = []
+  state.inFlight = state.inFlight.then(() => ship(batch)).catch((err) => {
     original.error(JSON.stringify(buildEntry('error', 'Log shipping to CloudWatch failed', { error: err, dropped: batch.length })))
   })
-  return inFlight
+  return state.inFlight
 }
 
 // ── API ─────────────────────────────────────────────────────────────────────
@@ -206,8 +223,6 @@ export const log = {
   error: (message: string, fields?: Record<string, unknown>) => write(buildEntry('error', message, fields), true),
 }
 
-let installed = false
-
 // Framework notices that are still printed but not shipped. Next warns about
 // metadataBase on every self-hosted production server that has an
 // `opengraph-image` file, even with metadataBase set — and then uses ours.
@@ -219,8 +234,8 @@ const NOT_SHIPPED = [/^⚠ metadataBase property in metadata export is not set/]
  * more than a JSON line.
  */
 export function installConsoleCapture() {
-  if (installed || !SHIPPING) return
-  installed = true
+  if (state.installed || !SHIPPING) return
+  state.installed = true
   console.warn = (...args: unknown[]) => {
     const entry = entryFromArgs('warn', args)
     write(entry, !NOT_SHIPPED.some((pattern) => pattern.test(entry.message)))

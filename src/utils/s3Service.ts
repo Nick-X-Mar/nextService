@@ -2,6 +2,7 @@ import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } fro
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
+import { retryAfterFreeze } from '@/utils/awsFreezeRetry'
 
 // Helper to load shared-credentials file in local dev
 const loadLocalCredentials = () =>
@@ -41,7 +42,7 @@ const getS3Config = () => {
   return config
 }
 
-const s3Client = new S3Client(getS3Config())
+const s3Client = retryAfterFreeze(new S3Client(getS3Config()))
 
 // Debug logging
 console.log('🔧 S3 Environment:', {

@@ -1,6 +1,7 @@
 import { CloudWatchLogsClient } from '@aws-sdk/client-cloudwatch-logs'
 import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
+import { retryAfterFreeze } from '@/utils/awsFreezeRetry'
 
 /** Where the app's own structured log lines go — the Monitoring stack's group. */
 export const APP_LOG_GROUP = '/nextservice/app'
@@ -39,6 +40,6 @@ export function cloudWatchLogs(): CloudWatchLogsClient {
     }
   }
 
-  client = new CloudWatchLogsClient(config)
+  client = retryAfterFreeze(new CloudWatchLogsClient(config))
   return client
 }

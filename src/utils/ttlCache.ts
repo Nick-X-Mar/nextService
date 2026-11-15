@@ -29,6 +29,8 @@ interface CacheEntry<T> {
 export interface TtlCache<T> {
   /** Returns the cached value if fresh, otherwise computes + stores it. */
   getOrCompute: (key: string, compute: () => Promise<T>) => Promise<T>
+  /** The last value stored for a key, expired or not — a fallback when computing it fails. */
+  lastKnown: (key: string) => T | undefined
   /** Clear a single key, including any computation for it already in flight. */
   invalidate: (key: string) => void
   /** Clear everything. */
@@ -79,6 +81,9 @@ export function createTtlCache<T>(ttlMs: number): TtlCache<T> {
 
       inFlight.set(key, promise)
       return promise
+    },
+    lastKnown(key) {
+      return store.get(key)?.value
     },
     invalidate(key) {
       store.delete(key)

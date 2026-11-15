@@ -16,6 +16,7 @@ import type {
 } from '@/types/events'
 import { TABLES } from '@/lib/tables'
 import { IS_INDEXABLE } from '@/lib/site-url'
+import { retryAfterFreeze } from '@/utils/awsFreezeRetry'
 
 const FROM_ADDRESS = process.env.SES_FROM_ADDRESS || 'no-reply@nextservice.gr'
 const FROM_NAME = 'NextService'
@@ -66,7 +67,7 @@ function getSesClient(): SESClient {
     }
   }
 
-  sesClient = new SESClient(config)
+  sesClient = retryAfterFreeze(new SESClient(config))
   return sesClient
 }
 

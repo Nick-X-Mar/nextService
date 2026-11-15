@@ -19,6 +19,7 @@ import {
 import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
 import { TABLES } from '@/lib/tables'
+import { retryAfterFreeze } from '@/utils/awsFreezeRetry'
 
 // Local DynamoDB doesn't accept PAY_PER_REQUEST on all versions, so we
 // emit provisioned throughput there and PAY_PER_REQUEST on real AWS.
@@ -59,7 +60,7 @@ function getRawClient(): DynamoDBClient {
     }
   }
 
-  rawClient = new DynamoDBClient(config)
+  rawClient = retryAfterFreeze(new DynamoDBClient(config))
   return rawClient
 }
 

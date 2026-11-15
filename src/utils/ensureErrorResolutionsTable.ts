@@ -14,6 +14,7 @@ import {
 import { fromIni } from '@aws-sdk/credential-provider-ini'
 import path from 'path'
 import { TABLES } from '@/lib/tables'
+import { retryAfterFreeze } from '@/utils/awsFreezeRetry'
 
 const isLocal =
   process.env.NODE_ENV === 'development' && !!process.env.DYNAMODB_ENDPOINT
@@ -52,7 +53,7 @@ function getRawClient(): DynamoDBClient {
     }
   }
 
-  rawClient = new DynamoDBClient(config)
+  rawClient = retryAfterFreeze(new DynamoDBClient(config))
   return rawClient
 }
 
