@@ -117,7 +117,10 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
               src={offer.image}
               alt={offer.title}
               fill
-              sizes="(max-width: 768px) 100vw, 672px"
+              // The column is max-w-2xl with px-4: 640px at most, 32px short of the viewport below that.
+              sizes="(max-width: 672px) calc(100vw - 32px), 640px"
+              // The page's largest paint on a phone: 60 is visibly the same there and a quarter lighter.
+              quality={60}
               className="object-cover"
               priority
               // `priority` preloads it; this is what tells the browser it is

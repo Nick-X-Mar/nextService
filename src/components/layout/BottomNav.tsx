@@ -76,7 +76,8 @@ export default function BottomNav() {
               className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 mx-0.5 rounded-2xl active:scale-90 duration-200 ${
                 active
                   ? 'text-primary bg-primary-container/10'
-                  : 'text-on-surface/60 hover:text-primary-container'
+                  : // Not on-surface/60: at 9–10px that grey fell short of the 4.5:1 contrast small text needs.
+                    'text-on-surface-variant hover:text-primary-container'
               }`}
             >
               <span className="relative">
