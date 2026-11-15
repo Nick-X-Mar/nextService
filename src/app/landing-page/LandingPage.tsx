@@ -9,9 +9,11 @@ export default function LandingPage() {
       <div className="fixed inset-0 -z-10">
         <picture>
           <source media="(max-width: 767px)" srcSet="/road_mobile.webp" type="image/webp" />
+          {/* The homepage's largest paint: fetched first, ahead of the scripts. */}
           <img
             src="/road_desktop.webp"
             alt=""
+            fetchPriority="high"
             className="w-full h-full object-cover"
           />
         </picture>

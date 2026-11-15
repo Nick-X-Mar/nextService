@@ -25,6 +25,11 @@ function safeDate(value: string | undefined, fallback: Date): Date {
   return Number.isNaN(parsed.getTime()) ? fallback : parsed
 }
 
+// Rebuilt hourly, and on every admin hot-deal write (`revalidateOfferPages()`):
+// without a window it was built once per deploy, so a deal added in the admin
+// stayed out of the sitemap until the next one.
+export const revalidate = 3600
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: `${SITE_URL}/`, lastModified: CONTENT_LAST_MODIFIED, changeFrequency: 'weekly', priority: 1.0 },

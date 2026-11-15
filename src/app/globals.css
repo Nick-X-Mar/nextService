@@ -31,7 +31,8 @@ body {
 
 /* Material Symbols base styles */
 .material-symbols-outlined {
-  font-family: 'Material Symbols Outlined';
+  /* Self-hosted through next/font/local in the root layout. */
+  font-family: var(--font-material-symbols);
   font-weight: normal;
   font-style: normal;
   font-size: 24px;

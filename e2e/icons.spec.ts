@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { ICON_NAMES, ICON_FONT_URL } from '../src/lib/icons'
+import { ICON_NAMES } from '../src/lib/icons'
 import { loginAdmin } from './E-helpers'
 
 /**
@@ -48,11 +48,19 @@ test('Every icon the code uses is in the downloaded icon set', () => {
   expect(missing, 'add these to src/lib/icons.ts').toEqual([])
 })
 
-test('The icon set is sorted, as Google requires, and the page links it', async ({ request }) => {
+test('The icon set is sorted, as Google requires, and the self-hosted font matches it', async ({ request }) => {
   expect([...ICON_NAMES]).toEqual([...ICON_NAMES].sort())
+  // The font in src/app/fonts/ is downloaded for one list of names; an icon added
+  // since would render as its word until scripts/fetch-icon-font.ts is re-run.
+  const built = JSON.parse(readFileSync(join(SRC, 'app', 'fonts', 'material-symbols-outlined.json'), 'utf8'))
+  expect(built.iconNames, 'run: npx tsx scripts/fetch-icon-font.ts').toEqual([...ICON_NAMES])
+  // Served from our own domain: no render-blocking stylesheet on Google's, and
+  // the @font-face in the app's own CSS.
   const html = await (await request.get('/about/')).text()
-  expect(html).toContain(ICON_FONT_URL.replace(/&/g, '&amp;'))
-  expect(html).not.toContain('Material+Symbols+Outlined:wght,FILL@100..700')
+  expect(html).not.toContain('fonts.googleapis.com')
+  const sheets = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1])
+  const css = (await Promise.all(sheets.map(async (href) => (await request.get(href)).text()))).join('\n')
+  expect(css).toMatch(/@font-face\s*{[^}]*materialSymbols[^}]*\.woff2/)
 })
 
 test('The admin cannot save an icon that is not in the set', async ({ request }) => {

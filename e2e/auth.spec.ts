@@ -54,6 +54,13 @@ test.describe('Authentication flows', () => {
     expect(resp.status()).toBe(401)
   })
 
+  test('GET /api/auth/me answers a signed-out visitor with 200, not an error', async ({ request }) => {
+    // Every public page asks; a 401 there was a console error on all of them.
+    const resp = await request.get('/api/auth/me/')
+    expect(resp.status()).toBe(200)
+    expect((await resp.json()).authenticated).toBe(false)
+  })
+
   test('GET /api/auth/me returns user info with valid cookie', async ({ request }) => {
     const { token } = await loginViaAPI(request, TEST_GARAGE.email, TEST_GARAGE.password, 'garage')
     const resp = await request.get('/api/auth/me', {

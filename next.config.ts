@@ -173,13 +173,15 @@ function withEncodedVariants(
  * `form-action` stops an injected form from posting credentials off-site.
  *
  * Hosts allowed, and why:
- *  - fonts.googleapis.com / fonts.gstatic.com — the Inter and Material Symbols
- *    @import in globals.css
  *  - js.stripe.com / api.stripe.com / hooks.stripe.com — Stripe.js and its
  *    payment frames, loaded by lib/stripe-client.ts
  *  - *.amazonaws.com — S3 photo uploads (images) and AppSync (wss for chat)
  *  - www.googletagmanager.com / *.google-analytics.com / *.analytics.google.com —
- *    Google Analytics, loaded by lib/analytics.ts only after the visitor accepts
+ *    Google Analytics, loaded by lib/analytics.ts only after the visitor accepts.
+ *    Its advertising endpoints (doubleclick, google.gr/ads) stay blocked on purpose:
+ *    the privacy policy says analytics are not used for advertising.
+ *  - No font host: Inter (next/font/google) and Material Symbols (next/font/local,
+ *    scripts/fetch-icon-font.ts) are both served from our own domain.
  *  - ws://localhost:* — dev only, the AppSync mock from `npm run mock-appsync`
  */
 const isProd = process.env.NODE_ENV === 'production'
@@ -190,8 +192,8 @@ const CSP = [
   // strings, and without it hot reloading dies with an EvalError on every page
   // load. The production bundle never evals, so it stays out of the real policy.
   `script-src 'self' 'unsafe-inline'${isProd ? '' : " 'unsafe-eval'"} https://js.stripe.com https://www.googletagmanager.com`,
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' data: https://fonts.gstatic.com",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:",
   "img-src 'self' data: blob: https://*.amazonaws.com https://*.google-analytics.com https://www.googletagmanager.com",
   // The ws://localhost entries are development-only. `'self'` covers the app's
   // own origin but not a different port, and never the ws: scheme — so without

@@ -3,8 +3,9 @@
  * font is 1.1 MB, these about 25 KB, and it was the heaviest thing on every page.
  *
  * A name missing here renders as its word ("build") instead of the icon. So a new
- * icon in code goes here too (e2e/icons.spec.ts fails until it does), and the admin
- * forms that take an icon name refuse one that is not on this list.
+ * icon in code goes here too, followed by `npx tsx scripts/fetch-icon-font.ts`
+ * (e2e/icons.spec.ts fails until both are done), and the admin forms that take an
+ * icon name refuse one that is not on this list.
  *
  * Google requires the names in alphabetical order.
  */
@@ -196,8 +197,9 @@ export const isKnownIcon = (name: string): boolean => ICON_SET.has(name)
 
 /**
  * Only the weight, grade and size the app draws (`Icon` and `.material-symbols-outlined`),
- * with FILL kept as an axis for the filled variant. `block`: an icon is never shown
- * as its word while the font loads.
+ * with FILL kept as an axis for the filled variant. Not linked by the pages:
+ * scripts/fetch-icon-font.ts downloads this subset into src/app/fonts/, which the
+ * root layout serves itself. Re-run that script after changing ICON_NAMES.
  */
 export const ICON_FONT_URL =
   'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0..1,0' +

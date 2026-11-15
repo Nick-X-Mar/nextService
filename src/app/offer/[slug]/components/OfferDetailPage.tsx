@@ -120,6 +120,9 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
               sizes="(max-width: 768px) 100vw, 672px"
               className="object-cover"
               priority
+              // `priority` preloads it; this is what tells the browser it is
+              // the page's largest paint (Lighthouse "LCP request discovery").
+              fetchPriority="high"
             />
           </div>
         ) : (

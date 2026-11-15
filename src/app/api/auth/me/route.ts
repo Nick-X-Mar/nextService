@@ -18,8 +18,12 @@ const PRIVATE_FIELDS = new Set<string>([
 async function _GET(request: NextRequest) {
   try {
     const auth = await getAuthFromRequest(request)
+    // A visitor who never signed in asked a question and got its answer: 200,
+    // not 401. AuthContext asks on every page, and a 401 is a red console error
+    // that costs every public page its Lighthouse "Best Practices" score.
+    // Callers read `authenticated`, so the status changes nothing for them.
     if (!auth) {
-      return NextResponse.json({ authenticated: false }, { status: 401 })
+      return NextResponse.json({ authenticated: false })
     }
 
     const { userId, userType } = auth

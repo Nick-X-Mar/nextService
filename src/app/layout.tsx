@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
 const inter = Inter({
@@ -7,6 +8,18 @@ const inter = Inter({
   weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
   display: "swap",
   variable: "--font-inter",
+});
+
+// The Material Symbols subset of src/lib/icons.ts, served from our own domain
+// and preloaded like Inter (refresh it with scripts/fetch-icon-font.ts). From
+// fonts.googleapis.com it was a render-blocking stylesheet plus a second hop to
+// fonts.gstatic.com before any page could paint. `block`: an icon is never
+// shown as its word while the font loads.
+const materialSymbols = localFont({
+  src: "./fonts/material-symbols-outlined.woff2",
+  display: "block",
+  variable: "--font-material-symbols",
+  adjustFontFallback: false,
 });
 import AppShell from "@/components/layout/AppShell";
 import { ToastProvider } from "@/components/ToastProvider";
@@ -17,7 +30,6 @@ import NumberWheelGuard from "@/components/NumberWheelGuard";
 import { UserProvider } from "@/contexts/UserContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SITE_URL, IS_INDEXABLE } from "@/lib/site-url";
-import { ICON_FONT_URL } from "@/lib/icons";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -78,7 +90,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="el" className={inter.variable}>
+    <html lang="el" className={`${inter.variable} ${materialSymbols.variable}`}>
       <body className="font-body antialiased bg-surface text-on-surface">
         {/* Points AI crawlers at /llms.txt. React hoists <link> into <head>.
             Done here rather than through Next's `alternates.types` metadata,
@@ -90,12 +102,6 @@ export default function RootLayout({
           href={`${SITE_URL}/llms.txt`}
           title="llms.txt"
         />
-        {/* Inter comes from next/font (self-hosted, preloaded). The icon font is
-            linked here, not @imported from globals.css: an @import is found only
-            after that stylesheet downloads, one more round trip before any paint. */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="stylesheet" href={ICON_FONT_URL} />
         <AuthProvider>
           <UserProvider>
             <ToastProvider>

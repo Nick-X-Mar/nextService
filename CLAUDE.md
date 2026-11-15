@@ -28,6 +28,7 @@ Seed / maintenance scripts (run against local DynamoDB by default):
 - `npx tsx scripts/fix-hot-deal-categories.ts [--apply]` — move hot deals still on the legacy `service`/`fanopeia` categories to the request-form category `src/data/offers.json` gives their slug (dry run without `--apply`; prefix `DYNAMODB_ENDPOINT=http://localhost:8000` for local, otherwise AWS via the project `.aws/`). A hot deal's `category` must be one of `REQUEST_CATEGORIES` (`src/utils/categoryLabels.ts`) — "Πάρε Προσφορά" hands it to the form unchanged.
 - `npx tsx scripts/build-price-examples.ts [--report] [--dump]` — rebuild `src/data/price-examples.json` from the two offers spreadsheets at repo root (`NextService - Προσφορές Last.csv`, structured columns; `NextService - Φύλλο37.csv`, one free-text cell per car). Both are read, parsed and deduped on phone + category; no DynamoDB involved. The CSVs are not in git, and the script throws if a default one is missing — pass the paths you have as positional args instead.
 - `npx tsx scripts/validate-price-lookup.ts` — leave-one-out accuracy check of the price lookup
+- `npx tsx scripts/fetch-icon-font.ts` — re-download the self-hosted Material Symbols subset (`src/app/fonts/`) after adding a name to `ICON_NAMES` (`src/lib/icons.ts`); `e2e/icons.spec.ts` fails until it matches
 
 Node 24 (`.nvmrc`; the Amplify build runs `nvm install` from it, and the SSR runtime follows the build's major; the Lambdas are `NODEJS_24_X`). Java is required for DynamoDB Local.
 

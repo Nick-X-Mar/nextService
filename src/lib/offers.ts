@@ -56,9 +56,10 @@ export async function getOfferBySlug(slug: string): Promise<Offer | null> {
 
 /**
  * After an admin create, edit or delete: every offer page, since an edit can
- * move a deal to another slug or switch it off. The pages are ISR, so without
- * this the change shows once the minute's window passes.
+ * move a deal to another slug or switch it off, and the sitemap that lists
+ * them. Both are ISR, so without this the change shows once their window passes.
  */
 export function revalidateOfferPages() {
   revalidatePath('/offer/[slug]', 'page')
+  revalidatePath('/sitemap.xml')
 }

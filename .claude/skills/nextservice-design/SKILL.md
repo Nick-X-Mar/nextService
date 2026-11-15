@@ -37,7 +37,7 @@ The **uppercase micro-label** (`text-[10px] font-bold uppercase tracking-[0.1em]
 
 ## Icons
 
-**Material Symbols Outlined only**, via `<Icon name="..." />` from `@/components/ui/Icon`. Loaded from Google Fonts in `globals.css`.
+**Material Symbols Outlined only**, via `<Icon name="..." />` from `@/components/ui/Icon`. Only the names in `src/lib/icons.ts` exist: a subset font self-hosted through `next/font/local` (`src/app/fonts/`). A new icon goes in `ICON_NAMES`, then `npx tsx scripts/fetch-icon-font.ts`.
 
 ```tsx
 import Icon from '@/components/ui/Icon'
