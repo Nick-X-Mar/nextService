@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import Image from 'next/image'
 import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
+import PhotoViewer from '@/components/PhotoViewer'
 import { useToast } from '@/hooks/useToast'
 import { compressImages } from '@/utils/imageCompression'
 import { useFileDrop } from '@/hooks/useFileDrop'
@@ -180,29 +181,12 @@ export default function RequestPhotosCard({
         </div>
       )}
 
-      {lightboxIndex !== null && photoUrls[lightboxIndex] && (
-        <div
-          className="fixed inset-0 z-[100] bg-on-surface/90 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setLightboxIndex(null)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <button
-            onClick={() => setLightboxIndex(null)}
-            className="absolute top-5 right-5 w-10 h-10 rounded-full bg-surface/20 hover:bg-surface/30 flex items-center justify-center transition-colors"
-            aria-label="Κλείσιμο"
-          >
-            <Icon name="close" size="md" className="text-white" />
-          </button>
-          {/* eslint-disable-next-line @next/next/no-img-element -- presigned and
-              short-lived, so the image optimiser would only add a dead cache entry. */}
-          <img
-            src={photoUrls[lightboxIndex]}
-            alt={`Φωτογραφία ${lightboxIndex + 1}`}
-            className="max-h-[85vh] max-w-full object-contain rounded-xl"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
+      {lightboxIndex !== null && (
+        <PhotoViewer
+          photos={photoUrls.map((url, i) => ({ url, alt: `Φωτογραφία ${i + 1}` }))}
+          startIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
       )}
     </div>
   )

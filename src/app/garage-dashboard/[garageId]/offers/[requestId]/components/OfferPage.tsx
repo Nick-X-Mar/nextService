@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { ServiceVehicleCard, LicensePhotoCard, Spinner, AvailabilityGrid } from '@/components'
+import { ServiceVehicleCard, LicensePhotoCard, Spinner, AvailabilityGrid, PhotoViewer } from '@/components'
 import {
   buildDayHours,
   sanitizeSlots,
@@ -156,6 +156,7 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
   const [garage, setGarage] = useState<Garage | null>(null)
   const [offerNumber, setOfferNumber] = useState<string | undefined>()
   const [estimatedCost, setEstimatedCost] = useState(0)
+  const [photoIndex, setPhotoIndex] = useState<number | null>(null)
   const [offerAmount, setOfferAmount] = useState(0)
   const [selectedBenefits, setSelectedBenefits] = useState<string[]>([])
   const [notes, setNotes] = useState('')
@@ -745,7 +746,13 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {serviceRequest.photoUrls.map((url: string, index: number) => (
-                <a key={index} href={url} target="_blank" rel="noopener noreferrer" className="relative aspect-square bg-surface-container rounded-xl overflow-hidden hover:opacity-90 transition-opacity">
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => setPhotoIndex(index)}
+                  className="relative aspect-square bg-surface-container rounded-xl overflow-hidden hover:opacity-90 transition-opacity active:scale-95"
+                  aria-label={`Άνοιγμα φωτογραφίας ${index + 1}`}
+                >
                   <Image
                     src={url}
                     alt={`Φωτογραφία ${index + 1}`}
@@ -753,9 +760,16 @@ export default function OfferPage({ garageId, requestId }: OfferPageProps) {
                     sizes="(max-width: 640px) 50vw, 33vw"
                     className="object-cover"
                   />
-                </a>
+                </button>
               ))}
             </div>
+            {photoIndex !== null && (
+              <PhotoViewer
+                photos={serviceRequest.photoUrls.map((url: string, i: number) => ({ url, alt: `Φωτογραφία ${i + 1}` }))}
+                startIndex={photoIndex}
+                onClose={() => setPhotoIndex(null)}
+              />
+            )}
           </div>
         )}
 

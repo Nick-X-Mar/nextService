@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
 import { styles } from '@/styles/styles'
 import Icon from '@/components/ui/Icon'
-import { LoadMoreButton, Spinner } from '@/components'
+import { LoadMoreButton, Spinner, PhotoViewer } from '@/components'
 import { useNavigation } from '@/hooks/useNavigation'
 import type { ServiceRequest } from '@/types/requests'
 import { ServiceRequestStatus } from '@/types/statuses'
@@ -69,6 +69,7 @@ export default function AvailableRequests({ garageId, onInactive }: AvailableReq
   const { navigate, isNavigating } = useNavigation()
   const { refresh: refreshNotifications, businessTypes } = useNotifications()
   const [declining, setDeclining] = useState<ServiceRequest | null>(null)
+  const [viewing, setViewing] = useState<{ photoUrls: string[]; index: number } | null>(null)
 
   // Hold a ref to the offer-request ids the garage has already responded to so
   // we can filter realtime arrivals that are no longer relevant. The initial
@@ -409,16 +410,28 @@ export default function AvailableRequests({ garageId, onInactive }: AvailableReq
                       <Icon name="photo_library" filled size="sm" />
                       <span className="text-xs font-bold">{request.photoUrls.length} Φωτογραφίες</span>
                     </div>
+                    {/* A tap opens the photos here, not the request (the card's own click). */}
                     <div className="flex gap-2">
                       {request.photoUrls.slice(0, 3).map((url: string, i: number) => (
-                        <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden bg-surface-container flex-shrink-0">
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setViewing({ photoUrls: request.photoUrls ?? [], index: i }) }}
+                          className="relative w-16 h-16 rounded-lg overflow-hidden bg-surface-container flex-shrink-0 active:scale-95 transition-transform"
+                          aria-label={`Άνοιγμα φωτογραφίας ${i + 1}`}
+                        >
                           <Image src={url} alt={`Φωτογραφία ${i + 1}`} fill sizes="64px" className="object-cover" />
-                        </div>
+                        </button>
                       ))}
                       {request.photoUrls.length > 3 && (
-                        <div className="w-16 h-16 rounded-lg bg-surface-container flex items-center justify-center flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setViewing({ photoUrls: request.photoUrls ?? [], index: 3 }) }}
+                          className="w-16 h-16 rounded-lg bg-surface-container flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
+                          aria-label={`Άλλες ${request.photoUrls.length - 3} φωτογραφίες`}
+                        >
                           <span className="text-xs font-bold text-secondary">+{request.photoUrls.length - 3}</span>
-                        </div>
+                        </button>
                       )}
                     </div>
                   </div>
@@ -481,6 +494,13 @@ export default function AvailableRequests({ garageId, onInactive }: AvailableReq
         onClose={() => setDeclining(null)}
         onDeclined={handleDeclined}
       />
+      {viewing && (
+        <PhotoViewer
+          photos={viewing.photoUrls.map((url, i) => ({ url, alt: `Φωτογραφία ${i + 1}` }))}
+          startIndex={viewing.index}
+          onClose={() => setViewing(null)}
+        />
+      )}
     </div>
   )
 }

@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Image from 'next/image'
-import Icon from '@/components/ui/Icon'
+import PhotoViewer from '@/components/PhotoViewer'
 
 export interface ChatAttachmentView {
   id: string
@@ -18,7 +18,7 @@ interface ChatAttachmentsProps {
 }
 
 /**
- * The photos inside a chat bubble, plus the full-size viewer they open into.
+ * The photos inside a chat bubble; a tap opens them in the PhotoViewer.
  *
  * A single photo gets a large preview; two or more tile into a square grid,
  * which is what keeps a five-photo message from taking over the thread.
@@ -27,17 +27,6 @@ export default function ChatAttachments({ attachments, onOwnBubble = false }: Ch
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   const usable = attachments.filter((a) => !!a.url)
-
-  useEffect(() => {
-    if (lightboxIndex === null) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setLightboxIndex(null)
-      if (e.key === 'ArrowRight') setLightboxIndex((i) => (i === null ? i : Math.min(i + 1, usable.length - 1)))
-      if (e.key === 'ArrowLeft') setLightboxIndex((i) => (i === null ? i : Math.max(i - 1, 0)))
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [lightboxIndex, usable.length])
 
   if (usable.length === 0) return null
 
@@ -69,58 +58,12 @@ export default function ChatAttachments({ attachments, onOwnBubble = false }: Ch
         ))}
       </div>
 
-      {lightboxIndex !== null && usable[lightboxIndex] && (
-        <div
-          className="fixed inset-0 z-[100] bg-on-surface/90 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setLightboxIndex(null)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <button
-            onClick={() => setLightboxIndex(null)}
-            className="absolute top-5 right-5 w-10 h-10 rounded-full bg-surface/20 hover:bg-surface/30 flex items-center justify-center transition-colors"
-            aria-label="Κλείσιμο"
-          >
-            <Icon name="close" size="md" className="text-white" />
-          </button>
-
-          {usable.length > 1 && (
-            <>
-              <button
-                onClick={(e) => { e.stopPropagation(); setLightboxIndex(Math.max(lightboxIndex - 1, 0)) }}
-                disabled={lightboxIndex === 0}
-                className="absolute left-4 w-10 h-10 rounded-full bg-surface/20 hover:bg-surface/30 flex items-center justify-center disabled:opacity-30 transition-colors"
-                aria-label="Προηγούμενη"
-              >
-                <Icon name="chevron_left" size="md" className="text-white" />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); setLightboxIndex(Math.min(lightboxIndex + 1, usable.length - 1)) }}
-                disabled={lightboxIndex === usable.length - 1}
-                className="absolute right-4 w-10 h-10 rounded-full bg-surface/20 hover:bg-surface/30 flex items-center justify-center disabled:opacity-30 transition-colors"
-                aria-label="Επόμενη"
-              >
-                <Icon name="chevron_right" size="md" className="text-white" />
-              </button>
-            </>
-          )}
-
-          {/* eslint-disable-next-line @next/next/no-img-element -- the presigned
-              URL is short-lived and single-use here, so routing it through the
-              image optimiser would only add a cache entry nothing can reuse. */}
-          <img
-            src={usable[lightboxIndex].url}
-            alt={usable[lightboxIndex].originalName || 'Φωτογραφία'}
-            className="max-h-[85vh] max-w-full object-contain rounded-xl"
-            onClick={(e) => e.stopPropagation()}
-          />
-
-          {usable.length > 1 && (
-            <div className="absolute bottom-6 text-white/80 text-xs font-bold tracking-widest">
-              {lightboxIndex + 1} / {usable.length}
-            </div>
-          )}
-        </div>
+      {lightboxIndex !== null && (
+        <PhotoViewer
+          photos={usable.map((a, i) => ({ url: a.url as string, alt: a.originalName || `Φωτογραφία ${i + 1}` }))}
+          startIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
       )}
     </>
   )

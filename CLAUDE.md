@@ -104,6 +104,7 @@ SEO: the old WordPress site's 76 sitemap URLs are each served as is or 308'd in 
 ### Shared Code
 
 - `src/components/` — reusable UI (Button, Modal, Input, Spinner, Switch, Checkbox, SegmentedControl, LoadMoreButton, …) plus `layout/` (AppShell, Sidebar, TopHeader, BottomNav, Footer) and `ui/` (Icon, badge). Always reuse instead of creating one-off equivalents.
+- **Every photo opens in `PhotoViewer`** (`src/components/PhotoViewer.tsx`): over the page, swipe/drag or arrows and ←/→ between photos, pinch or double tap to zoom (garages read the πλαίσιο off the άδεια). Never link a photo with `target="_blank"`. It renders into `<body>` and stops clicks at its root, so it can open from inside a clickable card.
 - `src/contexts/AuthContext.tsx` — auth state (client vs garage), persisted to localStorage
 - `src/contexts/UserContext.tsx` — user-level state
 - `src/contexts/NotificationsContext.tsx` — the one poller (30s) for unread counts + alerts, plus the garage's live new-request bell

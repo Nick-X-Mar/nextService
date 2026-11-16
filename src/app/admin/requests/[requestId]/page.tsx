@@ -11,6 +11,7 @@ import RequestTimeline from './components/RequestTimeline'
 import { WaitingOnChip, waitingFor } from '../../components/WaitingOnBadge'
 import type { RequestWaiting } from '@/types/adminRequests'
 import Spinner from '@/components/Spinner'
+import PhotoViewer, { type ViewerPhoto } from '@/components/PhotoViewer'
 import { isCommissionable } from '@/lib/commission-basis'
 import { completionReasonLabel, type ClientConfirmation, type CompletionReason } from '@/types/reviews'
 import { useConfirm } from '@/hooks/useConfirm'
@@ -134,6 +135,7 @@ export default function RequestDetailPage() {
 
   // Cancel state
   const [cancelling, setCancelling] = useState(false)
+  const [viewing, setViewing] = useState<{ photos: ViewerPhoto[]; index: number } | null>(null)
 
   const fetchDetail = useCallback(async () => {
     try {
@@ -551,14 +553,13 @@ export default function RequestDetailPage() {
                 {data.vehicle.isTurbo && <span className="text-xs bg-surface-container-high text-on-surface/60 px-2 py-0.5 rounded">Turbo</span>}
               </div>
               {data.vehicle.licensePhotoUrl && (
-                <a
-                  href={data.vehicle.licensePhotoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => setViewing({ photos: [{ url: data.vehicle!.licensePhotoUrl!, alt: 'Άδεια κυκλοφορίας' }], index: 0 })}
                   className="inline-block text-xs text-primary hover:underline mt-1"
                 >
                   Φωτογραφία άδειας →
-                </a>
+                </button>
               )}
             </div>
           ) : (
@@ -576,7 +577,13 @@ export default function RequestDetailPage() {
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {data.photoUrls.map((url, i) => (
-              <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="block relative h-32">
+              <button
+                key={i}
+                type="button"
+                onClick={() => setViewing({ photos: data.photoUrls.map((u, j) => ({ url: u, alt: `Φωτογραφία ${j + 1}` })), index: i })}
+                className="block relative h-32"
+                aria-label={`Φωτογραφία ${i + 1}`}
+              >
                 <Image
                   src={url}
                   alt={`Photo ${i + 1}`}
@@ -584,7 +591,7 @@ export default function RequestDetailPage() {
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                   className="object-cover rounded-lg border border-outline-variant/20 hover:opacity-80 transition-opacity"
                 />
-              </a>
+              </button>
             ))}
           </div>
         </div>
@@ -677,15 +684,14 @@ export default function RequestDetailPage() {
                             <p className="text-sm text-on-surface whitespace-pre-wrap break-words">{message.message}</p>
                           )}
                           {message.attachments.map((url, i) => (
-                            <a
+                            <button
                               key={url}
-                              href={url}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              type="button"
+                              onClick={() => setViewing({ photos: message.attachments.map((u, j) => ({ url: u, alt: `Συνημμένο ${j + 1}` })), index: i })}
                               className="block text-xs text-primary hover:underline mt-1"
                             >
                               Συνημμένο {i + 1} →
-                            </a>
+                            </button>
                           ))}
                         </div>
                       </div>
@@ -827,6 +833,9 @@ export default function RequestDetailPage() {
             </div>
           </div>
         </div>
+      )}
+      {viewing && (
+        <PhotoViewer photos={viewing.photos} startIndex={viewing.index} onClose={() => setViewing(null)} />
       )}
     </div>
   )
