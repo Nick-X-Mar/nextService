@@ -320,13 +320,6 @@ const nextConfig: NextConfig = {
           { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
         ],
       },
-      // Pictures under public/ (the logo on every page, the offer photos, the
-      // homepage background) were served with a few seconds of cache. A day,
-      // like the optimised copies above — so a replaced picture gets a new name.
-      ...['/images/:path*', '/road_desktop.webp', '/road_mobile.webp', '/logo.png'].map((source) => ({
-        source,
-        headers: [{ key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' }],
-      })),
     ]
   },
 };

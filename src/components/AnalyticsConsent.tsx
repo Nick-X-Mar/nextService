@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Button from '@/components/Button'
 import {
+  CONSENT_SETTLED_ATTR,
   OPEN_CONSENT_EVENT,
   clearAnalyticsCookies,
   isMeasuredHost,
@@ -20,16 +21,29 @@ import {
  */
 export default function AnalyticsConsent() {
   const pathname = usePathname()
-  const [open, setOpen] = useState(false)
+  // Rendered by the server too, so it paints with the page; CONSENT_SETTLED_SCRIPT
+  // hides it before the first paint when there is nothing to ask, and the
+  // effect below then drops it.
+  const [open, setOpen] = useState(true)
+  // The server HTML shows the question before the script that answers it has
+  // loaded; a tap then would do nothing, so the buttons wait, disabled.
+  const [ready, setReady] = useState(false)
   const inAdmin = pathname?.startsWith('/admin')
 
   useEffect(() => {
-    if (!isMeasuredHost() || inAdmin) return
+    setReady(true)
+    if (!isMeasuredHost() || inAdmin) {
+      setOpen(false)
+      return
+    }
     const consent = readConsent()
     if (consent === 'granted') loadAnalytics()
-    if (consent === null) setOpen(true)
+    if (consent !== null) setOpen(false)
 
-    const reopen = () => setOpen(true)
+    const reopen = () => {
+      document.documentElement.removeAttribute(CONSENT_SETTLED_ATTR)
+      setOpen(true)
+    }
     window.addEventListener(OPEN_CONSENT_EVENT, reopen)
     return () => window.removeEventListener(OPEN_CONSENT_EVENT, reopen)
   }, [inAdmin])
@@ -52,6 +66,7 @@ export default function AnalyticsConsent() {
 
   return (
     <div
+      data-consent-banner
       role="dialog"
       aria-label="Cookies στατιστικών"
       className="fixed inset-x-0 bottom-20 md:bottom-4 z-[55] px-4 pointer-events-none"
@@ -65,10 +80,10 @@ export default function AnalyticsConsent() {
           </Link>
         </p>
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <Button variant="outline" size="sm" onClick={decline}>
+          <Button variant="outline" size="sm" onClick={decline} disabled={!ready}>
             Όχι, ευχαριστώ
           </Button>
-          <Button variant="outline" size="sm" onClick={accept}>
+          <Button variant="outline" size="sm" onClick={accept} disabled={!ready}>
             Αποδοχή
           </Button>
         </div>

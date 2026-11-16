@@ -32,6 +32,8 @@ export default function TopHeader() {
           <button
             className="md:hidden p-2 rounded-full hover:bg-surface-container transition-colors active:scale-95"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label={mobileMenuOpen ? 'Κλείσιμο μενού' : 'Μενού'}
+            aria-expanded={mobileMenuOpen}
           >
             <Icon name={mobileMenuOpen ? 'close' : 'menu'} className={isLanding ? 'text-white' : 'text-on-surface'} />
           </button>

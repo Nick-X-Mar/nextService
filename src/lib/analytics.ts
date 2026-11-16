@@ -9,6 +9,23 @@ export const OPEN_CONSENT_EVENT = 'nextservice:analytics-consent'
 
 export type AnalyticsConsent = 'granted' | 'denied'
 
+/**
+ * On <html> when the consent banner has nothing to ask: not the measured host,
+ * or the visitor already answered. The banner is in the server HTML so it
+ * paints with the page — rendered only after hydration it was the largest
+ * paint on half the site, seconds late — and CSS hides it under this attribute.
+ */
+export const CONSENT_SETTLED_ATTR = 'data-consent-settled'
+
+/**
+ * Inline at the top of <body>, so the attribute is set before the banner is
+ * parsed and an answered visitor never sees it flash. Mirrors `isMeasuredHost`
+ * and `readConsent`; blocked storage leaves the question open, as `readConsent` does.
+ */
+export const CONSENT_SETTLED_SCRIPT =
+  `try{if(location.hostname!==${JSON.stringify(MEASURED_HOST)}||/^(granted|denied)$/.test(localStorage.getItem(${JSON.stringify(CONSENT_KEY)})||''))` +
+  `document.documentElement.setAttribute(${JSON.stringify(CONSENT_SETTLED_ATTR)},'')}catch(e){}`
+
 export const isMeasuredHost = (): boolean => window.location.hostname === MEASURED_HOST
 
 export function readConsent(): AnalyticsConsent | null {

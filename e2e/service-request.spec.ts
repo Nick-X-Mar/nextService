@@ -1102,3 +1102,44 @@ test.describe('Request funnel in the browser', () => {
     await tab.waitForURL(`**/requests/${clientId}/`)
   })
 })
+
+test.describe('The request form works without a mouse', () => {
+  test('Brand and model are chosen with Tab, the arrows and Enter alone', async ({ page }) => {
+    await page.goto('/car-details/?new=1')
+    await page.getByRole('button', { name: /Αλλαγή λαδιών/ }).click({ timeout: 30_000 })
+
+    // A real button, named by its label and its value, that the keyboard reaches.
+    const brand = page.getByRole('button', { name: /^Μάρκα/ })
+    await brand.focus()
+    await expect(brand).toHaveAttribute('aria-expanded', 'false')
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('combobox', { name: 'Αναζήτηση μάρκας' })).toBeFocused()
+    await page.keyboard.type('toyota')
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('Enter')
+    // Chosen, closed, and the focus back on the field to carry on from.
+    await expect(brand).toBeFocused()
+    await expect(brand).toHaveAccessibleName(/Μάρκα.*Toyota/)
+    await expect(brand).toHaveAttribute('aria-expanded', 'false')
+
+    // Tab goes straight on to the model; ↓ opens it, ↓↓ walks the list, Enter takes the row.
+    const model = page.getByRole('button', { name: /^Μοντέλο/ })
+    await page.keyboard.press('Tab')
+    await expect(model).toBeFocused()
+    await page.keyboard.press('ArrowDown')
+    await expect(page.getByRole('combobox', { name: 'Αναζήτηση μοντέλου' })).toBeFocused()
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('ArrowDown')
+    await page.keyboard.press('Enter')
+    await expect(model).toHaveAccessibleName(/Μοντέλο.*Corolla/)
+    await expect(page.getByRole('option', { name: 'Corolla' })).toHaveCount(0)
+
+    // Esc closes without choosing.
+    await page.keyboard.press(' ')
+    await expect(page.getByRole('listbox')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('listbox')).toHaveCount(0)
+    await expect(model).toBeFocused()
+    await expect(model).toHaveAccessibleName(/Μοντέλο.*Corolla/)
+  })
+})

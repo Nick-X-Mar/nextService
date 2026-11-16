@@ -256,8 +256,9 @@ export default function LoginPage() {
             />
 
             <div className="space-y-1.5">
-              <label className={styles.labelUpper}>Email</label>
+              <label htmlFor="login-email" className={styles.labelUpper}>Email</label>
               <input
+                id="login-email"
                 type="email"
                 value={email}
                 onChange={(e) => {
@@ -279,9 +280,10 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className={styles.labelUpper}>Κωδικός πρόσβασης</label>
+              <label htmlFor="login-password" className={styles.labelUpper}>Κωδικός πρόσβασης</label>
               <div className="relative">
                 <input
+                  id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -315,9 +317,10 @@ export default function LoginPage() {
 
             {mode === 'register' && (
               <div className="space-y-1.5">
-                <label className={styles.labelUpper}>Επιβεβαίωση κωδικού</label>
+                <label htmlFor="login-confirm-password" className={styles.labelUpper}>Επιβεβαίωση κωδικού</label>
                 <div className="relative">
                   <input
+                    id="login-confirm-password"
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
@@ -329,6 +332,7 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? 'Απόκρυψη κωδικού' : 'Εμφάνιση κωδικού'}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors"
                   >
                     <Icon name={showConfirmPassword ? 'visibility_off' : 'visibility'} size="sm" />

@@ -360,12 +360,13 @@ export default function RegisterProfessionalPage() {
                 const isLocked = isEmailField && emailLocked
                 return (
                   <div key={field.key} className="space-y-2">
-                    <label className={`${styles.labelUpper} flex items-center gap-2`}>
+                    <label htmlFor={`garage-${field.key}`} className={`${styles.labelUpper} flex items-center gap-2`}>
                       <Icon name={field.icon} size="sm" className="text-on-surface-variant" />
                       {field.label} *
                       {isLocked && <Icon name="lock" size="sm" className="text-on-surface-variant/50" />}
                     </label>
                     <input
+                      id={`garage-${field.key}`}
                       type={field.type}
                       value={formData[field.key]}
                       onChange={(e) => handleInputChange(field.key, e.target.value)}
@@ -383,11 +384,12 @@ export default function RegisterProfessionalPage() {
               {showPasswordFields && (
                 <>
                   <div className="space-y-2">
-                    <label className={`${styles.labelUpper} flex items-center gap-2`}>
+                    <label htmlFor="garage-password" className={`${styles.labelUpper} flex items-center gap-2`}>
                       <Icon name="lock" size="sm" className="text-on-surface-variant" />
                       Κωδικός Πρόσβασης *
                     </label>
                     <input
+                      id="garage-password"
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -398,11 +400,12 @@ export default function RegisterProfessionalPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className={`${styles.labelUpper} flex items-center gap-2`}>
+                    <label htmlFor="garage-confirm-password" className={`${styles.labelUpper} flex items-center gap-2`}>
                       <Icon name="lock" size="sm" className="text-on-surface-variant" />
                       Επιβεβαίωση Κωδικού *
                     </label>
                     <input
+                      id="garage-confirm-password"
                       type="password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}

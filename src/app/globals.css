@@ -29,6 +29,12 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* The consent banner is in the server HTML; hidden before the first paint when
+   there is nothing to ask (CONSENT_SETTLED_SCRIPT in src/lib/analytics.ts). */
+html[data-consent-settled] [data-consent-banner] {
+  display: none;
+}
+
 /* Material Symbols base styles */
 .material-symbols-outlined {
   /* Self-hosted through next/font/local in the root layout. */

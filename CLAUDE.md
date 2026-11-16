@@ -238,7 +238,7 @@ The app uses a complete Material Design 3 system: Inter (latin + greek subsets),
 
 **Before writing or restyling any UI, load the `nextservice-design` skill** (`.claude/skills/nextservice-design/SKILL.md`) — it has the full token set, type ramp, component API and signature elements. Never hardcode hex values or duplicate a shared component.
 
-Pictures are cached for a day — the optimised `/_next/image` copies (`images.minimumCacheTTL`, AVIF then WebP) and the files under `public/` (`headers()` in `next.config.ts`) — so **replace a picture under a new file name** and update what points at it (`src/data/offers.json`, the `HotDeals` rows); the same name can show the old one for up to a day.
+The optimised `/_next/image` copies are cached for a day (`images.minimumCacheTTL`, AVIF then WebP), so **replace a picture under a new file name** and update what points at it (`src/data/offers.json`, the `HotDeals` rows); the same name can show the old one for up to a day. Files under `public/` are served by Amplify itself with `max-age=5`: `headers()` in `next.config.ts` does not reach them (that takes Amplify `customHeaders`, i.e. the CDK app).
 
 Logo: `public/images/next_logo.svg` on light backgrounds, `next_logo_on_dark.svg` (white SERVICE + gear) on dark ones such as the landing photo and the admin sidebar — the charcoal parts vanish there. It is 2114×717, so give `next/image` matching `width`/`height`.
 

@@ -26,6 +26,7 @@ import { ToastProvider } from "@/components/ToastProvider";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import InAppBrowserEscape from "@/components/InAppBrowserEscape";
 import AnalyticsConsent from "@/components/AnalyticsConsent";
+import { CONSENT_SETTLED_SCRIPT } from "@/lib/analytics";
 import NumberWheelGuard from "@/components/NumberWheelGuard";
 import { UserProvider } from "@/contexts/UserContext";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -90,8 +91,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="el" className={`${inter.variable} ${materialSymbols.variable}`}>
+    // suppressHydrationWarning: CONSENT_SETTLED_SCRIPT may set an attribute on
+    // <html> before React hydrates it.
+    <html lang="el" className={`${inter.variable} ${materialSymbols.variable}`} suppressHydrationWarning>
       <body className="font-body antialiased bg-surface text-on-surface">
+        {/* First in <body>: runs before the consent banner below is parsed. */}
+        <script dangerouslySetInnerHTML={{ __html: CONSENT_SETTLED_SCRIPT }} />
         {/* Points AI crawlers at /llms.txt. React hoists <link> into <head>.
             Done here rather than through Next's `alternates.types` metadata,
             which silently emits nothing for this media type. There is no formal

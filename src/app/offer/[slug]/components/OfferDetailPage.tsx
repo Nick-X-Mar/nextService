@@ -93,6 +93,7 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
         <div className="max-w-2xl mx-auto flex items-center justify-between px-4 h-14">
           <button
             onClick={() => router.back()}
+            aria-label="Πίσω"
             className="flex items-center gap-1 text-on-surface-variant hover:text-on-surface transition-colors"
           >
             <Icon name="arrow_back" size="md" />

@@ -214,6 +214,7 @@ export default function OffersSection() {
         {/* Left Arrow */}
         <button
           onClick={() => navigate(-1)}
+          aria-label="Προηγούμενη εργασία"
           className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center opacity-100 hover:bg-white/25 active:scale-90 transition-opacity"
         >
           <Icon name="chevron_left" size="md" className="text-white" />
@@ -222,6 +223,7 @@ export default function OffersSection() {
         {/* Right Arrow */}
         <button
           onClick={() => navigate(1)}
+          aria-label="Επόμενη εργασία"
           className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center opacity-100 hover:bg-white/25 active:scale-90 transition-opacity"
         >
           <Icon name="chevron_right" size="md" className="text-white" />

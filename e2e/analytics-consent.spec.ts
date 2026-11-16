@@ -72,6 +72,18 @@ test.describe('Google Analytics consent', () => {
     expect(google).toHaveLength(1)
   })
 
+  test('The question is in the page as served, and an answered visitor never sees it', async ({ page, request }) => {
+    // In the server HTML, so it paints with the page: added after hydration it
+    // was the largest paint on half the site, seconds late.
+    expect(await (await request.get('/about/')).text()).toContain('data-consent-banner')
+
+    // Answered before: hidden by the inline script before any paint, not after hydration.
+    await page.addInitScript(() => localStorage.setItem('nextservice-analytics-consent', 'denied'))
+    await openAsProduction(page, '/about/')
+    expect(await page.evaluate(() => document.documentElement.hasAttribute('data-consent-settled'))).toBe(true)
+    await expect(question(page)).toBeHidden()
+  })
+
   test('The admin panel is neither asked nor measured', async ({ page }) => {
     const google = await openAsProduction(page, '/admin/login/')
     await expect(page.locator('input').first()).toBeVisible({ timeout: 30_000 })

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Icon from '@/components/ui/Icon'
+import SearchablePicker from './SearchablePicker'
 import Spinner from '@/components/Spinner'
 import GearSubmitButton from '@/components/GearSubmitButton'
 import DictationField from '@/components/DictationField'
@@ -229,8 +230,6 @@ export default function CarBrandModelSelector({ category }: { category: string }
   const [modelSearch, setModelSearch] = useState('')
   const brandRef = useRef<HTMLDivElement>(null)
   const modelRef = useRef<HTMLDivElement>(null)
-  const brandSearchRef = useRef<HTMLInputElement>(null)
-  const modelSearchRef = useRef<HTMLInputElement>(null)
 
   const availableModels = !isBrandOther && brand ? carBrands[brand as keyof typeof carBrands] || [] : []
   const filteredBrands = Object.keys(carBrands).filter(b =>
@@ -481,11 +480,12 @@ export default function CarBrandModelSelector({ category }: { category: string }
           {/* Vehicle selector for logged-in users */}
           {vehicles.length > 0 && (
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
+              <label htmlFor="car-saved-vehicle" className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
                 <Icon name="directions_car" size="sm" className="text-primary inline-block mr-1 align-text-bottom" />
                 Τα Οχήματά μου
               </label>
               <select
+                id="car-saved-vehicle"
                 value={selectedVehicleId}
                 onChange={(e) => selectVehicle(e.target.value)}
                 className="w-full h-14 bg-surface-container-highest rounded-xl px-4 border-none focus:ring-2 focus:ring-primary font-bold text-sm text-on-surface cursor-pointer appearance-none"
@@ -503,100 +503,59 @@ export default function CarBrandModelSelector({ category }: { category: string }
 
           {/* Brand */}
           <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
+            <label id="car-brand-label" htmlFor="car-brand-trigger" className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
               Μάρκα <span className="text-error">*</span>
             </label>
-            <div className="relative" ref={brandRef}>
-              <div
-                onClick={() => { setBrandOpen(!brandOpen); setModelOpen(false); setBrandSearch(''); setTimeout(() => brandSearchRef.current?.focus(), 50) }}
-                className="w-full h-14 bg-surface-container-highest rounded-xl px-4 flex items-center justify-between cursor-pointer"
-              >
-                <span className={`font-bold text-base ${currentBrand ? 'text-on-surface' : 'text-on-surface-variant/50'}`}>
-                  {isBrandOther ? 'Άλλο' : brand ? titleCase(brand) : 'Επιλέξτε...'}
-                </span>
-                <Icon name={brandOpen ? 'expand_less' : 'expand_more'} className="text-on-surface-variant" />
-              </div>
-              {brandOpen && (
-                <div className="absolute z-50 left-0 right-0 top-[60px] bg-surface-container-lowest rounded-2xl shadow-2xl border border-outline-variant/10 max-h-[320px] overflow-y-auto p-2 space-y-1">
-                  <div className="sticky top-0 bg-surface-container-lowest pb-1">
-                    <div className="relative">
-                      <Icon name="search" size="sm" className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50" />
-                      <input
-                        ref={brandSearchRef}
-                        type="text"
-                        value={brandSearch}
-                        onChange={(e) => setBrandSearch(e.target.value)}
-                        placeholder="Αναζήτηση μάρκας..."
-                        className="w-full h-10 bg-surface-container-highest rounded-xl pl-9 pr-4 border-none focus:ring-2 focus:ring-primary text-sm font-medium"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </div>
-                  </div>
-                  {filteredBrands.map((b) => (
-                    <div
-                      key={b}
-                      onClick={() => {
-                        setIsBrandOther(false); setCustomBrand(''); setBrand(b)
-                        setIsModelOther(false); setCustomModel(''); setModel('')
-                        setBrandOpen(false)
-                      }}
-                      className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
-                        brand === b && !isBrandOther ? 'bg-primary/10' : 'bg-surface-container hover:bg-surface-container-high'
-                      }`}
-                    >
-                      <span className={`text-base font-bold ${brand === b && !isBrandOther ? 'text-primary' : 'text-on-surface'}`}>
-                        {titleCase(b)}
-                      </span>
-                      {brand === b && !isBrandOther && <Icon name="check" size="sm" className="text-primary" />}
-                    </div>
-                  ))}
-                  {!brandSearch && (
-                    <div
-                      onClick={() => {
-                        setIsBrandOther(true); setBrand('')
-                        setIsModelOther(false); setCustomModel(''); setModel('')
-                        setBrandOpen(false)
-                      }}
-                      className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
-                        isBrandOther ? 'bg-primary/10' : 'bg-surface-container hover:bg-surface-container-high'
-                      }`}
-                    >
-                      <span className={`text-base font-bold ${isBrandOther ? 'text-primary' : 'text-on-surface'}`}>
-                        Άλλο
-                      </span>
-                      {isBrandOther && <Icon name="check" size="sm" className="text-primary" />}
-                    </div>
-                  )}
-                  {filteredBrands.length === 0 && brandSearch && (
-                    <div className="p-2 space-y-2">
-                      <p className="text-center text-xs text-on-surface-variant/50">Δεν βρέθηκε μάρκα</p>
-                      <div
-                        onClick={() => {
-                          setIsBrandOther(true); setBrand(''); setCustomBrand(brandSearch)
-                          setIsModelOther(false); setCustomModel(''); setModel('')
-                          setBrandOpen(false); setBrandSearch('')
-                        }}
-                        className="flex items-center gap-3 p-3 rounded-xl cursor-pointer bg-tertiary/10 hover:bg-tertiary/20 transition-colors"
-                      >
-                        <Icon name="add_circle" size="sm" className="text-tertiary" />
-                        <span className="text-sm font-bold text-on-surface">
-                          Συνέχεια με &ldquo;<span className="text-tertiary">{brandSearch}</span>&rdquo;
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            <SearchablePicker
+              id="car-brand"
+              containerRef={brandRef}
+              open={brandOpen}
+              onToggle={() => { setBrandOpen(!brandOpen); setModelOpen(false); setBrandSearch('') }}
+              onClose={() => { setBrandOpen(false); setBrandSearch('') }}
+              value={isBrandOther ? 'Άλλο' : brand ? titleCase(brand) : 'Επιλέξτε...'}
+              hasValue={!!currentBrand}
+              search={brandSearch}
+              onSearchChange={setBrandSearch}
+              searchPlaceholder="Αναζήτηση μάρκας..."
+              options={[
+                ...filteredBrands.map((b) => ({
+                  key: b,
+                  label: titleCase(b),
+                  selected: brand === b && !isBrandOther,
+                  onSelect: () => {
+                    setIsBrandOther(false); setCustomBrand(''); setBrand(b)
+                    setIsModelOther(false); setCustomModel(''); setModel('')
+                    setBrandOpen(false)
+                  },
+                })),
+                ...(!brandSearch ? [{
+                  key: '__other',
+                  label: 'Άλλο',
+                  selected: isBrandOther,
+                  onSelect: () => {
+                    setIsBrandOther(true); setBrand('')
+                    setIsModelOther(false); setCustomModel(''); setModel('')
+                    setBrandOpen(false)
+                  },
+                }] : []),
+              ]}
+              noMatchText="Δεν βρέθηκε μάρκα"
+              onContinueWithSearch={() => {
+                setIsBrandOther(true); setBrand(''); setCustomBrand(brandSearch)
+                setIsModelOther(false); setCustomModel(''); setModel('')
+                setBrandOpen(false); setBrandSearch('')
+              }}
+            />
           </div>
 
           {/* Custom Brand */}
           {isBrandOther && (
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
+              <label htmlFor="car-custom-brand" className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
                 Μάρκα (Άλλο) <span className="text-error">*</span>
               </label>
               <input
+                id="car-custom-brand"
                 type="text"
                 value={customBrand}
                 onChange={(e) => setCustomBrand(e.target.value)}
@@ -609,91 +568,54 @@ export default function CarBrandModelSelector({ category }: { category: string }
           {/* Model */}
           {(brand || isBrandOther) && (
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
+              <label
+                id="car-model-label"
+                htmlFor={isBrandOther ? 'car-model-input' : 'car-model-trigger'}
+                className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant"
+              >
                 Μοντέλο <span className="text-error">*</span>
               </label>
               {!isBrandOther ? (
-                <div className="relative" ref={modelRef}>
-                  <div
-                    onClick={() => { setModelOpen(!modelOpen); setBrandOpen(false); setModelSearch(''); setTimeout(() => modelSearchRef.current?.focus(), 50) }}
-                    className="w-full h-14 bg-surface-container-highest rounded-xl px-4 flex items-center justify-between cursor-pointer"
-                  >
-                    <span className={`font-bold text-base ${model ? 'text-on-surface' : 'text-on-surface-variant/50'}`}>
-                      {isModelOther ? 'Άλλο' : model || 'Επιλέξτε...'}
-                    </span>
-                    <Icon name={modelOpen ? 'expand_less' : 'expand_more'} className="text-on-surface-variant" />
-                  </div>
-                  {modelOpen && (
-                    <div className="absolute z-50 left-0 right-0 top-[60px] bg-surface-container-lowest rounded-2xl shadow-2xl border border-outline-variant/10 max-h-[320px] overflow-y-auto p-2 space-y-1">
-                      <div className="sticky top-0 bg-surface-container-lowest pb-1">
-                        <div className="relative">
-                          <Icon name="search" size="sm" className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50" />
-                          <input
-                            ref={modelSearchRef}
-                            type="text"
-                            value={modelSearch}
-                            onChange={(e) => setModelSearch(e.target.value)}
-                            placeholder="Αναζήτηση μοντέλου..."
-                            className="w-full h-10 bg-surface-container-highest rounded-xl pl-9 pr-4 border-none focus:ring-2 focus:ring-primary text-sm font-medium"
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </div>
-                      </div>
-                      {filteredModels.map((m) => (
-                        <div
-                          key={m}
-                          onClick={() => {
-                            setIsModelOther(false); setCustomModel(''); setModel(m)
-                            setModelOpen(false)
-                          }}
-                          className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
-                            model === m && !isModelOther ? 'bg-primary/10' : 'bg-surface-container hover:bg-surface-container-high'
-                          }`}
-                        >
-                          <span className={`text-base font-bold ${model === m && !isModelOther ? 'text-primary' : 'text-on-surface'}`}>
-                            {m}
-                          </span>
-                          {model === m && !isModelOther && <Icon name="check" size="sm" className="text-primary" />}
-                        </div>
-                      ))}
-                      {!modelSearch && (
-                        <div
-                          onClick={() => {
-                            setIsModelOther(true); setModel('')
-                            setModelOpen(false)
-                          }}
-                          className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
-                            isModelOther ? 'bg-primary/10' : 'bg-surface-container hover:bg-surface-container-high'
-                          }`}
-                        >
-                          <span className={`text-base font-bold ${isModelOther ? 'text-primary' : 'text-on-surface'}`}>
-                            Άλλο
-                          </span>
-                          {isModelOther && <Icon name="check" size="sm" className="text-primary" />}
-                        </div>
-                      )}
-                      {filteredModels.length === 0 && modelSearch && (
-                        <div className="p-2 space-y-2">
-                          <p className="text-center text-xs text-on-surface-variant/50">Δεν βρέθηκε μοντέλο</p>
-                          <div
-                            onClick={() => {
-                              setIsModelOther(true); setModel(''); setCustomModel(modelSearch)
-                              setModelOpen(false); setModelSearch('')
-                            }}
-                            className="flex items-center gap-3 p-3 rounded-xl cursor-pointer bg-tertiary/10 hover:bg-tertiary/20 transition-colors"
-                          >
-                            <Icon name="add_circle" size="sm" className="text-tertiary" />
-                            <span className="text-sm font-bold text-on-surface">
-                              Συνέχεια με &ldquo;<span className="text-tertiary">{modelSearch}</span>&rdquo;
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <SearchablePicker
+                  id="car-model"
+                  containerRef={modelRef}
+                  open={modelOpen}
+                  onToggle={() => { setModelOpen(!modelOpen); setBrandOpen(false); setModelSearch('') }}
+                  onClose={() => { setModelOpen(false); setModelSearch('') }}
+                  value={isModelOther ? 'Άλλο' : model || 'Επιλέξτε...'}
+                  hasValue={!!model}
+                  search={modelSearch}
+                  onSearchChange={setModelSearch}
+                  searchPlaceholder="Αναζήτηση μοντέλου..."
+                  options={[
+                    ...filteredModels.map((m) => ({
+                      key: m,
+                      label: m,
+                      selected: model === m && !isModelOther,
+                      onSelect: () => {
+                        setIsModelOther(false); setCustomModel(''); setModel(m)
+                        setModelOpen(false)
+                      },
+                    })),
+                    ...(!modelSearch ? [{
+                      key: '__other',
+                      label: 'Άλλο',
+                      selected: isModelOther,
+                      onSelect: () => {
+                        setIsModelOther(true); setModel('')
+                        setModelOpen(false)
+                      },
+                    }] : []),
+                  ]}
+                  noMatchText="Δεν βρέθηκε μοντέλο"
+                  onContinueWithSearch={() => {
+                    setIsModelOther(true); setModel(''); setCustomModel(modelSearch)
+                    setModelOpen(false); setModelSearch('')
+                  }}
+                />
               ) : (
                 <input
+                  id="car-model-input"
                   type="text"
                   value={customModel}
                   onChange={(e) => setCustomModel(e.target.value)}
@@ -707,10 +629,11 @@ export default function CarBrandModelSelector({ category }: { category: string }
           {/* Custom Model (when brand is from list but model is "other") */}
           {isModelOther && !isBrandOther && (
             <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
+              <label htmlFor="car-custom-model" className="text-[10px] font-bold uppercase tracking-[0.1em] text-on-surface-variant">
                 Μοντέλο (Άλλο) <span className="text-error">*</span>
               </label>
               <input
+                id="car-custom-model"
                 type="text"
                 value={customModel}
                 onChange={(e) => setCustomModel(e.target.value)}

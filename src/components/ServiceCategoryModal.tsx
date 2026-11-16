@@ -62,6 +62,7 @@ export default function ServiceCategoryModal({ isOpen, onClose, extraFormData, o
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Αναζήτηση..."
+          aria-label="Αναζήτηση εργασίας"
           className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface-container border border-outline-variant/20 text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
           autoFocus
         />
