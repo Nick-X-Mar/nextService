@@ -132,6 +132,35 @@ temp/
 local-data/
 dev-data/
 
+# TypeScript's incremental build cache: rewritten by every build and type check.
+*.tsbuildinfo
+
+# The app shell (Capacitor, android/ ios/ mobile/) lives on the `mobile-app`
+# branch only. Leaving that branch keeps on disk the files its own nested
+# .gitignores hide (those files are not on this branch), so here they look new:
+# the same rules, from the root. Only generated files and machine-local config
+# are listed — never app source — so merging this into mobile-app hides nothing
+# it should track.
+/android/.gradle/
+/android/build/
+/android/app/build/*
+!/android/app/build/.npmkeep
+/android/local.properties
+/android/capacitor-cordova-android-plugins/
+/android/app/src/main/assets/public/
+/android/app/src/main/assets/capacitor.config.json
+/android/app/src/main/assets/capacitor.plugins.json
+/android/app/src/main/res/xml/config.xml
+/ios/App/build/
+/ios/App/Pods/
+/ios/App/output/
+/ios/App/App/public/
+/ios/App/App/capacitor.config.json
+/ios/App/App/config.xml
+/ios/capacitor-cordova-ios-plugins/
+/ios/DerivedData/
+/ios/**/xcuserdata/
+
 # Playwright MCP snapshots
 .playwright-mcp/
 
@@ -139,3 +168,8 @@ dev-data/
 test-results/
 # Offer spreadsheets (customer names and phones) — input to scripts/build-price-examples.ts, never committed
 NextService - *.csv
+mobile/www/server-url.js
+# Firebase client config for the app (android/app, ios/App/App): kept on the
+# machine that builds the app, out of git, since scanners flag its API key.
+google-services.json
+GoogleService-Info.plist
