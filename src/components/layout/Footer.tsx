@@ -21,6 +21,7 @@ const footerLinks = [
   { label: 'Όροι Χρήσης', href: '/terms/' },
   { label: 'Πολιτική Απορρήτου', href: '/privacy/' },
   { label: 'Επικοινωνία', href: '/contact/' },
+  { label: 'Εφαρμογή', href: '/app/' },
 ]
 
 export default function Footer() {

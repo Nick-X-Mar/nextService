@@ -181,3 +181,14 @@ export async function deleteOffer(id: string): Promise<void> {
 export async function putOffer(item: Record<string, unknown>): Promise<void> {
   await client.send(new PutCommand({ TableName: TABLES.Offers, Item: item }))
 }
+
+/** The push endpoints a user's notifications go to (PushSubscriptions). */
+export async function pushSubscriptionsOf(userType: 'client' | 'garage', userId: string): Promise<string[]> {
+  const res = await client.send(new QueryCommand({
+    TableName: TABLES.PushSubscriptions,
+    IndexName: 'UserSubscriptionsIndex',
+    KeyConditionExpression: 'userKey = :key',
+    ExpressionAttributeValues: { ':key': `${userType}#${userId}` },
+  }))
+  return (res.Items ?? []).map((row) => row.endpoint as string).sort()
+}

@@ -13,6 +13,7 @@ import OfferSummaryCard from './OfferSummaryCard'
 import RequestDetailsModal from './RequestDetailsModal'
 import CancellationModal from './CancellationModal'
 import GuestAccountPanel from './GuestAccountPanel'
+import InstallAppNudge from './InstallAppNudge'
 import { useToast } from '../../../hooks/useToast'
 // Navigation is handled by AppShell
 import { ServiceRequestStatus, OfferStatus } from '../../../types/statuses'
@@ -406,6 +407,9 @@ function RequestsPageContent({ clientId }: RequestsPageProps) {
 
         {/* Renders nothing when there is nothing waiting on the user. */}
         <AlertStack className="mb-6" />
+
+        {/* Where sending a request lands: the moment to offer the app. */}
+        {!guestSessionEnded && <InstallAppNudge />}
 
         {isRegisteredUser === false && (
           <GuestAccountPanel

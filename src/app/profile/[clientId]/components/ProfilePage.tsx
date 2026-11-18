@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { styles } from '../../../../styles/styles'
 // Navigation handled by AppShell
 import UserInfoSection from './UserInfoSection'
@@ -12,6 +13,7 @@ import { useAuth } from '../../../../contexts/AuthContext'
 import Icon from '@/components/ui/Icon'
 import Spinner from '@/components/Spinner'
 import InlineNudge from '@/components/InlineNudge'
+import PushNotificationsSetting from '@/components/PushNotificationsSetting'
 import { useAsyncTask } from '@/hooks/useAsyncTask'
 import { useNavigation } from '@/hooks/useNavigation'
 
@@ -260,6 +262,16 @@ export default function ProfilePage({ clientId }: ProfilePageProps) {
             <WalletSection clientId={clientId} />
           </div>
         )}
+
+        {/* This device: the app and its notifications */}
+        <div className={`${styles.card} mb-6 space-y-4`}>
+          <h2 className={styles.cardTitle}>Εφαρμογή & ειδοποιήσεις</h2>
+          <PushNotificationsSetting audience="client" />
+          <Link href="/app/" className={`${styles.linkText} inline-flex items-center gap-1 text-sm`}>
+            <Icon name="install_mobile" size="sm" />
+            Βάλε το NextService στην οθόνη σου
+          </Link>
+        </div>
 
         {/* Navigation Menu Items */}
         <div className="space-y-1 mb-6">

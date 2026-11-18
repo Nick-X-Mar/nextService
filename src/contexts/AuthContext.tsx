@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react'
 import appSyncService from '@/lib/appsync-service'
 import { clearFormData } from '@/utils/formStorage'
+import { releasePush } from '@/lib/web-push-client'
 
 export type UserType = 'client' | 'garage' | 'guest' | null
 
@@ -123,6 +124,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Logout function - calls server to clear httpOnly cookie
   const logout = useCallback(async () => {
+    // While the cookie still says whose browser this is.
+    await releasePush()
     try {
       await fetch('/api/auth/logout/', { method: 'POST' })
     } catch {

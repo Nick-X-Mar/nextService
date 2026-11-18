@@ -34,4 +34,5 @@ export const TABLES = {
   SiteContent: table('SiteContent', process.env.SITE_CONTENT_TABLE),
   RequestDeclines: table('RequestDeclines'),
   GarageSettlements: table('GarageSettlements'),
+  PushSubscriptions: table('PushSubscriptions'),
 } as const

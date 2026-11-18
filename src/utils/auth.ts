@@ -15,6 +15,17 @@ const SESSION_MAX_AGE_SEC = (() => {
   return n * mult
 })()
 
+/**
+ * The installed app (the PWA) keeps its user signed in a little longer: a
+ * session that started there, or that the app took over
+ * (`/api/auth/app-session`), carries `app: true` and slides over 3 days
+ * instead of SESSION_EXPIRY, so opening the app every few days never asks
+ * for the password again. A browser tab keeps the short window: it may be a
+ * shared computer.
+ */
+export const APP_SESSION_EXPIRY = '3d'
+export const APP_SESSION_MAX_AGE_SEC = 3 * 24 * 60 * 60
+
 function getSecret(): Uint8Array {
   const key = process.env.JWT_SECRET
   if (!key) {
@@ -26,13 +37,15 @@ function getSecret(): Uint8Array {
 export interface AuthPayload {
   userId: string
   userType: 'client' | 'garage'
+  /** A session of the installed app: see APP_SESSION_EXPIRY. */
+  app?: boolean
 }
 
-export async function signToken(payload: AuthPayload): Promise<string> {
-  return new SignJWT({ ...payload })
+export async function signToken({ userId, userType, app }: AuthPayload): Promise<string> {
+  return new SignJWT(app ? { userId, userType, app: true } : { userId, userType })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime(SESSION_EXPIRY)
+    .setExpirationTime(app ? APP_SESSION_EXPIRY : SESSION_EXPIRY)
     .sign(getSecret())
 }
 
@@ -42,19 +55,20 @@ export async function verifyToken(token: string): Promise<AuthPayload | null> {
     return {
       userId: payload.userId as string,
       userType: payload.userType as 'client' | 'garage',
+      app: payload.app === true,
     }
   } catch {
     return null
   }
 }
 
-export function setAuthCookie(response: NextResponse, token: string): void {
+export function setAuthCookie(response: NextResponse, token: string, app = false): void {
   response.cookies.set(TOKEN_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: SESSION_MAX_AGE_SEC,
+    maxAge: app ? APP_SESSION_MAX_AGE_SEC : SESSION_MAX_AGE_SEC,
   })
 }
 

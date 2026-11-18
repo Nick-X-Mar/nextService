@@ -7,6 +7,8 @@ import { athensDateTime, isPastAthensDate } from '@/utils/athensTime'
 import { ServiceRequestStatus, OfferStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { sendEmail } from '@/utils/emailService'
+import { pushToUser } from '@/utils/pushService'
+import { withPlusVat } from '@/utils/vat'
 import { EventName, EmailTemplate } from '@/types/events'
 import { getStripe, DEPOSIT_PERCENT } from '@/lib/stripe-server'
 import { requireClient } from '@/utils/requireAuth'
@@ -656,6 +658,22 @@ async function notifyAcceptanceParticipants(args: {
         clientId: args.clientId,
         garageId: args.garageId,
         requestId: args.requestId
+      })
+    }
+
+    if (args.garageId) {
+      // Noon UTC is the same calendar day in Athens, whatever zone this runs in.
+      const day = new Date(`${args.appointmentDate}T12:00:00Z`).toLocaleDateString('el-GR', {
+        weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Athens',
+      })
+      await pushToUser('garage', args.garageId, {
+        title: 'Κλείστηκε ραντεβού',
+        body: [
+          args.appointmentTime ? `${day}, ${args.appointmentTime}` : day,
+          args.appointmentPrice !== undefined ? withPlusVat(`${args.appointmentPrice}€`) : '',
+        ].filter(Boolean).join(' · '),
+        url: `/garage-dashboard/${args.garageId}/?tab=appointments`,
+        tag: `booking-${args.requestId}`,
       })
     }
 

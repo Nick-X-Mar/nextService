@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
@@ -25,6 +25,8 @@ import AppShell from "@/components/layout/AppShell";
 import { ToastProvider } from "@/components/ToastProvider";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import InAppBrowserEscape from "@/components/InAppBrowserEscape";
+import PwaManager from "@/components/PwaManager";
+import { INSTALL_PROMPT_SCRIPT } from "@/lib/pwa";
 import AnalyticsConsent from "@/components/AnalyticsConsent";
 import { CONSENT_SETTLED_SCRIPT } from "@/lib/analytics";
 import NumberWheelGuard from "@/components/NumberWheelGuard";
@@ -43,7 +45,16 @@ export const metadata: Metadata = {
   applicationName: "NextService",
   icons: {
     icon: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
+    // The installed app's icon on an iPhone (the manifest's are Android's and
+    // computers'), the same NS mark.
+    apple: "/icons/apple-touch-icon.png",
+  },
+  // Installed on an iPhone (src/app/manifest.ts): its name under the icon, and
+  // the page below the status bar rather than under it.
+  appleWebApp: {
+    capable: true,
+    title: "NextService",
+    statusBarStyle: "default",
   },
   openGraph: {
     type: "website",
@@ -85,6 +96,11 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  // The `surface` token: the browser bar and the installed app's status bar.
+  themeColor: "#fbf9f8",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -97,6 +113,8 @@ export default function RootLayout({
       <body className="font-body antialiased bg-surface text-on-surface">
         {/* First in <body>: runs before the consent banner below is parsed. */}
         <script dangerouslySetInnerHTML={{ __html: CONSENT_SETTLED_SCRIPT }} />
+        {/* Keeps the browser's install offer for the /app/ page (see lib/pwa.ts). */}
+        <script dangerouslySetInnerHTML={{ __html: INSTALL_PROMPT_SCRIPT }} />
         {/* Points AI crawlers at /llms.txt. React hoists <link> into <head>.
             Done here rather than through Next's `alternates.types` metadata,
             which silently emits nothing for this media type. There is no formal
@@ -114,6 +132,8 @@ export default function RootLayout({
                 <AppShell>
                   {children}
                 </AppShell>
+                {/* Inside the toasts: its notification prompt reports through them. */}
+                <PwaManager />
               </ConfirmProvider>
             </ToastProvider>
             <InAppBrowserEscape />

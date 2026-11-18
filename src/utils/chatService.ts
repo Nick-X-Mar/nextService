@@ -16,6 +16,7 @@ import { ServiceRequestStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { EventName, EmailTemplate } from '@/types/events'
 import { sendEmail } from '@/utils/emailService'
+import { pushToUser } from '@/utils/pushService'
 import { requireAuth, requireActiveGarage, type AuthInfo } from '@/utils/requireAuth'
 import { presignAttachmentList, type ChatAttachment } from '@/utils/chatAttachments'
 import { invalidateUnread } from '@/utils/unreadCache'
@@ -417,6 +418,16 @@ export async function createChatMessage(args: {
     hasAttachments: (attachments?.length ?? 0) > 0,
   }).catch((err) => console.error('[chat] notify failed:', err))
 
+  await notifyByPush({
+    requestId,
+    request,
+    senderType: auth.userType,
+    senderName: auth.userType === 'client' ? names.forGarage : senderName,
+    garageId,
+    message: messageData.message,
+    hasAttachments: (attachments?.length ?? 0) > 0,
+  })
+
   // What goes over the wire — and back to the sender — carries signed URLs.
   // The stored row holds S3 keys, which a browser cannot render, so publishing
   // `messageData` verbatim would deliver a photo message with no photo in it
@@ -447,6 +458,61 @@ export async function createChatMessage(args: {
 }
 
 const CHAT_EMAIL_COOLDOWN_MS = 15 * 60 * 1000
+
+/** Longest message text a notification carries; the device cuts it shorter anyway. */
+const PUSH_PREVIEW_LENGTH = 140
+
+/**
+ * Every message, to the other side's devices with notifications on, unlike
+ * the email, which waits out a cooldown. The text is what the chat itself
+ * shows them: a garage sees the client's first name only. One notification
+ * per conversation: the next message replaces it (`tag`).
+ */
+async function notifyByPush(args: {
+  requestId: string
+  request: Record<string, unknown>
+  senderType: 'client' | 'garage'
+  senderName: string
+  garageId: string
+  message: string
+  hasAttachments: boolean
+}): Promise<void> {
+  const { requestId, request, senderType, senderName, garageId, message, hasAttachments } = args
+  const text = message.length > PUSH_PREVIEW_LENGTH ? `${message.slice(0, PUSH_PREVIEW_LENGTH - 1)}…` : message
+  const body = text || (hasAttachments ? 'Σας έστειλε φωτογραφία' : '')
+  if (!body) return
+
+  try {
+    if (senderType === 'garage') {
+      const clientId = request.clientId as string | undefined
+      if (!clientId) return
+      await pushToUser('client', clientId, {
+        title: senderName,
+        body,
+        url: `/requests/${clientId}/chats/${requestId}/?garageId=${garageId}`,
+        tag: `chat-${requestId}-${garageId}`,
+      })
+      return
+    }
+
+    // A pending or deactivated garage cannot open the chat (see notifyByEmail).
+    const garage = await dynamoDB.send(new GetCommand({
+      TableName: TABLES.Garages,
+      Key: { id: garageId },
+      ProjectionExpression: 'isActive',
+    }))
+    if (garage.Item?.isActive !== true) return
+    await pushToUser('garage', garageId, {
+      title: senderName,
+      body,
+      url: `/garage-dashboard/${garageId}/chat/${requestId}/`,
+      tag: `chat-${requestId}-${garageId}`,
+    })
+  } catch (error) {
+    // Never into the message: it is already sent.
+    console.error('[chat] push failed:', error)
+  }
+}
 
 /**
  * "You have a new message" mail to whoever did not send it. Awaited by the

@@ -120,7 +120,18 @@ export default function Sidebar() {
       </nav>
 
       {/* Bottom actions */}
-      <div className="px-4 py-6 border-t border-outline-variant/10">
+      <div className="px-4 py-6 border-t border-outline-variant/10 space-y-1">
+        <Link
+          href="/app/"
+          className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-colors ${
+            pathname.startsWith('/app')
+              ? 'bg-primary-container/10 text-primary'
+              : 'text-secondary hover:bg-surface-container hover:text-on-surface'
+          }`}
+        >
+          <Icon name="install_desktop" filled={pathname.startsWith('/app')} />
+          <span className="text-xs uppercase tracking-wider">Εφαρμογή</span>
+        </Link>
         <button
           onClick={() => run(logout)}
           disabled={isPending()}
