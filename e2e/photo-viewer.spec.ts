@@ -85,4 +85,27 @@ test.describe('Photos open inside the app', () => {
 
     expect(newTabs).toEqual([])
   })
+
+  test('The request details in a garage\'s chat show the photos and the άδεια, not just a count', async ({ page, request }) => {
+    const client = await newClient(request, 'chat-photos')
+    const garage = await newGarage(request, { prefix: 'chat-photos' })
+    const requestId = await newRequest(request, client, { brand: 'Kia', model: `Sorento${Date.now()}` })
+
+    await signInGarage(page, garage)
+    await showPhotosOn(page, requestId)
+    await page.goto(`/garage-dashboard/${garage.id}/chat/${requestId}/`)
+    await page.getByText('Λεπτομέρειες', { exact: true }).click({ timeout: 30_000 })
+
+    await expect(page.getByText(`Φωτογραφίες (${PHOTOS.length})`)).toBeVisible()
+    await page.getByRole('button', { name: 'Άνοιγμα φωτογραφίας 3' }).click()
+    await expect(counter(page)).toHaveText(`3 / ${PHOTOS.length}`)
+    await expect.poll(() => shownPhoto(page)).toBe(PHOTOS[2])
+    await page.keyboard.press('Escape')
+    await expect(viewer(page)).toBeHidden()
+
+    await page.getByRole('button', { name: 'Άνοιγμα άδειας κυκλοφορίας' }).click()
+    await expect(viewer(page)).toBeVisible()
+    await expect(counter(page)).toHaveCount(0)
+    await expect.poll(() => shownPhoto(page)).toBe(new URL(LICENCE).pathname)
+  })
 })

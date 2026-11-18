@@ -62,7 +62,7 @@ const getTransmissionText = (value?: boolean | string | null) => {
   return 'Δεν έχει δηλωθεί'
 }
 
-const getFuelTypeText = (fuelType?: string | null) => {
+export const getFuelTypeText = (fuelType?: string | null) => {
   if (!fuelType) return 'Δεν έχει δηλωθεί'
 
   const normalized = fuelType.trim().toLowerCase()

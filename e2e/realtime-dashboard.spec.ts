@@ -24,7 +24,9 @@ test('Garage dashboard shows new request without refresh', async ({ page, reques
   // 2. Open the garage dashboard in a real browser.
   await loginAsGarage(page, request)
   const subscribed = waitForRoomSubscription(page, 'new-requests')
-  await page.goto(`/garage-dashboard/${TEST_GARAGE.id}/`)
+  // The feed by name: the bare dashboard opens on the chats instead while a
+  // client's message is unread, and the shared garage always has one.
+  await page.goto(`/garage-dashboard/${TEST_GARAGE.id}/?tab=requests`)
 
   // Wait until the dashboard is past its loading spinner — the badge label
   // appears once garageData has loaded and counts have been fetched.

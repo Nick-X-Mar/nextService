@@ -77,7 +77,7 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
   const [accountState, setAccountState] = useState<GarageAccountState>('pending')
   const [bookedJobs, setBookedJobs] = useState<BookedJob[]>([])
   const { success } = useToast()
-  const { markRequestsSeen, businessTypes } = useNotifications()
+  const { markRequestsSeen, businessTypes, openThreads, loaded: summaryLoaded } = useNotifications()
   // Track which request ids we've already seen via realtime so the badge
   // counter and toast don't fire twice (e.g. an event arriving twice during
   // a flaky reconnect).
@@ -210,12 +210,30 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
     navigate(tabHref(tab))
   }
 
+  // The dashboard with no tab is where every way into the account lands:
+  // signing in, the middleware's home, the header logo. A client who wrote on
+  // an open request and is still waiting comes before new requests, so while
+  // such a message is unread the garage starts on its open chats. A ?tab= in
+  // the URL is a choice the garage made, and is left alone. Decided once, on
+  // the first summary: a message that arrives while the garage is already
+  // reading the feed must not pull the page out from under it.
+  const [landingDecided, setLandingDecided] = useState(false)
+  const isOwnLanding =
+    tabParam === null && !landingDecided && !isPendingValidation &&
+    userType === 'garage' && authGarage?.id === garageId
+  const holdForChats = isOwnLanding && (!summaryLoaded || openThreads > 0)
+  useEffect(() => {
+    if (!isOwnLanding || !summaryLoaded) return
+    if (openThreads > 0) router.replace(`/garage-dashboard/${garageId}/chats/`)
+    else setLandingDecided(true)
+  }, [isOwnLanding, summaryLoaded, openThreads, router, garageId])
+
   // Sitting on the requests feed *is* reading the notifications, so the bell
   // empties as soon as the tab is open — and again for anything that lands while
   // the garage stays there.
   useEffect(() => {
-    if (activeTab === 'requests') markRequestsSeen()
-  }, [activeTab, counts.requests, markRequestsSeen])
+    if (activeTab === 'requests' && !holdForChats) markRequestsSeen()
+  }, [activeTab, holdForChats, counts.requests, markRequestsSeen])
 
   // ─── Realtime: badge counter ───
   // Lives at the dashboard level so it stays mounted across tab switches.
@@ -373,7 +391,9 @@ export default function GarageDashboardPage({ garageId }: GarageDashboardPagePro
     )
   }
 
-  if (isLoading) return loadingView
+  // Not the feed while it is still open where the garage starts, or it would
+  // flash up and load for nothing on the way to the chats.
+  if (isLoading || holdForChats) return loadingView
 
   if (!garageData) {
     return (

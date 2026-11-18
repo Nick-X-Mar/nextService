@@ -23,6 +23,12 @@ export interface LiveRequest {
 }
 
 interface NotificationsState extends NotificationSummary {
+  /**
+   * The first poll since sign-in has answered (or failed). Until then every
+   * count reads zero, which a page choosing where to send the user by them
+   * must not take as "nothing waiting".
+   */
+  loaded: boolean
   /** Requests broadcast since the garage last looked at the bell, newest first. */
   liveRequests: LiveRequest[]
   /** Empties the bell — call it when the garage opens the requests feed. */
@@ -33,6 +39,7 @@ interface NotificationsState extends NotificationSummary {
 
 const NotificationsContext = createContext<NotificationsState>({
   ...EMPTY_SUMMARY,
+  loaded: false,
   liveRequests: [],
   markRequestsSeen: () => {},
   refresh: () => {},
@@ -66,6 +73,7 @@ const MAX_LIVE_REQUESTS = 8
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
   const { userType, garage } = useAuth()
   const [summary, setSummary] = useState<NotificationSummary>(EMPTY_SUMMARY)
+  const [loaded, setLoaded] = useState(false)
   const [liveRequests, setLiveRequests] = useState<LiveRequest[]>([])
   const [tick, setTick] = useState(0)
   const { info } = useToast()
@@ -121,6 +129,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     if (!enabled) {
       setSummary(EMPTY_SUMMARY)
+      setLoaded(false)
       arrivalsRef.current.clear()
       departedRef.current.clear()
       return
@@ -147,6 +156,10 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         })
       } catch {
         /* silent — a badge is not worth surfacing an error for */
+      } finally {
+        // A failed poll counts too: whoever waits on the first answer must not
+        // wait forever for one that is not coming.
+        if (!cancelled) setLoaded(true)
       }
     }
 
@@ -217,7 +230,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   })
 
   return (
-    <NotificationsContext.Provider value={{ ...summary, liveRequests, markRequestsSeen, refresh }}>
+    <NotificationsContext.Provider value={{ ...summary, loaded, liveRequests, markRequestsSeen, refresh }}>
       {children}
     </NotificationsContext.Provider>
   )

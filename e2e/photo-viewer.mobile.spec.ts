@@ -57,3 +57,27 @@ test('On a phone the photos fill the screen and swipe sideways', async ({ page, 
   await close.click()
   await expect(viewer(page)).toBeHidden()
 })
+
+test('On a phone the chat\'s request details show the photos and the άδεια without going sideways', async ({ page, request }) => {
+  const client = await newClient(request, 'chat-photos-m')
+  const garage = await newGarage(request, { prefix: 'chat-photos-m' })
+  const requestId = await newRequest(request, client, { brand: 'Kia', model: `SorentoM${Date.now()}` })
+
+  await signInGarage(page, garage)
+  await showPhotosOn(page, requestId)
+  await page.goto(`/garage-dashboard/${garage.id}/chat/${requestId}/`)
+  await page.getByText('Λεπτομέρειες', { exact: true }).click({ timeout: 30_000 })
+
+  const last = page.getByRole('button', { name: `Άνοιγμα φωτογραφίας ${PHOTOS.length}` })
+  await last.scrollIntoViewIfNeeded()
+  await expect(last).toBeInViewport()
+  const licence = page.getByRole('button', { name: 'Άνοιγμα άδειας κυκλοφορίας' })
+  await licence.scrollIntoViewIfNeeded()
+  await expect(licence).toBeInViewport()
+  const width = page.viewportSize()!.width
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
+
+  await licence.click()
+  await expect(viewer(page)).toBeVisible()
+  await expect(counter(page)).toHaveCount(0)
+})

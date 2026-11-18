@@ -40,6 +40,9 @@ export interface ServiceRequest {
     licensePlate?: string
     engineNumber?: string
     vinNumber?: string
+    color?: string
+    /** The name the client gave the car. */
+    nickname?: string
     /** Presigned URL for the άδεια κυκλοφορίας photo — short-lived, never persisted. */
     licensePhotoUrl?: string | null
   }

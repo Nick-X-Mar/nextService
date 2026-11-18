@@ -95,7 +95,7 @@ Key routes:
 - `/login`, `/forgot-password`, `/reset-password`
 - `/car-details` → `/car-specifications` — multi-step vehicle + service request form (localStorage-persisted). The draft records its `owner`; identity fields (saved-car link, VIN, engine number, άδεια, `submissionId`) are dropped when another session opens it. Start a new request with `startNewRequest()` or link to `/car-details/?new=1`. Bodywork also goes through `/car-specifications` (`BodyWorkPhotosForm`).
 - `/requests/[clientId]` — client requests, `details/[requestId]`, `chats/[requestId]`
-- `/garage-dashboard/[garageId]` — garage portal + `offers/[requestId]`, `chats/`, `chats/appointments`, `chat/[requestId]`
+- `/garage-dashboard/[garageId]` — garage portal + `offers/[requestId]`, `chats/`, `chats/appointments`, `chat/[requestId]`. The bare URL (no `?tab=`) is where every way in lands; while a client's message on an open request is unread (`openThreads` in the summary) it goes on to `chats/` instead of the feed, decided once per landing. Tests that want the feed open `?tab=requests` (the shared `TEST_GARAGE` always has unread chats).
 - `/register-professional`, `/profile/[clientId]`, `/offer`, `/privacy`, `/terms`
 - `/admin/**` — dashboard, clients (`/admin/users`), garages (`/admin/garages/[garageId]` is the garage's whole record: details, rate, jobs, payments), requests, payments, commissions, emails, errors, funnel, performance, hot-deals, custom-vehicles, **content** (edit the public pages' copy), **reviews** (moderation), settings, tests
 

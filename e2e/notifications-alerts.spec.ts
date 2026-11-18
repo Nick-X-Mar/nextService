@@ -188,6 +188,35 @@ test("The garage's chat lists show yesterday's appointment and link to each othe
   await expect.poll(async () => (await summary(request, garage.token)).threads, { timeout: 15_000 }).toBe(0)
 })
 
+test('A garage with an unread message on an open request starts on its open chats, then on the feed once read', async ({ page, request }) => {
+  const client = await newClient(request, 'landing')
+  const garage = await newGarage(request, { prefix: 'landing' })
+  const requestId = await newRequest(request, client, { brand: 'Kia', model: 'Sorento' })
+  await makeOffer(request, garage, requestId)
+  expect((await postMessage(request, client.token, requestId, 'Μπορώ να το φέρω αύριο;', garage.id)).status()).toBe(200)
+  await summaryUntil(request, garage.token, (s) => s.openThreads === 1)
+
+  await signInGarage(page, garage)
+  const dashboard = `/garage-dashboard/${garage.id}/`
+  await page.goto(dashboard)
+  await page.waitForURL(new RegExp(`/garage-dashboard/${garage.id}/chats/$`), { timeout: 30_000 })
+  const card = page.locator(`[data-request-id="${requestId}"]`)
+  await expect(card).toContainText('Kia Sorento', { timeout: 30_000 })
+
+  // A tab in the URL is the garage's own choice: no detour.
+  await page.goto(`${dashboard}?tab=requests`)
+  await expect(page.getByRole('button', { name: /Αιτήματα \(\d+\)/ }).first()).toBeVisible({ timeout: 30_000 })
+  expect(new URL(page.url()).pathname).toBe(dashboard)
+
+  // Once the message is read, the account opens on the feed again.
+  await page.goto(`/garage-dashboard/${garage.id}/chat/${requestId}/`)
+  await expect(page.getByText('Μπορώ να το φέρω αύριο;')).toBeVisible({ timeout: 30_000 })
+  await expect.poll(async () => (await summary(request, garage.token)).openThreads, { timeout: 15_000 }).toBe(0)
+  await page.goto(dashboard)
+  await expect(page.getByRole('button', { name: /Αιτήματα \(\d+\)/ }).first()).toBeVisible({ timeout: 30_000 })
+  expect(new URL(page.url()).pathname).toBe(dashboard)
+})
+
 test('Marking a notification seen with an empty or malformed body is a 400, not a 500', async ({ request }) => {
   const client = await newClient(request, 'seen-empty')
   for (const data of ['', 'null', '[]', '{"kind":"offers"}']) {

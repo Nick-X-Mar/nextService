@@ -1,11 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { SegmentedControl } from './index'
 import { styles } from '../styles/styles'
 import { ServiceRequestStatus } from '../types/statuses'
 import type { ServiceRequest } from '../types/requests'
 import Icon from '@/components/ui/Icon'
+import PhotoViewer, { type ViewerPhoto } from '@/components/PhotoViewer'
+import { getFuelTypeText } from '@/components/ServiceVehicleCard'
 import { REQUEST_CATEGORIES, getCategoryText } from '@/utils/categoryLabels'
 
 interface RequestDetailsPanelProps {
@@ -17,6 +20,13 @@ interface RequestDetailsPanelProps {
 export default function RequestDetailsPanel({ request, onUpdate, allowEdit = true }: RequestDetailsPanelProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [viewing, setViewing] = useState<{ photos: ViewerPhoto[]; index: number } | null>(null)
+  const photos: ViewerPhoto[] = (request.photoUrls || []).map((url, i) => ({ url, alt: `Φωτογραφία ${i + 1}` }))
+  // Only a presigned https URL is renderable, as in LicensePhotoCard: a raw S3
+  // key makes next/image throw and takes the whole chat down with it.
+  const licensePhotoUrl = request.vehicle?.licensePhotoUrl?.startsWith('https://')
+    ? request.vehicle.licensePhotoUrl
+    : null
   const [editData, setEditData] = useState({
     description: request.description,
     category: request.category,
@@ -356,7 +366,7 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
                   />
                 ) : (
                   <p className="text-sm font-medium text-on-surface mt-1">
-                    {request.vehicle.fuelType === 'petrol' ? 'Βενζίνη' : 'Πετρέλαιο'}
+                    {getFuelTypeText(request.vehicle.fuelType)}
                   </p>
                 )}
               </div>
@@ -384,37 +394,95 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
             </div>
 
             {/* Drive Type */}
-            <div className="mt-4">
-              <label className={styles.label}>Κίνηση</label>
-              {isEditing && allowEdit ? (
-                <SegmentedControl
-                  options={[
-                    { value: '2wd', label: '2WD' },
-                    { value: '4x4', label: '4x4' }
-                  ]}
-                  value={editData.is4x4 ? '4x4' : '2wd'}
-                  onChange={(value) => setEditData({ ...editData, is4x4: value === '4x4' })}
-                  variant="orange"
-                  size="md"
-                />
-              ) : (
-                <p className="text-sm font-medium text-on-surface mt-1">
-                  {request.vehicle.is4x4 ? '4x4' : '2WD'}
-                </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div>
+                <label className={styles.label}>Κίνηση</label>
+                {isEditing && allowEdit ? (
+                  <SegmentedControl
+                    options={[
+                      { value: '2wd', label: '2WD' },
+                      { value: '4x4', label: '4x4' }
+                    ]}
+                    value={editData.is4x4 ? '4x4' : '2wd'}
+                    onChange={(value) => setEditData({ ...editData, is4x4: value === '4x4' })}
+                    variant="orange"
+                    size="md"
+                  />
+                ) : (
+                  <p className="text-sm font-medium text-on-surface mt-1">
+                    {request.vehicle.is4x4 ? '4x4' : '2WD'}
+                  </p>
+                )}
+              </div>
+
+              {!isEditing && (
+                <div>
+                  <label className={styles.label}>Turbo</label>
+                  <p className="text-sm font-medium text-on-surface mt-1">
+                    {request.vehicle.isTurbo ? 'Ναι' : 'Όχι'}
+                  </p>
+                </div>
               )}
+            </div>
+
+            {/* Colour and the car's name, when the client gave them. */}
+            {!isEditing && (request.vehicle.color || request.vehicle.nickname) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                {request.vehicle.color && (
+                  <div>
+                    <label className={styles.label}>Χρώμα</label>
+                    <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.color}</p>
+                  </div>
+                )}
+                {request.vehicle.nickname && (
+                  <div>
+                    <label className={styles.label}>Όνομα Οχήματος</label>
+                    <p className="text-sm font-medium text-on-surface mt-1 break-words">{request.vehicle.nickname}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* What the client photographed: the damage for a bodywork job, the
+            άδεια for the numbers on it. The garage quotes and talks from this
+            panel, so the pictures themselves are here, not just a count. */}
+        {photos.length > 0 && (
+          <div className="border-t border-outline-variant/10 pt-4">
+            <label className={styles.label}>Φωτογραφίες ({photos.length})</label>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-2">
+              {photos.map((photo, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => setViewing({ photos, index })}
+                  className="relative aspect-square bg-surface-container rounded-lg overflow-hidden hover:opacity-90 transition-opacity active:scale-95"
+                  aria-label={`Άνοιγμα φωτογραφίας ${index + 1}`}
+                >
+                  <Image src={photo.url} alt={photo.alt} fill sizes="(max-width: 640px) 33vw, 160px" className="object-cover" />
+                </button>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Photos count */}
-        {request.photoUrls && request.photoUrls.length > 0 && (
+        {licensePhotoUrl && (
           <div className="border-t border-outline-variant/10 pt-4">
-            <label className={styles.label}>Φωτογραφίες</label>
-            <div className="flex items-center gap-2 mt-1">
-              <Icon name="photo_library" size="sm" className="text-primary" filled />
-              <p className="text-sm font-medium text-on-surface">{request.photoUrls.length} φωτογραφία/ες</p>
-            </div>
+            <label className={styles.label}>Άδεια Κυκλοφορίας</label>
+            <button
+              type="button"
+              onClick={() => setViewing({ photos: [{ url: licensePhotoUrl, alt: 'Άδεια κυκλοφορίας' }], index: 0 })}
+              className="mt-2 block relative w-40 aspect-[3/2] bg-surface-container rounded-lg overflow-hidden hover:opacity-90 transition-opacity active:scale-95"
+              aria-label="Άνοιγμα άδειας κυκλοφορίας"
+            >
+              <Image src={licensePhotoUrl} alt="Άδεια κυκλοφορίας" fill sizes="160px" className="object-contain" />
+            </button>
           </div>
+        )}
+
+        {viewing && (
+          <PhotoViewer photos={viewing.photos} startIndex={viewing.index} onClose={() => setViewing(null)} />
         )}
 
         {/* Edit Actions */}
