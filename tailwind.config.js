@@ -4,6 +4,8 @@ module.exports = {
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    // The class-string constants: a class only they use is otherwise never generated.
+    './src/styles/**/*.{js,ts}',
   ],
   theme: {
     extend: {

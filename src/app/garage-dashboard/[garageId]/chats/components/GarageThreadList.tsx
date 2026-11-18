@@ -27,6 +27,13 @@ export interface GarageThreadView {
 }
 
 /**
+ * The client wrote last, so the conversation waits on the garage — read or
+ * not: a message the garage opened and left unanswered is still waiting.
+ */
+export const awaitsGarageReply = (thread: Pick<GarageThreadView, 'lastMessage'>) =>
+  thread.lastMessage?.senderType === 'client'
+
+/**
  * Both of the garage's chat lists, from the endpoint the unread badge is
  * computed by. Each page shows one bucket and links to the other, so whatever
  * the badge counts is always reachable from either.
@@ -169,6 +176,7 @@ export function GarageThreadCard({ garageId, thread }: { garageId: string; threa
   const opening = isNavigating(href)
   const { vehicle, lastMessage } = thread
   const showDate = thread.status === ServiceRequestStatus.APPOINTMENT && thread.appointmentDate
+  const waiting = awaitsGarageReply(thread)
 
   return (
     <div
@@ -176,8 +184,9 @@ export function GarageThreadCard({ garageId, thread }: { garageId: string; threa
       tabIndex={0}
       onClick={() => navigate(href)}
       onKeyDown={(e) => { if (e.key === 'Enter') navigate(href) }}
-      className={`${styles.card} cursor-pointer hover:shadow-lg hover:border-primary/20 active:scale-[0.99] transition-all duration-200`}
+      className={`${waiting ? styles.cardAwaitingReply : `${styles.card} hover:border-primary/20`} cursor-pointer hover:shadow-lg active:scale-[0.99] transition-all duration-200`}
       data-request-id={thread.requestId}
+      data-awaiting-reply={waiting || undefined}
     >
       {showDate && (
         <div className="flex items-center gap-2 mb-4 pb-3 border-b border-outline-variant/10">
@@ -225,6 +234,7 @@ export function GarageThreadCard({ garageId, thread }: { garageId: string; threa
             <span className="text-xs text-secondary">{getCategoryText(thread.category ?? '')}</span>
             <span className="text-outline">·</span>
             <StatusChip status={thread.status} />
+            {waiting && <span className={styles.statusAwaitingReply}>Περιμένει απάντησή σας</span>}
             {thread.needsReview && (
               <span className={styles.statusPending}>Αξιολόγησε τον πελάτη</span>
             )}

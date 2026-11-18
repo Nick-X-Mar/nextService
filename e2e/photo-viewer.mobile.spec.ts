@@ -68,6 +68,11 @@ test('On a phone the chat\'s request details show the photos and the άδεια 
   await page.goto(`/garage-dashboard/${garage.id}/chat/${requestId}/`)
   await page.getByText('Λεπτομέρειες', { exact: true }).click({ timeout: 30_000 })
 
+  // The photos come first, on one row: in view the moment the panel opens,
+  // though it gets less than half of a phone's screen.
+  await expect(page.getByRole('button', { name: 'Άνοιγμα φωτογραφίας 1' })).toBeInViewport()
+  await expect(page.getByRole('button', { name: 'Άνοιγμα φωτογραφίας 2' })).toBeInViewport()
+  // More than fit across scroll inside the row, never the page.
   const last = page.getByRole('button', { name: `Άνοιγμα φωτογραφίας ${PHOTOS.length}` })
   await last.scrollIntoViewIfNeeded()
   await expect(last).toBeInViewport()

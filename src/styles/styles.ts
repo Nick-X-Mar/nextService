@@ -74,6 +74,9 @@ export const styles = {
   card: "bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10",
   cardHover: "bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10 hover:shadow-2xl hover:shadow-on-surface/5 transition-all duration-300",
   cardSimple: "bg-surface-container-low rounded-xl p-5 shadow-sm",
+  // A conversation waiting on the garage: the client wrote last. In the logo's
+  // NEXT orange, so it stands out in a list of plain cards.
+  cardAwaitingReply: "bg-primary-container/15 rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-primary-container",
 
   // Form Elements
   input: "w-full h-14 bg-surface-container-highest border-0 rounded-xl px-4 font-medium text-on-surface focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest transition-all",
@@ -103,6 +106,7 @@ export const styles = {
   statusAppointment: "text-[0.65rem] font-black uppercase tracking-[0.1em] text-blue-700 bg-blue-100 px-2 py-1 rounded-sm",
   statusCompleted: "text-[0.65rem] font-black uppercase tracking-[0.1em] text-green-700 bg-green-100 px-2 py-1 rounded-sm",
   statusCancelled: "text-[0.65rem] font-black uppercase tracking-[0.1em] text-red-700 bg-red-100 px-2 py-1 rounded-sm",
+  statusAwaitingReply: "text-[0.65rem] font-black uppercase tracking-[0.1em] text-on-primary-container bg-primary-container px-2 py-1 rounded-sm",
 
   // Bento grid for vehicle specs.
   // `min-w-0` on the cell is load-bearing: a grid item's automatic minimum size

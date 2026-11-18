@@ -12,6 +12,7 @@ import { clientViewedLabel, formatAppointment, garageOfferState, offerStatusClas
 import { clientDisplayName, clientInitials } from './clientLabel'
 import { PLUS_VAT } from '@/utils/vat'
 import { declineReasonLabel } from '@/types/declines'
+import { awaitsGarageReply, useGarageThreads } from '../chats/components/GarageThreadList'
 
 interface Offer {
   id: string
@@ -83,6 +84,11 @@ export default function MyOffers({ garageId, onInactive }: MyOffersProps) {
   const [declines, setDeclines] = useState<Decline[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState<Filter>('all')
+  // Garages work from this tab more than from the chat lists, so a client's
+  // message waiting here has to show on the offer itself. Same threads, same
+  // rule as the chat lists.
+  const { open: openThreads, appointments: appointmentThreads } = useGarageThreads()
+  const threadByRequest = new Map([...openThreads, ...appointmentThreads].map((t) => [t.requestId, t]))
 
   const loadOffers = useCallback(async () => {
     try {
@@ -222,10 +228,15 @@ export default function MyOffers({ garageId, onInactive }: MyOffersProps) {
             const state = stateOf(offer)
             const closed = isClosed(state)
             const completed = isCompleted(offer)
+            const thread = threadByRequest.get(offer.serviceRequestId)
+            const waiting = !closed && !!thread && awaitsGarageReply(thread)
+            const chatHref = `/garage-dashboard/${garageId}/chat/${offer.serviceRequestId}/`
             return (
             <article
               key={offer.id}
-              className={`bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10 transition-all duration-300 ${
+              data-request-id={offer.serviceRequestId}
+              data-awaiting-reply={waiting || undefined}
+              className={`${waiting ? styles.cardAwaitingReply : 'bg-surface-container-lowest rounded-xl p-6 shadow-[0_4px_24px_rgba(27,28,28,0.04)] border border-outline-variant/10'} transition-all duration-300 ${
                 closed
                   ? 'opacity-60 cursor-default'
                   : 'cursor-pointer hover:shadow-2xl hover:shadow-on-surface/5'
@@ -234,6 +245,27 @@ export default function MyOffers({ garageId, onInactive }: MyOffersProps) {
                 if (!closed) navigate(href)
               }}
             >
+              {waiting && thread?.lastMessage && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); navigate(chatHref) }}
+                  disabled={isNavigating(chatHref)}
+                  className="w-full flex items-center gap-3 p-3 mb-4 rounded-lg bg-primary-container text-on-primary-container text-left active:scale-[0.99] transition-transform disabled:opacity-80"
+                >
+                  {isNavigating(chatHref)
+                    ? <Spinner size="sm" />
+                    : <Icon name="mark_chat_unread" size="sm" filled className="flex-shrink-0" />}
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-xs font-bold">Ο πελάτης σάς έγραψε</span>
+                    <span className="block text-xs truncate">{thread.lastMessage.message}</span>
+                  </span>
+                  <span className="flex items-center gap-1 text-xs font-bold flex-shrink-0">
+                    Απάντηση
+                    <Icon name="arrow_forward" size="sm" />
+                  </span>
+                </button>
+              )}
+
               {/* Status + Price row */}
               <div className="flex items-start justify-between mb-4">
                 <span className={completed ? styles.statusCompleted : offerStatusClass(state)}>

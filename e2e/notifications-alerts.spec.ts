@@ -202,19 +202,43 @@ test('A garage with an unread message on an open request starts on its open chat
   await page.waitForURL(new RegExp(`/garage-dashboard/${garage.id}/chats/$`), { timeout: 30_000 })
   const card = page.locator(`[data-request-id="${requestId}"]`)
   await expect(card).toContainText('Kia Sorento', { timeout: 30_000 })
+  // The client wrote last: the card says the conversation waits on the garage.
+  await expect(card).toHaveAttribute('data-awaiting-reply', 'true')
+  await expect(card).toContainText('Περιμένει απάντησή σας')
 
   // A tab in the URL is the garage's own choice: no detour.
   await page.goto(`${dashboard}?tab=requests`)
   await expect(page.getByRole('button', { name: /Αιτήματα \(\d+\)/ }).first()).toBeVisible({ timeout: 30_000 })
   expect(new URL(page.url()).pathname).toBe(dashboard)
 
+  // The offer says so too, where garages spend their time, and leads to the chat.
+  await page.goto(`${dashboard}?tab=offers`)
+  const offer = page.locator(`article[data-request-id="${requestId}"]`)
+  await expect(offer).toHaveAttribute('data-awaiting-reply', 'true', { timeout: 30_000 })
+  await offer.getByRole('button', { name: /Ο πελάτης σάς έγραψε/ }).click()
+  await page.waitForURL(new RegExp(`/chat/${requestId}/$`))
+
   // Once the message is read, the account opens on the feed again.
-  await page.goto(`/garage-dashboard/${garage.id}/chat/${requestId}/`)
   await expect(page.getByText('Μπορώ να το φέρω αύριο;')).toBeVisible({ timeout: 30_000 })
   await expect.poll(async () => (await summary(request, garage.token)).openThreads, { timeout: 15_000 }).toBe(0)
   await page.goto(dashboard)
   await expect(page.getByRole('button', { name: /Αιτήματα \(\d+\)/ }).first()).toBeVisible({ timeout: 30_000 })
   expect(new URL(page.url()).pathname).toBe(dashboard)
+
+  // Read is not answered: the card keeps waiting until the garage replies.
+  await page.goto(`/garage-dashboard/${garage.id}/chats/`)
+  await expect(card).toHaveAttribute('data-awaiting-reply', 'true', { timeout: 30_000 })
+  expect((await postMessage(request, garage.token, requestId, 'Ναι, στις 10:00.')).status()).toBe(200)
+  // The list reads messages from a GSI, which may not hold the reply yet.
+  await expect(async () => {
+    await page.reload()
+    await expect(card).toContainText('Εσείς: Ναι, στις 10:00.', { timeout: 5_000 })
+  }).toPass({ timeout: 45_000 })
+  await expect(card).not.toHaveAttribute('data-awaiting-reply')
+  await expect(card).not.toContainText('Περιμένει απάντησή σας')
+  await page.goto(`${dashboard}?tab=offers`)
+  await expect(offer).toBeVisible({ timeout: 30_000 })
+  await expect(offer).not.toHaveAttribute('data-awaiting-reply')
 })
 
 test('Marking a notification seen with an empty or malformed body is a 400, not a 500', async ({ request }) => {

@@ -96,7 +96,22 @@ test.describe('Photos open inside the app', () => {
     await page.goto(`/garage-dashboard/${garage.id}/chat/${requestId}/`)
     await page.getByText('Λεπτομέρειες', { exact: true }).click({ timeout: 30_000 })
 
+    // In view as the panel opens, without scrolling it: the car is only make,
+    // model and year until the garage asks for the rest.
     await expect(page.getByText(`Φωτογραφίες (${PHOTOS.length})`)).toBeVisible()
+    for (let i = 1; i <= PHOTOS.length; i++) {
+      await expect(page.getByRole('button', { name: `Άνοιγμα φωτογραφίας ${i}` })).toBeInViewport()
+    }
+    await expect(page.getByRole('button', { name: 'Άνοιγμα άδειας κυκλοφορίας' })).toBeInViewport()
+    await expect(page.getByText('Kia', { exact: true })).toBeVisible()
+    await expect(page.getByText('Καύσιμο', { exact: true })).toBeHidden()
+    const allSpecs = page.getByRole('button', { name: 'Όλα τα στοιχεία οχήματος' })
+    await expect(allSpecs).toHaveAttribute('aria-expanded', 'false')
+    await allSpecs.click()
+    await expect(page.getByText('Καύσιμο', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Λιγότερα στοιχεία' }).click()
+    await expect(page.getByText('Καύσιμο', { exact: true })).toBeHidden()
+
     await page.getByRole('button', { name: 'Άνοιγμα φωτογραφίας 3' }).click()
     await expect(counter(page)).toHaveText(`3 / ${PHOTOS.length}`)
     await expect.poll(() => shownPhoto(page)).toBe(PHOTOS[2])

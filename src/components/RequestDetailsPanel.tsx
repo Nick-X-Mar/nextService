@@ -20,6 +20,8 @@ interface RequestDetailsPanelProps {
 export default function RequestDetailsPanel({ request, onUpdate, allowEdit = true }: RequestDetailsPanelProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
+  // Make, model and year show; the other specs open on request.
+  const [showAllSpecs, setShowAllSpecs] = useState(false)
   const [viewing, setViewing] = useState<{ photos: ViewerPhoto[]; index: number } | null>(null)
   const photos: ViewerPhoto[] = (request.photoUrls || []).map((url, i) => ({ url, alt: `Φωτογραφία ${i + 1}` }))
   // Only a presigned https URL is renderable, as in LicensePhotoCard: a raw S3
@@ -178,6 +180,46 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
         <div className="px-5 pb-5 border-t border-outline-variant/10">
           <div className="pt-4 space-y-4">
 
+        {/* What the client photographed: the damage for a bodywork job, the
+            άδεια for the numbers on it. First and on one row, so it is in view
+            as soon as the panel opens, even on a phone, where the panel gets
+            less than half the screen. */}
+        {(photos.length > 0 || licensePhotoUrl) && (
+          <div>
+            <label className={styles.label}>
+              {photos.length > 0 ? `Φωτογραφίες (${photos.length})` : 'Άδεια Κυκλοφορίας'}
+            </label>
+            <div className="flex gap-2 mt-2 overflow-x-auto no-scrollbar">
+              {photos.map((photo, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => setViewing({ photos, index })}
+                  className="relative flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 bg-surface-container rounded-lg overflow-hidden hover:opacity-90 transition-opacity active:scale-95"
+                  aria-label={`Άνοιγμα φωτογραφίας ${index + 1}`}
+                >
+                  <Image src={photo.url} alt={photo.alt} fill sizes="96px" className="object-cover" />
+                </button>
+              ))}
+              {licensePhotoUrl && (
+                <button
+                  type="button"
+                  onClick={() => setViewing({ photos: [{ url: licensePhotoUrl, alt: 'Άδεια κυκλοφορίας' }], index: 0 })}
+                  className="relative flex-shrink-0 w-28 h-20 sm:w-36 sm:h-24 bg-surface-container rounded-lg overflow-hidden hover:opacity-90 transition-opacity active:scale-95"
+                  aria-label="Άνοιγμα άδειας κυκλοφορίας"
+                >
+                  <Image src={licensePhotoUrl} alt="Άδεια κυκλοφορίας" fill sizes="144px" className="object-contain" />
+                  {photos.length > 0 && (
+                    <span className="absolute inset-x-0 bottom-0 bg-on-surface/60 text-surface text-[10px] font-bold uppercase tracking-[0.1em] text-center py-0.5">
+                      Άδεια
+                    </span>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Request Details */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Category */}
@@ -222,13 +264,15 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
         {/* Vehicle Details */}
         {request.vehicle && (
           <div className="border-t border-outline-variant/10 pt-4">
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 mb-3">
               <Icon name="directions_car" size="sm" className="text-primary" filled />
               <p className={styles.labelUpper}>Στοιχεία Οχήματος</p>
             </div>
 
-            {/* Basic Vehicle Info */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            {/* Make, model and year say which car it is; the rest opens on
+                request, so the panel stays short enough for the photos above
+                and the chat below. */}
+            <div className={isEditing ? 'grid grid-cols-1 md:grid-cols-3 gap-4' : 'grid grid-cols-3 gap-4'}>
               {/* Brand */}
               <div>
                 <label className={styles.label}>Μάρκα</label>
@@ -274,210 +318,190 @@ export default function RequestDetailsPanel({ request, onUpdate, allowEdit = tru
                   <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.modelYear}</p>
                 )}
               </div>
-
-              {/* License Plate. The plate is winner-only: a garage that has not won
-                  the job is not sent it, so read-only rows without a value are left
-                  out rather than shown empty. */}
-              {((isEditing && allowEdit) || request.vehicle.licensePlate) && (
-                <div>
-                  <label className={styles.label}>Αριθμός Κυκλοφορίας</label>
-                  {isEditing && allowEdit ? (
-                    <input
-                      type="text"
-                      value={editData.licensePlate}
-                      onChange={(e) => setEditData({ ...editData, licensePlate: e.target.value })}
-                      className={`${styles.input} mt-1`}
-                    />
-                  ) : (
-                    <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.licensePlate}</p>
-                  )}
-                </div>
-              )}
             </div>
 
-            {/* Technical Specifications */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              {/* Engine CC */}
-              <div>
-                <label className={styles.label}>CC</label>
-                {isEditing && allowEdit ? (
-                  <input
-                    type="text"
-                    value={editData.engineCC}
-                    onChange={(e) => setEditData({ ...editData, engineCC: e.target.value })}
-                    className={`${styles.input} mt-1`}
-                    maxLength={4}
-                  />
-                ) : (
-                  <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.engineCC}</p>
-                )}
-              </div>
+            {!isEditing && (
+              <button
+                type="button"
+                onClick={() => setShowAllSpecs(!showAllSpecs)}
+                aria-expanded={showAllSpecs}
+                className="mt-3 flex items-center gap-1 text-xs font-bold text-primary hover:underline"
+              >
+                {showAllSpecs ? 'Λιγότερα στοιχεία' : 'Όλα τα στοιχεία οχήματος'}
+                <Icon name={showAllSpecs ? 'expand_less' : 'expand_more'} size="sm" />
+              </button>
+            )}
 
-              {/* Engine Number */}
-              {((isEditing && allowEdit) || request.vehicle.engineNumber) && (
-                <div>
-                  <label className={styles.label}>Αριθμός Κινητήρα</label>
-                  {isEditing && allowEdit ? (
-                    <input
-                      type="text"
-                      value={editData.engineNumber}
-                      onChange={(e) => setEditData({ ...editData, engineNumber: e.target.value })}
-                      className={`${styles.input} mt-1`}
-                    />
-                  ) : (
-                    <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.engineNumber}</p>
-                  )}
-                </div>
-              )}
-
-              {/* VIN Number */}
-              {((isEditing && allowEdit) || request.vehicle.vinNumber) && (
-                <div>
-                  <label className={styles.label}>Αριθμός Πλαισίου</label>
-                  {isEditing && allowEdit ? (
-                    <input
-                      type="text"
-                      value={editData.vinNumber}
-                      onChange={(e) => setEditData({ ...editData, vinNumber: e.target.value })}
-                      className={`${styles.input} mt-1`}
-                    />
-                  ) : (
-                    <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.vinNumber}</p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Fuel Type and Transmission */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Fuel Type */}
-              <div>
-                <label className={styles.label}>Καύσιμο</label>
-                {isEditing && allowEdit ? (
-                  <SegmentedControl
-                    options={[
-                      { value: 'petrol', label: 'Βενζίνη' },
-                      { value: 'diesel', label: 'Πετρέλαιο' }
-                    ]}
-                    value={editData.fuelType}
-                    onChange={(value) => setEditData({ ...editData, fuelType: value as 'petrol' | 'diesel' })}
-                    variant="orange"
-                    size="md"
-                  />
-                ) : (
-                  <p className="text-sm font-medium text-on-surface mt-1">
-                    {getFuelTypeText(request.vehicle.fuelType)}
-                  </p>
-                )}
-              </div>
-
-              {/* Transmission */}
-              <div>
-                <label className={styles.label}>Μετάδοση</label>
-                {isEditing && allowEdit ? (
-                  <SegmentedControl
-                    options={[
-                      { value: 'manual', label: 'Χειροκίνητο' },
-                      { value: 'automatic', label: 'Αυτόματο' }
-                    ]}
-                    value={editData.isAutomatic ? 'automatic' : 'manual'}
-                    onChange={(value) => setEditData({ ...editData, isAutomatic: value === 'automatic' })}
-                    variant="orange"
-                    size="md"
-                  />
-                ) : (
-                  <p className="text-sm font-medium text-on-surface mt-1">
-                    {request.vehicle.isAutomatic ? 'Αυτόματο' : 'Χειροκίνητο'}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Drive Type */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <div>
-                <label className={styles.label}>Κίνηση</label>
-                {isEditing && allowEdit ? (
-                  <SegmentedControl
-                    options={[
-                      { value: '2wd', label: '2WD' },
-                      { value: '4x4', label: '4x4' }
-                    ]}
-                    value={editData.is4x4 ? '4x4' : '2wd'}
-                    onChange={(value) => setEditData({ ...editData, is4x4: value === '4x4' })}
-                    variant="orange"
-                    size="md"
-                  />
-                ) : (
-                  <p className="text-sm font-medium text-on-surface mt-1">
-                    {request.vehicle.is4x4 ? '4x4' : '2WD'}
-                  </p>
-                )}
-              </div>
-
-              {!isEditing && (
-                <div>
-                  <label className={styles.label}>Turbo</label>
-                  <p className="text-sm font-medium text-on-surface mt-1">
-                    {request.vehicle.isTurbo ? 'Ναι' : 'Όχι'}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Colour and the car's name, when the client gave them. */}
-            {!isEditing && (request.vehicle.color || request.vehicle.nickname) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                {request.vehicle.color && (
-                  <div>
-                    <label className={styles.label}>Χρώμα</label>
-                    <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.color}</p>
+            {(showAllSpecs || isEditing) && (
+              <div className="mt-4">
+                {/* License Plate. The plate is winner-only: a garage that has not won
+                    the job is not sent it, so read-only rows without a value are left
+                    out rather than shown empty. */}
+                {((isEditing && allowEdit) || request.vehicle.licensePlate) && (
+                  <div className="mb-4">
+                    <label className={styles.label}>Αριθμός Κυκλοφορίας</label>
+                    {isEditing && allowEdit ? (
+                      <input
+                        type="text"
+                        value={editData.licensePlate}
+                        onChange={(e) => setEditData({ ...editData, licensePlate: e.target.value })}
+                        className={`${styles.input} mt-1`}
+                      />
+                    ) : (
+                      <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.licensePlate}</p>
+                    )}
                   </div>
                 )}
-                {request.vehicle.nickname && (
+
+                {/* Technical Specifications */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  {/* Engine CC */}
                   <div>
-                    <label className={styles.label}>Όνομα Οχήματος</label>
-                    <p className="text-sm font-medium text-on-surface mt-1 break-words">{request.vehicle.nickname}</p>
+                    <label className={styles.label}>CC</label>
+                    {isEditing && allowEdit ? (
+                      <input
+                        type="text"
+                        value={editData.engineCC}
+                        onChange={(e) => setEditData({ ...editData, engineCC: e.target.value })}
+                        className={`${styles.input} mt-1`}
+                        maxLength={4}
+                      />
+                    ) : (
+                      <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.engineCC}</p>
+                    )}
+                  </div>
+
+                  {/* Engine Number */}
+                  {((isEditing && allowEdit) || request.vehicle.engineNumber) && (
+                    <div>
+                      <label className={styles.label}>Αριθμός Κινητήρα</label>
+                      {isEditing && allowEdit ? (
+                        <input
+                          type="text"
+                          value={editData.engineNumber}
+                          onChange={(e) => setEditData({ ...editData, engineNumber: e.target.value })}
+                          className={`${styles.input} mt-1`}
+                        />
+                      ) : (
+                        <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.engineNumber}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* VIN Number */}
+                  {((isEditing && allowEdit) || request.vehicle.vinNumber) && (
+                    <div>
+                      <label className={styles.label}>Αριθμός Πλαισίου</label>
+                      {isEditing && allowEdit ? (
+                        <input
+                          type="text"
+                          value={editData.vinNumber}
+                          onChange={(e) => setEditData({ ...editData, vinNumber: e.target.value })}
+                          className={`${styles.input} mt-1`}
+                        />
+                      ) : (
+                        <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.vinNumber}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Fuel Type and Transmission */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Fuel Type */}
+                  <div>
+                    <label className={styles.label}>Καύσιμο</label>
+                    {isEditing && allowEdit ? (
+                      <SegmentedControl
+                        options={[
+                          { value: 'petrol', label: 'Βενζίνη' },
+                          { value: 'diesel', label: 'Πετρέλαιο' }
+                        ]}
+                        value={editData.fuelType}
+                        onChange={(value) => setEditData({ ...editData, fuelType: value as 'petrol' | 'diesel' })}
+                        variant="orange"
+                        size="md"
+                      />
+                    ) : (
+                      <p className="text-sm font-medium text-on-surface mt-1">
+                        {getFuelTypeText(request.vehicle.fuelType)}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Transmission */}
+                  <div>
+                    <label className={styles.label}>Μετάδοση</label>
+                    {isEditing && allowEdit ? (
+                      <SegmentedControl
+                        options={[
+                          { value: 'manual', label: 'Χειροκίνητο' },
+                          { value: 'automatic', label: 'Αυτόματο' }
+                        ]}
+                        value={editData.isAutomatic ? 'automatic' : 'manual'}
+                        onChange={(value) => setEditData({ ...editData, isAutomatic: value === 'automatic' })}
+                        variant="orange"
+                        size="md"
+                      />
+                    ) : (
+                      <p className="text-sm font-medium text-on-surface mt-1">
+                        {request.vehicle.isAutomatic ? 'Αυτόματο' : 'Χειροκίνητο'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Drive Type */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className={styles.label}>Κίνηση</label>
+                    {isEditing && allowEdit ? (
+                      <SegmentedControl
+                        options={[
+                          { value: '2wd', label: '2WD' },
+                          { value: '4x4', label: '4x4' }
+                        ]}
+                        value={editData.is4x4 ? '4x4' : '2wd'}
+                        onChange={(value) => setEditData({ ...editData, is4x4: value === '4x4' })}
+                        variant="orange"
+                        size="md"
+                      />
+                    ) : (
+                      <p className="text-sm font-medium text-on-surface mt-1">
+                        {request.vehicle.is4x4 ? '4x4' : '2WD'}
+                      </p>
+                    )}
+                  </div>
+
+                  {!isEditing && (
+                    <div>
+                      <label className={styles.label}>Turbo</label>
+                      <p className="text-sm font-medium text-on-surface mt-1">
+                        {request.vehicle.isTurbo ? 'Ναι' : 'Όχι'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Colour and the car's name, when the client gave them. */}
+                {!isEditing && (request.vehicle.color || request.vehicle.nickname) && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    {request.vehicle.color && (
+                      <div>
+                        <label className={styles.label}>Χρώμα</label>
+                        <p className="text-sm font-medium text-on-surface mt-1">{request.vehicle.color}</p>
+                      </div>
+                    )}
+                    {request.vehicle.nickname && (
+                      <div>
+                        <label className={styles.label}>Όνομα Οχήματος</label>
+                        <p className="text-sm font-medium text-on-surface mt-1 break-words">{request.vehicle.nickname}</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
-          </div>
-        )}
-
-        {/* What the client photographed: the damage for a bodywork job, the
-            άδεια for the numbers on it. The garage quotes and talks from this
-            panel, so the pictures themselves are here, not just a count. */}
-        {photos.length > 0 && (
-          <div className="border-t border-outline-variant/10 pt-4">
-            <label className={styles.label}>Φωτογραφίες ({photos.length})</label>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-2">
-              {photos.map((photo, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => setViewing({ photos, index })}
-                  className="relative aspect-square bg-surface-container rounded-lg overflow-hidden hover:opacity-90 transition-opacity active:scale-95"
-                  aria-label={`Άνοιγμα φωτογραφίας ${index + 1}`}
-                >
-                  <Image src={photo.url} alt={photo.alt} fill sizes="(max-width: 640px) 33vw, 160px" className="object-cover" />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {licensePhotoUrl && (
-          <div className="border-t border-outline-variant/10 pt-4">
-            <label className={styles.label}>Άδεια Κυκλοφορίας</label>
-            <button
-              type="button"
-              onClick={() => setViewing({ photos: [{ url: licensePhotoUrl, alt: 'Άδεια κυκλοφορίας' }], index: 0 })}
-              className="mt-2 block relative w-40 aspect-[3/2] bg-surface-container rounded-lg overflow-hidden hover:opacity-90 transition-opacity active:scale-95"
-              aria-label="Άνοιγμα άδειας κυκλοφορίας"
-            >
-              <Image src={licensePhotoUrl} alt="Άδεια κυκλοφορίας" fill sizes="160px" className="object-contain" />
-            </button>
           </div>
         )}
 
