@@ -10,6 +10,8 @@ from aws_cdk import (
 )
 from constructs import Construct
 
+from stacks.log_retention import LOG_RETENTION
+
 
 class MonitoringStack(Stack):
     """CloudWatch logs, SNS alerts, and alarms for 4xx/5xx errors."""
@@ -38,13 +40,13 @@ class MonitoringStack(Stack):
         self.app_log_group = logs.LogGroup(
             self, "AppLogGroup",
             log_group_name="/nextservice/app",
-            retention=logs.RetentionDays.ONE_MONTH,
+            retention=LOG_RETENTION,
         )
 
         self.api_log_group = logs.LogGroup(
             self, "ApiLogGroup",
             log_group_name="/nextservice/api",
-            retention=logs.RetentionDays.ONE_MONTH,
+            retention=LOG_RETENTION,
         )
 
         # ── Metric Filters ──────────────────────────────────────

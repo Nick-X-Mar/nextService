@@ -987,7 +987,11 @@
     "PointInTimeRecoverySpecification": {
      "PointInTimeRecoveryEnabled": true
     },
-    "TableName": "PerformanceMetrics"
+    "TableName": "PerformanceMetrics",
+    "TimeToLiveSpecification": {
+     "AttributeName": "expiresAt",
+     "Enabled": true
+    }
    },
    "UpdateReplacePolicy": "Retain",
    "DeletionPolicy": "Retain",

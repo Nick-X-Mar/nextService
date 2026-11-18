@@ -126,6 +126,32 @@
     "aws:asset:property": "Code"
    }
   },
+  "EventsAuthorizerFnLogRetentionEDE71001": {
+   "Type": "Custom::LogRetention",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
+      "Arn"
+     ]
+    },
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "EventsAuthorizerFnE9651D1C"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 90
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/EventsAuthorizerFn/LogRetention/Resource"
+   }
+  },
   "EventsAuthorizerFnAppSyncInvokeAuthorizer2292CEA4": {
    "Type": "AWS::Lambda::Permission",
    "Properties": {
@@ -154,6 +180,95 @@
    },
    "Metadata": {
     "aws:cdk:path": "NextService-AppSync/EventsAuthorizerFn/AppSyncInvokeAuthorizer"
+   }
+  },
+  "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/Resource"
+   }
+  },
+  "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "logs:PutRetentionPolicy",
+        "logs:DeleteRetentionPolicy"
+       ],
+       "Effect": "Allow",
+       "Resource": "*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB",
+    "Roles": [
+     {
+      "Ref": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/DefaultPolicy/Resource"
+   }
+  },
+  "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Handler": "index.handler",
+    "Runtime": "nodejs22.x",
+    "Timeout": 900,
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-766671488262-eu-central-1",
+     "S3Key": "2819175352ad1ce0dae768e83fc328fb70fb5f10b4a8ff0ccbcb791f02b0716d.zip"
+    },
+    "Role": {
+     "Fn::GetAtt": [
+      "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB",
+      "Arn"
+     ]
+    }
+   },
+   "DependsOn": [
+    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB",
+    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/Resource",
+    "aws:asset:path": "asset.2819175352ad1ce0dae768e83fc328fb70fb5f10b4a8ff0ccbcb791f02b0716d",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
    }
   },
   "ChatEventsApi": {
@@ -330,6 +445,32 @@
     "aws:asset:property": "Code"
    }
   },
+  "ApiKeyRotatorFnLogRetention995DABF2": {
+   "Type": "Custom::LogRetention",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
+      "Arn"
+     ]
+    },
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "ApiKeyRotatorFnBDF6B9CF"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 90
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/ApiKeyRotatorFn/LogRetention/Resource"
+   }
+  },
   "ApiKeyRotatorScheduleFED55C18": {
    "Type": "AWS::Events::Rule",
    "Properties": {
@@ -409,7 +550,7 @@
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/02NwU7DMAyGn2X31MCKBNdtEhckqNoHmLzM67ImblU7TFOUd0dNOXD6Pvu3/G9h+/oOzxu8S2XPQ+XdCVKnaAeDdzkmITuTSkDGnmZIXZnN4cKrZeMxnM4I6SOyVTfykv33hubgRNzI2TgMkNrR0xIUNqN39lHuimUj9RFFSAV2C4zUsI92IN2jkMFpkgdbSIcL7yZnVnxSeXG4IjP5LwwkE1rKhn6IVSC18a8zesrG+jGe76j2CmnncQ7lzSI5m9LaKfaO+2X/HXWKmk3z0OvITzW81PC2uYlz1RxZXSBoV/4C83uVsEwBAAA="
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/02OQU/DMAyFf8vumYEVCa7bJC4gmNofMHmZ14YlTlU7TFWU/46aceD0Pev52W8Dm+dXeFzhTdb2fF17d4LcKdqrwZscs5CdSCUgY08T5K7OZn/huyrGYzidEfJbYqsu8uL91weaghNxkYtxGCC30dNiVB6id3aue1UVI80RRUgFtguMNLBL9kq6QyHjYy/wEfuWlLi+wHGUmS3k/YW3ozN3vFM9uh+QmfwnBpIRLRVDP8QqkNv01yJ5Ksb6mM43VDtA3nqcQj2ziFJM7dEp9o77GiGJabI1/pV0TFrMYdYh8kMDTw28rL7FufWUWF0gaO/8BVuyI2pqAQAA"
    },
    "Metadata": {
     "aws:cdk:path": "NextService-AppSync/CDKMetadata/Default"

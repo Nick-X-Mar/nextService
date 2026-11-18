@@ -14,6 +14,8 @@ from aws_cdk import (
 )
 from constructs import Construct
 
+from stacks.log_retention import expire_lambda_logs, expire_logs
+
 
 # Regions an account has to enable before use. Services there act under
 # regional principals (`<service>.<region>.amazonaws.com`).
@@ -97,11 +99,14 @@ class AmplifyStack(Stack):
             ],
             resources=["*"],
         ))
+        expire_lambda_logs(auth_secrets_fn)
 
         auth_secrets_provider = cr.Provider(
             self, "AuthSecretsProvider",
             on_event_handler=auth_secrets_fn,
         )
+        # The provider's own framework Lambda, which logs to a group of its own.
+        expire_lambda_logs(auth_secrets_provider.node.find_child("framework-onEvent"))
 
         auth_secrets_cr = CustomResource(
             self, "AuthSecretsResource",
@@ -502,6 +507,11 @@ frontend:
             CfnOutput(self, "CustomDomainStatus", value=custom_domain.attr_domain_status)
             CfnOutput(self, "CustomDomainCertificateRecord",
                       value=custom_domain.attr_certificate_record)
+
+        # The SSR runtime's own output. Amplify writes it here by itself in
+        # staging (production's never arrived, hence /nextservice/app), with no
+        # retention unless we set one.
+        expire_logs(self, "SsrLogRetention", f"/aws/amplify/{self.amplify_app.attr_app_id}")
 
         # ── Outputs ─────────────────────────────────────────────
         CfnOutput(self, "AmplifyAppId",

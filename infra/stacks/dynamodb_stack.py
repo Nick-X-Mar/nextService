@@ -369,8 +369,10 @@ class DynamoDBStack(Stack):
                 ("GaragePaymentsIndex", ("garageId", S), ("createdAt", S)),
             ],
         )
+        # TTL: rows expire with the technical logs (stacks/log_retention.py).
         self.performance_table = self._app_table(
             "PerformanceMetricsTable", "PerformanceMetrics", ("endpoint", S), sort=("timestamp", S),
+            ttl="expiresAt",
             indexes=[("StatusCodeIndex", ("statusCode", N), ("timestamp", S))],
         )
         self.site_content_table = self._app_table("SiteContentTable", "SiteContent", ("pageKey", S))

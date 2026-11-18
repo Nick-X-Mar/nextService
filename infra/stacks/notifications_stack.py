@@ -45,6 +45,8 @@ from aws_cdk import (
 )
 from constructs import Construct
 
+from stacks.log_retention import expire_lambda_logs
+
 
 # SES Configuration Set name. Referenced here *and* in the senders
 # (`src/utils/emailService.ts` + `infra/lambdas/new-request-broadcast`) via
@@ -177,6 +179,7 @@ class NotificationsStack(Stack):
                 "EMAIL_LOGS_TABLE": "EmailLogs",
             },
         )
+        expire_lambda_logs(self.ses_processor_fn)
         self.ses_processor_fn.add_to_role_policy(iam.PolicyStatement(
             sid="UpdateEmailLogs",
             actions=["dynamodb:UpdateItem"],
@@ -233,6 +236,7 @@ class NotificationsStack(Stack):
             # the account quota first (Service Quotas → Lambda → Concurrent
             # executions), then add the reservation back.
         )
+        expire_lambda_logs(self.broadcast_fn)
 
         # ── IAM permissions ─────────────────────────────────────
         # DynamoDB: Scan Garages, Get Vehicles, Put+Update EmailLogs
@@ -398,6 +402,7 @@ class NotificationsStack(Stack):
                 "COMPLETION_MAX_AGE_DAYS": "30",
             },
         )
+        expire_lambda_logs(self.completion_sweeper_fn)
 
         # Query StatusIndex, read the request, stamp completionPromptedAt.
         self.completion_sweeper_fn.add_to_role_policy(

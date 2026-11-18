@@ -6,6 +6,8 @@ import {
   DynamoDBClient,
   CreateTableCommand,
   DescribeTableCommand,
+  DescribeTimeToLiveCommand,
+  UpdateTimeToLiveCommand,
   ResourceInUseException,
   ResourceNotFoundException,
   type CreateTableCommandInput
@@ -108,6 +110,22 @@ async function waitForActive(client: DynamoDBClient, name: string): Promise<void
   }
 }
 
+// Rows carry `expiresAt` (recordMetric). In AWS the CDK stack switches TTL on
+// and the app may not change it; DynamoDB Local gets it here.
+async function ensureLocalTtl(client: DynamoDBClient, name: string): Promise<void> {
+  if (!isLocal) return
+  try {
+    const desc = await client.send(new DescribeTimeToLiveCommand({ TableName: name }))
+    if (desc.TimeToLiveDescription?.AttributeName === 'expiresAt') return
+    await client.send(new UpdateTimeToLiveCommand({
+      TableName: name,
+      TimeToLiveSpecification: { Enabled: true, AttributeName: 'expiresAt' }
+    }))
+  } catch (err) {
+    console.warn(`[ensurePerformanceTable] TTL setup skipped on ${name}:`, err instanceof Error ? err.message : err)
+  }
+}
+
 let ready: Promise<void> | null = null
 
 export function ensurePerformanceTable(): Promise<void> {
@@ -121,8 +139,8 @@ async function doEnsure(): Promise<void> {
 
   try {
     const desc = await client.send(new DescribeTableCommand({ TableName: name }))
-    if (desc.Table?.TableStatus === 'ACTIVE') return
-    await waitForActive(client, name)
+    if (desc.Table?.TableStatus !== 'ACTIVE') await waitForActive(client, name)
+    await ensureLocalTtl(client, name)
     return
   } catch (err) {
     if (!(err instanceof ResourceNotFoundException)) {
@@ -135,9 +153,11 @@ async function doEnsure(): Promise<void> {
     await client.send(new CreateTableCommand(applyBilling(tableSpec)))
     console.log(`[ensurePerformanceTable] Created ${name}`)
     await waitForActive(client, name)
+    await ensureLocalTtl(client, name)
   } catch (err) {
     if (err instanceof ResourceInUseException) {
       await waitForActive(client, name)
+      await ensureLocalTtl(client, name)
       return
     }
     console.error(`[ensurePerformanceTable] Failed to create ${name}:`, err)

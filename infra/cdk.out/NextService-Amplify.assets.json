@@ -1,6 +1,21 @@
 {
   "version": "53.0.0",
   "files": {
+    "2819175352ad1ce0dae768e83fc328fb70fb5f10b4a8ff0ccbcb791f02b0716d": {
+      "displayName": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/Code",
+      "source": {
+        "path": "asset.2819175352ad1ce0dae768e83fc328fb70fb5f10b4a8ff0ccbcb791f02b0716d",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "766671488262-eu-central-1-089d1020": {
+          "bucketName": "cdk-hnb659fds-assets-766671488262-eu-central-1",
+          "objectKey": "2819175352ad1ce0dae768e83fc328fb70fb5f10b4a8ff0ccbcb791f02b0716d.zip",
+          "region": "eu-central-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-file-publishing-role-766671488262-eu-central-1"
+        }
+      }
+    },
     "07a90cc3efdfc34da22208dcd9d211f06f5b0e01b21e778edc7c3966b1f61d57": {
       "displayName": "AuthSecretsProvider/framework-onEvent/Code",
       "source": {
@@ -16,16 +31,16 @@
         }
       }
     },
-    "23cbfb03dd12e8d0451f4c1979e39db0182b7e6acbf9f91e71be66f748a48a89": {
+    "ed241af20e92e690f9f901d02975adda049b996df830e81801d8428fb5d94779": {
       "displayName": "NextService-Amplify Template",
       "source": {
         "path": "NextService-Amplify.template.json",
         "packaging": "file"
       },
       "destinations": {
-        "766671488262-eu-central-1-cd40efa6": {
+        "766671488262-eu-central-1-d0e230df": {
           "bucketName": "cdk-hnb659fds-assets-766671488262-eu-central-1",
-          "objectKey": "23cbfb03dd12e8d0451f4c1979e39db0182b7e6acbf9f91e71be66f748a48a89.json",
+          "objectKey": "ed241af20e92e690f9f901d02975adda049b996df830e81801d8428fb5d94779.json",
           "region": "eu-central-1",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-file-publishing-role-766671488262-eu-central-1"
         }

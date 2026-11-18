@@ -8,6 +8,6 @@
  * timestamp but does not move this version — substantive legal changes belong
  * in the shipped text.
  */
-export const LEGAL_TEXT_DATE = '2026-11-03'
+export const LEGAL_TEXT_DATE = '2026-11-18'
 
 export const TERMS_VERSION = LEGAL_TEXT_DATE

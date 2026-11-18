@@ -71,6 +71,12 @@
       "data": "EventsAuthorizerFnAppSyncInvokeAuthorizer2292CEA4"
     }
   ],
+  "/NextService-AppSync/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A"
+    }
+  ],
   "/NextService-AppSync/ApiKeyRotatorFn/Resource": [
     {
       "type": "aws:cdk:logicalId",
@@ -131,16 +137,40 @@
       "data": "EventsAuthorizerFnServiceRole37EFF19E"
     }
   ],
+  "/NextService-AppSync/EventsAuthorizerFn/LogRetention/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "EventsAuthorizerFnLogRetentionEDE71001"
+    }
+  ],
+  "/NextService-AppSync/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB"
+    }
+  ],
   "/NextService-AppSync/ApiKeyRotatorFn/ServiceRole/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ApiKeyRotatorFnServiceRole510DF920"
     }
   ],
+  "/NextService-AppSync/ApiKeyRotatorFn/LogRetention/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ApiKeyRotatorFnLogRetention995DABF2"
+    }
+  ],
   "/NextService-AppSync/EventsAuthorizerFn/ServiceRole/DefaultPolicy/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "EventsAuthorizerFnServiceRoleDefaultPolicyA3130703"
+    }
+  ],
+  "/NextService-AppSync/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB"
     }
   ],
   "/NextService-AppSync/ApiKeyRotatorFn/ServiceRole/DefaultPolicy/Resource": [

@@ -47,6 +47,12 @@
       "data": "AuthSecretsFn8DAB7E42"
     }
   ],
+  "/NextService-Amplify/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A"
+    }
+  ],
   "/NextService-Amplify/AuthSecretsResource/Default": [
     {
       "type": "aws:cdk:logicalId",
@@ -59,6 +65,12 @@
       "data": "AmplifyRole7A8FD9BC"
     }
   ],
+  "/NextService-Amplify/SsrLogRetention/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SsrLogRetentionD2178DCD"
+    }
+  ],
   "/NextService-Amplify/CDKMetadata/Default": [
     {
       "type": "aws:cdk:logicalId",
@@ -69,6 +81,18 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "AuthSecretsFnServiceRole1E13F711"
+    }
+  ],
+  "/NextService-Amplify/AuthSecretsFn/LogRetention/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuthSecretsFnLogRetention65FBF514"
+    }
+  ],
+  "/NextService-Amplify/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB"
     }
   ],
   "/NextService-Amplify/AuthSecretsProvider/framework-onEvent/Resource": [
@@ -89,10 +113,22 @@
       "data": "AuthSecretsFnServiceRoleDefaultPolicy2652A7D8"
     }
   ],
+  "/NextService-Amplify/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB"
+    }
+  ],
   "/NextService-Amplify/AuthSecretsProvider/framework-onEvent/ServiceRole/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "AuthSecretsProviderframeworkonEventServiceRole46CC2671"
+    }
+  ],
+  "/NextService-Amplify/AuthSecretsProvider/framework-onEvent/LogRetention/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuthSecretsProviderframeworkonEventLogRetention7AC57D23"
     }
   ],
   "/NextService-Amplify/AuthSecretsProvider/framework-onEvent/ServiceRole/DefaultPolicy/Resource": [

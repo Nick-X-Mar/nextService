@@ -86,6 +86,121 @@
     "aws:cdk:path": "NextService-Amplify/AuthSecretsFn/Resource"
    }
   },
+  "AuthSecretsFnLogRetention65FBF514": {
+   "Type": "Custom::LogRetention",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
+      "Arn"
+     ]
+    },
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "AuthSecretsFn8DAB7E42"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 90
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Amplify/AuthSecretsFn/LogRetention/Resource"
+   }
+  },
+  "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Amplify/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/Resource"
+   }
+  },
+  "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "logs:PutRetentionPolicy",
+        "logs:DeleteRetentionPolicy"
+       ],
+       "Effect": "Allow",
+       "Resource": "*"
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB",
+    "Roles": [
+     {
+      "Ref": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Amplify/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/DefaultPolicy/Resource"
+   }
+  },
+  "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Handler": "index.handler",
+    "Runtime": "nodejs22.x",
+    "Timeout": 900,
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-766671488262-eu-central-1",
+     "S3Key": "2819175352ad1ce0dae768e83fc328fb70fb5f10b4a8ff0ccbcb791f02b0716d.zip"
+    },
+    "Role": {
+     "Fn::GetAtt": [
+      "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB",
+      "Arn"
+     ]
+    }
+   },
+   "DependsOn": [
+    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB",
+    "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "NextService-Amplify/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/Resource",
+    "aws:asset:path": "asset.2819175352ad1ce0dae768e83fc328fb70fb5f10b4a8ff0ccbcb791f02b0716d",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
   "AuthSecretsProviderframeworkonEventServiceRole46CC2671": {
    "Type": "AWS::IAM::Role",
    "Properties": {
@@ -216,6 +331,32 @@
     "aws:asset:path": "asset.07a90cc3efdfc34da22208dcd9d211f06f5b0e01b21e778edc7c3966b1f61d57",
     "aws:asset:is-bundled": false,
     "aws:asset:property": "Code"
+   }
+  },
+  "AuthSecretsProviderframeworkonEventLogRetention7AC57D23": {
+   "Type": "Custom::LogRetention",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
+      "Arn"
+     ]
+    },
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "AuthSecretsProviderframeworkonEvent1EF28EB0"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 90
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Amplify/AuthSecretsProvider/framework-onEvent/LogRetention/Resource"
    }
   },
   "AuthSecretsResource": {
@@ -604,10 +745,39 @@
     "aws:cdk:path": "NextService-Amplify/MainBranch"
    }
   },
+  "SsrLogRetentionD2178DCD": {
+   "Type": "Custom::LogRetention",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
+      "Arn"
+     ]
+    },
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/amplify/",
+       {
+        "Fn::GetAtt": [
+         "NextServiceApp",
+         "AppId"
+        ]
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 90
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-Amplify/SsrLogRetention/Resource"
+   }
+  },
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/02O3WrDMAxGn6X3irY1g+22Cex2IX2AoDpOq8U/wbJXgvG7j6Qb7OociU/iO+Lx9R2fD3SXSo1zZfiC+RxJzUB3GbIhexkJ80dyKrJ30E7uzwswWcy9N3pb7+y8YbVu48MKSD2QiI6Cpw0gNTZJzTo2JBrILoanFXM7udOybIdNIKdupYBKEr0dghafgtKCXfDfPOoA+6dzpCu7K7R7rP9N7U3++WeKS4oFujXevHuq8aXGt8OXMFchuchWY//gD1BV3KcLAQAA"
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/z2NzU7DMBCEn6V3Z4EGCa5NJE5IROkDRFvHSd34J/KuqSLL747iAqdvdkczc4Tj6zs8H/BOlRyXyugLpDOjXATeaUgG7WVESB/RSdbeiXZyfzoLjRZS743a34WdN1pu+/lQWRg/E3z6uVesXKmgekAixQSnHYJqaKJcFDdISqBdjZ42SO3kTuu6VzUBnbzmXFYU+RikEiV7Zpy1m4WMxN4O4dck6IL/1qMKoi3Of6qd3FfkNXIW3cZX755qeKnh7XAjrasQHWuroH/wBxldXCkdAQAA"
    },
    "Metadata": {
     "aws:cdk:path": "NextService-Amplify/CDKMetadata/Default"

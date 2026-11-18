@@ -71,6 +71,12 @@
       "data": "SesEventProcessorFnAllowInvokeNextServiceNotificationsSESEventsTopicD50C0EE620086923"
     }
   ],
+  "/NextService-Notifications/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A"
+    }
+  ],
   "/NextService-Notifications/NewRequestBroadcastDLQ/Resource": [
     {
       "type": "aws:cdk:logicalId",
@@ -155,10 +161,22 @@
       "data": "SesEventProcessorFnServiceRole09063D12"
     }
   ],
+  "/NextService-Notifications/SesEventProcessorFn/LogRetention/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SesEventProcessorFnLogRetention5CAF7F8B"
+    }
+  ],
   "/NextService-Notifications/SesEventProcessorFn/SESEventsTopic/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "SesEventProcessorFnSESEventsTopicC5FCEA83"
+    }
+  ],
+  "/NextService-Notifications/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB"
     }
   ],
   "/NextService-Notifications/NewRequestBroadcastFn/ServiceRole/Resource": [
@@ -167,16 +185,34 @@
       "data": "NewRequestBroadcastFnServiceRoleAC0DE572"
     }
   ],
+  "/NextService-Notifications/NewRequestBroadcastFn/LogRetention/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "NewRequestBroadcastFnLogRetention1707FA2B"
+    }
+  ],
   "/NextService-Notifications/CompletionSweeperFn/ServiceRole/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "CompletionSweeperFnServiceRoleF9B56C68"
     }
   ],
+  "/NextService-Notifications/CompletionSweeperFn/LogRetention/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CompletionSweeperFnLogRetention2F42CB3F"
+    }
+  ],
   "/NextService-Notifications/SesEventProcessorFn/ServiceRole/DefaultPolicy/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "SesEventProcessorFnServiceRoleDefaultPolicy9DC7513A"
+    }
+  ],
+  "/NextService-Notifications/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB"
     }
   ],
   "/NextService-Notifications/NewRequestBroadcastFn/ServiceRole/DefaultPolicy/Resource": [

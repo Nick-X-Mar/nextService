@@ -23,6 +23,8 @@ from aws_cdk import (
 ROTATOR_INTERVAL_DAYS = 300
 from constructs import Construct
 
+from stacks.log_retention import expire_lambda_logs
+
 
 
 # The API key is published to every browser (NEXT_PUBLIC_APPSYNC_API_KEY), so
@@ -127,6 +129,7 @@ class AppSyncStack(Stack):
                 ],
             )
         )
+        expire_lambda_logs(self.authorizer_fn)
 
         # AppSync Events API (pub/sub channels, not GraphQL)
         self.events_api = appsync.CfnApi(
@@ -227,6 +230,7 @@ class AppSyncStack(Stack):
                 "APPSYNC_API_ID": api_id,
             },
         )
+        expire_lambda_logs(rotator_fn)
         rotator_fn.add_to_role_policy(iam.PolicyStatement(
             sid="RotateAppSyncApiKeys",
             actions=[

@@ -16,6 +16,21 @@
         }
       }
     },
+    "2819175352ad1ce0dae768e83fc328fb70fb5f10b4a8ff0ccbcb791f02b0716d": {
+      "displayName": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/Code",
+      "source": {
+        "path": "asset.2819175352ad1ce0dae768e83fc328fb70fb5f10b4a8ff0ccbcb791f02b0716d",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "766671488262-eu-central-1-089d1020": {
+          "bucketName": "cdk-hnb659fds-assets-766671488262-eu-central-1",
+          "objectKey": "2819175352ad1ce0dae768e83fc328fb70fb5f10b4a8ff0ccbcb791f02b0716d.zip",
+          "region": "eu-central-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-file-publishing-role-766671488262-eu-central-1"
+        }
+      }
+    },
     "0c481c51b3274e8d79197c0e4842a12eb5bd129df1d39e0fd39de3747befcd49": {
       "displayName": "ApiKeyRotatorFn/Code",
       "source": {
@@ -31,16 +46,16 @@
         }
       }
     },
-    "d4f723a75728b83b8c60cb511aa476543a38419cbb90f00e019ee645a3c15f5a": {
+    "57989fb8f49b116fea12395fbdbf0a4738deec9df67be52231248bab3419625e": {
       "displayName": "NextService-AppSync Template",
       "source": {
         "path": "NextService-AppSync.template.json",
         "packaging": "file"
       },
       "destinations": {
-        "766671488262-eu-central-1-94b62025": {
+        "766671488262-eu-central-1-8e322002": {
           "bucketName": "cdk-hnb659fds-assets-766671488262-eu-central-1",
-          "objectKey": "d4f723a75728b83b8c60cb511aa476543a38419cbb90f00e019ee645a3c15f5a.json",
+          "objectKey": "57989fb8f49b116fea12395fbdbf0a4738deec9df67be52231248bab3419625e.json",
           "region": "eu-central-1",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-file-publishing-role-766671488262-eu-central-1"
         }
