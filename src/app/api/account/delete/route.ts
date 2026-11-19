@@ -21,6 +21,7 @@ import { EventName } from '@/types/events'
 import { OfferStatus, ServiceRequestStatus } from '@/types/statuses'
 import { hasAppointmentStarted } from '@/lib/appointment-window'
 import { broadcastRequestUpdate } from '@/utils/requestBroadcast'
+import { deleteSubscriptionsOf } from '@/utils/pushService'
 import { withMetrics } from '@/utils/withMetrics'
 import { TABLES } from '@/lib/tables'
 
@@ -126,6 +127,8 @@ async function _POST(request: NextRequest) {
     await wipeEmailLogs(userType === 'client' ? 'clientId' : 'garageId', userId, summary)
     await anonymizeRow(tableName, user, userType === 'client' ? CLIENT_KEEPS : GARAGE_KEEPS)
     if (userType === 'garage') invalidateGarageActive(userId)
+    // No device hears from the account again.
+    await deleteSubscriptionsOf(userType, userId)
 
     await logEvent({
       eventName: EventName.AccountDeleted,

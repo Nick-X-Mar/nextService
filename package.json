@@ -49,6 +49,7 @@
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^3.4.1",
     "typescript": "^5",
+    "web-push": "^3.6.7",
     "ws": "^8.14.2"
   },
   "devDependencies": {
@@ -56,6 +57,7 @@
     "@playwright/test": "^1.58.2",
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "^24.19.2",
+    "@types/web-push": "^3.6.4",
     "@types/ws": "^8.18.1",
     "dynamodb-admin": "^4.0.0",
     "eslint": "^8",

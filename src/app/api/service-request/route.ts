@@ -13,6 +13,7 @@ import { signToken, setAuthCookie } from '@/utils/auth'
 import { createRateLimiter } from '@/utils/rateLimit'
 import { withMetrics } from '@/utils/withMetrics'
 import { broadcastNewRequest } from '@/utils/requestBroadcast'
+import { pushNewRequestToGarages } from '@/utils/pushService'
 import { getCategoryText, OTHER_CATEGORY } from '@/utils/categoryLabels'
 import { estimateFor } from '@/app/api/price-estimation/estimate'
 import { isValidEngineCC, normalizeEngineCC } from '@/app/api/vehicles/engineCC'
@@ -569,6 +570,9 @@ async function _POST(request: NextRequest) {
     // swallows its own errors and the publish has a 4s timeout, so this can
     // neither fail the request nor hang it.
     await broadcastNewRequest(serviceRequestId)
+    // And to the devices of the garages that take it with notifications on;
+    // never throws.
+    await pushNewRequestToGarages(serviceRequestId)
 
     const response = NextResponse.json({
       success: true,

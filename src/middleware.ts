@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { jwtVerify, SignJWT } from 'jose'
 import { verifyAdminToken, ADMIN_COOKIE } from '@/utils/adminAuth'
+import { APP_SESSION_EXPIRY, APP_SESSION_MAX_AGE_SEC } from '@/utils/auth'
 
 const TOKEN_COOKIE_NAME = 'auth-token'
 const SESSION_EXPIRY = process.env.SESSION_EXPIRY || '2d'
@@ -81,21 +82,22 @@ function homeFor(userType: string, userId: string): string {
     : `/requests/${userId}/`
 }
 
-async function issueRefreshedToken(userId: string, userType: string): Promise<string> {
-  return new SignJWT({ userId, userType })
+/** `app`: a session of the installed app keeps its longer window (APP_SESSION_EXPIRY). */
+async function issueRefreshedToken(userId: string, userType: string, app: boolean): Promise<string> {
+  return new SignJWT(app ? { userId, userType, app: true } : { userId, userType })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime(SESSION_EXPIRY)
+    .setExpirationTime(app ? APP_SESSION_EXPIRY : SESSION_EXPIRY)
     .sign(getSecret())
 }
 
-function applySlidingCookie(response: NextResponse, token: string): void {
+function applySlidingCookie(response: NextResponse, token: string, app: boolean): void {
   response.cookies.set(TOKEN_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: SESSION_MAX_AGE_SEC,
+    maxAge: app ? APP_SESSION_MAX_AGE_SEC : SESSION_MAX_AGE_SEC,
   })
 }
 
@@ -213,7 +215,7 @@ export async function middleware(request: NextRequest) {
       // Sliding session on page views too, so someone browsing their own area
       // never expires mid-session.
       if (isDueForRefresh(payload.iat)) {
-        applySlidingCookie(response, await issueRefreshedToken(userId, userType))
+        applySlidingCookie(response, await issueRefreshedToken(userId, userType, payload.app === true), payload.app === true)
       }
       return response
     } catch {
@@ -244,7 +246,7 @@ export async function middleware(request: NextRequest) {
           requestHeaders.set('x-user-type', userType)
           const response = NextResponse.next({ request: { headers: requestHeaders } })
           if (!isAuthRoute && isDueForRefresh(payload.iat)) {
-            applySlidingCookie(response, await issueRefreshedToken(userId, userType))
+            applySlidingCookie(response, await issueRefreshedToken(userId, userType, payload.app === true), payload.app === true)
           }
           return response
         }
@@ -299,7 +301,7 @@ export async function middleware(request: NextRequest) {
 
     // Sliding session, re-issued at most hourly (see REFRESH_AFTER_SEC).
     if (isDueForRefresh(payload.iat)) {
-      applySlidingCookie(response, await issueRefreshedToken(userId, userType))
+      applySlidingCookie(response, await issueRefreshedToken(userId, userType, payload.app === true), payload.app === true)
     }
 
     return response

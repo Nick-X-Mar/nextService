@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { pushActiveHere } from '@/lib/web-push-client'
 
 // User preferences for ambient (out-of-tab) notifications about new service
 // requests. Persisted to localStorage so each garage user can opt in/out
@@ -141,6 +142,8 @@ export function useNewRequestNotifier() {
 
     if (readBoolPref(BROWSER_NOTIF_PREF_KEY, false)
       && typeof window !== 'undefined'
+      // The push notification for the same request is on its way.
+      && !pushActiveHere()
       && typeof Notification !== 'undefined'
       && Notification.permission === 'granted'
       && document.visibilityState !== 'visible'

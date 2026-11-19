@@ -11,6 +11,23 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
+    // The service worker (public/sw.js) stays out of every spec but the PWA
+    // ones, which allow it: requests a worker handles never reach page.route.
+    serviceWorkers: 'block',
+    // Garages are asked about push notifications as soon as they sign in
+    // (PwaManager), and a client's requests offer the app (InstallAppNudge);
+    // both cards would sit among what other specs press and count. Already
+    // answered «Όχι τώρα» here, for good. The pwa specs start without it.
+    storageState: {
+      cookies: [],
+      origins: [{
+        origin: 'http://localhost:3000',
+        localStorage: [
+          { name: 'pushPrompt.dismissedAt', value: '99999999999999' },
+          { name: 'installNudge.dismissedAt', value: '99999999999999' },
+        ],
+      }],
+    },
   },
   /**
    * Chromium runs the whole suite. Firefox and WebKit run only the specs that

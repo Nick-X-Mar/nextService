@@ -409,6 +409,15 @@ class DynamoDBStack(Stack):
                 ("StatusIndex", ("status", S), ("createdAt", S)),
             ],
         )
+        # The browsers and installed apps (the PWA) that get push notifications:
+        # one row per push subscription, keyed by a hash of its endpoint, so a
+        # device signed in as someone new is simply re-owned.
+        self.push_subscriptions_table = self._app_table(
+            "PushSubscriptionsTable", "PushSubscriptions", ("subscriptionId", S),
+            indexes=[
+                ("UserSubscriptionsIndex", ("userKey", S), ("updatedAt", S)),
+            ],
+        )
 
         # ── Outputs ─────────────────────────────────────────────
         tables = {

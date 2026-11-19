@@ -5,6 +5,8 @@ import { collectAll } from '@/utils/pagination'
 import { OfferStatus, ServiceRequestStatus } from '@/types/statuses'
 import { logEvent } from '@/utils/eventLogger'
 import { sendEmail } from '@/utils/emailService'
+import { pushToUser } from '@/utils/pushService'
+import { withPlusVat } from '@/utils/vat'
 import { EventName, EmailTemplate } from '@/types/events'
 import { requireAuth, requireActiveGarage } from '@/utils/requireAuth'
 import { createRateLimiter } from '@/utils/rateLimit'
@@ -450,8 +452,9 @@ async function invalidateRequestOwner(serviceRequestId: string): Promise<void> {
 }
 
 /**
- * Look up the client + garage behind a new offer, then fire the "new offer"
- * email to the client. Pure side effect — errors are logged and swallowed.
+ * Look up the client + garage behind a new offer, then tell the client: on
+ * their devices with notifications on, and by email. Pure side effect —
+ * errors are logged and swallowed.
  */
 async function notifyClientAboutNewOffer(args: {
   clientId?: string
@@ -466,6 +469,15 @@ async function notifyClientAboutNewOffer(args: {
       dynamoDB.send(new GetCommand({ TableName: TABLES.Clients, Key: { id: args.clientId } })),
       dynamoDB.send(new GetCommand({ TableName: TABLES.Garages, Key: { id: args.garageId } }))
     ])
+
+    const garageName = (garageRes.Item?.companyName as string) || 'Συνεργείο'
+    // Before the email: a guest without one may still have notifications on.
+    await pushToUser('client', args.clientId, {
+      title: 'Νέα προσφορά',
+      body: `${garageName}: ${withPlusVat(`${args.offerAmount}€`)}`,
+      url: `/requests/${args.clientId}/details/${args.serviceRequestId}/`,
+      tag: `offers-${args.serviceRequestId}`,
+    })
 
     const clientEmail = clientRes.Item?.email as string | undefined
     if (!clientEmail) return
