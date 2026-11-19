@@ -143,6 +143,14 @@
       }
     }
   ],
+  "/NextService-DynamoDB/PushSubscriptionsTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "PushSubscriptionsTable14F60E9C"
+      }
+    }
+  ],
   "/NextService-DynamoDB/ClientsTableArn": [
     {
       "type": "aws:cdk:logicalId",
@@ -315,6 +323,12 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "GarageSettlementsTable8BE9B8E1"
+    }
+  ],
+  "/NextService-DynamoDB/PushSubscriptionsTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PushSubscriptionsTable14F60E9C"
     }
   ],
   "/NextService-DynamoDB/CDKMetadata/Default": [

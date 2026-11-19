@@ -1,16 +1,16 @@
 {
   "version": "53.0.0",
   "files": {
-    "30f874c0579659a725a345766efea8d54ea81140634b7366f7a61ed0e62898c1": {
+    "8e812a6322fceac6b1c60ab97cdd50e5a167a2396761e6bb1550e553d3db4e84": {
       "displayName": "NextService-DynamoDB Template",
       "source": {
         "path": "NextService-DynamoDB.template.json",
         "packaging": "file"
       },
       "destinations": {
-        "766671488262-eu-central-1-c290fc96": {
+        "766671488262-eu-central-1-fcfe9944": {
           "bucketName": "cdk-hnb659fds-assets-766671488262-eu-central-1",
-          "objectKey": "30f874c0579659a725a345766efea8d54ea81140634b7366f7a61ed0e62898c1.json",
+          "objectKey": "8e812a6322fceac6b1c60ab97cdd50e5a167a2396761e6bb1550e553d3db4e84.json",
           "region": "eu-central-1",
           "assumeRoleArn": "arn:${AWS::Partition}:iam::766671488262:role/cdk-hnb659fds-file-publishing-role-766671488262-eu-central-1"
         }

@@ -1327,6 +1327,60 @@
     "aws:cdk:path": "NextService-DynamoDB/GarageSettlementsTable/Resource"
    }
   },
+  "PushSubscriptionsTable14F60E9C": {
+   "Type": "AWS::DynamoDB::Table",
+   "Properties": {
+    "AttributeDefinitions": [
+     {
+      "AttributeName": "subscriptionId",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "userKey",
+      "AttributeType": "S"
+     },
+     {
+      "AttributeName": "updatedAt",
+      "AttributeType": "S"
+     }
+    ],
+    "BillingMode": "PAY_PER_REQUEST",
+    "DeletionProtectionEnabled": true,
+    "GlobalSecondaryIndexes": [
+     {
+      "IndexName": "UserSubscriptionsIndex",
+      "KeySchema": [
+       {
+        "AttributeName": "userKey",
+        "KeyType": "HASH"
+       },
+       {
+        "AttributeName": "updatedAt",
+        "KeyType": "RANGE"
+       }
+      ],
+      "Projection": {
+       "ProjectionType": "ALL"
+      }
+     }
+    ],
+    "KeySchema": [
+     {
+      "AttributeName": "subscriptionId",
+      "KeyType": "HASH"
+     }
+    ],
+    "PointInTimeRecoverySpecification": {
+     "PointInTimeRecoveryEnabled": true
+    },
+    "TableName": "PushSubscriptions"
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "NextService-DynamoDB/PushSubscriptionsTable/Resource"
+   }
+  },
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
