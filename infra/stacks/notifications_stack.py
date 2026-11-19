@@ -67,6 +67,7 @@ class NotificationsStack(Stack):
         garages_table_arn: str,
         alert_topic: sns.ITopic,
         app_url: str,
+        admin_email: str,
         notifications_enabled: bool = True,
         ses_from_address: str = "no-reply@nextservice.gr",
         manage_ses_identity: bool = False,
@@ -224,6 +225,8 @@ class NotificationsStack(Stack):
                 "EMAIL_LOGS_TABLE": "EmailLogs",
                 "SITE_CONTENT_TABLE": "SiteContent",
                 "NOTIFICATIONS_ENABLED": "true" if notifications_enabled else "false",
+                # On staging, the only address it emails (see the Lambda).
+                "ADMIN_EMAIL": admin_email,
                 "SEND_CONCURRENCY": "10",
             },
             # NOTE: no `reserved_concurrent_executions` — AWS requires every
@@ -395,6 +398,8 @@ class NotificationsStack(Stack):
                 "EMAIL_LOGS_TABLE": "EmailLogs",
                 "SITE_CONTENT_TABLE": "SiteContent",
                 "NOTIFICATIONS_ENABLED": str(notifications_enabled).lower(),
+                # On staging, the only address it emails (see the Lambda).
+                "ADMIN_EMAIL": admin_email,
                 # Keep in step with COMPLETION_GRACE_HOURS in
                 # src/types/reviews.ts — the in-app prompt uses that constant,
                 # and the two must agree or the email arrives before the badge.

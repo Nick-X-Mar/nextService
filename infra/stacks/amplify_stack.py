@@ -49,6 +49,7 @@ class AmplifyStack(Stack):
         appsync_api_id: str,
         realtime_secret_name: str,
         domain_prefixes: list[str] = (),
+        admin_email: str,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -413,7 +414,7 @@ frontend:
                     name="SES_CONFIG_SET", value="nextservice-main",
                 ),
                 amplify.CfnApp.EnvironmentVariableProperty(
-                    name="ADMIN_EMAIL", value="nmarianos93@gmail.com",
+                    name="ADMIN_EMAIL", value=admin_email,
                 ),
                 # Auth — resolved from Secrets Manager at deploy time
                 amplify.CfnApp.EnvironmentVariableProperty(

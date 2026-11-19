@@ -16,9 +16,9 @@ export interface PerformanceMetric {
   userId?: string
 }
 
-// Technical logs are kept 3 months (the privacy policy says so; the log groups
+// Technical logs are kept 30 days (the privacy policy says so; the log groups
 // follow infra/stacks/log_retention.py). DynamoDB TTL then deletes the row.
-const METRIC_TTL_SECONDS = 90 * 24 * 60 * 60
+const METRIC_TTL_SECONDS = 30 * 24 * 60 * 60
 
 /**
  * Record an API call metric. Never throws: a failed write is logged as a warning.

@@ -106,7 +106,7 @@
       ]
      ]
     },
-    "RetentionInDays": 90
+    "RetentionInDays": 30
    },
    "Metadata": {
     "aws:cdk:path": "NextService-Amplify/AuthSecretsFn/LogRetention/Resource"
@@ -353,7 +353,7 @@
       ]
      ]
     },
-    "RetentionInDays": 90
+    "RetentionInDays": 30
    },
    "Metadata": {
     "aws:cdk:path": "NextService-Amplify/AuthSecretsProvider/framework-onEvent/LogRetention/Resource"
@@ -768,7 +768,7 @@
       ]
      ]
     },
-    "RetentionInDays": 90
+    "RetentionInDays": 30
    },
    "Metadata": {
     "aws:cdk:path": "NextService-Amplify/SsrLogRetention/Resource"

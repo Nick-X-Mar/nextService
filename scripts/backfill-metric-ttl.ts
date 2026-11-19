@@ -1,15 +1,14 @@
 /**
- * Give every PerformanceMetrics row written before TTL was switched on an
- * `expiresAt`, so DynamoDB deletes it 90 days after it was recorded — the same
- * 3 months the privacy policy promises for technical logs and recordMetric()
- * now stamps on new rows. A row already older than that gets an `expiresAt` in
- * the past, which DynamoDB deletes within a day or two.
+ * Give every PerformanceMetrics row the `expiresAt` the retention allows: 30
+ * days after it was recorded, the period the privacy policy promises for
+ * technical logs and the one recordMetric() stamps on new rows. That covers
+ * rows written before the table had TTL and rows stamped under a longer
+ * retention; a later `expiresAt` is brought forward, an earlier one is never
+ * pushed back. A row already older than that gets an `expiresAt` in the past,
+ * which DynamoDB deletes within a day or two.
  *
- * Run it after the DynamoDB stack has switched TTL on for the table (a row
- * stamped before that is still deleted, just once TTL is enabled).
- *
- * Dry run by default; pass --apply to write. Only `expiresAt` is set, and only
- * on rows that don't have one yet.
+ * Dry run by default; pass --apply to write. Only `expiresAt` is changed, each
+ * update conditional on it still being missing or later than the target.
  *
  * Usage (local DynamoDB):
  *   DYNAMODB_ENDPOINT=http://localhost:8000 npx tsx scripts/backfill-metric-ttl.ts [--apply]
@@ -31,7 +30,7 @@ const ENDPOINT = process.env.DYNAMODB_ENDPOINT
 const APPLY = process.argv.includes('--apply')
 
 // Same as METRIC_TTL_SECONDS in src/utils/performanceService.ts.
-const TTL_SECONDS = 90 * 24 * 60 * 60
+const TTL_SECONDS = 30 * 24 * 60 * 60
 const CONCURRENCY = 25
 
 const isLocal = !!ENDPOINT && ENDPOINT.includes('localhost')
@@ -64,16 +63,16 @@ interface MetricRow {
   endpoint: string
   timestamp: string
   rawTimestamp?: string
+  expiresAt?: number
 }
 
-async function scanUnstamped(): Promise<MetricRow[]> {
+async function scanAll(): Promise<MetricRow[]> {
   const rows: MetricRow[] = []
   let startKey: Record<string, unknown> | undefined
   do {
     const res = await db.send(new ScanCommand({
       TableName: TABLE,
-      ProjectionExpression: 'endpoint, #ts, rawTimestamp',
-      FilterExpression: 'attribute_not_exists(expiresAt)',
+      ProjectionExpression: 'endpoint, #ts, rawTimestamp, expiresAt',
       ExpressionAttributeNames: { '#ts': 'timestamp' },
       ExclusiveStartKey: startKey,
     }))
@@ -94,26 +93,32 @@ function recordedAt(row: MetricRow): number | null {
 
 async function main() {
   console.log(`${TABLE} @ ${isLocal ? ENDPOINT : REGION} — ${APPLY ? 'APPLY' : 'dry run'}`)
-  const rows = await scanUnstamped()
+  const rows = await scanAll()
   const now = Math.floor(Date.now() / 1000)
 
   const updates: { row: MetricRow; expiresAt: number }[] = []
   const undated: MetricRow[] = []
   for (const row of rows) {
     const ms = recordedAt(row)
-    if (ms === null) undated.push(row)
-    else updates.push({ row, expiresAt: Math.floor(ms / 1000) + TTL_SECONDS })
+    if (ms === null) {
+      if (row.expiresAt === undefined) undated.push(row)
+      continue
+    }
+    const expiresAt = Math.floor(ms / 1000) + TTL_SECONDS
+    if (row.expiresAt === undefined || row.expiresAt > expiresAt) updates.push({ row, expiresAt })
   }
 
   const expired = updates.filter((u) => u.expiresAt <= now).length
   const days = updates.map((u) => u.expiresAt - TTL_SECONDS).sort((a, b) => a - b)
-  console.log(`Rows without expiresAt: ${rows.length}`)
+  console.log(`Rows: ${rows.length}, to (re)stamp: ${updates.length}`)
+  console.log(`  without expiresAt: ${updates.filter((u) => u.row.expiresAt === undefined).length}`)
+  console.log(`  expiring later than ${TTL_SECONDS / 86400} days: ${updates.filter((u) => u.row.expiresAt !== undefined).length}`)
   if (days.length) {
     const day = (s: number) => new Date(s * 1000).toISOString().slice(0, 10)
     console.log(`  recorded ${day(days[0])} → ${day(days[days.length - 1])}`)
   }
-  console.log(`  already past 90 days (TTL deletes them within ~48h): ${expired}`)
-  console.log(`  no usable date, left alone: ${undated.length}`)
+  console.log(`  already past ${TTL_SECONDS / 86400} days (TTL deletes them within ~48h): ${expired}`)
+  console.log(`  no usable date and no expiresAt, left alone: ${undated.length}`)
 
   if (!APPLY) {
     console.log('\nDry run — nothing written. Re-run with --apply.')
@@ -129,7 +134,7 @@ async function main() {
           TableName: TABLE,
           Key: { endpoint: row.endpoint, timestamp: row.timestamp },
           UpdateExpression: 'SET expiresAt = :e',
-          ConditionExpression: 'attribute_exists(endpoint) AND attribute_not_exists(expiresAt)',
+          ConditionExpression: 'attribute_exists(endpoint) AND (attribute_not_exists(expiresAt) OR expiresAt > :e)',
           ExpressionAttributeValues: { ':e': expiresAt },
         }))
         done++

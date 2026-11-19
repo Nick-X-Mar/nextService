@@ -146,7 +146,7 @@
       ]
      ]
     },
-    "RetentionInDays": 90
+    "RetentionInDays": 30
    },
    "Metadata": {
     "aws:cdk:path": "NextService-AppSync/EventsAuthorizerFn/LogRetention/Resource"
@@ -465,7 +465,7 @@
       ]
      ]
     },
-    "RetentionInDays": 90
+    "RetentionInDays": 30
    },
    "Metadata": {
     "aws:cdk:path": "NextService-AppSync/ApiKeyRotatorFn/LogRetention/Resource"

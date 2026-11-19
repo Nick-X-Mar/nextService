@@ -15,7 +15,7 @@ import type {
   EventNameValue
 } from '@/types/events'
 import { TABLES } from '@/lib/tables'
-import { IS_INDEXABLE } from '@/lib/site-url'
+import { IS_INDEXABLE, STAGE } from '@/lib/site-url'
 import { retryAfterFreeze } from '@/utils/awsFreezeRetry'
 
 const FROM_ADDRESS = process.env.SES_FROM_ADDRESS || 'no-reply@nextservice.gr'
@@ -42,6 +42,25 @@ const EMAIL_LOG_TTL_SECONDS = 180 * 24 * 60 * 60
  */
 const notificationsEnabled =
   (process.env.NOTIFICATIONS_ENABLED ?? 'false').toLowerCase() === 'true'
+
+/**
+ * Staging mails the admin only (product rule): its garages and clients are test
+ * accounts, some of them on real people's addresses. Any other recipient is
+ * logged as `skipped`, so /admin/emails still shows what would have gone out.
+ * The admin's address with a +tag (name+garage2@gmail.com) is the admin's own
+ * inbox, so a test garage or client registered on one still gets its mail.
+ * The two Lambdas that send mail apply the same rule.
+ */
+function withheldOnStaging(to: string): boolean {
+  if (STAGE !== 'staging') return false
+  const admin = process.env.ADMIN_EMAIL
+  return !admin || withoutPlusTag(to) !== withoutPlusTag(admin)
+}
+
+function withoutPlusTag(address: string): string {
+  const [local, domain] = address.trim().toLowerCase().split('@')
+  return `${local.split('+')[0]}@${domain}`
+}
 
 let sesClient: SESClient | null = null
 function getSesClient(): SESClient {
@@ -116,6 +135,7 @@ async function sendEmailInternal(input: SendEmailInput): Promise<void> {
   // template name + ids if it ever needs the actual content. Keeping the
   // log row PII-free reduces blast radius if the table ever leaks.
   const linkOrigin = originOf(rendered.ctaUrl)
+  const sending = notificationsEnabled && !withheldOnStaging(to)
   const baseRecord: EmailLogRecord & { linkOrigin?: string } = {
     emailId,
     to,
@@ -124,7 +144,7 @@ async function sendEmailInternal(input: SendEmailInput): Promise<void> {
     subject: rendered.subject,
     bodyPreview: '',
     triggerEvent,
-    status: notificationsEnabled ? 'queued' : 'skipped',
+    status: sending ? 'queued' : 'skipped',
     sentAt,
     ...(clientId ? { clientId } : {}),
     ...(garageId ? { garageId } : {}),
@@ -137,9 +157,9 @@ async function sendEmailInternal(input: SendEmailInput): Promise<void> {
 
   await writeEmailLog(baseRecord)
 
-  if (!notificationsEnabled) {
+  if (!sending) {
     console.log(
-      `[emailService] NOTIFICATIONS OFF — would send "${rendered.subject}" to ${to} (template=${templateName}, trigger=${triggerEvent})`
+      `[emailService] ${notificationsEnabled ? 'STAGING, NOT THE ADMIN' : 'NOTIFICATIONS OFF'} — would send "${rendered.subject}" to ${to} (template=${templateName}, trigger=${triggerEvent})`
     )
     return
   }

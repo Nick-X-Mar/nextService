@@ -27,7 +27,7 @@
    "Type": "AWS::Logs::LogGroup",
    "Properties": {
     "LogGroupName": "/nextservice/app",
-    "RetentionInDays": 90
+    "RetentionInDays": 30
    },
    "UpdateReplacePolicy": "Retain",
    "DeletionPolicy": "Retain",
@@ -39,7 +39,7 @@
    "Type": "AWS::Logs::LogGroup",
    "Properties": {
     "LogGroupName": "/nextservice/api",
-    "RetentionInDays": 90
+    "RetentionInDays": 30
    },
    "UpdateReplacePolicy": "Retain",
    "DeletionPolicy": "Retain",

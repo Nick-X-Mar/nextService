@@ -1,7 +1,7 @@
 """How long CloudWatch keeps NextService's logs.
 
 The privacy policy promises that technical logs are deleted automatically after
-this long («Τεχνικά αρχεία λειτουργίας: 3 μήνες», src/data/content/pages.ts),
+this long («Τεχνικά αρχεία λειτουργίας: 30 ημέρες», src/data/content/pages.ts),
 so every log group we write to must carry it. Change the two together.
 """
 from aws_cdk import (
@@ -10,7 +10,7 @@ from aws_cdk import (
 )
 from constructs import Construct
 
-LOG_RETENTION = logs.RetentionDays.THREE_MONTHS
+LOG_RETENTION = logs.RetentionDays.ONE_MONTH
 
 
 def expire_logs(scope: Construct, construct_id: str, log_group_name: str) -> None:

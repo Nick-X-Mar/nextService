@@ -203,7 +203,7 @@
       ]
      ]
     },
-    "RetentionInDays": 90
+    "RetentionInDays": 30
    },
    "Metadata": {
     "aws:cdk:path": "NextService-Notifications/SesEventProcessorFn/LogRetention/Resource"
@@ -473,7 +473,7 @@
    "Properties": {
     "Code": {
      "S3Bucket": "cdk-hnb659fds-assets-766671488262-eu-central-1",
-     "S3Key": "7707b5062dd12b0b6bec30b8c9d36d048bf9a1b58abf7baaa93da478921f340b.zip"
+     "S3Key": "538984c7f0b0da0cefb5b616e5548d0b43d90713d11e6170ef027b437343adb8.zip"
     },
     "Description": "Fan-out new service request → active garages via SES",
     "Environment": {
@@ -486,6 +486,7 @@
       "EMAIL_LOGS_TABLE": "EmailLogs",
       "SITE_CONTENT_TABLE": "SiteContent",
       "NOTIFICATIONS_ENABLED": "true",
+      "ADMIN_EMAIL": "nmarianos93@gmail.com",
       "SEND_CONCURRENCY": "10"
      }
     },
@@ -507,7 +508,7 @@
    ],
    "Metadata": {
     "aws:cdk:path": "NextService-Notifications/NewRequestBroadcastFn/Resource",
-    "aws:asset:path": "asset.7707b5062dd12b0b6bec30b8c9d36d048bf9a1b58abf7baaa93da478921f340b",
+    "aws:asset:path": "asset.538984c7f0b0da0cefb5b616e5548d0b43d90713d11e6170ef027b437343adb8",
     "aws:asset:is-bundled": false,
     "aws:asset:property": "Code"
    }
@@ -532,7 +533,7 @@
       ]
      ]
     },
-    "RetentionInDays": 90
+    "RetentionInDays": 30
    },
    "Metadata": {
     "aws:cdk:path": "NextService-Notifications/NewRequestBroadcastFn/LogRetention/Resource"
@@ -748,7 +749,7 @@
    "Properties": {
     "Code": {
      "S3Bucket": "cdk-hnb659fds-assets-766671488262-eu-central-1",
-     "S3Key": "e5c0d94ed9680fb8377d35bbea3a04c2bdde2418eda49d3a473f6b5bf1337908.zip"
+     "S3Key": "811e9ad0d2289e58af8ebfd71223c6f0afd4bf7804c6c874b75fef94ca28680c.zip"
     },
     "Description": "Asks garages to confirm past appointments; reminds clients of unanswered offers",
     "Environment": {
@@ -764,6 +765,7 @@
       "EMAIL_LOGS_TABLE": "EmailLogs",
       "SITE_CONTENT_TABLE": "SiteContent",
       "NOTIFICATIONS_ENABLED": "true",
+      "ADMIN_EMAIL": "nmarianos93@gmail.com",
       "COMPLETION_GRACE_HOURS": "4",
       "COMPLETION_MAX_AGE_DAYS": "30"
      }
@@ -786,7 +788,7 @@
    ],
    "Metadata": {
     "aws:cdk:path": "NextService-Notifications/CompletionSweeperFn/Resource",
-    "aws:asset:path": "asset.e5c0d94ed9680fb8377d35bbea3a04c2bdde2418eda49d3a473f6b5bf1337908",
+    "aws:asset:path": "asset.811e9ad0d2289e58af8ebfd71223c6f0afd4bf7804c6c874b75fef94ca28680c",
     "aws:asset:is-bundled": false,
     "aws:asset:property": "Code"
    }
@@ -811,7 +813,7 @@
       ]
      ]
     },
-    "RetentionInDays": 90
+    "RetentionInDays": 30
    },
    "Metadata": {
     "aws:cdk:path": "NextService-Notifications/CompletionSweeperFn/LogRetention/Resource"

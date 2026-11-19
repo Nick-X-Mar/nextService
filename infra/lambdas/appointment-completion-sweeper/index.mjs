@@ -39,7 +39,10 @@ const FROM_NAME = 'NextService'
 const APP_URL = (process.env.APP_URL || 'https://nextservice.gr').replace(/\/$/, '')
 // Same rule as the app's emailService: only production is on the real domain,
 // and every other stage tags the subject it sends.
-const SUBJECT_TAG = /(^|\.)nextservice\.gr$/.test(new URL(APP_URL).hostname) ? '' : '[Staging] '
+const IS_STAGING = !/(^|\.)nextservice\.gr$/.test(new URL(APP_URL).hostname)
+const SUBJECT_TAG = IS_STAGING ? '[Staging] ' : ''
+// Staging mails the admin only (withheldOnStaging in src/utils/emailService.ts).
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || ''
 const REQUESTS_TABLE = process.env.SERVICE_REQUESTS_TABLE || 'ServiceRequests'
 const GARAGES_TABLE = process.env.GARAGES_TABLE || 'Garages'
 const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
@@ -61,6 +64,21 @@ const ASSUMED_END = '18:00'
 const MAX_AGE_DAYS = Number.parseInt(process.env.COMPLETION_MAX_AGE_DAYS || '30', 10)
 const EMAIL_LOG_TTL_SECONDS = 180 * 24 * 60 * 60
 const MAX_PAGES = 20
+
+/**
+ * Staging mails the admin only, as the app does: its garages and clients are
+ * test accounts, some on real people's addresses. The admin's address with a
+ * +tag is the admin's own inbox and still gets its mail.
+ */
+function withheldOnStaging(to) {
+  if (!IS_STAGING) return false
+  return !ADMIN_EMAIL || withoutPlusTag(to) !== withoutPlusTag(ADMIN_EMAIL)
+}
+
+function withoutPlusTag(address) {
+  const [local, domain] = address.trim().toLowerCase().split('@')
+  return `${local.split('+')[0]}@${domain}`
+}
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }))
 const ses = new SESClient({ region: REGION })
@@ -359,7 +377,7 @@ async function sendRendered({ to, templateName, triggerEvent, ids, rendered }) {
     sentAt: new Date().toISOString(),
   }
 
-  if (!NOTIFICATIONS_ENABLED) {
+  if (!NOTIFICATIONS_ENABLED || (to && withheldOnStaging(to))) {
     // Still recorded, so the admin's email view shows what would have gone out.
     await writeEmailLog({ ...base, status: 'skipped' })
     return

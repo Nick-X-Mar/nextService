@@ -33,7 +33,10 @@ const FROM_NAME = 'NextService'
 const APP_URL = (process.env.APP_URL || 'https://nextservice.gr').replace(/\/$/, '')
 // Same rule as the app's emailService: only production is on the real domain,
 // and every other stage tags the subject it sends.
-const SUBJECT_TAG = /(^|\.)nextservice\.gr$/.test(new URL(APP_URL).hostname) ? '' : '[Staging] '
+const IS_STAGING = !/(^|\.)nextservice\.gr$/.test(new URL(APP_URL).hostname)
+const SUBJECT_TAG = IS_STAGING ? '[Staging] ' : ''
+// Staging mails the admin only (withheldOnStaging in src/utils/emailService.ts).
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || ''
 const GARAGES_TABLE = process.env.GARAGES_TABLE || 'Garages'
 const VEHICLES_TABLE = process.env.VEHICLES_TABLE || 'Vehicles'
 const EMAIL_LOGS_TABLE = process.env.EMAIL_LOGS_TABLE || 'EmailLogs'
@@ -46,6 +49,21 @@ const NOTIFICATIONS_ENABLED =
   (process.env.NOTIFICATIONS_ENABLED ?? 'false').toLowerCase() === 'true'
 const SEND_CONCURRENCY = Number.parseInt(process.env.SEND_CONCURRENCY || '10', 10)
 const EMAIL_LOG_TTL_SECONDS = 180 * 24 * 60 * 60
+
+/**
+ * Staging mails the admin only, as the app does: its garages and clients are
+ * test accounts, some on real people's addresses. The admin's address with a
+ * +tag is the admin's own inbox and still gets its mail.
+ */
+function withheldOnStaging(to) {
+  if (!IS_STAGING) return false
+  return !ADMIN_EMAIL || withoutPlusTag(to) !== withoutPlusTag(ADMIN_EMAIL)
+}
+
+function withoutPlusTag(address) {
+  const [local, domain] = address.trim().toLowerCase().split('@')
+  return `${local.split('+')[0]}@${domain}`
+}
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region: REGION }))
 const ses = new SESClient({ region: REGION })
@@ -187,6 +205,7 @@ async function sendToGarage(garage, request, vehicle, copy) {
 
   const emailId = randomUUID()
   const sentAt = new Date().toISOString()
+  const sending = NOTIFICATIONS_ENABLED && !withheldOnStaging(email)
 
   await writeLog({
     emailId,
@@ -195,15 +214,15 @@ async function sendToGarage(garage, request, vehicle, copy) {
     templateName: TEMPLATE_NAME,
     subject: rendered.subject,
     triggerEvent: 'service_request_submitted',
-    status: NOTIFICATIONS_ENABLED ? 'queued' : 'skipped',
+    status: sending ? 'queued' : 'skipped',
     sentAt,
     garageId,
     requestId: request.id
   })
 
-  if (!NOTIFICATIONS_ENABLED) {
+  if (!sending) {
     console.log(
-      `[broadcast] NOTIFICATIONS_OFF — would send "${rendered.subject}" to ${email}`
+      `[broadcast] ${NOTIFICATIONS_ENABLED ? 'STAGING, NOT THE ADMIN' : 'NOTIFICATIONS_OFF'} — would send "${rendered.subject}" to ${email}`
     )
     return
   }

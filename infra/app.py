@@ -53,6 +53,11 @@ AWS_ACCOUNT = "766671488262"
 # Email to receive alarm notifications (will get a confirmation email)
 ALERT_EMAIL = "nmarianos93@gmail.com"
 
+# The admin's inbox (ADMIN_EMAIL): the admin's own emails, and on staging the
+# only address any email goes to (withheldOnStaging in src/utils/emailService.ts
+# and the two Lambdas that send mail).
+ADMIN_EMAIL = "nmarianos93@gmail.com"
+
 # GitHub repo (for Amplify auto-deploy)
 GITHUB_OWNER = "Nick-X-Mar"
 GITHUB_REPO = "nextService"
@@ -180,6 +185,7 @@ amplify = AmplifyStack(
     appsync_api_id=appsync.events_api.attr_api_id,
     realtime_secret_name=REALTIME_SECRET_NAME,
     domain_prefixes=config["domain_prefixes"],
+    admin_email=ADMIN_EMAIL,
     env=env,
 )
 # Amplify no longer imports anything from the S3 stack (bucket name is passed
@@ -203,6 +209,7 @@ if app_url:
         garages_table_arn=dynamo.garages_table.table_arn,
         alert_topic=monitoring.alert_topic,
         app_url=app_url,
+        admin_email=ADMIN_EMAIL,
         notifications_enabled=True,
         manage_ses_identity=config["manage_ses_identity"],
         env=env,
