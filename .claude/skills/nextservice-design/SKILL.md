@@ -74,7 +74,7 @@ The app is **light-mode only**. There is no dark palette — don't add `dark:` v
 These are what make the app look like itself. Reuse them rather than inventing new flourishes:
 
 - `.machined-gradient` — the primary→amber diagonal gradient.
-- `.glass-panel` — `rgba(251,249,248,0.8)` + `backdrop-blur(20px)`; the same treatment appears inline on `TopHeader` (`bg-surface/80 backdrop-blur-xl`) and `BottomNav`.
+- `.glass-panel` — `rgba(251,249,248,0.8)` + `backdrop-blur(20px)`; the same treatment appears inline on `TopHeader` (`bg-surface/80 backdrop-blur-xl`).
 - `.animate-gear-roll` — a gear rolling across the submit button (`GearSubmitButton.tsx`).
 - `.active-tab-indicator` — a 3px `#ff9900` rounded underline for the active tab.
 - **Bento spec grid** — `styles.specGrid` / `specCell` / `specLabel` / `specValue`, the 3-column vehicle-spec block.
@@ -120,7 +120,7 @@ Inside a button the spinner **replaces** the leading icon rather than being adde
 `src/components/layout/AppShell.tsx` wraps everything and is already wired in the root layout:
 - `TopHeader` — `h-16`, `z-50`; sticky + translucent normally, transparent + absolute on `/`.
 - `Sidebar` — `hidden md:flex`, `w-64`, fixed at `top-16`, `z-40`. Main content offsets with `md:ml-64`. Shown for garages always; for clients everywhere except `/`.
-- `BottomNav` — `md:hidden`, fixed bottom, `rounded-t-3xl`, glass. Main content pads `pb-24 md:pb-0`.
+- `BottomNav` — `md:hidden`, fixed bottom, `h-16`, `rounded-t-3xl`, solid `bg-surface` (like the header's menu). Main content pads `pb-20 md:pb-0`; a bar fixed above it sits at `bottom-16 md:bottom-0`.
 - `/admin/*` **bypasses the shell entirely** and brings its own layout.
 
 Build mobile-first: this is a phone-first product, the desktop sidebar is the secondary case. Breakpoints are stock Tailwind.

@@ -222,10 +222,10 @@ export default function OfferDetailPage({ initialOffer }: OfferDetailPageProps) 
         </div>
       </div>
 
-      {/* Bottom CTA, kept above BottomNav (h-20 = 80px on mobile). Sticky, not
+      {/* Bottom CTA, kept above BottomNav (h-16 = 64px on mobile). Sticky, not
           fixed: it rides along the offer and stops at the end of the page, so
           the footer below is never left under it. */}
-      <div className="sticky bottom-20 md:bottom-0 z-40 bg-surface/80 backdrop-blur-xl border-t border-outline-variant/20 p-4">
+      <div className="sticky bottom-16 md:bottom-0 z-40 bg-surface/80 backdrop-blur-xl border-t border-outline-variant/20 p-4">
         <div className="max-w-2xl mx-auto">
           <button
             onClick={handleGetOffer}

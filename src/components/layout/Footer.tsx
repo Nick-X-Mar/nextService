@@ -21,7 +21,8 @@ const footerLinks = [
   { label: 'Όροι Χρήσης', href: '/terms/' },
   { label: 'Πολιτική Απορρήτου', href: '/privacy/' },
   { label: 'Επικοινωνία', href: '/contact/' },
-  { label: 'Εφαρμογή', href: '/app/' },
+  // Not inside the installed app itself (`.browser-only`, globals.css).
+  { label: 'Εφαρμογή', href: '/app/', className: 'browser-only' },
 ]
 
 export default function Footer() {
@@ -73,7 +74,7 @@ export default function Footer() {
               <Link
                 key={link.label}
                 href={link.href}
-                className="inline-block py-2.5 text-sm text-on-surface-variant hover:text-on-surface transition-colors"
+                className={`inline-block py-2.5 text-sm text-on-surface-variant hover:text-on-surface transition-colors ${link.className ?? ''}`}
               >
                 {link.label}
               </Link>

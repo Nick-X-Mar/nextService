@@ -59,6 +59,9 @@ export default function TopHeader() {
               <Link href="/register-professional/" className={`${isLanding ? 'text-white/80 hover:text-white' : 'text-secondary hover:text-on-surface'} transition-colors`}>
                 Επαγγελματίες
               </Link>
+              <Link href="/app/" className={`browser-only ${isLanding ? 'text-white/80 hover:text-white' : 'text-secondary hover:text-on-surface'} transition-colors`}>
+                Εφαρμογή
+              </Link>
             </>
           )}
           {/* Logged-in clients see ONLY the "Νέο Αίτημα" CTA — every other
@@ -171,6 +174,10 @@ export default function TopHeader() {
               <span className="font-medium">Πληρωμές</span>
             </Link>
           )}
+          <Link href="/app/" onClick={() => setMobileMenuOpen(false)} className="browser-only flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors">
+            <Icon name="install_mobile" className="text-primary" />
+            <span className="font-medium">Η εφαρμογή NextService</span>
+          </Link>
           {userType && userType !== 'guest' && (
             <button onClick={() => { logout(); setMobileMenuOpen(false) }} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-container transition-colors w-full text-tertiary">
               <Icon name="logout" className="text-tertiary" />

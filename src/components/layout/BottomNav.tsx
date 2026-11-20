@@ -14,6 +14,8 @@ interface NavItem extends ActiveNavItem {
   badge?: number
   /** What the badge counts, for screen readers. */
   badgeLabel?: string
+  /** Gone inside the installed app (`.browser-only`, globals.css). */
+  browserOnly?: boolean
 }
 
 export default function BottomNav() {
@@ -32,6 +34,7 @@ export default function BottomNav() {
   ] : [
     { label: 'Αρχική', icon: 'home', href: '/', matchPaths: ['/'] },
     { label: 'Σύνδεση', icon: 'login', href: '/login', matchPaths: ['/login'] },
+    { label: 'Εφαρμογή', icon: 'install_mobile', href: '/app/', matchPaths: ['/app'], browserOnly: true },
   ]
 
   // Pending validation: the app tabs would all be empty, so the only
@@ -59,21 +62,23 @@ export default function BottomNav() {
   if (!navItems.length) return null
 
   return (
-    <nav className="fixed bottom-0 w-full z-50 md:hidden rounded-t-3xl bg-[#fbf9f8]/80 backdrop-blur-xl border-t border-outline-variant/20 shadow-[0_-4px_20px_0_rgba(0,0,0,0.04)]">
+    // Solid, like the header's menu: see-through, it took the colour of the
+    // landing photo behind it.
+    <nav className="fixed bottom-0 w-full z-50 md:hidden rounded-t-3xl bg-surface border-t border-outline-variant/20 shadow-[0_-4px_20px_0_rgba(0,0,0,0.04)]">
       {/* Each tab takes an equal share (`flex-1 min-w-0`) instead of sizing to
           its label. The garage's five tabs used to add up past the screen on a
           320px phone, pushing Ρυθμίσεις off the right edge entirely; equal
           shares plus a truncating label keep every tab reachable. The active
           pill's padding is horizontal-free for the same reason — it used to add
           32px to whichever tab happened to be selected. */}
-      <div className="flex items-center h-20 px-2">
+      <div className="flex items-center h-16 px-2">
         {navItems.map((item) => {
           const active = item.href === activeHref
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 mx-0.5 rounded-2xl active:scale-90 duration-200 ${
+              className={`flex-1 min-w-0 flex flex-col items-center justify-center py-1 mx-0.5 rounded-2xl active:scale-90 duration-200 ${item.browserOnly ? 'browser-only' : ''} ${
                 active
                   ? 'text-primary bg-primary-container/10'
                   : // Not on-surface/60: at 9–10px that grey fell short of the 4.5:1 contrast small text needs.

@@ -60,3 +60,29 @@ test('After sending a request, the requests page offers the app; «Όχι τώρ
   await expect(page.getByRole('heading', { name: 'Τα Αιτήματά μου' })).toBeVisible()
   await expect(card).toBeHidden()
 })
+
+test('A visitor finds the app in the bottom bar and the menu, both marked to stay out of the installed app', async ({ page }) => {
+  await page.goto('/')
+  // The bottom bar is the page's last <nav>; the footer has an Εφαρμογή link of its own.
+  const barLink = page.locator('nav').last().locator('a[href="/app/"]')
+  await expect(barLink).toHaveText(/Εφαρμογή/)
+  await expect(barLink).toBeVisible()
+  await page.getByRole('button', { name: 'Μενού' }).click()
+  const menuLink = page.getByRole('link', { name: /Η εφαρμογή NextService/ })
+  await expect(menuLink).toBeVisible()
+  await expectNoSidewaysScroll(page)
+
+  // No browser here can be put in display-mode: standalone (Chromium ignores
+  // it as an emulated media feature), so check what the app would apply: both
+  // links (and the footer's) carry .browser-only, hidden in the installed app.
+  for (const link of await page.locator('a[href="/app/"]').all()) {
+    await expect(link).toHaveClass(/\bbrowser-only\b/)
+  }
+  const hiddenInApp = await page.evaluate(() => [...document.styleSheets]
+    .flatMap((sheet) => { try { return [...sheet.cssRules] } catch { return [] } })
+    .some((rule) => rule instanceof CSSMediaRule
+      && rule.conditionText.includes('display-mode: standalone')
+      && [...rule.cssRules].some((inner) => inner instanceof CSSStyleRule
+        && inner.selectorText === '.browser-only' && inner.style.display === 'none')))
+  expect(hiddenInApp, '.browser-only is hidden in display-mode: standalone').toBe(true)
+})

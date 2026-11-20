@@ -385,10 +385,10 @@ export default function BodyWorkPhotosForm({ savedData }: BodyWorkPhotosFormProp
           </div>
         </div>
 
-        {/* Fixed bottom section, above the phone's BottomNav (h-20). At
+        {/* Fixed bottom section, above the phone's BottomNav (h-16). At
             bottom-0 the nav covered half the submit button and all of the
             back link. */}
-        <div className="fixed bottom-20 md:bottom-0 left-0 right-0 bg-surface/80 backdrop-blur-xl border-t border-outline-variant/10 px-5 pt-4 pb-4 md:pb-8 z-40">
+        <div className="fixed bottom-16 md:bottom-0 left-0 right-0 bg-surface/80 backdrop-blur-xl border-t border-outline-variant/10 px-5 pt-4 pb-4 md:pb-8 z-40">
           <div className="max-w-lg mx-auto">
             <GuestTermsCheckbox account={account} className="mb-3" />
 

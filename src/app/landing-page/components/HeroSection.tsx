@@ -273,7 +273,7 @@ export default function HeroSection() {
           exist below the fold. In the flow under the menu, since the menu now opens
           by itself: on a short screen the hero grows rather than the two colliding.
           The padding keeps it above BottomNav on mobile. */}
-      <div className="relative z-10 pb-28 md:pb-16 flex flex-col items-center gap-2">
+      <div className="relative z-10 pb-24 md:pb-16 flex flex-col items-center gap-2">
         <div className="flex flex-wrap items-center justify-center gap-2 px-4">
           <button
             type="button"

@@ -7,9 +7,20 @@
   --background: #fbf9f8;
   --foreground: #1b1c1c;
 
-  /* App shell chrome — keep in sync with TopHeader (h-16) and BottomNav (h-20). */
+  /* App shell chrome — keep in sync with TopHeader (h-16) and BottomNav (h-16). */
   --app-header-h: 4rem;
-  --app-bottom-nav-h: 5rem;
+  --app-bottom-nav-h: 4rem;
+}
+
+/*
+ * The ways in to /app/ (the site as an installed app), which mean nothing
+ * inside the app itself. The same test as isStandalone() (src/lib/pwa.ts),
+ * made in CSS so the app never paints them, not even before React loads.
+ */
+@media (display-mode: standalone), (display-mode: window-controls-overlay) {
+  .browser-only {
+    display: none !important;
+  }
 }
 
 * {
@@ -71,7 +82,7 @@ html[data-consent-settled] [data-consent-banner] {
  * `dvh` rather than `vh` so a mobile browser's collapsing URL bar is accounted
  * for as well; the plain `vh` line above it is the fallback for browsers
  * without `dvh` support. Pages using this must not sit inside the app shell's
- * pt-14/pb-24 chrome padding — see AppShell's `isViewportPage`.
+ * pt-14/pb-20 chrome padding — see AppShell's `isViewportPage`.
  */
 .app-viewport {
   height: calc(100vh - var(--app-header-h) - var(--app-bottom-nav-h));

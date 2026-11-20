@@ -31,7 +31,7 @@ export default function PushPrompt({ audience, onDone }: { audience: 'garage' | 
     <div
       role="dialog"
       aria-label="Ειδοποιήσεις"
-      className="fixed inset-x-0 bottom-20 md:bottom-4 z-[55] px-4 pointer-events-none"
+      className="fixed inset-x-0 bottom-16 md:bottom-4 z-[55] px-4 pointer-events-none"
     >
       <div className="pointer-events-auto mx-auto max-w-xl rounded-2xl bg-surface-container-lowest p-4 shadow-2xl border border-outline-variant/20">
         <p className="text-sm text-on-surface">{COPY[audience]}</p>
