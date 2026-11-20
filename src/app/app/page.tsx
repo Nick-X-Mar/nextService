@@ -8,7 +8,9 @@ import InstallApp from './components/InstallApp'
 const URL = `${SITE_URL}/app/`
 
 export const metadata: Metadata = {
-  title: 'Η εφαρμογή NextService',
+  // Bare, without the «| NextService» template: an iPhone offers the title of
+  // the page it is on as the name under the icon, whatever the manifest says.
+  title: { absolute: 'NextService' },
   description: 'Βάλε το NextService στο κινητό ή στον υπολογιστή σου: μένεις συνδεδεμένος και σε ειδοποιούμε για προσφορές και μηνύματα. Δωρεάν, χωρίς App Store.',
   alternates: { canonical: URL },
 }

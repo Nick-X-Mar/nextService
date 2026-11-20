@@ -22,6 +22,8 @@ async function expectNoSidewaysScroll(page: Page) {
 
 test('The app page gives this phone’s install steps and fits the screen', async ({ page }) => {
   await page.goto('/app/')
+  // What an iPhone offers as the name under the icon.
+  await expect(page).toHaveTitle('NextService')
   const iphone = test.info().project.name === 'mobile-iphone'
   await expect(page.getByRole('heading', { name: iphone ? 'Στο iPhone ή στο iPad' : 'Στο κινητό σου' })).toBeVisible()
   if (iphone) await expect(page.getByText('Προσθήκη στην οθόνη Αφετηρίας')).toBeVisible()
