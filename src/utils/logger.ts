@@ -228,6 +228,11 @@ export const log = {
 // `opengraph-image` file, even with metadataBase set — and then uses ours.
 const NOT_SHIPPED = [/^⚠ metadataBase property in metadata export is not set/]
 
+// Node prints its own process warnings through console.error — web-push's
+// url.parse() (DEP0169) on the first push an instance sends, for one. They
+// are warnings: shipped as errors, each set off the error alarm.
+const NODE_WARNING = /^\(node:\d+\) (\[\w+\] )?\w*Warning: /
+
 /**
  * Turns `console.warn` / `console.error` into structured entries on a deployed
  * server. Local dev keeps the plain console, where a readable stack matters
@@ -240,5 +245,8 @@ export function installConsoleCapture() {
     const entry = entryFromArgs('warn', args)
     write(entry, !NOT_SHIPPED.some((pattern) => pattern.test(entry.message)))
   }
-  console.error = (...args: unknown[]) => write(entryFromArgs('error', args), true)
+  console.error = (...args: unknown[]) => {
+    const entry = entryFromArgs('error', args)
+    write(NODE_WARNING.test(entry.message) ? { ...entry, level: 'warn' } : entry, true)
+  }
 }
