@@ -97,11 +97,13 @@ test.describe('Installable app', () => {
     const opens = async (headers: Record<string, string> = {}) => {
       const res = await request.get('/app/open/', { headers, maxRedirects: 0 })
       expect(res.status()).toBe(307)
-      return new URL(res.headers().location, 'http://localhost:3000').pathname
+      // A path, never a host: on Amplify the handler's own URL is localhost:3000
+      expect(res.headers().location).toMatch(/^\/(?!\/)/)
+      return res.headers().location
     }
     const guest = await newGuest(playwright)
     const anonymous = await guest.get('/app/open/', { maxRedirects: 0 })
-    expect(new URL(anonymous.headers().location, 'http://localhost:3000').pathname).toBe('/')
+    expect(anonymous.headers().location).toBe('/')
     await guest.dispose()
 
     const client = await newClient(request, 'pwa-open')
