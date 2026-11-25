@@ -16,7 +16,7 @@
     "aws:cdk:path": "NextService-AppSync/RealtimeJwtSecret/Resource"
    }
   },
-  "EventsAuthorizerFnServiceRole37EFF19E": {
+  "RealtimeSecretRotationFnServiceRoleA7ACA289": {
    "Type": "AWS::IAM::Role",
    "Properties": {
     "AssumeRolePolicyDocument": {
@@ -47,86 +47,58 @@
     ]
    },
    "Metadata": {
-    "aws:cdk:path": "NextService-AppSync/EventsAuthorizerFn/ServiceRole/Resource"
+    "aws:cdk:path": "NextService-AppSync/RealtimeSecretRotationFn/ServiceRole/Resource"
    }
   },
-  "EventsAuthorizerFnServiceRoleDefaultPolicyA3130703": {
+  "RealtimeSecretRotationFnServiceRoleDefaultPolicy511C2916": {
    "Type": "AWS::IAM::Policy",
    "Properties": {
     "PolicyDocument": {
      "Statement": [
       {
-       "Action": "dynamodb:GetItem",
+       "Action": "secretsmanager:PutSecretValue",
        "Effect": "Allow",
-       "Resource": [
-        "arn:aws:dynamodb:eu-central-1:766671488262:table/ServiceRequests",
-        "arn:aws:dynamodb:eu-central-1:766671488262:table/Garages"
-       ]
+       "Resource": "arn:aws:secretsmanager:eu-central-1:766671488262:secret:nextservice/realtime-jwt-secret-*"
       }
      ],
      "Version": "2012-10-17"
     },
-    "PolicyName": "EventsAuthorizerFnServiceRoleDefaultPolicyA3130703",
+    "PolicyName": "RealtimeSecretRotationFnServiceRoleDefaultPolicy511C2916",
     "Roles": [
      {
-      "Ref": "EventsAuthorizerFnServiceRole37EFF19E"
+      "Ref": "RealtimeSecretRotationFnServiceRoleA7ACA289"
      }
     ]
    },
    "Metadata": {
-    "aws:cdk:path": "NextService-AppSync/EventsAuthorizerFn/ServiceRole/DefaultPolicy/Resource"
+    "aws:cdk:path": "NextService-AppSync/RealtimeSecretRotationFn/ServiceRole/DefaultPolicy/Resource"
    }
   },
-  "EventsAuthorizerFnE9651D1C": {
+  "RealtimeSecretRotationFn0C3C6910": {
    "Type": "AWS::Lambda::Function",
    "Properties": {
     "Code": {
-     "S3Bucket": "cdk-hnb659fds-assets-766671488262-eu-central-1",
-     "S3Key": "df408d689efd7f5b53eee83867eae3a65c2fc2570b06e094afe508715d3cb46d.zip"
+     "ZipFile": "\nimport json, secrets, boto3\nsm = boto3.client(\"secretsmanager\")\ndef handler(event, context):\n    props = event[\"ResourceProperties\"]\n    name = props[\"SecretName\"]\n    old = event.get(\"OldResourceProperties\", {}).get(\"Generation\")\n    if event[\"RequestType\"] != \"Delete\" and props[\"Generation\"] != old:\n        keys = props.get(\"JsonKeys\") or []\n        value = (json.dumps({k: secrets.token_hex(32) for k in keys})\n                 if keys else secrets.token_hex(32))\n        sm.put_secret_value(SecretId=name, SecretString=value)\n    # Delete leaves the secret alone: it belongs to the stack that made it.\n    return {\"PhysicalResourceId\": name}\n"
     },
-    "Description": "Authorizes AppSync Events connect/subscribe/publish per channel",
-    "Environment": {
-     "Variables": {
-      "SERVICE_REQUESTS_TABLE": "ServiceRequests",
-      "GARAGES_TABLE": "Garages",
-      "REALTIME_JWT_SECRET": {
-       "Fn::Join": [
-        "",
-        [
-         "{{resolve:secretsmanager:",
-         {
-          "Ref": "RealtimeJwtSecretE8152CE0"
-         },
-         ":SecretString:::}}"
-        ]
-       ]
-      }
-     }
-    },
-    "FunctionName": "nextservice-appsync-authorizer",
     "Handler": "index.handler",
-    "MemorySize": 256,
     "Role": {
      "Fn::GetAtt": [
-      "EventsAuthorizerFnServiceRole37EFF19E",
+      "RealtimeSecretRotationFnServiceRoleA7ACA289",
       "Arn"
      ]
     },
-    "Runtime": "nodejs24.x",
-    "Timeout": 10
+    "Runtime": "python3.12",
+    "Timeout": 30
    },
    "DependsOn": [
-    "EventsAuthorizerFnServiceRoleDefaultPolicyA3130703",
-    "EventsAuthorizerFnServiceRole37EFF19E"
+    "RealtimeSecretRotationFnServiceRoleDefaultPolicy511C2916",
+    "RealtimeSecretRotationFnServiceRoleA7ACA289"
    ],
    "Metadata": {
-    "aws:cdk:path": "NextService-AppSync/EventsAuthorizerFn/Resource",
-    "aws:asset:path": "asset.df408d689efd7f5b53eee83867eae3a65c2fc2570b06e094afe508715d3cb46d",
-    "aws:asset:is-bundled": false,
-    "aws:asset:property": "Code"
+    "aws:cdk:path": "NextService-AppSync/RealtimeSecretRotationFn/Resource"
    }
   },
-  "EventsAuthorizerFnLogRetentionEDE71001": {
+  "RealtimeSecretRotationFnLogRetention950DA638": {
    "Type": "Custom::LogRetention",
    "Properties": {
     "ServiceToken": {
@@ -141,7 +113,7 @@
       [
        "/aws/lambda/",
        {
-        "Ref": "EventsAuthorizerFnE9651D1C"
+        "Ref": "RealtimeSecretRotationFn0C3C6910"
        }
       ]
      ]
@@ -149,37 +121,7 @@
     "RetentionInDays": 30
    },
    "Metadata": {
-    "aws:cdk:path": "NextService-AppSync/EventsAuthorizerFn/LogRetention/Resource"
-   }
-  },
-  "EventsAuthorizerFnAppSyncInvokeAuthorizer2292CEA4": {
-   "Type": "AWS::Lambda::Permission",
-   "Properties": {
-    "Action": "lambda:InvokeFunction",
-    "FunctionName": {
-     "Fn::GetAtt": [
-      "EventsAuthorizerFnE9651D1C",
-      "Arn"
-     ]
-    },
-    "Principal": "appsync.amazonaws.com",
-    "SourceArn": {
-     "Fn::Join": [
-      "",
-      [
-       "arn:aws:appsync:eu-central-1:766671488262:apis/",
-       {
-        "Fn::GetAtt": [
-         "ChatEventsApi",
-         "ApiId"
-        ]
-       }
-      ]
-     ]
-    }
-   },
-   "Metadata": {
-    "aws:cdk:path": "NextService-AppSync/EventsAuthorizerFn/AppSyncInvokeAuthorizer"
+    "aws:cdk:path": "NextService-AppSync/RealtimeSecretRotationFn/LogRetention/Resource"
    }
   },
   "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB": {
@@ -269,6 +211,366 @@
     "aws:asset:path": "asset.2819175352ad1ce0dae768e83fc328fb70fb5f10b4a8ff0ccbcb791f02b0716d",
     "aws:asset:is-bundled": false,
     "aws:asset:property": "Code"
+   }
+  },
+  "RealtimeSecretRotationProviderframeworkonEventServiceRole72C650F3": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/RealtimeSecretRotationProvider/framework-onEvent/ServiceRole/Resource"
+   }
+  },
+  "RealtimeSecretRotationProviderframeworkonEventServiceRoleDefaultPolicyB2B59AB9": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "lambda:InvokeFunction",
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "RealtimeSecretRotationFn0C3C6910",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "RealtimeSecretRotationFn0C3C6910",
+             "Arn"
+            ]
+           },
+           ":*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "lambda:GetFunction",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "RealtimeSecretRotationFn0C3C6910",
+         "Arn"
+        ]
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "RealtimeSecretRotationProviderframeworkonEventServiceRoleDefaultPolicyB2B59AB9",
+    "Roles": [
+     {
+      "Ref": "RealtimeSecretRotationProviderframeworkonEventServiceRole72C650F3"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/RealtimeSecretRotationProvider/framework-onEvent/ServiceRole/DefaultPolicy/Resource"
+   }
+  },
+  "RealtimeSecretRotationProviderframeworkonEvent9A093565": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-766671488262-eu-central-1",
+     "S3Key": "07a90cc3efdfc34da22208dcd9d211f06f5b0e01b21e778edc7c3966b1f61d57.zip"
+    },
+    "Description": "AWS CDK resource provider framework - onEvent (NextService-AppSync/RealtimeSecretRotationProvider)",
+    "Environment": {
+     "Variables": {
+      "USER_ON_EVENT_FUNCTION_ARN": {
+       "Fn::GetAtt": [
+        "RealtimeSecretRotationFn0C3C6910",
+        "Arn"
+       ]
+      }
+     }
+    },
+    "Handler": "framework.onEvent",
+    "LoggingConfig": {
+     "ApplicationLogLevel": "FATAL",
+     "LogFormat": "JSON"
+    },
+    "Role": {
+     "Fn::GetAtt": [
+      "RealtimeSecretRotationProviderframeworkonEventServiceRole72C650F3",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs22.x",
+    "Timeout": 900
+   },
+   "DependsOn": [
+    "RealtimeSecretRotationProviderframeworkonEventServiceRoleDefaultPolicyB2B59AB9",
+    "RealtimeSecretRotationProviderframeworkonEventServiceRole72C650F3"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/RealtimeSecretRotationProvider/framework-onEvent/Resource",
+    "aws:asset:path": "asset.07a90cc3efdfc34da22208dcd9d211f06f5b0e01b21e778edc7c3966b1f61d57",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "RealtimeSecretRotationProviderframeworkonEventLogRetention76D356A9": {
+   "Type": "Custom::LogRetention",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
+      "Arn"
+     ]
+    },
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "RealtimeSecretRotationProviderframeworkonEvent9A093565"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 30
+   },
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/RealtimeSecretRotationProvider/framework-onEvent/LogRetention/Resource"
+   }
+  },
+  "RealtimeSecretRotation": {
+   "Type": "Custom::SecretRotation",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "RealtimeSecretRotationProviderframeworkonEvent9A093565",
+      "Arn"
+     ]
+    },
+    "SecretName": "nextservice/realtime-jwt-secret",
+    "Generation": "1",
+    "JsonKeys": []
+   },
+   "DependsOn": [
+    "RealtimeJwtSecretE8152CE0"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/RealtimeSecretRotation/Default"
+   }
+  },
+  "EventsAuthorizerFnServiceRole37EFF19E": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "DependsOn": [
+    "RealtimeSecretRotation"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/EventsAuthorizerFn/ServiceRole/Resource"
+   }
+  },
+  "EventsAuthorizerFnServiceRoleDefaultPolicyA3130703": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "dynamodb:GetItem",
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/ServiceRequests",
+        "arn:aws:dynamodb:eu-central-1:766671488262:table/Garages"
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "EventsAuthorizerFnServiceRoleDefaultPolicyA3130703",
+    "Roles": [
+     {
+      "Ref": "EventsAuthorizerFnServiceRole37EFF19E"
+     }
+    ]
+   },
+   "DependsOn": [
+    "RealtimeSecretRotation"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/EventsAuthorizerFn/ServiceRole/DefaultPolicy/Resource"
+   }
+  },
+  "EventsAuthorizerFnE9651D1C": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": "cdk-hnb659fds-assets-766671488262-eu-central-1",
+     "S3Key": "df408d689efd7f5b53eee83867eae3a65c2fc2570b06e094afe508715d3cb46d.zip"
+    },
+    "Description": "Authorizes AppSync Events connect/subscribe/publish per channel",
+    "Environment": {
+     "Variables": {
+      "SERVICE_REQUESTS_TABLE": "ServiceRequests",
+      "GARAGES_TABLE": "Garages",
+      "REALTIME_JWT_SECRET": {
+       "Fn::Join": [
+        "",
+        [
+         "{{resolve:secretsmanager:",
+         {
+          "Ref": "RealtimeJwtSecretE8152CE0"
+         },
+         ":SecretString:::}}"
+        ]
+       ]
+      },
+      "SECRETS_GENERATION": "1"
+     }
+    },
+    "FunctionName": "nextservice-appsync-authorizer",
+    "Handler": "index.handler",
+    "MemorySize": 256,
+    "Role": {
+     "Fn::GetAtt": [
+      "EventsAuthorizerFnServiceRole37EFF19E",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs24.x",
+    "Timeout": 10
+   },
+   "DependsOn": [
+    "EventsAuthorizerFnServiceRoleDefaultPolicyA3130703",
+    "EventsAuthorizerFnServiceRole37EFF19E",
+    "RealtimeSecretRotation"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/EventsAuthorizerFn/Resource",
+    "aws:asset:path": "asset.df408d689efd7f5b53eee83867eae3a65c2fc2570b06e094afe508715d3cb46d",
+    "aws:asset:is-bundled": false,
+    "aws:asset:property": "Code"
+   }
+  },
+  "EventsAuthorizerFnLogRetentionEDE71001": {
+   "Type": "Custom::LogRetention",
+   "Properties": {
+    "ServiceToken": {
+     "Fn::GetAtt": [
+      "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A",
+      "Arn"
+     ]
+    },
+    "LogGroupName": {
+     "Fn::Join": [
+      "",
+      [
+       "/aws/lambda/",
+       {
+        "Ref": "EventsAuthorizerFnE9651D1C"
+       }
+      ]
+     ]
+    },
+    "RetentionInDays": 30
+   },
+   "DependsOn": [
+    "RealtimeSecretRotation"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/EventsAuthorizerFn/LogRetention/Resource"
+   }
+  },
+  "EventsAuthorizerFnAppSyncInvokeAuthorizer2292CEA4": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "EventsAuthorizerFnE9651D1C",
+      "Arn"
+     ]
+    },
+    "Principal": "appsync.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:aws:appsync:eu-central-1:766671488262:apis/",
+       {
+        "Fn::GetAtt": [
+         "ChatEventsApi",
+         "ApiId"
+        ]
+       }
+      ]
+     ]
+    }
+   },
+   "DependsOn": [
+    "RealtimeSecretRotation"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "NextService-AppSync/EventsAuthorizerFn/AppSyncInvokeAuthorizer"
    }
   },
   "ChatEventsApi": {
@@ -550,7 +852,7 @@
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/02OQU/DMAyFf8vumYEVCa7bJC4gmNofMHmZ14YlTlU7TFWU/46aceD0Pev52W8Dm+dXeFzhTdb2fF17d4LcKdqrwZscs5CdSCUgY08T5K7OZn/huyrGYzidEfJbYqsu8uL91weaghNxkYtxGCC30dNiVB6id3aue1UVI80RRUgFtguMNLBL9kq6QyHjYy/wEfuWlLi+wHGUmS3k/YW3ozN3vFM9uh+QmfwnBpIRLRVDP8QqkNv01yJ5Ksb6mM43VDtA3nqcQj2ziFJM7dEp9o77GiGJabI1/pV0TFrMYdYh8kMDTw28rL7FufWUWF0gaO/8BVuyI2pqAQAA"
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/02OwW7CMBBEv4W72bakUnuFSFxatVH4ALQ4S3Cx15HXBiHL/17FoKqnmdWbHc0KVq/v8LzAqyz1cF5ac4C8i6jPCq+yz0I6UBSHjCMFyLt6q/bId1eURXcYEPI2sY7G88z++46CMyLGc1EGHeTeW5pB1c5bo281V11R1o8Cn37sKRLXEmn2KEJRYD2LkgY2SZ8pblBI4TTJjTXk9sjryai7fFAtbU/ITPYLHcmEmoqiC3EUyH16rEiWitLWp+GKUZ8gry0GV2tmU0pNkfgUNKm6YBdxNDwqnSR6tw8PKNAFfzEDBdVW8vfVHvk7xSnForpbPHl+auClgbfFjxizDImjcQT9XX8BfTswbZMBAAA="
    },
    "Metadata": {
     "aws:cdk:path": "NextService-AppSync/CDKMetadata/Default"

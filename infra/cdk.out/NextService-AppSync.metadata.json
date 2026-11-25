@@ -59,6 +59,24 @@
       "data": "RealtimeJwtSecretE8152CE0"
     }
   ],
+  "/NextService-AppSync/RealtimeSecretRotationFn/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RealtimeSecretRotationFn0C3C6910"
+    }
+  ],
+  "/NextService-AppSync/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A"
+    }
+  ],
+  "/NextService-AppSync/RealtimeSecretRotation/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RealtimeSecretRotation"
+    }
+  ],
   "/NextService-AppSync/EventsAuthorizerFn/Resource": [
     {
       "type": "aws:cdk:logicalId",
@@ -69,12 +87,6 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "EventsAuthorizerFnAppSyncInvokeAuthorizer2292CEA4"
-    }
-  ],
-  "/NextService-AppSync/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/Resource": [
-    {
-      "type": "aws:cdk:logicalId",
-      "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A"
     }
   ],
   "/NextService-AppSync/ApiKeyRotatorFn/Resource": [
@@ -131,6 +143,30 @@
       "data": "ExportsOutputFnGetAttChatEventsApiApiId96C43684"
     }
   ],
+  "/NextService-AppSync/RealtimeSecretRotationFn/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RealtimeSecretRotationFnServiceRoleA7ACA289"
+    }
+  ],
+  "/NextService-AppSync/RealtimeSecretRotationFn/LogRetention/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RealtimeSecretRotationFnLogRetention950DA638"
+    }
+  ],
+  "/NextService-AppSync/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB"
+    }
+  ],
+  "/NextService-AppSync/RealtimeSecretRotationProvider/framework-onEvent/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RealtimeSecretRotationProviderframeworkonEvent9A093565"
+    }
+  ],
   "/NextService-AppSync/EventsAuthorizerFn/ServiceRole/Resource": [
     {
       "type": "aws:cdk:logicalId",
@@ -141,12 +177,6 @@
     {
       "type": "aws:cdk:logicalId",
       "data": "EventsAuthorizerFnLogRetentionEDE71001"
-    }
-  ],
-  "/NextService-AppSync/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/Resource": [
-    {
-      "type": "aws:cdk:logicalId",
-      "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB"
     }
   ],
   "/NextService-AppSync/ApiKeyRotatorFn/ServiceRole/Resource": [
@@ -161,10 +191,10 @@
       "data": "ApiKeyRotatorFnLogRetention995DABF2"
     }
   ],
-  "/NextService-AppSync/EventsAuthorizerFn/ServiceRole/DefaultPolicy/Resource": [
+  "/NextService-AppSync/RealtimeSecretRotationFn/ServiceRole/DefaultPolicy/Resource": [
     {
       "type": "aws:cdk:logicalId",
-      "data": "EventsAuthorizerFnServiceRoleDefaultPolicyA3130703"
+      "data": "RealtimeSecretRotationFnServiceRoleDefaultPolicy511C2916"
     }
   ],
   "/NextService-AppSync/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/DefaultPolicy/Resource": [
@@ -173,10 +203,34 @@
       "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB"
     }
   ],
+  "/NextService-AppSync/RealtimeSecretRotationProvider/framework-onEvent/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RealtimeSecretRotationProviderframeworkonEventServiceRole72C650F3"
+    }
+  ],
+  "/NextService-AppSync/RealtimeSecretRotationProvider/framework-onEvent/LogRetention/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RealtimeSecretRotationProviderframeworkonEventLogRetention76D356A9"
+    }
+  ],
+  "/NextService-AppSync/EventsAuthorizerFn/ServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "EventsAuthorizerFnServiceRoleDefaultPolicyA3130703"
+    }
+  ],
   "/NextService-AppSync/ApiKeyRotatorFn/ServiceRole/DefaultPolicy/Resource": [
     {
       "type": "aws:cdk:logicalId",
       "data": "ApiKeyRotatorFnServiceRoleDefaultPolicy575FB301"
+    }
+  ],
+  "/NextService-AppSync/RealtimeSecretRotationProvider/framework-onEvent/ServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RealtimeSecretRotationProviderframeworkonEventServiceRoleDefaultPolicyB2B59AB9"
     }
   ]
 }

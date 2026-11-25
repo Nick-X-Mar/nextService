@@ -15,6 +15,7 @@ from aws_cdk import (
 from constructs import Construct
 
 from stacks.log_retention import expire_lambda_logs, expire_logs
+from stacks.secret_rotation import rotate_secret
 
 
 # Regions an account has to enable before use. Services there act under
@@ -48,6 +49,7 @@ class AmplifyStack(Stack):
         appsync_api_key: str,
         appsync_api_id: str,
         realtime_secret_name: str,
+        secrets_generation: int,
         domain_prefixes: list[str] = (),
         admin_email: str,
         **kwargs,
@@ -116,6 +118,14 @@ class AmplifyStack(Stack):
             properties={"SecretName": auth_secrets_name},
             removal_policy=RemovalPolicy.DESTROY,
         )
+        # New values whenever the stage's secrets_generation goes up (app.py).
+        auth_secrets_rotation = rotate_secret(
+            self, "AuthSecretsRotation",
+            secret_name=auth_secrets_name,
+            generation=secrets_generation,
+            json_keys=["JWT_SECRET", "ADMIN_JWT_SECRET"],
+        )
+        auth_secrets_rotation.node.add_dependency(auth_secrets_cr)
 
         jwt_secret_value = SecretValue.secrets_manager(
             auth_secrets_name, json_field="JWT_SECRET",
@@ -442,6 +452,12 @@ frontend:
                     name="REALTIME_JWT_SECRET",
                     value=SecretValue.secrets_manager(realtime_secret_name).unsafe_unwrap(),
                 ),
+                # Read by nothing: changing it is what makes CloudFormation
+                # update the app, and so read the three secrets above again
+                # after a rotation (stacks/secret_rotation.py).
+                amplify.CfnApp.EnvironmentVariableProperty(
+                    name="SECRETS_GENERATION", value=str(secrets_generation),
+                ),
                 # Payments feature flags — disabled for the launch phase
                 # (free booking, no deposit, no refunds flow). Flip to "true"
                 # once the Stripe integration is ready to go live.
@@ -463,6 +479,7 @@ frontend:
         # Amplify env vars resolve `{{resolve:secretsmanager:...}}` at deploy
         # time, so the secret must exist before the app is created/updated.
         self.amplify_app.node.add_dependency(auth_secrets_cr)
+        self.amplify_app.node.add_dependency(auth_secrets_rotation)
 
         # ── Branch ──────────────────────────────────────────────
         # compute_role_arn wires our role into the SSR compute Lambda at

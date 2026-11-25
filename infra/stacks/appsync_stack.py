@@ -24,6 +24,7 @@ ROTATOR_INTERVAL_DAYS = 300
 from constructs import Construct
 
 from stacks.log_retention import expire_lambda_logs
+from stacks.secret_rotation import rotate_secret
 
 
 
@@ -67,6 +68,7 @@ class AppSyncStack(Stack):
         construct_id: str,
         *,
         alert_topic: sns.ITopic | None = None,
+        secrets_generation: int,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -89,6 +91,13 @@ class AppSyncStack(Stack):
                 exclude_punctuation=True,
             ),
         )
+        # New value whenever the stage's secrets_generation goes up (app.py).
+        realtime_secret_rotation = rotate_secret(
+            self, "RealtimeSecretRotation",
+            secret_name=REALTIME_SECRET_NAME,
+            generation=secrets_generation,
+        )
+        realtime_secret_rotation.node.add_dependency(self.realtime_secret)
 
         # ── Authorizer ───────────────────────────────────────────
         # API_KEY alone is not an access control here: the key is published to
@@ -118,8 +127,12 @@ class AppSyncStack(Stack):
                 "GARAGES_TABLE": "Garages",
                 # The same secret the Next.js app signs with (see above).
                 "REALTIME_JWT_SECRET": self.realtime_secret.secret_value.unsafe_unwrap(),
+                # Read by nothing: changing it is what makes CloudFormation
+                # read the secret above again after a rotation.
+                "SECRETS_GENERATION": str(secrets_generation),
             },
         )
+        self.authorizer_fn.node.add_dependency(realtime_secret_rotation)
         self.authorizer_fn.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["dynamodb:GetItem"],

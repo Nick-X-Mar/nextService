@@ -97,6 +97,12 @@ AUTH_SECRETS_NAME = "nextservice/auth-secrets"
 #                 https://www.nextservice.gr in the same change. The apex stays
 #                 on Pointer for now: its WordPress 301s every path to www, and
 #                 mail clients may be set up with the bare domain as server.
+#   secrets_generation — raise it to replace the stage's JWT_SECRET,
+#                 ADMIN_JWT_SECRET and REALTIME_JWT_SECRET with new random values
+#                 on the next deploy (stacks/secret_rotation.py). The next
+#                 Amplify build picks them up and signs everyone out; until it
+#                 runs, real-time is down (the authorizer already has the new
+#                 key). 1 = after the React2Shell exploitation of 2026-11-25.
 STAGES = {
     "staging": {
         "region": "eu-central-1",
@@ -105,6 +111,7 @@ STAGES = {
         "amplify_role_name": "nextservice-amplify-role",
         "manage_ses_identity": False,
         "domain_prefixes": [],
+        "secrets_generation": 1,
     },
     "production": {
         "region": "eu-south-1",
@@ -113,6 +120,7 @@ STAGES = {
         "amplify_role_name": "nextservice-amplify-role-production",
         "manage_ses_identity": True,
         "domain_prefixes": ["www"],
+        "secrets_generation": 1,
     },
 }
 
@@ -163,6 +171,7 @@ monitoring = MonitoringStack(
 appsync = AppSyncStack(
     app, "NextService-AppSync",
     alert_topic=monitoring.alert_topic,
+    secrets_generation=config["secrets_generation"],
     env=env,
 )
 appsync.add_dependency(monitoring)
@@ -184,6 +193,7 @@ amplify = AmplifyStack(
     appsync_api_key=appsync.api_key.attr_api_key,
     appsync_api_id=appsync.events_api.attr_api_id,
     realtime_secret_name=REALTIME_SECRET_NAME,
+    secrets_generation=config["secrets_generation"],
     domain_prefixes=config["domain_prefixes"],
     admin_email=ADMIN_EMAIL,
     env=env,
