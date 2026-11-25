@@ -24,6 +24,8 @@ const eslintConfig = [
       "playwright.config.ts",
       "tsconfig.tsbuildinfo",
       "local-appsync-server.js",
+      // Written by `next build`; it references the generated route types.
+      "next-env.d.ts",
     ],
   },
   // typescript-eslint flat config bundles parser + plugin + recommended

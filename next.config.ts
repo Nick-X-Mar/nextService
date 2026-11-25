@@ -233,11 +233,7 @@ const nextConfig: NextConfig = {
       './public/images/offers/**',
     ],
   },
-  devIndicators: {
-    appIsrStatus: false,
-    buildActivity: false,
-    buildActivityPosition: 'bottom-right',
-  },
+  devIndicators: false,
   images: {
     // AVIF first (well under WebP for the same photo); browsers without it get WebP.
     formats: ['image/avif', 'image/webp'],
